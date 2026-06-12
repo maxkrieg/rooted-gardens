@@ -1,0 +1,690 @@
+# CLAUDE.md — Rooted Gardens Business App
+
+## Project Overview
+
+This is an internal business management app for **Rooted Gardens**, a small eco-landscaping
+company based in Norwich, VT (~20 employees). The company has two service lines:
+
+- **The Electric Lawn** — weekly electric mowing, route-based, crew-driven
+- **Rooted Gardens** — ecological garden design, installation, and maintenance
+
+The app replaces a large Excel spreadsheet and text/call scheduling with a proper
+web app. Parent company is **Tigertown Farm LLC**.
+
+---
+
+## Who Uses This App
+
+| User | Device | Primary Needs |
+|------|--------|--------------|
+| **Owner — lawn side** | Phone (primary), laptop occasionally | Schedule management, crew dispatch, route oversight |
+| **Owner — garden side** | Phone (primary), laptop rarely | Garden project tracking, client notes |
+| **Crew members** (~18 people) | Personal phones only | Today's stops, log completions, photos |
+| **Accountant** | Laptop (almost always) | Invoice queue, QuickBooks sync |
+
+**Critical:** Everyone except the accountant works primarily from a phone.
+- Crew members use personal phones only — the crew experience must be a PWA
+  (installable from browser, no app store), mobile-first for all `/crew/*` routes.
+- The owners also use the app **mostly on their phones**, only
+  occasionally on a laptop. So `/management/*` routes must be **fully responsive and
+  usable one-handed on a phone first**, then progressively enhanced for the extra
+  screen space on desktop. Do NOT build desktop-only management layouts.
+- The accountant is the one laptop-first user; their billing views
+  (`/management/billing/*`) can assume a wide screen.
+
+---
+
+## Tech Stack
+
+### Frontend
+- **Next.js 16** (App Router, TypeScript) — Turbopack is the default bundler for `dev` and
+  `build`; do NOT add a webpack config (it breaks the Turbopack build). Caching is opt-in /
+  dynamic-by-default, which suits this always-fresh business app.
+- **Tailwind CSS** — utility-first styling
+- **shadcn/ui** — component library (installed via CLI, components live in `components/ui/`)
+- **Serwist** (`@serwist/next`) — PWA manifest and service worker for crew mobile install.
+  Replaces `next-pwa` (unmaintained and webpack-based — incompatible with Turbopack/Next 16)
+- **lucide-react** — icons
+- **react-hook-form** + **zod** — form handling and validation
+- **date-fns** — date manipulation (NOT moment.js, NOT dayjs)
+- **@tanstack/react-query** — server state management and caching
+
+### Backend / Database
+- **Supabase** — PostgreSQL + Auth + Storage + Realtime
+  - Auth: magic link email (no passwords — simpler for small team)
+  - Storage: photo uploads (visit photos, property how-to guides)
+  - Realtime: schedule updates push to crew phones without refresh
+  - Row-Level Security (RLS) enabled on all tables
+- **Next.js Server Actions** — preferred over API routes for mutations
+- **Next.js Route Handlers** (`app/api/`) — only for webhooks and QuickBooks OAuth
+
+### External Integrations
+- **QuickBooks Online API** — invoice sync
+  - Package: `node-quickbooks` + `intuit-oauth`
+  - Auth: OAuth 2.0 (tokens stored in `integrations` table, encrypted)
+  - Scope: one-way push from this app → QBO (never pull)
+  - Endpoints used: `createInvoice`, `createCustomer`, `getCustomer`
+- **Twilio** — outbound SMS for crew schedule-change notifications. This is the only
+  notification channel besides in-app realtime — **no email anywhere in the app**.
+  - Sent from a Supabase Edge Function (`send-sms`), never inline
+  - Requires US **A2P 10DLC** brand + campaign registration — start early, ~1–2 week
+    carrier approval gates all delivery
+  - STOP/HELP handled via inbound webhook → `employees.sms_opt_out`
+
+### Deployment
+- **Vercel** — Next.js hosting
+- **Supabase Cloud** — database and auth
+- Environment: `.env.local` for dev, Vercel env vars for prod
+
+---
+
+## Repository Structure
+
+```
+rooted-gardens/
+├── CLAUDE.md                    ← you are here
+├── PHASES.md                    ← build phases and tasks
+├── app/
+│   ├── layout.tsx               ← root layout (fonts, providers)
+│   ├── (auth)/
+│   │   └── login/page.tsx       ← magic link login
+│   ├── (management)/            ← desktop management UI
+│   │   ├── layout.tsx           ← sidebar nav, desktop shell
+│   │   ├── dashboard/page.tsx
+│   │   ├── schedule/page.tsx    ← the main schedule grid
+│   │   ├── accounts/
+│   │   │   ├── page.tsx         ← account list
+│   │   │   └── [id]/page.tsx    ← account detail
+│   │   ├── billing/page.tsx     ← invoice queue
+│   │   ├── fleet/page.tsx
+│   │   └── team/page.tsx
+│   ├── (crew)/                  ← mobile crew UI (PWA)
+│   │   ├── layout.tsx           ← bottom nav, mobile shell
+│   │   ├── today/page.tsx       ← today's stops
+│   │   └── stop/[visitId]/
+│   │       └── page.tsx         ← individual stop detail + log
+│   └── api/
+│       ├── quickbooks/
+│       │   ├── connect/route.ts ← OAuth initiation
+│       │   └── callback/route.ts← OAuth callback
+│       └── webhooks/
+│           ├── supabase/route.ts
+│           └── twilio/route.ts   ← inbound STOP/HELP (SMS opt-out)
+├── components/
+│   ├── ui/                      ← shadcn components (auto-generated, don't edit)
+│   ├── management/              ← desktop-specific components
+│   │   ├── ScheduleGrid.tsx     ← the week grid (core component)
+│   │   ├── AccountCard.tsx
+│   │   ├── RouteGroup.tsx
+│   │   └── InvoiceQueue.tsx
+│   └── crew/                    ← mobile-specific components
+│       ├── StopCard.tsx
+│       ├── VisitLogger.tsx
+│       └── ServiceTypeSelector.tsx
+├── lib/
+│   ├── supabase/
+│   │   ├── client.ts            ← browser client
+│   │   ├── server.ts            ← server client (Server Actions / RSC)
+│   │   └── middleware.ts
+│   ├── quickbooks/
+│   │   ├── client.ts
+│   │   └── sync.ts              ← push visits to QBO
+│   └── utils/
+│       ├── dates.ts             ← week helpers (getWeekStart, etc.)
+│       └── visits.ts            ← visit status helpers
+├── types/
+│   ├── database.ts              ← generated Supabase types (supabase gen types)
+│   └── app.ts                   ← app-level types built on top of DB types
+├── supabase/
+│   ├── migrations/              ← SQL migration files
+│   └── seed.sql                 ← dev seed data (NOT from real spreadsheet)
+└── public/
+    ├── manifest.json            ← PWA manifest
+    └── icons/                   ← PWA icons (192, 512)
+```
+
+---
+
+## Database Schema
+
+All tables use UUID primary keys. All tables have `created_at` and `updated_at`
+with `updated_at` maintained by a trigger. RLS enabled everywhere.
+
+### Core Domain Tables
+
+```sql
+-- Billing entities (the people/orgs that get invoices)
+accounts (
+  id uuid PK,
+  name text NOT NULL,
+  contact_name text,
+  email text,
+  phone text,
+  billing_type text NOT NULL   -- 'per_visit' | 'contract' | 'as_needed'
+    CHECK (billing_type IN ('per_visit', 'contract', 'as_needed')),
+  price_per_visit numeric(8,2), -- only for per_visit accounts
+  contract_rate numeric(8,2),   -- only for contract accounts
+  contract_period text,         -- 'monthly' | 'seasonal' (for contract accounts)
+  status text DEFAULT 'active'  -- 'active' | 'inactive' | 'prospective'
+    CHECK (status IN ('active', 'inactive', 'prospective')),
+  qbo_customer_id text,         -- QuickBooks customer ID
+  notes text,
+  created_at, updated_at
+)
+
+-- Physical locations (an account may have multiple properties)
+properties (
+  id uuid PK,
+  account_id uuid FK → accounts,
+  address text NOT NULL,
+  lat numeric(10,7),
+  lng numeric(10,7),
+  parking_notes text,
+  access_notes text,          -- gate codes, key location, etc.
+  crew_notes text,            -- standing instructions for all visits
+  created_at, updated_at
+)
+
+-- Named work areas within a property. Simple properties have one zone.
+-- Complex/commercial properties have multiple zones with different frequencies.
+service_zones (
+  id uuid PK,
+  property_id uuid FK → properties,
+  account_id uuid FK → accounts,  -- denormalized for query convenience
+  name text NOT NULL,             -- e.g. "Pool House & Steep Hills", "Front Lawn"
+  frequency text NOT NULL         -- 'weekly' | 'biweekly' | 'monthly' | 'as_needed'
+    CHECK (frequency IN ('weekly', 'biweekly', 'monthly', 'as_needed')),
+  sort_order integer DEFAULT 0,   -- crew visit sequence within property
+  notes text,                     -- zone-specific standing instructions
+  active boolean DEFAULT true,
+  created_at, updated_at
+)
+
+-- Route groupings (geographic clusters of properties)
+route_groups (
+  id uuid PK,
+  name text NOT NULL,   -- e.g. "Sharon VT", "Hawk Pine Rd Corridor"
+  sort_order integer DEFAULT 0,
+  created_at, updated_at
+)
+
+-- Assign properties to route groups
+property_route_groups (
+  property_id uuid FK → properties,
+  route_group_id uuid FK → route_groups,
+  sort_order integer DEFAULT 0,
+  PRIMARY KEY (property_id, route_group_id)
+)
+```
+
+### People & Equipment
+
+```sql
+employees (
+  id uuid PK,
+  user_id uuid FK → auth.users,  -- nullable (not all employees have app access)
+  name text NOT NULL,
+  phone text,
+  sms_opt_out boolean DEFAULT false,  -- honor STOP; suppress schedule-change texts
+  email text,
+  role text NOT NULL    -- 'owner' | 'crew' | 'accountant' | 'lead'
+    CHECK (role IN ('owner', 'crew', 'accountant', 'lead')),
+  side text,            -- 'lawn' | 'garden' | 'both' (which service line)
+  active boolean DEFAULT true,
+  hourly_rate numeric(6,2),
+  created_at, updated_at
+)
+
+vehicles (
+  id uuid PK,
+  name text NOT NULL,     -- e.g. "Blue F-150", "White Ram"
+  type text DEFAULT 'truck',
+  plate text,
+  status text DEFAULT 'available'
+    CHECK (status IN ('available', 'in_use', 'maintenance', 'retired')),
+  notes text,
+  created_at, updated_at
+)
+
+equipment (
+  id uuid PK,
+  name text NOT NULL,    -- e.g. "Mower #3", "Trimmer 2"
+  type text NOT NULL,    -- 'mower' | 'trimmer' | 'blower' | 'edger' | 'other'
+  status text DEFAULT 'available'
+    CHECK (status IN ('available', 'in_use', 'maintenance', 'retired')),
+  last_serviced date,
+  notes text,
+  created_at, updated_at
+)
+```
+
+### Scheduling & Visits
+
+```sql
+-- Visits are the core operational record. One row per (service_zone, week).
+-- A visit starts as 'scheduled' and progresses through status.
+visits (
+  id uuid PK,
+  service_zone_id uuid FK → service_zones,
+  account_id uuid FK → accounts,        -- denormalized
+  property_id uuid FK → properties,     -- denormalized
+  week_start date NOT NULL,             -- always a Monday; the "column" in the old sheet
+  
+  -- Planning (set by owner/lead before the week)
+  crew_instruction text,                -- the "orange cell" — visit-specific note for crew
+  vehicle_id uuid FK → vehicles,
+  -- crew assignment + completion are tracked in the visit_crew join table (below),
+  -- NOT as uuid[] arrays — keeps RLS, Realtime filters, and joins relational
+  
+  -- Completion (set by crew in the field)
+  status text DEFAULT 'scheduled'
+    CHECK (status IN ('scheduled', 'completed', 'skipped', 'invoiced')),
+  actual_date date,                     -- the real day it was done
+  service_types text[],                 -- ['mow', 'double_cut', 'trim', 'edge', 'leaf_mulch', 'other']
+  completion_note text,                 -- freeform note from crew
+  skip_reason text,                     -- if status = 'skipped'
+  
+  -- Billing
+  invoiced_at timestamptz,
+  qbo_invoice_id text,
+  invoice_amount numeric(8,2),          -- snapshot of price at time of invoicing
+  
+  created_at, updated_at
+)
+
+-- Crew↔visit assignments and completions.
+-- Replaces the old visits.assigned_crew[] and visits.completed_by[] arrays so that
+-- RLS predicates, Realtime filters, and joins are all relational. One row per
+-- (visit, employee, relation).
+--   'assigned'  = planned onto this visit by owner/lead before the week
+--   'completed' = actually performed the work, logged by crew in the field
+visit_crew (
+  visit_id uuid FK → visits ON DELETE CASCADE,
+  employee_id uuid FK → employees,
+  relation text NOT NULL                -- 'assigned' | 'completed'
+    CHECK (relation IN ('assigned', 'completed')),
+  created_at timestamptz DEFAULT now(),
+  PRIMARY KEY (visit_id, employee_id, relation)
+)
+-- Index for "my stops" queries and Realtime subscriptions:
+--   CREATE INDEX visit_crew_employee_idx ON visit_crew (employee_id, relation);
+
+-- Job start/stop tracking. One row per crew member's work session on a visit.
+-- Crew tap "Start" on arrival and "Stop" when done; a visit is "in progress" while
+-- it has any session with ended_at IS NULL. This is OPERATIONAL on-site time and is
+-- distinct from BOTH the planning/billing lifecycle (visits.status) and payroll shift
+-- time (time_entries). Stopping does NOT mark the visit completed — completion is still
+-- logged separately (service_types, photos). started_at/ended_at are recorded on the
+-- device at tap time so they stay correct even when logged offline and synced later.
+visit_sessions (
+  id uuid PK,
+  visit_id uuid FK → visits ON DELETE CASCADE,
+  employee_id uuid FK → employees,
+  started_at timestamptz NOT NULL,      -- client-recorded; survives offline queueing
+  ended_at timestamptz,                 -- NULL = still in progress
+  source text DEFAULT 'crew_app'        -- 'crew_app' | 'manual' (owner-entered/edited)
+    CHECK (source IN ('crew_app', 'manual')),
+  note text,
+  created_at, updated_at
+)
+-- Indexes for "what's in progress now" and per-visit / per-employee lookups:
+--   CREATE INDEX visit_sessions_active_idx ON visit_sessions (visit_id) WHERE ended_at IS NULL;
+--   CREATE INDEX visit_sessions_employee_idx ON visit_sessions (employee_id, started_at);
+
+-- Time tracking — payroll shift clock (one shift per employee per day, approved for
+-- payroll). Distinct from visit_sessions above: that is per-job on-site time; this is
+-- the daily clock-in/out. They are not auto-derived from each other.
+time_entries (
+  id uuid PK,
+  employee_id uuid FK → employees,
+  visit_id uuid FK → visits,            -- nullable (some time not tied to a visit)
+  date date NOT NULL,
+  clock_in timestamptz,
+  clock_out timestamptz,
+  break_minutes integer DEFAULT 0,
+  approved boolean DEFAULT false,
+  approved_by uuid FK → employees,
+  notes text,
+  created_at, updated_at
+)
+```
+
+### Media & Integrations
+
+```sql
+-- Photos attached to properties or specific visits
+photos (
+  id uuid PK,
+  property_id uuid FK → properties,    -- always set
+  visit_id uuid FK → visits,            -- nullable (property how-to photos have no visit)
+  storage_path text NOT NULL,           -- Supabase Storage path
+  type text DEFAULT 'visit'             -- 'visit' | 'how_to' | 'customer_request' | 'before' | 'after'
+    CHECK (type IN ('visit', 'how_to', 'customer_request', 'before', 'after')),
+  caption text,
+  uploaded_by uuid FK → employees,
+  created_at
+)
+
+-- QuickBooks OAuth tokens (encrypted at rest)
+integrations (
+  id uuid PK,
+  service text NOT NULL,                -- 'quickbooks'
+  access_token text,
+  refresh_token text,
+  realm_id text,                        -- QBO company ID
+  token_expires_at timestamptz,
+  created_at, updated_at
+)
+```
+
+---
+
+## Auth & Roles
+
+Supabase Auth with **magic link** (email only — no passwords).
+
+| Role | Access |
+|------|--------|
+| `owner` | Full access to all management and crew views |
+| `lead` | Schedule read + crew views + visit logging |
+| `crew` | Crew views only (`/crew/*`) — today's stops, log completion |
+| `accountant` | Billing views only + account read |
+
+Role is stored in `employees.role`. Check via:
+```ts
+// In Server Actions / Route Handlers
+const { data: employee } = await supabase
+  .from('employees')
+  .select('role')
+  .eq('user_id', session.user.id)
+  .single()
+```
+
+RLS policies gate data by role. The `user_id` on `employees` links Supabase Auth
+users to their employee record.
+
+---
+
+## Key Domain Concepts
+
+### Billing Types
+Two fundamentally different account types — never conflate them:
+
+- **`per_visit`** — residential, one price per completed visit. Each visit = one QBO invoice line. Price stored on `accounts.price_per_visit`.
+- **`contract`** — commercial or large multi-zone properties. Flat periodic rate regardless of how many zones were serviced. Multiple service zones with different frequencies. Invoice is periodic (monthly/seasonal), not per-visit. Price stored on `accounts.contract_rate`.
+- **`as_needed`** — quoted per engagement, no set schedule.
+
+### Service Zones
+A `service_zone` is a named work area within a property. It is NOT a billing unit.
+- Simple residential property: one zone named "Property" (or just the address)
+- Complex/commercial property: multiple zones (e.g. "Pool House", "Tennis Court", "Entry Hill")
+- Zones have their own `frequency` — within a multi-zone account, some zones are weekly while others are monthly
+- On the crew mobile view for multi-zone stops, show the full zone list with frequency badges so crew knows what's due this week
+
+### Visits
+A `visit` is a (service_zone × week) record. The `week_start` is always a Monday.
+- Created by the owner when scheduling ("this zone needs to happen week of June 8")
+- May have a `crew_instruction` — a one-time note for this specific visit (distinct from property standing notes)
+- Crew completes it in the field: sets `actual_date`, `service_types[]`, `completion_note`
+- Accountant marks as `invoiced` after pushing to QBO
+
+### Job Sessions & In-Progress State
+A `visit_session` records a crew member actively working a visit between a **Start** and
+**Stop** tap (table `visit_sessions`). It answers "who is on site right now and for how long."
+- **Start** inserts a session (`started_at = now`, `ended_at = null`); **Stop** sets `ended_at`.
+- A visit is **in progress** when it has ≥1 session with `ended_at IS NULL`. This is a
+  *derived* state, NOT a value of `visits.status` — a visit stays `scheduled`/`completed`
+  for planning/billing while independently being "in progress" operationally. Do not add
+  `in_progress` to the `visits.status` enum.
+- Multiple crew can have concurrent sessions on the same visit (whole crew on one lawn).
+- **Stop ≠ done with the work.** Stopping only closes the on-site clock. Crew still log
+  completion (`actual_date`, `service_types[]`, photos) via the separate completion flow.
+  The Stop action may *offer* to open the completion logger, but never sets status itself.
+- Owners see in-progress live and are notified on every start/stop.
+- Sessions are **operational**, not payroll. They do not write `time_entries`; payroll
+  stays on the daily clock-in/out. (A future reconciliation could cross-check the two.)
+- Because start/stop happen in the field, they go through the crew **offline queue** like
+  completions — so live in-progress state and owner notifications are only as fresh as the
+  crew member's connectivity. A session opened and closed while fully offline arrives as an
+  already-ended session on sync; notifications must coalesce / idempotently handle that.
+
+### Service Types (multi-select on completion)
+```
+'mow' | 'double_cut' | 'trim' | 'edge' | 'leaf_mulch' | 'cleanup' | 'other'
+```
+A single visit can have multiple service types (e.g. `['mow', 'trim']`).
+
+### The Week Model
+The app thinks in weeks (Mon–Sun), matching the owner's spreadsheet. Use `date-fns`:
+```ts
+import { startOfWeek, addWeeks } from 'date-fns'
+const weekStart = startOfWeek(date, { weekStartsOn: 1 }) // Monday
+```
+
+---
+
+## UI Conventions
+
+### Design System — "Field & Foliage"
+
+Warm, natural, lightly editorial — the feel of a botanical field notebook (kraft paper, soil,
+sage, terracotta), NOT corporate SaaS. Backgrounds are warm "paper," never stark white.
+Materialized in `app/globals.css` (CSS variables) + Tailwind theme + `next/font` during task 1.1;
+shadcn/ui consumes the variables. This block is the single source of truth for look-and-feel.
+
+**Typography** (`next/font/google`):
+- Display / headings / notable numbers → **Fraunces** (soft "old-style" serif, optical sizing;
+  warm, organic). Weights 400–600.
+- Body / UI / labels → **Hanken Grotesk** (humanist sans, highly legible in the field; friendly,
+  not overused). Weights 400/500/600/700. This is the default `font-sans`.
+- Numeric data (schedule, billing, timesheets) → Hanken Grotesk with `tabular-nums`.
+- Never use Inter / Roboto / Arial / system fonts.
+
+**Color tokens** (light = the default; hex, mapped to shadcn variables):
+```
+--background          #F6F3EA   warm paper (app bg)
+--foreground          #2B2A24   bark ink (primary text)
+--card / --popover    #FCFAF4   surface
+--primary             #4A7C59   brand sage/forest green
+--primary-foreground  #F4F1E8
+--secondary           #ECE8DF   warm stone
+--secondary-foreground#4A3B2E   bark brown
+--muted               #EDE9DF
+--muted-foreground    #6E665A   warm taupe
+--accent              #E3EDE4   soft sage tint (hover/active surfaces)
+--accent-foreground   #3A6347
+--destructive         #B0492F   earthy brick red
+--border / --input    #E4DDCF   warm sand
+--ring                #4A7C59   brand-green focus
+--radius              0.75rem
+```
+Brand accents (beyond shadcn defaults): `--clay #C2683E` (terracotta — garden side + the live
+"on-site" indicator), `--ochre #D9A441` (wheat/amber), `--bark #4A3B2E`, `--sap #6FA84B` (fresh green).
+Dark theme ("soil at dusk", for dawn/dusk field use): `--background #1C1A15`, `--foreground #ECE7DA`,
+`--card #24211B`, `--primary #6B9A78`, `--primary-foreground #15140F`, `--muted-foreground #A89E8C`,
+`--border #353026`, `--ring #6B9A78` — same semantic mapping, lightened.
+
+**Status colors** (visit-status badges — bg / text):
+- scheduled → `#ECE8DF` / `#6E665A` (warm stone gray)
+- completed → `#E3F1E7` / `#2F6E45` (leaf green)
+- skipped → `#FBF0D6` / `#9A6B16` (ochre/amber)
+- invoiced → `#E4ECF2` / `#3F6E97` (denim — the one cool hue, marks the "billed" track)
+- **on-site / in-progress (live)** → `--clay` terracotta with a pulsing dot + elapsed ("On site •
+  0:42"); deliberately warm so it pops against the green UI and is never confused with
+  completed-green or skipped-amber. Derived from open `visit_sessions`, never a `visits.status` value.
+
+**Shape, spacing, depth:**
+- Radius: base 0.75rem; cards `rounded-2xl` (organic), badges/pills full, buttons/inputs `rounded-lg`.
+- Spacing: Tailwind 4px scale; crew tap targets ≥44px (`h-11`/`h-12`), comfortable `gap-3/4`, cards `p-4/5`.
+- Shadow: soft, warm, low — `0 1px 2px rgba(43,42,36,.04), 0 6px 16px -4px rgba(43,42,36,.08)`. Never harsh/black.
+- Texture (optional, subtle): faint paper grain on the app bg + organic line motifs in empty
+  states/headers. Must never reduce legibility or hurt performance.
+
+**Component intent:**
+- Buttons: primary = filled brand green, Hanken 600; crew primary actions large & full-width
+  (`h-12`). Secondary = outline on paper; destructive = brick; ghost = tertiary.
+- Cards: warm surface, 1px sand border, soft shadow, `rounded-2xl`, generous padding. Crew stop
+  cards are large and tappable with the address prominent (Fraunces).
+- Badges: pill, tinted bg + darker text per status token, uppercase micro-label with
+  letter-spacing, optional leading dot.
+- Inputs: paper surface, sand border, 2px green focus ring; ≥16px font on crew (prevents zoom), `h-11`+.
+- Nav: crew = bottom bar (paper, top hairline; active tab = green icon+label, ≥44px). Management =
+  warm sidebar with right hairline (active = green left-border/pill) on desktop; hamburger/bottom on phone.
+
+**Hero treatments (anchor screens):**
+- Crew "Today's stops": warm paper bg (faint grain); header "Today · Tue Jun 11" (Fraunces) + route
+  name; vertically stacked large stop cards (address in Fraunces, account muted, frequency badge,
+  status chip); terracotta "On site" pulse when a session is open; orange crew-instruction ribbon
+  across the card top when present; big bottom nav; botanical empty state.
+- Management dashboard: paper bg; "Today at a glance" with large Fraunces stat numerals in tinted
+  stat cards; a "Crews on site now" panel with terracotta live pulses + elapsed; "This week"
+  summary; amber maintenance chips. Editorial and warm, comfortable density; stacks on a phone.
+
+### Mobile (Crew) — `/crew/*`
+- Full-height viewport, touch-optimized
+- Bottom navigation bar (Today | History | Profile)
+- Large tap targets (min 44px)
+- Minimal text, icon-forward
+- No tables, no dense layouts
+- Offline-tolerant: use Supabase Realtime + local state, show stale data gracefully
+- Colors & type: per the **Design System** above (warm paper bg, sage-green primary, Fraunces +
+  Hanken Grotesk). Favor high contrast and large type for sunlight legibility in the field.
+
+### Management — `/management/*` (phone-primary, responsive)
+- Owners use these routes **mostly on a phone**, occasionally on a laptop — design
+  mobile-first, then enhance for desktop. Do NOT build desktop-only layouts.
+- Navigation: bottom bar / hamburger on phone; collapsible left sidebar on desktop.
+- Data-dense tables, grids, and multi-column layouts are fine on desktop but must
+  degrade to card / stacked layouts on phone — no horizontal-scrolling tables for owners.
+- The schedule grid is the core view and the hardest to fit on a phone. Provide a
+  **mobile-adapted view** (e.g. single week, vertically stacked by route group) that
+  collapses the 4-week desktop grid. Spreadsheet-like density is a desktop affordance.
+- Billing (`/management/billing/*`) is the exception — the accountant is laptop-first,
+  so it can assume a wide screen and stay table/grid-dense.
+- Colors & type: per the **Design System** above; lean on the warm neutrals for dense data and
+  use `tabular-nums` for numeric columns (schedule, billing, timesheets).
+
+### Shared Components
+- Use shadcn/ui primitives as the base (Button, Card, Dialog, etc.)
+- `service_types` multi-select: always rendered as a checkbox group, never a dropdown
+- Visit status badges: use the **Design System** status colors (scheduled / completed / skipped /
+  invoiced) — pill shape, tinted bg + darker text
+- **In-progress** = the `--clay` terracotta on-site indicator from the Design System (pulsing dot +
+  elapsed), overlaid on the status badge — derived from open `visit_sessions`, never a `visits.status` value
+- All dates displayed as human-readable ("Mon Jun 8" not "2026-06-08")
+
+---
+
+## Data Architecture: Online Management vs. Offline-Tolerant Crew
+
+The two halves of this app have **different data-fetching models** because they run in
+different environments. Do not apply one pattern uniformly — pick the model by route group.
+
+### `/management/*` — phone-primary, online → Server-first
+Owners use these routes mostly on a phone (occasionally a laptop); the accountant's
+billing views are laptop. Unlike `/crew/*`, these flows **assume a working connection**
+— they are not built to be offline-tolerant.
+- **Reads:** React Server Components fetch directly with the Supabase **server** client.
+- **Writes:** **Server Actions** (form submits, status changes, scheduling, QBO push).
+- React Query is optional here — only for client-side interactivity that needs caching
+  (e.g. the schedule grid's optimistic cell updates). Default to RSC + Server Actions.
+- **Field-use caveat:** because owners are phone-primary, an owner may schedule from the
+  field on weak signal. Server-first is still the default — do NOT build a management
+  offline queue speculatively. If field connectivity becomes a real pain point, extend
+  the crew offline-queue pattern (below) to the specific management mutations that hurt.
+
+### `/crew/*` — mobile PWA, rural VT, intermittent connectivity → Client-first + offline queue
+Crew work in areas with no guaranteed signal. Server Components and Server Actions are
+network round-trips and **do not work offline**, so the crew side cannot depend on them
+for its core loop (view stops → log completion → upload photo).
+- **Reads:** **client components** using **React Query** over the Supabase **browser**
+  client. React Query's cache (persisted to IndexedDB via
+  `@tanstack/query-persist-client`) is what crew see when offline — show it as stale,
+  don't block on the network.
+- **Writes:** go through an **offline mutation queue** (IndexedDB), NOT Server Actions.
+  A completion, photo, or **job start/stop** logged offline is enqueued locally with a
+  device-captured timestamp, the UI updates optimistically, and the queue flushes to
+  Supabase when connectivity returns. The queue itself is built in Phase 4 / task 4.1.
+- **Realtime:** subscribe with the browser client (see below). Treat realtime as a
+  best-effort enhancement on top of the cache, never the source of truth.
+
+### Realtime subscriptions
+**Crew** (`/crew/*`) — because crew↔visit links now live in `visit_crew` (not a `uuid[]`),
+subscriptions are relational and filterable:
+- **New / changed assignments:** subscribe to `visit_crew` filtered by
+  `employee_id=eq.<my_employee_id>` and `relation=eq.assigned`.
+- **Content changes** (crew instruction edits, new stops in the week): subscribe to
+  `visits`. Realtime cannot filter `visits` by the crew set, so subscribe to the current
+  week and filter client-side against the `visit_id`s the crew member is assigned to.
+  At this company's scale (≤ a few hundred visits/week) this is cheap.
+
+**Management** (`/management/*`) — owners need live in-progress state, so the schedule and
+dashboard subscribe to `visit_sessions` (INSERT = a start, UPDATE setting `ended_at` = a
+stop). This is the one place management leans on realtime; treat it as a best-effort live
+overlay on top of the server-rendered schedule, never the source of truth. Owner start/stop
+alerts are **in-app only** — a toast on this same subscription, with no email / SMS / push
+(Phase 8.3). If an owner doesn't have the app open, they simply catch up on next open.
+
+> Why this matters: the old `assigned_crew uuid[]` design could not be filtered by
+> Supabase Realtime (its `postgres_changes` filters don't support array containment),
+> and arrays can't be FK-joined or cleanly used in RLS. `visit_crew` fixes all three.
+
+---
+
+## Development Conventions
+
+- **TypeScript strict mode** — no `any` types
+- **Mutations follow the route group** (see Data Architecture above): `/management/*`
+  uses **Server Actions**; `/crew/*` uses the **offline mutation queue**, never Server
+  Actions, so completions/photos survive loss of signal
+- **React Query** for client-side data fetching and caching (required on `/crew/*`,
+  optional on `/management/*`)
+- **Zod schemas** for all form validation — define schemas in `lib/validators/`
+- **Never** import Supabase browser client in a Server Component
+- **Never** import Supabase server client in a Client Component
+- File naming: `PascalCase` for components, `camelCase` for utilities
+- Prefer Server Components by default on `/management/*`; add `'use client'` only when
+  needed (event handlers, hooks, browser APIs). `/crew/*` is client-first by design
+  (offline support) — see Data Architecture above
+- All Supabase queries go through typed client — run `supabase gen types typescript`
+  after schema changes and commit `types/database.ts`
+- Keep schedule-related logic in `lib/utils/schedule.ts`
+- Keep QBO sync logic in `lib/quickbooks/sync.ts` — never inline it
+
+---
+
+## Environment Variables
+
+```bash
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=      # server-only, never expose to client
+
+# QuickBooks
+QBO_CLIENT_ID=
+QBO_CLIENT_SECRET=
+QBO_REDIRECT_URI=
+QBO_ENVIRONMENT=sandbox         # 'sandbox' | 'production'
+
+# Twilio (SMS notifications — no email is used anywhere in the app)
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_MESSAGING_SERVICE_SID=   # use a Messaging Service, not a raw number
+
+# App
+NEXT_PUBLIC_APP_URL=            # https://yourapp.vercel.app
+```
+
+---
+
+## Things to Avoid
+
+- Do NOT build a customer-facing portal (out of scope)
+- Do NOT build a native mobile app — PWA is sufficient
+- Do NOT use Prisma or Drizzle — use Supabase client directly with generated types
+- Do NOT pull data FROM QuickBooks — sync is one-way (app → QBO only)
+- Do NOT store Supabase service role key anywhere client-accessible
+- Do NOT use `any` types — generate proper types from Supabase schema
+- Do NOT build pricing tiers or pricing calculation logic — prices are stored flat per account
+- Do NOT rebuild invoicing UI — QBO handles invoice presentation; we only push data to it

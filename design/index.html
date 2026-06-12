@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rooted Gardens — “Field &amp; Foliage” mockups</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..600&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{--bg:#F6F3EA;--ink:#2B2A24;--muted:#6E665A;--primary:#4A7C59;--card:#FCFAF4;--border:#E4DDCF;--clay:#C2683E}
+  *{box-sizing:border-box;margin:0}
+  body{font-family:"Hanken Grotesk",sans-serif;background:var(--bg);color:var(--ink);padding:48px 24px;display:flex;justify-content:center}
+  .wrap{max-width:720px}
+  .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  h1{font-family:"Fraunces",serif;font-weight:560;font-size:40px;letter-spacing:-.01em;margin:6px 0 6px}
+  p{color:var(--muted);line-height:1.55;margin-bottom:28px}
+  .swatches{display:flex;gap:8px;margin:0 0 30px;flex-wrap:wrap}
+  .sw{width:48px;height:48px;border-radius:12px;border:1px solid var(--border);display:grid;place-items:end;font-size:9px;color:#fff;padding:3px;font-weight:600}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  a.card{display:block;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:22px;text-decoration:none;color:var(--ink);box-shadow:0 1px 2px rgba(43,42,36,.04),0 6px 16px -4px rgba(43,42,36,.08);transition:transform .15s}
+  a.card:hover{transform:translateY(-2px)}
+  a.card b{font-family:"Fraunces",serif;font-weight:540;font-size:20px;display:block;margin-bottom:5px}
+  a.card span{color:var(--muted);font-size:13.5px}
+  .note{margin-top:26px;font-size:13px;color:var(--muted);border-left:3px solid var(--clay);padding-left:12px}
+  @media(max-width:560px){.cards{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="eyebrow">Rooted Gardens · design system</div>
+    <h1>“Field &amp; Foliage”</h1>
+    <p>Warm, natural, lightly editorial — kraft paper, soil, sage, terracotta. Fraunces (display) + Hanken Grotesk (body). Open the two hero screens below.</p>
+    <div class="swatches">
+      <div class="sw" style="background:#4A7C59">sage</div>
+      <div class="sw" style="background:#C2683E">clay</div>
+      <div class="sw" style="background:#D9A441">ochre</div>
+      <div class="sw" style="background:#6FA84B">sap</div>
+      <div class="sw" style="background:#4A3B2E">bark</div>
+      <div class="sw" style="background:#F6F3EA;color:#6E665A">paper</div>
+    </div>
+    <div class="cards">
+      <a class="card" href="crew-today.html"><b>Crew · Today’s Stops</b><span>Mobile PWA — field view, on-site pulse, crew-instruction ribbon, bottom nav.</span></a>
+      <a class="card" href="management-dashboard.html"><b>Management · Dashboard</b><span>Owner view — at-a-glance stats, crews on site now, week summary, alerts.</span></a>
+    </div>
+    <p class="note">These are non-binding visual references for eyeballing the direction. The authoritative spec is <b>CLAUDE.md → UI Conventions → Design System</b>, which the build loop reads.</p>
+  </div>
+</body>
+</html>

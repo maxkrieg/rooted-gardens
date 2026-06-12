@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Rooted Crew — Today's Stops (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --background:#F6F3EA; --foreground:#2B2A24;
+    --card:#FCFAF4; --border:#E4DDCF; --muted-foreground:#6E665A;
+    --primary:#4A7C59; --primary-700:#3A6347; --primary-foreground:#F4F1E8;
+    --clay:#C2683E; --clay-tint:#F6E6D9; --clay-ink:#9C4F2C;
+    --ochre:#D9A441; --bark:#4A3B2E; --sap:#6FA84B;
+    --radius:0.75rem;
+    --font-display:"Fraunces",Georgia,serif;
+    --font-sans:"Hanken Grotesk",system-ui,sans-serif;
+    --shadow-card:0 1px 2px rgba(43,42,36,.04), 0 6px 16px -4px rgba(43,42,36,.08);
+    /* status */
+    --st-sched-bg:#ECE8DF; --st-sched-fg:#6E665A;
+    --st-done-bg:#E3F1E7;  --st-done-fg:#2F6E45;
+    --st-skip-bg:#FBF0D6;  --st-skip-fg:#9A6B16;
+    --st-inv-bg:#E4ECF2;   --st-inv-fg:#3F6E97;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    font-family:var(--font-sans); color:var(--foreground);
+    background:var(--background);
+    display:flex; justify-content:center; min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* subtle paper grain */
+  body::before{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.045;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .phone{
+    position:relative; z-index:1; width:100%; max-width:430px; min-height:100vh;
+    padding:0 0 96px; background:linear-gradient(180deg,#F8F5EE,#F4F0E6);
+    border-left:1px solid var(--border); border-right:1px solid var(--border);
+  }
+  /* header */
+  header{padding:28px 20px 14px}
+  .eyebrow{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted-foreground); font-weight:600}
+  h1{font-family:var(--font-display); font-weight:560; font-size:38px; line-height:1.02; letter-spacing:-.01em; margin:4px 0 2px; font-optical-sizing:auto}
+  .route{display:flex; align-items:center; gap:7px; color:var(--bark); font-weight:500; font-size:15px; margin-top:6px}
+  .route svg{width:16px;height:16px;color:var(--primary)}
+  .summary{display:flex; gap:8px; padding:6px 20px 18px; flex-wrap:wrap}
+  .tag{display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600; padding:6px 11px; border-radius:999px; background:var(--card); border:1px solid var(--border); color:var(--bark)}
+  .tag .dot{width:7px;height:7px;border-radius:50%}
+  .tag.clock{background:#EAF1EC; border-color:#CFE2D4; color:var(--primary-700)}
+  /* stop cards */
+  .list{display:flex; flex-direction:column; gap:14px; padding:2px 16px}
+  .card{
+    position:relative; background:var(--card); border:1px solid var(--border);
+    border-radius:18px; box-shadow:var(--shadow-card); overflow:hidden;
+    animation:rise .5s cubic-bezier(.2,.7,.2,1) both;
+  }
+  .card:nth-child(1){animation-delay:.04s}
+  .card:nth-child(2){animation-delay:.10s}
+  .card:nth-child(3){animation-delay:.16s}
+  .card:nth-child(4){animation-delay:.22s}
+  .card:nth-child(5){animation-delay:.28s}
+  @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .card.onsite{border-color:#E7C3AC}
+  .card.onsite::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--clay)}
+  .card.done{opacity:.82}
+  .ribbon{display:flex; gap:9px; align-items:flex-start; background:var(--clay-tint); color:var(--clay-ink); padding:10px 16px; font-size:13.5px; font-weight:600; border-bottom:1px solid #EAD3C2}
+  .ribbon svg{width:16px;height:16px;flex:none;margin-top:1px}
+  .body{padding:16px 18px 17px}
+  .toprow{display:flex; justify-content:space-between; align-items:flex-start; gap:12px}
+  .addr{font-family:var(--font-display); font-weight:540; font-size:21px; line-height:1.15; letter-spacing:-.01em}
+  .acct{color:var(--muted-foreground); font-size:14px; margin-top:3px}
+  .done .addr{text-decoration:none}
+  .skip .addr{text-decoration:line-through; text-decoration-color:#C9BFA8; color:var(--muted-foreground)}
+  .chip{display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; padding:5px 10px; border-radius:999px; white-space:nowrap}
+  .chip svg{width:13px;height:13px}
+  .chip--sched{background:var(--st-sched-bg); color:var(--st-sched-fg)}
+  .chip--done{background:var(--st-done-bg); color:var(--st-done-fg)}
+  .chip--skip{background:var(--st-skip-bg); color:var(--st-skip-fg)}
+  .chip--onsite{background:var(--clay-tint); color:var(--clay-ink)}
+  .chip--onsite .pulse{width:8px;height:8px;border-radius:50%;background:var(--clay);box-shadow:0 0 0 0 rgba(194,104,62,.5);animation:pulse 1.8s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(194,104,62,.5)}70%{box-shadow:0 0 0 7px rgba(194,104,62,0)}100%{box-shadow:0 0 0 0 rgba(194,104,62,0)}}
+  .meta{display:flex; align-items:center; gap:8px; margin-top:13px; flex-wrap:wrap}
+  .freq{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--primary-700);background:#E7EFE9;padding:4px 9px;border-radius:999px}
+  .freq.contract{color:#7A5A2A;background:#F2E8D4}
+  .services{display:flex;align-items:center;gap:6px;color:var(--muted-foreground);font-size:13.5px;font-weight:500}
+  .services svg{width:15px;height:15px;color:var(--sap)}
+  .zones{margin-top:13px;border-top:1px dashed var(--border);padding-top:11px;display:flex;flex-direction:column;gap:8px}
+  .zone{display:flex;justify-content:space-between;align-items:center;font-size:14px}
+  .zone span:first-child{font-weight:500}
+  .miniaddr{display:flex;align-items:center;gap:7px;margin-top:11px}
+  .maps{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--primary-700);text-decoration:none;background:#EAF1EC;border:1px solid #CFE2D4;padding:7px 11px;border-radius:10px}
+  .maps svg{width:15px;height:15px}
+  /* bottom nav */
+  nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;
+      background:rgba(252,250,244,.92);backdrop-filter:blur(8px);border-top:1px solid var(--border);
+      display:flex;justify-content:space-around;padding:9px 8px calc(9px + env(safe-area-inset-bottom));z-index:5}
+  .navbtn{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:64px;min-height:48px;justify-content:center;
+          color:var(--muted-foreground);font-size:11px;font-weight:600;text-decoration:none;border-radius:12px}
+  .navbtn svg{width:23px;height:23px}
+  .navbtn.active{color:var(--primary)}
+  .navbtn.active::after{content:"";width:5px;height:5px;border-radius:50%;background:var(--primary);margin-top:-1px}
+  .hint{position:fixed;top:10px;left:10px;z-index:9;font-size:11px;color:var(--muted-foreground);background:var(--card);border:1px solid var(--border);padding:4px 9px;border-radius:8px}
+</style>
+</head>
+<body>
+  <div class="hint">mockup · crew “Today”</div>
+  <div class="phone">
+    <header>
+      <div class="eyebrow">Today · Tue Jun 11</div>
+      <h1>Today’s Stops</h1>
+      <div class="route">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        Sharon VT · Hawk Pine Corridor
+      </div>
+    </header>
+    <div class="summary">
+      <span class="tag clock"><span class="dot" style="background:var(--sap)"></span>Clocked in · 3h 12m</span>
+      <span class="tag">5 stops · 1 done</span>
+    </div>
+
+    <div class="list">
+      <!-- IN PROGRESS + crew instruction -->
+      <article class="card onsite">
+        <div class="ribbon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+          Gate code 1847 · friendly dog in side yard, leave gate latched
+        </div>
+        <div class="body">
+          <div class="toprow">
+            <div>
+              <div class="addr">412 Howe Hill Rd</div>
+              <div class="acct">Marshfield Residence</div>
+            </div>
+            <span class="chip chip--onsite"><span class="pulse"></span>On site · 0:42</span>
+          </div>
+          <div class="meta">
+            <span class="freq">Weekly</span>
+            <span class="services"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.12 15.88M14.47 14.48 20 20M8.12 8.12 12 12"/></svg>Mow · Trim</span>
+            <a class="maps" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>Maps</a>
+          </div>
+        </div>
+      </article>
+
+      <!-- SCHEDULED -->
+      <article class="card">
+        <div class="body">
+          <div class="toprow">
+            <div>
+              <div class="addr">7 Quarry Lane</div>
+              <div class="acct">Beckett Property</div>
+            </div>
+            <span class="chip chip--sched">Scheduled</span>
+          </div>
+          <div class="meta">
+            <span class="freq">Weekly</span>
+            <a class="maps" href="#" style="margin-left:auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>Maps</a>
+          </div>
+        </div>
+      </article>
+
+      <!-- MULTI-ZONE / CONTRACT scheduled -->
+      <article class="card">
+        <div class="body">
+          <div class="toprow">
+            <div>
+              <div class="addr">Cedarbrook Estate</div>
+              <div class="acct">Cedarbrook HOA · contract</div>
+            </div>
+            <span class="chip chip--sched">Scheduled</span>
+          </div>
+          <div class="meta"><span class="freq contract">Contract · 3 zones</span></div>
+          <div class="zones">
+            <div class="zone"><span>Pool House &amp; Steep Hills</span><span class="freq">Weekly</span></div>
+            <div class="zone"><span>Front Entry Lawn</span><span class="freq">Weekly</span></div>
+            <div class="zone"><span>Tennis Court Verge</span><span class="freq" style="color:#7A5A2A;background:#F2E8D4">Monthly</span></div>
+          </div>
+        </div>
+      </article>
+
+      <!-- COMPLETED -->
+      <article class="card done">
+        <div class="body">
+          <div class="toprow">
+            <div>
+              <div class="addr">29 Mill Brook Rd</div>
+              <div class="acct">Alden Residence</div>
+            </div>
+            <span class="chip chip--done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Done</span>
+          </div>
+          <div class="meta">
+            <span class="freq">Weekly</span>
+            <span class="services"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Mowed · Trimmed · Edged · 9:24am</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- SKIPPED -->
+      <article class="card skip done">
+        <div class="body">
+          <div class="toprow">
+            <div>
+              <div class="addr">88 Pinnacle Ridge</div>
+              <div class="acct">Voss Residence</div>
+            </div>
+            <span class="chip chip--skip">Skipped</span>
+          </div>
+          <div class="meta"><span class="services" style="color:var(--muted-foreground)">Yard too wet — rescheduled</span></div>
+        </div>
+      </article>
+    </div>
+  </div>
+
+  <nav>
+    <a class="navbtn active" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>Today</a>
+    <a class="navbtn" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9 9 0 0 0-7.5 4"/><path d="M3 4v4h4"/><path d="M12 8v4l3 2"/></svg>History</a>
+    <a class="navbtn" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Profile</a>
+  </nav>
+</body>
+</html>
