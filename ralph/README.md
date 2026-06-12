@@ -91,3 +91,20 @@ When the run ends, the loop prints the remaining `- [~]` tasks — your human to
 Phase 0 (Twilio 10DLC registration, Intuit developer app, cloud account provisioning), live
 QuickBooks pushes, live SMS sends, and Vercel deploys. The code for credential-gated features is
 written and typechecked locally, marked `<!-- live-untested: needs <cred> -->`.
+
+## Finishing up — promote the build branch to `main`
+
+The loop works on `ralph/build` (and commits there locally). The GitHub repo's default branch is
+`ralph/build` too. When the build is **done**, rename it to `main` in one pass — this keeps all
+history on a single line and brings over any progress you pushed along the way:
+
+```bash
+git branch -m ralph/build main           # rename the local branch
+git push -u origin main                   # push it and set upstream
+gh repo edit --default-branch main        # make main the GitHub default
+git push origin --delete ralph/build      # remove the old remote branch
+```
+
+Do this only after the loop finishes — switching the branch mid-build is fiddly and unnecessary.
+The loop commits **locally only**; run `git push` whenever you want to snapshot progress to GitHub
+(remote `origin` → `github.com/maxkrieg/rooted-gardens`, private).
