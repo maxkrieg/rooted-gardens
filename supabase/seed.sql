@@ -1,0 +1,2 @@
+-- Dev seed data — full implementation in task 1.9
+-- Run via: supabase db reset

@@ -19,20 +19,20 @@ in-progress view 3.11 consumes the crew start/stop producer 4.10; build it again
 > day one, in parallel with Phase 1. Nothing here blocks *beginning* Phase 1 coding, but
 > several later tasks block on them, so kicking them off late stalls the end of the build.
 
-- [ ] **0.1 — A2P 10DLC SMS registration** (blocks 8.2 → 8.3)
+- [~] **0.1 — A2P 10DLC SMS registration** (blocks 8.2 → 8.3) <!-- blocked: needs human — Twilio account + TCR brand/campaign registration, carrier approval ~1-2 weeks -->
   *Depends on: — (start here)*
   Create the Twilio account and start brand + campaign registration with The Campaign
   Registry (brand = Tigertown Farm LLC, EIN / business details; campaign = operational
   schedule notifications). Carrier approval takes ~1–2 weeks and gates ALL SMS delivery, so
   begin immediately. A verified toll-free number is the fallback path.
 
-- [ ] **0.2 — Intuit developer app for QuickBooks** (blocks 5.2–5.4)
+- [~] **0.2 — Intuit developer app for QuickBooks** (blocks 5.2–5.4) <!-- blocked: needs human — Intuit Developer account + QBO_CLIENT_ID/SECRET, production review required -->
   *Depends on: — (start here)*
   Create an Intuit Developer account and app to obtain `QBO_CLIENT_ID` / `QBO_CLIENT_SECRET`
   and configure the OAuth redirect URI. Production keys require Intuit app review — develop
   against sandbox now, request production review before Phase 5 ships.
 
-- [ ] **0.3 — Provision cloud accounts** (blocks Phase 1)
+- [~] **0.3 — Provision cloud accounts** (blocks Phase 1) <!-- blocked: needs human — Supabase project URL/keys, Vercel project, Twilio Messaging Service -->
   *Depends on: — (start here)*
   Create the Supabase project (URL + anon + service-role keys), the Vercel project, and the
   Twilio Messaging Service. Populate `.env.local`. This is the one Phase 0 item that actually
@@ -45,7 +45,7 @@ in-progress view 3.11 consumes the crew start/stop producer 4.10; build it again
 > Goal: Working Next.js + Supabase project with auth, typed schema, PWA config, seed data,
 > and the two layout shells (management desktop, crew mobile).
 
-- [ ] **1.1 — Init Next.js project**
+- [x] **1.1 — Init Next.js project**
   *Depends on: — (start here)*
   Scaffold a new Next.js 16 project with TypeScript, Tailwind CSS, and App Router
   (Turbopack is the default bundler — do not add a webpack config).

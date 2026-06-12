@@ -8,3 +8,6 @@ ralph/logs/
 .DS_Store
 supabase/.branches/
 supabase/.temp/
+*.tsbuildinfo
+next-env.d.ts
+.vercel

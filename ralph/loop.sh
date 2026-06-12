@@ -51,11 +51,35 @@ command -v claude >/dev/null 2>&1 || die "claude CLI not found on PATH."
 [ -f "$PROMPT" ]      || die "Prompt file not found: $PROMPT"
 [ -f "$PHASES_FILE" ] || die "PHASES.md not found in $ROOT"
 
-# hard per-iteration timeout: prefer GNU timeout / gtimeout; degrade gracefully if absent
+# hard per-iteration timeout: prefer GNU timeout / gtimeout; degrade gracefully if absent.
+# -k 30 sends SIGKILL 30s after SIGTERM so a stuck child (e.g. npm) can't linger.
 TIMEOUT_CMD=()
-if command -v timeout  >/dev/null 2>&1; then TIMEOUT_CMD=(timeout  "$ITER_TIMEOUT")
-elif command -v gtimeout >/dev/null 2>&1; then TIMEOUT_CMD=(gtimeout "$ITER_TIMEOUT")
+if command -v timeout  >/dev/null 2>&1; then TIMEOUT_CMD=(timeout  -k 30 "$ITER_TIMEOUT")
+elif command -v gtimeout >/dev/null 2>&1; then TIMEOUT_CMD=(gtimeout -k 30 "$ITER_TIMEOUT")
 else warn "No 'timeout'/'gtimeout' found — running without a per-iteration timeout (brew install coreutils)."; fi
+
+# Clean teardown on Ctrl-C: kill the whole process group so no orphaned claude/npm lingers
+# (this is why the first run needed a full terminal close — an interactive child held the TTY).
+trap 'echo; warn "interrupted — terminating agent + children."; kill 0 2>/dev/null; exit 130' INT TERM
+
+# Live, fault-tolerant pretty-printer for Claude Code stream-json (so a long task is visibly
+# working, not a blank screen). `-R + fromjson?` never errors out on a stray line.
+fmt_stream() {
+  if command -v jq >/dev/null 2>&1; then
+    jq -Rr --unbuffered '
+      (fromjson? // {}) as $e
+      | if $e.type=="assistant" then
+          ($e.message.content[]?
+           | if .type=="text" then (.text // empty)
+             elif .type=="tool_use" then "  → "+(.name//"tool")+"  "+(((.input.command//.input.file_path//.input.url//.input.description)//"")|tostring|gsub("\n";" ")|.[0:110])
+             else empty end)
+        elif $e.type=="result" then "  ■ "+((.subtype//"done"))+(if (.is_error//false) then " (ERROR)" else "" end)
+        elif ($e.type=="system" and (.subtype//"")=="init") then "  ● agent session started"
+        else empty end' 2>/dev/null
+  else
+    cat
+  fi
+}
 
 # --- bootstrap git + branch + ignore + baseline commit ----------------------------------
 bootstrap() {
@@ -107,13 +131,10 @@ if [ "$DRY_RUN" = "1" ]; then
   log "root=$ROOT  branch=$BRANCH  model=$MODEL  max_iters=$MAX_ITERS"
   log "remaining todo=$(count_todo)  done=$(count_done)  blocked=$(count_blocked)"
   printf '\n[ralph] would run each iteration:\n  '
-  printf '%q ' "${TIMEOUT_CMD[@]}" claude -p "\$(cat $PROMPT)" --model "$MODEL" --dangerously-skip-permissions
-  printf '\n'
+  printf '%q ' "${TIMEOUT_CMD[@]}" claude -p "\$(cat $PROMPT)" --model "$MODEL" --dangerously-skip-permissions --verbose --output-format stream-json
+  printf '%s\n' '< /dev/null 2>&1 | tee LOG | fmt_stream'
   exit 0
 fi
-
-VERBOSE_FLAG=()
-[ "$VERBOSE" = "1" ] && VERBOSE_FLAG=(--verbose)
 
 stalls=0
 last_status=""
@@ -128,11 +149,15 @@ for ((i = 1; i <= MAX_ITERS; i++)); do
   before_head="$(git rev-parse HEAD)"
   iter_log="$LOG_DIR/iter-$(printf '%03d' "$i").log"
 
+  # stdin is closed (< /dev/null): any scaffolder that would prompt (create-next-app, shadcn)
+  # gets EOF and fails fast instead of hanging on the TTY. Raw stream-json → log (forensics),
+  # piped through fmt_stream → live readable progress.
   set +e
   "${TIMEOUT_CMD[@]}" claude -p "$(cat "$PROMPT")" \
       --model "$MODEL" \
       --dangerously-skip-permissions \
-      "${VERBOSE_FLAG[@]}" 2>&1 | tee "$iter_log"
+      --verbose --output-format stream-json \
+      < /dev/null 2>&1 | tee "$iter_log" | fmt_stream
   rc=${PIPESTATUS[0]}
   set -e
   [ "$rc" -eq 0 ] || warn "Agent exited non-zero (rc=$rc) on iteration $i — see $iter_log."
@@ -145,10 +170,10 @@ for ((i = 1; i <= MAX_ITERS; i++)); do
   fi
 
   # honor explicit sentinels from the agent
-  if grep -q '^RALPH_COMPLETE$' "$iter_log"; then
+  if grep -q 'RALPH_COMPLETE' "$iter_log"; then
     log "Agent signaled RALPH_COMPLETE."; last_status="complete"; break
   fi
-  if grep -q '^RALPH_BLOCKED_ALL$' "$iter_log"; then
+  if grep -q 'RALPH_BLOCKED_ALL' "$iter_log"; then
     log "Agent signaled RALPH_BLOCKED_ALL — only blocked/human-gated tasks remain."
     last_status="blocked"; break
   fi

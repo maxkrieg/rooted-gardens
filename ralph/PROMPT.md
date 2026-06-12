@@ -55,6 +55,13 @@ WITHOUT blocking the loop:
 - Follow `CLAUDE.md` exactly. Match the prescribed file paths, the Next.js 16 App Router structure
   (Turbopack default — no webpack config), TypeScript strict (no `any`), Tailwind + shadcn/ui,
   React Query, Zod, date-fns, and the "Field & Foliage" Design System.
+- **You have NO stdin — run every command non-interactively.** A command that waits for input
+  will hang the whole run. Always pass flags that pre-answer prompts: `create-next-app` with
+  explicit options + `--yes` (e.g. `npx --yes create-next-app@latest . --ts --tailwind --app
+  --eslint --use-npm --yes`), `shadcn` with `--yes`/`-d` defaults, `npx --yes ...` to skip install
+  prompts. `supabase init`/`db reset` are non-interactive. Never launch a long-running foreground
+  process that doesn't exit (e.g. `npm run dev`, `supabase start` is fine as it daemonizes) — for a
+  dev server, start it backgrounded, probe it, then stop it.
 - **Use the installed skills for the work at hand** (invoke them via the Skill tool — they raise
   quality and won't trigger on their own in this headless run):
   - Any **Supabase** work (migrations, RLS, SSR auth, realtime, storage) → `supabase`; for schema /

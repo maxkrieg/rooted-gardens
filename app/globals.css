@@ -1,0 +1,137 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Field & Foliage design system — Tailwind v4 CSS-first configuration.
+ * @theme inline maps external CSS vars (set in :root / .dark) to Tailwind utilities.
+ * Fonts: Fraunces (display) + Hanken Grotesk (sans), loaded via next/font/google.
+ */
+@theme inline {
+  /* Typography */
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+
+  /* Semantic colors */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Brand accents */
+  --color-clay: var(--clay);
+  --color-ochre: var(--ochre);
+  --color-bark: var(--bark);
+  --color-sap: var(--sap);
+
+  /* Border radius */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+
+  /* Warm shadow */
+  --shadow-warm: 0 1px 2px rgba(43, 42, 36, 0.04), 0 6px 16px -4px rgba(43, 42, 36, 0.08);
+  --shadow-warm-lg: 0 4px 6px -1px rgba(43, 42, 36, 0.06), 0 12px 24px -4px rgba(43, 42, 36, 0.12);
+}
+
+/* ── Light theme (default) ─────────────────────────────────────────────── */
+:root {
+  --background: #f6f3ea;
+  --foreground: #2b2a24;
+  --card: #fcfaf4;
+  --card-foreground: #2b2a24;
+  --popover: #fcfaf4;
+  --popover-foreground: #2b2a24;
+  --primary: #4a7c59;
+  --primary-foreground: #f4f1e8;
+  --secondary: #ece8df;
+  --secondary-foreground: #4a3b2e;
+  --muted: #ede9df;
+  --muted-foreground: #6e665a;
+  --accent: #e3ede4;
+  --accent-foreground: #3a6347;
+  --destructive: #b0492f;
+  --destructive-foreground: #f4f1e8;
+  --border: #e4ddcf;
+  --input: #e4ddcf;
+  --ring: #4a7c59;
+  --radius: 0.75rem;
+
+  /* Brand accents */
+  --clay: #c2683e;
+  --ochre: #d9a441;
+  --bark: #4a3b2e;
+  --sap: #6fa84b;
+}
+
+/* ── Dark theme ("soil at dusk") ───────────────────────────────────────── */
+.dark {
+  --background: #1c1a15;
+  --foreground: #ece7da;
+  --card: #24211b;
+  --card-foreground: #ece7da;
+  --popover: #24211b;
+  --popover-foreground: #ece7da;
+  --primary: #6b9a78;
+  --primary-foreground: #15140f;
+  --secondary: #2a271f;
+  --secondary-foreground: #ece7da;
+  --muted: #2a271f;
+  --muted-foreground: #a89e8c;
+  --accent: #2e3c30;
+  --accent-foreground: #9ec9a9;
+  --destructive: #b0492f;
+  --destructive-foreground: #f4f1e8;
+  --border: #353026;
+  --input: #353026;
+  --ring: #6b9a78;
+}
+
+/* ── Base styles ────────────────────────────────────────────────────────── */
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Visit status badge colors */
+  .status-scheduled {
+    background-color: #ece8df;
+    color: #6e665a;
+  }
+  .status-completed {
+    background-color: #e3f1e7;
+    color: #2f6e45;
+  }
+  .status-skipped {
+    background-color: #fbf0d6;
+    color: #9a6b16;
+  }
+  .status-invoiced {
+    background-color: #e4ecf2;
+    color: #3f6e97;
+  }
+}
