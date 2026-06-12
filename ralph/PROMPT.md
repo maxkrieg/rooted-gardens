@@ -16,9 +16,16 @@ Do NOT continue to a second task.
 - Inspect the actual repo to learn what already exists: `git log --oneline -20`, the file tree,
   `package.json`. Do not assume a task is done because it "seems" done — verify against the repo
   and the checkbox.
+- **Stub files are NOT done work.** Task 1.1 scaffolded the entire directory tree as labeled
+  placeholders. Any file containing a marker like `// Stub — full implementation in task X.Y`
+  (typically just `return null`, an empty component, or a no-op handler) is an empty placeholder,
+  not an implementation. When you build that task, **replace the stub entirely** with the real
+  thing. Never treat a file merely *existing* as evidence its task is complete, and never check a
+  box for a task whose target files are still stubs. The `- [ ]` checkbox is the source of truth:
+  a stub + `- [ ]` means "not started."
 
 Checkbox legend in `PHASES.md`:
-- `- [ ]` = not started (actionable)
+- `- [ ]` = not started (actionable — even if a stub file for it already exists)
 - `- [x]` = complete
 - `- [~]` = blocked / human-gated (skip; not actionable)
 
@@ -81,7 +88,9 @@ WITHOUT blocking the loop:
 
 The task is only done when it actually works:
 - `npm run lint` and `npx tsc --noEmit` pass (once a project exists).
-- `npm run build` passes for tasks that change app/build surface.
+- `npm run build` passes for tasks that change app/build surface. **Build passing is necessary but
+  NOT sufficient** — a `return null` stub also builds. Confirm the task's real acceptance criteria
+  (the actual UI/route/logic described in the task) are implemented, not just that it compiles.
 - Migrations apply cleanly via `supabase db reset`.
 - If you **cannot** get it green: leave the task `- [ ]`, commit the partial work with a message
   prefixed `WIP <id>:` explaining what's blocking, emit the `RALPH_DONE` line describing the WIP,
