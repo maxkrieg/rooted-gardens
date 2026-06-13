@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Fraunces, Hanken_Grotesk } from 'next/font/google'
 import { Providers } from '@/components/providers'
+import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration'
 import './globals.css'
 
 const fraunces = Fraunces({
@@ -22,6 +23,15 @@ const hankenGrotesk = Hanken_Grotesk({
 export const metadata: Metadata = {
   title: 'Rooted Gardens',
   description: 'Internal business management for Rooted Gardens eco-landscaping',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Rooted Crew',
+  },
+  icons: {
+    apple: '/icons/icon-192.png',
+  },
 }
 
 export default function RootLayout({
@@ -32,12 +42,17 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+        {/* Prevent zoom on input focus on iOS (crew field use) */}
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+        <meta name="theme-color" content="#4A7C59" />
       </head>
       <body
         className={`${fraunces.variable} ${hankenGrotesk.variable} antialiased`}
       >
-        <Providers>{children}</Providers>
+        <Providers>
+          <ServiceWorkerRegistration />
+          {children}
+        </Providers>
       </body>
     </html>
   )

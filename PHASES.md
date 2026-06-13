@@ -111,7 +111,7 @@ in-progress view 3.11 consumes the crew start/stop producer 4.10; build it again
   Desktop: sidebar always visible. Mobile: hamburger toggle. Apply green primary
   color (`#4a7c59`) as the brand accent throughout.
 
-- [ ] **1.7 — Crew layout shell (mobile PWA)**
+- [x] **1.7 — Crew layout shell (mobile PWA)**
   *Depends on: 1.1*
   Create `app/(crew)/layout.tsx` with a full-viewport mobile layout and a
   sticky bottom navigation bar with three tabs: Today (home icon), History
