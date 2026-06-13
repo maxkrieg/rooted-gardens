@@ -61,7 +61,7 @@ in-progress view 3.11 consumes the crew start/stop producer 4.10; build it again
   to those variables and set Hanken Grotesk as the default sans + Fraunces as the display family.
   Verify the dev server renders a warm-paper background with the sage-green primary before moving on.
 
-- [ ] **1.2 — Supabase project and full schema migration**
+- [x] **1.2 — Supabase project and full schema migration**
   *Depends on: 1.1, 0.3*
   Write a single SQL migration file at `supabase/migrations/001_initial_schema.sql`
   that creates all tables from `CLAUDE.md` exactly: `accounts`, `properties`,
