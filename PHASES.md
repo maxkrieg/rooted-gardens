@@ -84,7 +84,7 @@ in-progress view 3.11 consumes the crew start/stop producer 4.10; build it again
   wrapper in `components/providers.tsx` and add it to the root layout.
   (Comes before auth because the auth flow and middleware use these clients.)
 
-- [ ] **1.4 — Supabase Auth with magic link**
+- [x] **1.4 — Supabase Auth with magic link**
   *Depends on: 1.1, 1.3*
   Configure Supabase Auth for magic link (email only). Create the login page at
   `app/(auth)/login/page.tsx` with an email input form that calls
