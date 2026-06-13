@@ -58,9 +58,27 @@ if command -v timeout  >/dev/null 2>&1; then TIMEOUT_CMD=(timeout  -k 30 "$ITER_
 elif command -v gtimeout >/dev/null 2>&1; then TIMEOUT_CMD=(gtimeout -k 30 "$ITER_TIMEOUT")
 else warn "No 'timeout'/'gtimeout' found — running without a per-iteration timeout (brew install coreutils)."; fi
 
-# Clean teardown on Ctrl-C: kill the whole process group so no orphaned claude/npm lingers
-# (this is why the first run needed a full terminal close — an interactive child held the TTY).
-trap 'echo; warn "interrupted — terminating agent + children."; kill 0 2>/dev/null; exit 130' INT TERM
+# Recursively signal a process and all its descendants (children-first so npm/node die before
+# their parent reparents them away). macOS has no `setsid`, so we walk the tree with pgrep.
+kill_tree() {
+  local pid="$1" sig="${2:-TERM}" child
+  for child in $(pgrep -P "$pid" 2>/dev/null); do kill_tree "$child" "$sig"; done
+  kill -"$sig" "$pid" 2>/dev/null || true
+}
+
+# Clean teardown on Ctrl-C. The agent runs in the BACKGROUND and we `wait` on it, so this trap
+# actually fires mid-iteration (a foreground pipeline would defer it until it returned — which is
+# why Ctrl-C didn't work before). Escalate TERM → KILL across the whole agent process tree.
+AGENT_PID=""; view_pid=""; iter_log=""
+cleanup() {
+  echo; warn "interrupted — terminating agent + children…"
+  [ -n "$view_pid" ] && kill "$view_pid" 2>/dev/null    # stop the live-log follower
+  if [ -n "$AGENT_PID" ]; then
+    kill_tree "$AGENT_PID" TERM; sleep 2; kill_tree "$AGENT_PID" KILL
+  fi
+  exit 130
+}
+trap cleanup INT TERM
 
 # Live, fault-tolerant pretty-printer for Claude Code stream-json (so a long task is visibly
 # working, not a blank screen). `-R + fromjson?` never errors out on a stray line.
@@ -149,17 +167,27 @@ for ((i = 1; i <= MAX_ITERS; i++)); do
   before_head="$(git rev-parse HEAD)"
   iter_log="$LOG_DIR/iter-$(printf '%03d' "$i").log"
 
-  # stdin is closed (< /dev/null): any scaffolder that would prompt (create-next-app, shadcn)
-  # gets EOF and fails fast instead of hanging on the TTY. Raw stream-json → log (forensics),
-  # piped through fmt_stream → live readable progress.
-  set +e
+  # Run the agent in the BACKGROUND (writing raw stream-json to the log) and `wait` on it, so the
+  # Ctrl-C trap fires mid-iteration. stdin is closed (< /dev/null) so any scaffolder that would
+  # prompt (create-next-app, shadcn) gets EOF and fails fast instead of hanging on the TTY.
+  : > "$iter_log"
   "${TIMEOUT_CMD[@]}" claude -p "$(cat "$PROMPT")" \
       --model "$MODEL" \
       --dangerously-skip-permissions \
       --verbose --output-format stream-json \
-      < /dev/null 2>&1 | tee "$iter_log" | fmt_stream
-  rc=${PIPESTATUS[0]}
+      < /dev/null >> "$iter_log" 2>&1 &
+  AGENT_PID=$!
+  # live readable progress: follow the log and pretty-print it while the agent runs.
+  # Process substitution so $! is tail's own PID (kill it directly — no fragile pkill pattern).
+  tail -n +1 -f "$iter_log" 2>/dev/null > >(fmt_stream) &
+  view_pid=$!
+  set +e
+  wait "$AGENT_PID"; rc=$?
+  AGENT_PID=""
+  sleep 0.3                                   # let the follower flush the last lines
+  kill "$view_pid" 2>/dev/null                # closes the pipe → fmt_stream exits on EOF
   set -e
+  view_pid=""
   [ "$rc" -eq 0 ] || warn "Agent exited non-zero (rc=$rc) on iteration $i — see $iter_log."
 
   # fallback checkpoint: if the agent left changes uncommitted, snapshot them so git advances

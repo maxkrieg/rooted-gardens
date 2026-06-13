@@ -24,21 +24,27 @@ DRY_RUN=1 ./ralph/loop.sh
 # exercises Supabase CLI + Docker/OrbStack — de-risks your biggest dependency early)
 MAX_ITERS=2 ./ralph/loop.sh
 
-# Full run — grind through every actionable task. Wrap in `caffeinate -s` so macOS
-# doesn't sleep mid-build (sleep stalls iterations and can trip the per-iter timeout).
-caffeinate -s ./ralph/loop.sh
+# Full run — grind through every actionable task. Keep the Mac awake the whole time
+# (sleep pauses the loop). PLUG IN — see the power note below — then:
+caffeinate -dimsu ./ralph/loop.sh
 
 # Watch progress from another terminal
 tail -f ralph/logs/iter-*.log
 ```
 
-Stop anytime with **Ctrl-C** — every completed task is already committed. Re-run
-`caffeinate -s ./ralph/loop.sh` to resume from where it left off (it re-derives state from
-the checkboxes).
+Stop anytime with **Ctrl-C** — it terminates the agent and all its children (the loop runs the
+agent in the background and `wait`s on it, so the interrupt actually lands), and every completed
+task is already committed. Re-run `caffeinate -dimsu ./ralph/loop.sh` to resume from where it left
+off (it re-derives state from the checkboxes).
+
+> **Power / sleep (important for long runs):** run the Mac **plugged into AC**. `caffeinate -s`
+> (prevent system sleep) is honored **only on AC power** — on battery macOS will idle-sleep and
+> pause the loop. `caffeinate -dimsu` also prevents display + idle sleep, but AC is the reliable
+> fix for an unattended multi-hour build. The screen may still turn off; that's fine as long as
+> the *system* stays awake. (`caffeinate` is macOS-only; on Linux use `systemd-inhibit`.)
 
 **Prerequisites:** a container runtime (Docker Desktop or OrbStack) must be **running**, and the
-Supabase CLI installed — the local DB stack (`supabase start`) needs them. macOS only: `caffeinate`
-is built in; on Linux use `systemd-inhibit` or `caffeine`.
+Supabase CLI installed — the local DB stack (`supabase start`) needs them.
 
 ## Config (env vars)
 
