@@ -122,7 +122,7 @@ in-progress view 3.11 consumes the crew start/stop producer 4.10; build it again
   The crew layout should have no sidebar — bottom nav only. Ensure the viewport
   meta tag prevents zoom on input focus.
 
-- [ ] **1.8 — Role-based routing middleware**
+- [x] **1.8 — Role-based routing middleware**
   *Depends on: 1.2, 1.4*
   Extend `middleware.ts` to fetch the user's employee role after auth check.
   Redirect `accountant` role users away from `/crew/*`. Redirect `crew` role
