@@ -94,7 +94,7 @@ in-progress view 3.11 consumes the crew start/stop producer 4.10; build it again
   all `/management/*` and `/crew/*` routes and redirects unauthenticated users
   to `/login`. Use `@supabase/ssr` for cookie-based session handling.
 
-- [ ] **1.5 — Generate TypeScript types from schema**
+- [x] **1.5 — Generate TypeScript types from schema**
   *Depends on: 1.2*
   Run `supabase gen types typescript --local > types/database.ts`. Create
   `types/app.ts` with higher-level app types built on top of DB types — e.g.
