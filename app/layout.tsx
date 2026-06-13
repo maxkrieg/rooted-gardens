@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Fraunces, Hanken_Grotesk } from 'next/font/google'
+import { Providers } from '@/components/providers'
 import './globals.css'
 
 const fraunces = Fraunces({
@@ -36,7 +37,7 @@ export default function RootLayout({
       <body
         className={`${fraunces.variable} ${hankenGrotesk.variable} antialiased`}
       >
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   )

@@ -75,7 +75,7 @@ in-progress view 3.11 consumes the crew start/stop producer 4.10; build it again
   `created_at` / `updated_at` columns, and an `updated_at` trigger function
   applied to all tables. Enable RLS on all tables (policies come in Phase 2).
 
-- [ ] **1.3 — Supabase client utilities**
+- [x] **1.3 — Supabase client utilities**
   *Depends on: 1.1*
   Create `lib/supabase/client.ts` (browser client singleton using `createBrowserClient`),
   `lib/supabase/server.ts` (server client using `createServerClient` with cookie
