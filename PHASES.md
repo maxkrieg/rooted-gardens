@@ -102,7 +102,7 @@ in-progress view 3.11 consumes the crew start/stop producer 4.10; build it again
   `visit_crew` rows + employees), `EmployeeWithUser`. These joined types
   are what components actually consume.
 
-- [ ] **1.6 — Management layout shell (desktop)**
+- [x] **1.6 — Management layout shell (desktop)**
   *Depends on: 1.1, 1.4*
   Create `app/(management)/layout.tsx` with a fixed left sidebar and main content
   area. Sidebar contains: logo, nav links (Dashboard, Schedule, Accounts, Billing,
