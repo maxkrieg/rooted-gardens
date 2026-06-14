@@ -92,6 +92,11 @@ The task is only done when it actually works:
   NOT sufficient** — a `return null` stub also builds. Confirm the task's real acceptance criteria
   (the actual UI/route/logic described in the task) are implemented, not just that it compiles.
 - Migrations apply cleanly via `supabase db reset`.
+- **When a verification step fails, fix the SPECIFIC failing piece — never regenerate a large file
+  from scratch.** Rewriting a big artifact (seed SQL, migration, a long component) wholesale on each
+  error wastes enormous output tokens; edit the offending statements in place instead. Keep
+  generated artifacts modest (a task asking for sample/dev/test data means a *small* fixture, not an
+  exhaustive one) and respect any explicit size caps in the task text.
 - If you **cannot** get it green: leave the task `- [ ]`, commit the partial work with a message
   prefixed `WIP <id>:` explaining what's blocking, emit the `RALPH_DONE` line describing the WIP,
   and stop. (A later run re-attempts it.)

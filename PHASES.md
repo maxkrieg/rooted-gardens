@@ -132,15 +132,21 @@ in-progress view 3.11 consumes the crew start/stop producer 4.10; build it again
 
 - [ ] **1.9 — Seed data for development**
   *Depends on: 1.2*
-  Create `supabase/seed.sql` with realistic but fictional development data:
-  ~10 accounts (mix of per_visit and contract), ~15 properties, ~30 service zones,
-  5 employees (1 owner, 3 crew, 1 accountant), 3 vehicles, 4 equipment items,
-  8 weeks of visit history (with `visit_crew` assignment/completion rows). Include a few
-  `visit_sessions`: several completed (start + stop) and at least one **open** session
-  (`ended_at = null`) so the in-progress UI (3.11) has live data to render. This seed
-  should be runnable with `supabase db reset`. Do NOT use any real client data from the
-  Excel spreadsheet. (Moved up from Phase 8 — everything in Phases 2–4 is developed against
-  this data.)
+  Create `supabase/seed.sql` with a **small, lean** set of realistic but fictional dev data —
+  enough to build and test every screen against, no more. **Hard caps (do not exceed):**
+  - **5 accounts** (mix of per_visit and contract), **8 properties**, **12 service zones**
+    (include one multi-zone contract property),
+  - **5 employees** (1 owner, 3 crew, 1 accountant), **3 vehicles**, **4 equipment** items,
+  - **3 weeks** of visit history with `visit_crew` assignment/completion rows,
+  - **~6 `visit_sessions`**: a few completed (start + stop) and **at least one open** session
+    (`ended_at = null`) so the in-progress UI (3.11) has live data.
+  Runnable with `supabase db reset`. Do NOT use any real client data from the Excel spreadsheet.
+  **Keep it cheap & apply once:** generate the seed at roughly the sizes above (this is a dev
+  fixture, not a stress test — bigger costs a lot to generate for no benefit). Insert in
+  FK-safe order (accounts → properties → service_zones → route_groups → employees → visits →
+  visit_crew → visit_sessions). Run `supabase db reset` **once** to verify; if it errors, fix the
+  **specific** offending statements in place — do NOT regenerate the whole file from scratch.
+  (Moved up from Phase 8 — everything in Phases 2–4 is developed against this data.)
 
 ---
 
