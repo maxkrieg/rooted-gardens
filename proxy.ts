@@ -19,7 +19,7 @@ const ROLE_HOME: Record<EmployeeRole, string> = {
   crew: '/crew/today',
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   // Use anon key with cookies to refresh and validate the session.

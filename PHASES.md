@@ -11,6 +11,11 @@ one. A few cross-phase dependencies are intentional and flagged inline (e.g. the
 in-progress view 3.11 consumes the crew start/stop producer 4.10; build it against seed data
 1.9 and validate once 4.10 lands).
 
+> **Per-phase verification:** each phase ends with a **"✅ Verifying Phase N"** section — a
+> checklist to run *after* that phase's tasks are done, confirming they work together. These are
+> gates for you (or the agent on request), **not loop tasks**: they use plain bullets, never
+> `- [ ]` checkboxes, so the ralph loop ignores them.
+
 ---
 
 ## Phase 0 — Start at Kickoff (parallel, lead-time items)
@@ -37,6 +42,14 @@ in-progress view 3.11 consumes the crew start/stop producer 4.10; build it again
   Create the Supabase project (URL + anon + service-role keys), the Vercel project, and the
   Twilio Messaging Service. Populate `.env.local`. This is the one Phase 0 item that actually
   blocks starting Phase 1 (1.2 needs the Supabase project).
+
+### ✅ Verifying Phase 0 — Kickoff
+
+External / human items (they stay `[~]` until a person finishes them). Confirm each is *started*:
+- Twilio account exists and the A2P 10DLC brand + campaign are **submitted** to The Campaign Registry (0.1).
+- Intuit Developer app created; sandbox `QBO_CLIENT_ID` / `QBO_CLIENT_SECRET` + redirect URI in `.env.local` (0.2).
+- Supabase + Vercel projects provisioned, keys in `.env.local`; Twilio Messaging Service created (0.3).
+- Note: local dev needs none of these (the loop runs on local Supabase) — they gate production / live integrations only.
 
 ---
 
@@ -130,7 +143,7 @@ in-progress view 3.11 consumes the crew start/stop producer 4.10; build it again
   Owners and leads can access both. Store role in a cookie after first fetch
   to avoid a DB call on every request.
 
-- [ ] **1.9 — Seed data for development**
+- [x] **1.9 — Seed data for development**
   *Depends on: 1.2*
   Create `supabase/seed.sql` with a **small, lean** set of realistic but fictional dev data —
   enough to build and test every screen against, no more. **Hard caps (do not exceed):**
@@ -147,6 +160,20 @@ in-progress view 3.11 consumes the crew start/stop producer 4.10; build it again
   visit_crew → visit_sessions). Run `supabase db reset` **once** to verify; if it errors, fix the
   **specific** offending statements in place — do NOT regenerate the whole file from scratch.
   (Moved up from Phase 8 — everything in Phases 2–4 is developed against this data.)
+
+### ✅ Verifying Phase 1 — Foundation
+
+**Automated (must pass):**
+- `npm run build` · `npx tsc --noEmit` · `npm run lint`
+- `supabase db reset` applies `001_initial_schema` + `seed.sql` with no errors.
+
+**Functional:**
+- `npm run dev` renders a warm-paper background, sage-green primary, Fraunces headings + Hanken body (1.1).
+- All 14 tables exist (check the `db reset` output or `psql \dt`), including `visit_crew` and `visit_sessions` (1.2).
+- `/login` sends a magic link and shows the "check your email" state (1.4).
+- Signed out, `/management/*` and `/crew/*` redirect to `/login`; once signed in, role gating works (crew can't reach `/management`) (1.8).
+- `types/database.ts` matches the schema with no drift (1.5).
+- Seed contains ≥1 **open** `visit_session` (`ended_at IS NULL`) for the 3.11 UI (1.9).
 
 ---
 
@@ -228,6 +255,21 @@ in-progress view 3.11 consumes the crew start/stop producer 4.10; build it again
   - `photos`: `crew` INSERT; all roles SELECT for properties they can see.
   - `integrations`: service-role / `owner` only — never exposed to `crew` or `accountant`.
   Do this before Phases 3/4 build against these tables.
+
+### ✅ Verifying Phase 2 — Accounts & Properties
+
+**Automated:** `npm run build` · `tsc --noEmit` · `lint` pass; `supabase db reset` clean.
+
+**Functional (against seed data):**
+- Account list loads with property counts + last-visit; status and billing-type filters work (2.2).
+- New/edit account form validates (Zod) and persists; price/contract fields show conditionally (2.3).
+- Account detail shows info + properties-with-zones + recent-visits timeline + QBO link indicator (2.4).
+- Property + zone CRUD works; zone drag-reorder persists `sort_order`; a simple property auto-creates a "Full Property" zone (2.5).
+- Route groups create + assign properties with per-group counts (2.6); Cmd+K search finds accounts / contacts / addresses (2.7).
+
+**Security / RLS (2.1, 2.8) — switch `employees.role` or sign in per role:**
+- `crew` = SELECT-only on accounts/properties; `accountant` can update only `accounts.qbo_customer_id`.
+- `visit_sessions` / `time_entries` / `photos` policies enforced; `integrations` never readable by `crew` or `accountant`.
 
 ---
 
@@ -355,6 +397,20 @@ in-progress view 3.11 consumes the crew start/stop producer 4.10; build it again
   Put the derived helpers (`isVisitInProgress`, `activeSessionsFor`, elapsed formatting) in
   `lib/utils/visits.ts`.
 
+### ✅ Verifying Phase 3 — Schedule
+
+**Automated:** `npm run build` · `tsc --noEmit` · `lint` pass.
+
+**Functional (against seed data):**
+- Desktop grid renders service zones × current+3 weeks with the correct cell-state colors (3.2).
+- Clicking an empty cell creates a scheduled visit; clicking a visit opens `VisitDetailSheet` and edits persist (3.3).
+- Crew assignment adds/removes `visit_crew` rows (`relation='assigned'`) and shows avatar chips; bulk "Assign Route" works (3.4).
+- Prev/next week, "jump to today", `?week=` URL param, and mini-calendar all work (3.5).
+- Same-property zones group with a CONTRACT badge on multi-zone accounts (3.6); crew-instruction cells show the orange dot/banner (3.7).
+- Skip sets `skipped` + reason and undo reverts (3.8); dashboard shows today / this-week / equipment / outstanding instructions (3.9).
+- Narrowing the viewport swaps the grid for the stacked single-week mobile list, same `VisitDetailSheet` (3.10).
+- The seed's open session shows a live pulsing "On site" overlay on the grid + dashboard (3.11).
+
 ---
 
 ## Phase 4 — Crew Mobile Experience
@@ -473,6 +529,18 @@ in-progress view 3.11 consumes the crew start/stop producer 4.10; build it again
   member isn't clocked in (4.7), show the same non-blocking reminder. Realtime-enable the
   `visit_sessions` table so the management subscription in 3.11 receives start/stop events.
 
+### ✅ Verifying Phase 4 — Crew PWA
+
+**Automated:** `npm run build` · `tsc --noEmit` · `lint` pass; the Serwist service worker registers with no build errors.
+
+**Functional (mobile viewport / device):**
+- **Offline (DevTools → Offline):** today's stops still render from cache; a completion / photo / start-stop queues locally and syncs on reconnect (4.1).
+- App is installable ("Add to Home Screen"); manifest + service worker present.
+- Today list shows assigned stops in route order; stop detail shows notes / maps / zones; history lists the last 30 completed (4.2 / 4.3 / 4.8).
+- Completion writes `visit_crew` (`relation='completed'`) + status; photos upload to Storage + a `photos` row; skip works (4.4 / 4.5 / 4.6).
+- Clock in/out writes/updates `time_entries`; a completion-without-clock-in shows the reminder (4.7).
+- Editing a visit in management pushes a realtime toast to the crew view (4.9); Start/Stop writes `visit_sessions` and the 3.11 overlay updates live (4.10).
+
 ---
 
 ## Phase 5 — Billing & QuickBooks
@@ -535,6 +603,18 @@ in-progress view 3.11 consumes the crew start/stop producer 4.10; build it again
   Add a simple revenue summary to the billing page: MTD invoiced, YTD invoiced,
   broken down by billing type (per-visit vs contract).
 
+### ✅ Verifying Phase 5 — Billing & QuickBooks
+
+**Automated:** `npm run build` · `tsc --noEmit` · `lint` pass.
+
+**Functional:**
+- Invoice queue lists completed-not-invoiced visits grouped by account; `per_visit` = one line each, `contract` = periodic summary; date filter + running total (5.1).
+- Invoiced tab lists `invoiced` visits by month with QBO links; shows the `invoice_amount` snapshot (not live price); MTD/YTD revenue summary (5.5 / 5.6).
+
+**Human-gated (needs Intuit sandbox creds — `live-untested` otherwise):**
+- "Connect QuickBooks" OAuth round-trip stores tokens in `integrations` (5.2); `syncCustomer` creates/links a QBO customer (5.3).
+- "Push to QuickBooks" creates a sandbox invoice and flips status to `invoiced` only on success (transactional) (5.4).
+
 ---
 
 ## Phase 6 — Fleet & Equipment
@@ -566,6 +646,15 @@ in-progress view 3.11 consumes the crew start/stop producer 4.10; build it again
   history as a timeline on the card. When next service date is within 2 weeks,
   show a yellow badge on the fleet page and dashboard.
 
+### ✅ Verifying Phase 6 — Fleet & Equipment
+
+**Automated:** `npm run build` · `tsc --noEmit` · `lint` pass; `supabase db reset` applies the new `maintenance_logs` migration.
+
+**Functional (against seed data):**
+- Fleet page shows vehicles + equipment as card grids with status badges; overdue service flagged red (6.1); new vehicle/equipment forms persist.
+- "Log Maintenance" writes `maintenance_logs`, shows a timeline, and badges service due within 2 weeks (6.3).
+- Dashboard "Fleet Status Today" panel shows assignments; `maintenance` vehicles/equipment are excluded from assignment dropdowns (6.2).
+
 ---
 
 ## Phase 7 — Team & Timesheets
@@ -595,6 +684,15 @@ in-progress view 3.11 consumes the crew start/stop producer 4.10; build it again
   for a selected date range. Columns: Employee Name, Date, Clock In, Clock Out,
   Break, Total Hours, Approved. This is what goes to payroll. Format dates/times
   in EST. Use a Server Action that streams the CSV response.
+
+### ✅ Verifying Phase 7 — Team & Timesheets
+
+**Automated:** `npm run build` · `tsc --noEmit` · `lint` pass.
+
+**Functional:**
+- Team page lists employees with role / side / active + "has app access" badges (7.1); "Invite to App" sends a magic link; the SMS-consent toggle persists to `sms_opt_out`.
+- Timesheet grid shows the week's `time_entries` (employees × days) with daily/weekly totals; manual add/edit works; "Approve Week" sets `approved = true` (7.2).
+- "Export Timesheet" downloads a CSV of approved entries for a date range, with times in EST (7.3).
 
 ---
 
@@ -673,3 +771,17 @@ in-progress view 3.11 consumes the crew start/stop producer 4.10; build it again
   scroll, inputs don't zoom on focus (font-size ≥ 16px on inputs), bottom sheet doesn't get
   covered by keyboard, "Add to Home Screen" prompt works, back navigation works
   naturally. Fix any rough edges found.
+
+### ✅ Verifying Phase 8 — Polish, Reporting & Notifications
+
+**Automated:** `npm run build` · `tsc --noEmit` · `lint` pass; a final full `supabase db reset` is clean.
+
+**Functional:**
+- Property "Photos" tab groups how-to / visit / customer-request photos in a lightbox with captions (8.1).
+- Reports render 3 charts from real invoiced/visit data: revenue by month, visits per crew, frequency vs scheduled (8.4).
+- Audit: every list view has empty + loading + error states; the app is wrapped in an `ErrorBoundary`; no raw error strings reach users (8.5).
+- Mobile audit: ≥44px tap targets, inputs ≥16px (no zoom-on-focus), no horizontal scroll, installable, natural back-nav (8.6).
+
+**Human-gated (needs Twilio — `live-untested` otherwise):**
+- `send-sms` Edge Function skips opted-out / no-phone employees; the STOP inbound webhook flips `sms_opt_out` (8.2).
+- A schedule change (crew instruction / assignment / new stop) triggers the SMS to affected crew (8.3). In-app realtime owner start/stop alerts are already covered by the Phase 3/4 checks.
