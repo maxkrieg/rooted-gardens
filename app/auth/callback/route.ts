@@ -31,7 +31,10 @@ export async function GET(request: NextRequest) {
     if (!error) {
       return NextResponse.redirect(new URL(next, request.url))
     }
+    console.error('[auth/callback] exchangeCodeForSession error:', error)
+    return NextResponse.redirect(new URL(`/login?error=auth_failed&detail=${encodeURIComponent(error.message)}`, request.url))
   }
 
+  console.error('[auth/callback] no code param in request:', request.url)
   return NextResponse.redirect(new URL('/login?error=auth_failed', request.url))
 }

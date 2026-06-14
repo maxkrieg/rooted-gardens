@@ -650,6 +650,7 @@ alerts are **in-app only** — a toast on this same subscription, with no email 
   after schema changes and commit `types/database.ts`
 - Keep schedule-related logic in `lib/utils/schedule.ts`
 - Keep QBO sync logic in `lib/quickbooks/sync.ts` — never inline it
+- **Check trio:** `npm run build` · `npm run typecheck` · `npm run lint` — use `npm run typecheck` (not `npx tsc --noEmit`) for type checking
 
 ---
 

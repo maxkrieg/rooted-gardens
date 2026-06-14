@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(open design/index.html)"
+      "Bash(open design/index.html)",
+      "Bash(npx tsc *)"
     ]
   }
 }

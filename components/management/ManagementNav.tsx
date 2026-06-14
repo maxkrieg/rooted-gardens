@@ -20,12 +20,12 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/schedule', label: 'Schedule', icon: CalendarDays },
-  { href: '/accounts', label: 'Accounts', icon: Users },
-  { href: '/billing', label: 'Billing', icon: Receipt },
-  { href: '/fleet', label: 'Fleet', icon: Truck },
-  { href: '/team', label: 'Team', icon: UserCircle },
+  { href: '/management/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/management/schedule', label: 'Schedule', icon: CalendarDays },
+  { href: '/management/accounts', label: 'Accounts', icon: Users },
+  { href: '/management/billing', label: 'Billing', icon: Receipt },
+  { href: '/management/fleet', label: 'Fleet', icon: Truck },
+  { href: '/management/team', label: 'Team', icon: UserCircle },
 ]
 
 const SIDEBAR_LOGO_CLASSES =

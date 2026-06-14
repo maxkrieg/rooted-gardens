@@ -88,6 +88,14 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   `created_at` / `updated_at` columns, and an `updated_at` trigger function
   applied to all tables. Enable RLS on all tables (policies come in Phase 2).
 
+- [ ] **1.2.1 - Cloud supabase set up**
+  1. Go to supabase.com → New project
+  2. Once provisioned: Settings → API → copy the Project URL, anon key, and service_role key into .env.local
+  3. Authentication → URL Configuration:
+    - Site URL: http://localhost:3000
+    - Add to Redirect URLs: http://localhost:3000/auth/callback
+  4. Push your schema: run ! supabase db push (this applies your migration to the cloud project)
+
 - [x] **1.3 — Supabase client utilities**
   *Depends on: 1.1*
   Create `lib/supabase/client.ts` (browser client singleton using `createBrowserClient`),

@@ -1,17 +1,32 @@
 'use client'
 
-import { useState } from 'react'
+import { use, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
-export default function LoginPage() {
+export default function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; detail?: string }>
+}) {
+  return <LoginForm searchParamsPromise={searchParams} />
+}
+
+function LoginForm({
+  searchParamsPromise,
+}: {
+  searchParamsPromise: Promise<{ error?: string; detail?: string }>
+}) {
+  const params = use(searchParamsPromise)
   const [email, setEmail] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(
+    params.error ? (params.detail ?? 'Sign-in failed — try again.') : null
+  )
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
