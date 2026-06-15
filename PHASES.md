@@ -88,7 +88,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   `created_at` / `updated_at` columns, and an `updated_at` trigger function
   applied to all tables. Enable RLS on all tables (policies come in Phase 2).
 
-- [ ] **1.2.1 - Cloud supabase set up**
+- [x] **1.2.1 - Cloud supabase set up**
   1. Go to supabase.com → New project
   2. Once provisioned: Settings → API → copy the Project URL, anon key, and service_role key into .env.local
   3. Authentication → URL Configuration:
@@ -103,7 +103,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   handling for Server Components and Server Actions), and
   `lib/supabase/middleware.ts` (middleware client). Create a React Query provider
   wrapper in `components/providers.tsx` and add it to the root layout.
-  (Comes before auth because the auth flow and middleware use these clients.)
+  (Comes before auth because the auth flow and the root `proxy.ts` use these clients.)
 
 - [x] **1.4 — Supabase Auth with magic link**
   *Depends on: 1.1, 1.3*
@@ -111,9 +111,10 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   `app/(auth)/login/page.tsx` with an email input form that calls
   `supabase.auth.signInWithOtp()`. Show a "check your email" confirmation state
   after submit. Create an auth callback handler at
-  `app/auth/callback/route.ts`. Add middleware at `middleware.ts` that protects
-  all `/management/*` and `/crew/*` routes and redirects unauthenticated users
-  to `/login`. Use `@supabase/ssr` for cookie-based session handling.
+  `app/auth/callback/route.ts`. Add the root request proxy at `proxy.ts` (the Next 16
+  rename of the old `middleware.ts` convention) that protects all `/management/*` and
+  `/crew/*` routes and redirects unauthenticated users to `/login`. Use `@supabase/ssr`
+  for cookie-based session handling.
 
 - [x] **1.5 — Generate TypeScript types from schema**
   *Depends on: 1.2*
@@ -125,7 +126,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 
 - [x] **1.6 — Management layout shell (desktop)**
   *Depends on: 1.1, 1.4*
-  Create `app/(management)/layout.tsx` with a fixed left sidebar and main content
+  Create `app/management/layout.tsx` with a fixed left sidebar and main content
   area. Sidebar contains: logo, nav links (Dashboard, Schedule, Accounts, Billing,
   Fleet, Team), and a bottom user/logout section. Use shadcn `Sheet` for a
   collapsible mobile sidebar fallback. Sidebar should show the active route.
@@ -134,7 +135,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 
 - [x] **1.7 — Crew layout shell (mobile PWA)**
   *Depends on: 1.1*
-  Create `app/(crew)/layout.tsx` with a full-viewport mobile layout and a
+  Create `app/crew/layout.tsx` with a full-viewport mobile layout and a
   sticky bottom navigation bar with three tabs: Today (home icon), History
   (clock icon), Profile (user icon). Configure **Serwist** (`@serwist/next`) — wrap
   `next.config.ts` with `withSerwist` and add the service-worker entry (e.g.
@@ -143,9 +144,10 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   The crew layout should have no sidebar — bottom nav only. Ensure the viewport
   meta tag prevents zoom on input focus.
 
-- [x] **1.8 — Role-based routing middleware**
+- [x] **1.8 — Role-based routing proxy**
   *Depends on: 1.2, 1.4*
-  Extend `middleware.ts` to fetch the user's employee role after auth check.
+  Extend `proxy.ts` (Next 16's root proxy; formerly `middleware.ts`) to fetch the user's
+  employee role after auth check.
   Redirect `accountant` role users away from `/crew/*`. Redirect `crew` role
   users away from `/management/*` (except allow them to reach `/crew/*`).
   Owners and leads can access both. Store role in a cookie after first fetch
@@ -201,7 +203,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 
 - [ ] **2.2 — Account list page**
   *Depends on: 1.6, 2.1, 1.9*
-  Create `app/(management)/accounts/page.tsx`. Fetch all accounts server-side
+  Create `app/management/accounts/page.tsx`. Fetch all accounts server-side
   with property count and last visit date. Render a searchable, filterable table
   with columns: Name, Billing Type (badge), Status (badge), Price/Rate, Last Visit.
   Include a filter bar for status (`active` / `inactive` / `prospective`) and
@@ -219,7 +221,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 
 - [ ] **2.4 — Account detail page**
   *Depends on: 2.2*
-  Create `app/(management)/accounts/[id]/page.tsx`. Show three sections:
+  Create `app/management/accounts/[id]/page.tsx`. Show three sections:
   (1) Account info card with edit button, (2) Properties section listing all
   properties with their service zones, (3) Recent visits timeline (last 10 visits
   across all zones). Add "Add Property" button. Each property shows its address,
@@ -237,7 +239,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 
 - [ ] **2.6 — Route group management**
   *Depends on: 2.4*
-  Create a "Route Groups" section within `app/(management)/accounts/page.tsx`
+  Create a "Route Groups" section within `app/management/accounts/page.tsx`
   or as a sub-page. Display geographic clusters. Allow creating new route groups
   (name, sort order) and assigning properties to them via a multi-select. This
   is how the owner organizes the daily routes. Show a count of properties per group.
@@ -365,7 +367,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 
 - [ ] **3.9 — Schedule dashboard page**
   *Depends on: 3.1*
-  Create `app/(management)/dashboard/page.tsx`. Show:
+  Create `app/management/dashboard/page.tsx`. Show:
   (1) "Today at a glance" — visits scheduled for today, crew assignments, any
   with orange instructions highlighted first.
   (2) "This week" summary — total scheduled, completed, skipped, uninvoiced.
@@ -442,7 +444,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 
 - [ ] **4.2 — Today's stops page (crew mobile)**
   *Depends on: 4.1, 1.2*
-  Create `app/(crew)/today/page.tsx` as a **client** page using React Query over
+  Create `app/crew/today/page.tsx` as a **client** page using React Query over
   the Supabase browser client (this route must work from cache when offline — see
   CLAUDE.md "Data Architecture"). Show a vertical list of the current user's
   visits for today (join `visit_crew` on `employee_id = me AND relation = 'assigned'`),
@@ -454,7 +456,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 
 - [ ] **4.3 — Stop detail page (crew mobile)**
   *Depends on: 4.2*
-  Create `app/(crew)/stop/[visitId]/page.tsx`. Full-screen mobile view with:
+  Create `app/crew/stop/[visitId]/page.tsx`. Full-screen mobile view with:
   (1) Orange banner at top if `crew_instruction` is set — large, prominent.
   (2) Address with one-tap "Open in Maps" button.
   (3) Property notes (access notes, crew notes, parking notes) — collapsible.
@@ -495,7 +497,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 
 - [ ] **4.7 — Clock in / clock out (crew mobile)**
   *Depends on: 4.1, 1.2*
-  Add clock in/out to the crew Profile tab (`app/(crew)/profile/page.tsx`).
+  Add clock in/out to the crew Profile tab (`app/crew/profile/page.tsx`).
   Show current clock state (in or out) with elapsed time if clocked in.
   Large toggle button. Clock in creates a `time_entries` record with `clock_in`.
   Clock out updates the same record with `clock_out`. Show today's hours summary.
@@ -504,7 +506,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 
 - [ ] **4.8 — Visit history (crew mobile)**
   *Depends on: 4.1, 1.2*
-  Create `app/(crew)/history/page.tsx` (the History tab). Show the last 30
+  Create `app/crew/history/page.tsx` (the History tab). Show the last 30
   completed visits for the current crew member (join `visit_crew` on
   `employee_id = me AND relation = 'completed'`), most recent first. Each row:
   date, property address, service types. Tapping a row shows the visit detail
@@ -558,7 +560,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 
 - [ ] **5.1 — Invoice queue page**
   *Depends on: 4.4, 2.4*
-  Create `app/(management)/billing/page.tsx`. Show all visits with
+  Create `app/management/billing/page.tsx`. Show all visits with
   `status = 'completed'` (not yet invoiced), grouped by account.
   For `per_visit` accounts: each visit is one invoice line with the account's
   `price_per_visit`. For `contract` accounts: show completed visits as a
@@ -632,7 +634,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 
 - [ ] **6.1 — Fleet management page**
   *Depends on: 1.6, 1.2*
-  Create `app/(management)/fleet/page.tsx` with two sections: Vehicles and
+  Create `app/management/fleet/page.tsx` with two sections: Vehicles and
   Equipment. Each shows a card grid (not a table). Vehicle card: name, plate,
   status badge, current assignment if any, last maintenance note. Equipment card:
   name, type badge, status badge, last serviced date (flag red if overdue).
@@ -671,7 +673,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 
 - [ ] **7.1 — Team management page**
   *Depends on: 1.6, 1.4*
-  Create `app/(management)/team/page.tsx`. Show all employees as cards:
+  Create `app/management/team/page.tsx`. Show all employees as cards:
   name, role badge, side (lawn/garden), phone, active status. Owners can
   add employees (create employee record + invite to Supabase Auth via
   `supabase.auth.admin.inviteUserByEmail()`). Include an "Invite to App"
@@ -793,3 +795,126 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 **Human-gated (needs Twilio — `live-untested` otherwise):**
 - `send-sms` Edge Function skips opted-out / no-phone employees; the STOP inbound webhook flips `sms_opt_out` (8.2).
 - A schedule change (crew instruction / assignment / new stop) triggers the SMS to affected crew (8.3). In-app realtime owner start/stop alerts are already covered by the Phase 3/4 checks.
+
+---
+
+## Phase 9 — Public Marketing Site & Lead Intake (CRM-lite)
+
+> Goal: the customer-facing "front door" the internal app has been missing — a public
+> marketing site (home + a few sub-pages, modeled on myrootedgardens.com) and a lightweight
+> lead pipeline so prospect inquiries flow straight into the app instead of off-channel
+> phone/email. Captured in a new `leads` table, triaged in a management inbox, and converted
+> into a `prospective` account. This is **not** a customer portal (no customer login / no
+> self-service account management — that stays out of scope, see CLAUDE.md). The blog
+> ("Gardening Notes") is **deferred** — link out to the existing site for now.
+>
+> Additive and depends on earlier phases: lead→account conversion reuses the Phase 2
+> account/property forms + `get_my_role()` RLS helper; the new-lead SMS reuses the Twilio
+> `send-sms` Edge Function (8.2); the Leads inbox lives in the management shell (1.6). The
+> public marketing pages themselves only need the design system (1.1).
+
+- [ ] **9.1 — `leads` table + RLS migration**
+  *Depends on: 1.2, 2.1*
+  New migration `supabase/migrations/0xx_leads.sql` creating `leads`:
+  `id uuid PK`, `kind text CHECK (kind IN ('service_inquiry','job_application'))`,
+  `status text DEFAULT 'new' CHECK (status IN ('new','contacted','qualified','won','lost'))`,
+  `name text NOT NULL`, `email text`, `phone text`, `address text`,
+  `service_interest text CHECK (service_interest IN ('lawn','garden','both','other'))`,
+  `message text`, `source text DEFAULT 'website'`,
+  `details jsonb` (kind-specific extras — e.g. job position, resume storage path),
+  `assigned_to uuid FK → employees`, `converted_account_id uuid FK → accounts`,
+  `created_at` / `updated_at` + the shared `updated_at` trigger. Enable RLS + Realtime.
+  RLS (reuse `get_my_role()` from 2.1): **anon role INSERT only** (the public form — no
+  reads); `owner` / `lead` SELECT/UPDATE; `accountant` / `crew` no access. Update
+  `types/database.ts` (`supabase gen types`) and add a `Lead` app type in `types/app.ts`.
+  Add 2–3 seed leads to `supabase/seed.sql` (one per `kind`) so the inbox has data.
+
+- [ ] **9.2 — Public route group, shared layout & proxy allowlist**
+  *Depends on: 1.1*
+  Create the `app/(public)/` route group with `layout.tsx` — public chrome (top nav: Lawn,
+  Gardens, About, FAQ, Jobs, Contact; footer with both division contacts (Matt / lawn,
+  Krystyna / garden) + socials; a small "Staff log in" link → `/login`). No management
+  sidebar / crew bottom-nav. Move the landing page to `app/(public)/page.tsx` and **remove
+  the `/login` redirect from root** `app/page.tsx` (keep the `?code=` → `/auth/callback`
+  handling). Add the public paths (`/`, `/lawn`, `/gardens`, `/about`, `/faq`, `/jobs`,
+  `/contact`) to the `proxy.ts` **public allowlist** so they're reachable signed-out; keep
+  `/management/*` and `/crew/*` protected. Per-page `metadata` (title / description / Open
+  Graph) for SEO. Field & Foliage styling throughout.
+
+- [ ] **9.3 — Home / landing page**
+  *Depends on: 9.2*
+  `app/(public)/page.tsx`: hero + mission ("your yard becomes part of a connected network of
+  regenerative landscapes"), two service-line cards (The Electric Lawn / Rooted Gardens
+  design), the ELA partnership badge, a "Field Notes" teaser that **links out** to the
+  existing blog (deferred), and a prominent "Get started" CTA → the inquiry form (9.5).
+  Phone-first, responsive.
+
+- [ ] **9.4 — Marketing sub-pages: Lawn, Gardens, About, FAQ**
+  *Depends on: 9.2*
+  Content pages mirroring the live site, Field & Foliage styled, each with a contextual
+  inquiry CTA. Lawn / Gardens describe each division's services + its contact. FAQ uses a
+  shadcn `accordion` (add via CLI). Keep copy centralized so owners can revise it easily.
+
+- [ ] **9.5 — Public inquiry form + spam protection + Server Action**
+  *Depends on: 9.2, 9.1*
+  Zod schema in `lib/validators/lead.ts`; form component (react-hook-form) reachable at
+  `/contact` and embedded as the home CTA. Fields: name, email, phone, address, service
+  interest (lawn / garden — radio group), message. Spam protection: hidden **honeypot** field
+  + lightweight **per-IP rate limit** (server-side; no external captcha unless abuse appears).
+  Submit via a **Server Action** (online / management-side — Server Actions are correct here;
+  the offline queue is crew-only) inserting a `leads` row (`kind='service_inquiry'`,
+  `status='new'`). Show a warm success state. Fires the 9.7 notification.
+
+- [ ] **9.6 — Careers (Jobs) page + application**
+  *Depends on: 9.2, 9.1*
+  `app/(public)/jobs/page.tsx`: hiring pitch + any openings. A simple application form (name,
+  email, phone, position interest, message, optional **resume upload** → Supabase Storage)
+  that inserts a `leads` row with `kind='job_application'` and the extras in `details`
+  (position, resume path). Reuse the 9.5 spam protection + Server Action pattern.
+
+- [ ] **9.7 — New-lead notification (in-app + SMS)**
+  *Depends on: 9.5, 8.2*
+  **In-app:** management subscribes to `leads` INSERT (Realtime) → toast + an unread badge on
+  the new "Leads" sidebar item. **SMS:** route by `service_interest` to the owner whose
+  `employees.side` matches (lawn → Matt, garden → Krystyna; `both` / `other` → both owners) via
+  the `send-sms` Edge Function (8.2) — never call Twilio inline. Message is a minimal nudge
+  ("New website inquiry from [name] — open the app"). No email.
+
+- [ ] **9.8 — Management Leads inbox & pipeline**
+  *Depends on: 9.1, 1.6*
+  `app/management/leads/page.tsx`: list inquiries + job applications, filter by `kind` /
+  `status`, advance status through the pipeline (new → contacted → qualified → won / lost) and
+  assign to an owner — all via Server Actions. Add "Leads" to the management sidebar (1.6).
+  Phone-responsive (cards on phone, table on desktop), per the management UI rules.
+
+- [ ] **9.9 — Convert lead → account**
+  *Depends on: 9.8, 2.3, 2.5*
+  On a `service_inquiry` lead, a "Convert to Account" action creates an `accounts` row
+  (`status='prospective'`, pre-filled name / contact / email / phone) **+ a `property`** from
+  the lead's address, sets `leads.status='won'` and `leads.converted_account_id`, and links
+  back. Reuse `AccountForm` (2.3) and `PropertyForm` (2.5) pre-filled from the lead rather
+  than building new forms.
+
+### ✅ Verifying Phase 9 — Public Site & Lead Intake
+
+**Automated:** `npm run build` · `npm run typecheck` · `npm run lint` pass;
+`supabase db reset` applies the new `leads` migration + seed cleanly.
+
+**Functional (against seed data):**
+- Signed out, `/`, `/lawn`, `/gardens`, `/about`, `/faq`, `/jobs`, `/contact` all load (public
+  allowlist works); `/management/*` and `/crew/*` still redirect to `/login` (9.2).
+- Home renders both service lines + the inquiry CTA; sub-pages render with the FAQ accordion (9.3 / 9.4).
+- Submitting the inquiry form inserts a `leads` row (`kind='service_inquiry'`, `status='new'`)
+  and shows the success state; the honeypot / rate-limit reject obvious bots (9.5).
+- The careers form inserts `kind='job_application'` with the resume in Storage + `details` (9.6).
+- A new lead pushes an in-app toast / badge to management and (with Twilio) SMS to the matching
+  owner by `service_interest` (9.7).
+- The Leads inbox lists / filters leads and advances status; "Convert to Account" creates a
+  `prospective` account + property and marks the lead `won` (9.8 / 9.9).
+
+**Security / RLS (9.1):**
+- The anon / public role can INSERT into `leads` but cannot SELECT; `crew` / `accountant` have
+  no `leads` access; `owner` / `lead` can read + update.
+
+**Human-gated (needs Twilio — `live-untested` otherwise):**
+- The new-lead SMS reaches the matching owner via the `send-sms` Edge Function (9.7).

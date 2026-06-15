@@ -84,11 +84,21 @@ web app. Parent company is **Tigertown Farm LLC**.
 rooted-gardens/
 ├── CLAUDE.md                    ← you are here
 ├── PHASES.md                    ← build phases and tasks
+├── proxy.ts                     ← root request proxy (Next 16; auth + role gating, formerly middleware.ts)
 ├── app/
 │   ├── layout.tsx               ← root layout (fonts, providers)
 │   ├── (auth)/
 │   │   └── login/page.tsx       ← magic link login
-│   ├── (management)/            ← desktop management UI
+│   ├── (public)/                ← public marketing site + lead intake (no auth) [Phase 9]
+│   │   ├── layout.tsx           ← public chrome (top nav + footer, no app nav)
+│   │   ├── page.tsx             ← home / landing (root /)
+│   │   ├── lawn/page.tsx
+│   │   ├── gardens/page.tsx
+│   │   ├── about/page.tsx
+│   │   ├── faq/page.tsx
+│   │   ├── jobs/page.tsx        ← careers + application form
+│   │   └── contact/page.tsx     ← inquiry intake form
+│   ├── management/              ← desktop management UI
 │   │   ├── layout.tsx           ← sidebar nav, desktop shell
 │   │   ├── dashboard/page.tsx
 │   │   ├── schedule/page.tsx    ← the main schedule grid
@@ -98,7 +108,7 @@ rooted-gardens/
 │   │   ├── billing/page.tsx     ← invoice queue
 │   │   ├── fleet/page.tsx
 │   │   └── team/page.tsx
-│   ├── (crew)/                  ← mobile crew UI (PWA)
+│   ├── crew/                    ← mobile crew UI (PWA)
 │   │   ├── layout.tsx           ← bottom nav, mobile shell
 │   │   ├── today/page.tsx       ← today's stops
 │   │   └── stop/[visitId]/
@@ -171,6 +181,31 @@ accounts (
   notes text,
   created_at, updated_at
 )
+
+-- Public inquiries & job applications (CRM-lite). Captures UNTRUSTED public form input,
+-- kept separate from accounts (curated billing entities). Owner triages in the management
+-- Leads inbox and converts a qualified service inquiry into a prospective account. [Phase 9]
+leads (
+  id uuid PK,
+  kind text NOT NULL            -- 'service_inquiry' | 'job_application'
+    CHECK (kind IN ('service_inquiry', 'job_application')),
+  status text DEFAULT 'new'     -- pipeline: new → contacted → qualified → won/lost
+    CHECK (status IN ('new', 'contacted', 'qualified', 'won', 'lost')),
+  name text NOT NULL,
+  email text,
+  phone text,
+  address text,
+  service_interest text         -- 'lawn' | 'garden' | 'both' | 'other' (routes the SMS)
+    CHECK (service_interest IN ('lawn', 'garden', 'both', 'other')),
+  message text,
+  source text DEFAULT 'website',
+  details jsonb,                -- kind-specific extras (e.g. job position, resume path)
+  assigned_to uuid FK → employees,
+  converted_account_id uuid FK → accounts,  -- set when a lead becomes an account
+  created_at, updated_at
+)
+-- RLS: anon role INSERT only (public form, no reads); owner/lead SELECT+UPDATE;
+-- crew/accountant no access. Realtime-enabled for the management new-lead toast.
 
 -- Physical locations (an account may have multiple properties)
 properties (
@@ -681,7 +716,10 @@ NEXT_PUBLIC_APP_URL=            # https://yourapp.vercel.app
 
 ## Things to Avoid
 
-- Do NOT build a customer-facing portal (out of scope)
+- Do NOT build a customer-facing **portal** — i.e. no customer login or self-service
+  account management (out of scope). NOTE: a **public marketing site + one-way inquiry /
+  job-application form** (anonymous, no auth) is NOT a portal and IS in scope — see the
+  `(public)` route group and the `leads` table (Phase 9).
 - Do NOT build a native mobile app — PWA is sufficient
 - Do NOT use Prisma or Drizzle — use Supabase client directly with generated types
 - Do NOT pull data FROM QuickBooks — sync is one-way (app → QBO only)
