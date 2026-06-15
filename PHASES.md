@@ -192,7 +192,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 > Goal: Full CRUD for accounts, properties, and service zones. The CRM layer.
 > This is the foundation everything else is built on.
 
-- [ ] **2.1 — RLS policies for accounts and properties**
+- [x] **2.1 — RLS policies for accounts and properties**
   *Depends on: 1.2*
   Write RLS policies for `accounts`, `properties`, `service_zones`, and
   `route_groups`. Rules: `owner` and `lead` roles can SELECT/INSERT/UPDATE.

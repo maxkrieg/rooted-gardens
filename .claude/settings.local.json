@@ -5,7 +5,8 @@
       "Bash(npx tsc *)",
       "Bash(git checkout *)",
       "Bash(git push *)",
-      "Bash(supabase status *)"
+      "Bash(supabase status *)",
+      "WebFetch(domain:docs.claude.com)"
     ]
   }
 }
