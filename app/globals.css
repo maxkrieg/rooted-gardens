@@ -134,4 +134,32 @@
     background-color: #e4ecf2;
     color: #3f6e97;
   }
+
+  /* Account status badge colors */
+  .acct-active {
+    background-color: #e3f1e7;
+    color: #2f6e45;
+  }
+  .acct-inactive {
+    background-color: #ece8df;
+    color: #6e665a;
+  }
+  .acct-prospective {
+    background-color: #fbf0d6;
+    color: #9a6b16;
+  }
+
+  /* Billing type badge colors */
+  .billing-per_visit {
+    background-color: #e3ede4;
+    color: #3a6347;
+  }
+  .billing-contract {
+    background-color: #e4ecf2;
+    color: #3f6e97;
+  }
+  .billing-as_needed {
+    background-color: #ede9df;
+    color: #6e665a;
+  }
 }

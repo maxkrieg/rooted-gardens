@@ -84,6 +84,12 @@ export type AccountWithDetails = Account & {
   properties: PropertyWithZones[]
 }
 
+/** Flat row used by the account list — augments base account with aggregated counts. */
+export type AccountListRow = Account & {
+  propertyCount: number
+  lastVisitDate: string | null // ISO date string of most recent actual_date, or null
+}
+
 /** Service zone with its parent property and account info. */
 export type ZoneWithProperty = ServiceZone & {
   property: Property
