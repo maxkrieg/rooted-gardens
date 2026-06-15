@@ -13,8 +13,8 @@ in-progress view 3.11 consumes the crew start/stop producer 4.10; build it again
 
 > **Per-phase verification:** each phase ends with a **"✅ Verifying Phase N"** section — a
 > checklist to run *after* that phase's tasks are done, confirming they work together. These are
-> gates for you (or the agent on request), **not loop tasks**: they use plain bullets, never
-> `- [ ]` checkboxes, so the ralph loop ignores them.
+> gates for you (or the agent on request): they use plain bullets, never
+> `- [ ]` checkboxes.
 
 ---
 
@@ -49,7 +49,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 - Twilio account exists and the A2P 10DLC brand + campaign are **submitted** to The Campaign Registry (0.1).
 - Intuit Developer app created; sandbox `QBO_CLIENT_ID` / `QBO_CLIENT_SECRET` + redirect URI in `.env.local` (0.2).
 - Supabase + Vercel projects provisioned, keys in `.env.local`; Twilio Messaging Service created (0.3).
-- Note: local dev needs none of these (the loop runs on local Supabase) — they gate production / live integrations only.
+- Note: local dev needs none of these (local Supabase handles the database) — they gate production / live integrations only.
 
 ---
 
