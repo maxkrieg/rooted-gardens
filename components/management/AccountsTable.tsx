@@ -29,6 +29,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { AccountCard } from '@/components/management/AccountCard'
+import { AccountForm } from '@/components/management/AccountForm'
 import { AccountStatusBadge, BillingTypeBadge } from '@/components/management/badges'
 import type { AccountListRow, AccountStatus, BillingType } from '@/types/app'
 
@@ -221,17 +222,17 @@ export function AccountsTable({ accounts }: AccountsTableProps) {
         )}
       </div>
 
-      {/* New Account sheet (placeholder — AccountForm wired in task 2.3) */}
+      {/* New Account slide-over */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-md bg-card">
-          <SheetHeader className="mb-6">
+        <SheetContent side="right" className="w-full sm:max-w-md bg-card flex flex-col gap-0 p-0">
+          <SheetHeader className="px-6 pt-6 pb-4 border-b border-border shrink-0">
             <SheetTitle className="font-display text-xl">New Account</SheetTitle>
             <SheetDescription>
-              Account form — coming in task 2.3.
+              Fill in the details below to add a new billing account.
             </SheetDescription>
           </SheetHeader>
-          <div className="flex items-center justify-center h-48 rounded-xl border border-dashed border-border text-muted-foreground text-sm">
-            AccountForm placeholder
+          <div className="flex-1 overflow-y-auto px-6 py-5">
+            <AccountForm onSuccess={() => setSheetOpen(false)} />
           </div>
         </SheetContent>
       </Sheet>

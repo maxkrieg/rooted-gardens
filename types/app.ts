@@ -24,6 +24,9 @@ export type BillingType = (typeof BILLING_TYPES)[number]
 export const ACCOUNT_STATUSES = ['active', 'inactive', 'prospective'] as const
 export type AccountStatus = (typeof ACCOUNT_STATUSES)[number]
 
+export const CONTRACT_PERIODS = ['monthly', 'seasonal'] as const
+export type ContractPeriod = (typeof CONTRACT_PERIODS)[number]
+
 export const EMPLOYEE_ROLES = ['owner', 'lead', 'crew', 'accountant'] as const
 export type EmployeeRole = (typeof EMPLOYEE_ROLES)[number]
 

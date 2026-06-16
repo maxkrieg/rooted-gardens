@@ -201,7 +201,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   Use a helper function `get_my_role()` that reads from `employees` table
   to keep policies DRY.
 
-- [ ] **2.2 — Account list page**
+- [x] **2.2 — Account list page**
   *Depends on: 1.6, 2.1, 1.9*
   Create `app/management/accounts/page.tsx`. Fetch all accounts server-side
   with property count and last visit date. Render a searchable, filterable table
@@ -210,7 +210,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   billing type. Add a "New Account" button that opens a slide-over sheet form.
   Use shadcn `Table`, `Badge`, `Sheet`.
 
-- [ ] **2.3 — New account form (slide-over)**
+- [x] **2.3 — New account form (slide-over)**
   *Depends on: 2.2*
   Create `components/management/AccountForm.tsx`. Fields: name (required),
   contact name, email, phone, billing type (radio: Per Visit / Contract / As Needed),
