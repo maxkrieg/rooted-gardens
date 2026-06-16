@@ -8,20 +8,18 @@ import {
   Link2,
   Link2Off,
   Mail,
-  MapPin,
   Phone,
-  Plus,
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
   AccountStatusBadge,
   BillingTypeBadge,
-  FrequencyBadge,
   VisitStatusBadge,
 } from '@/components/management/badges'
 import { EditAccountSheet } from '@/components/management/EditAccountSheet'
+import { PropertySheet } from '@/components/management/PropertySheet'
+import { ZoneList } from '@/components/management/ZoneList'
 import { createClient } from '@/lib/supabase/server'
 import { formatAccountPrice } from '@/lib/utils/accounts'
 import type { AccountWithDetails, VisitWithZone } from '@/types/app'
@@ -167,22 +165,12 @@ export default async function AccountDetailPage({ params }: Props) {
       <section>
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-display text-lg font-semibold text-foreground">Properties</h2>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 h-9 opacity-50 cursor-not-allowed"
-            disabled
-            title="Property management coming in Task 2.5"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add Property
-          </Button>
+          <PropertySheet accountId={account.id} />
         </div>
 
         {account.properties.length === 0 ? (
           <Card className="rounded-2xl border border-border shadow-warm">
             <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-              <MapPin className="h-8 w-8 text-muted-foreground/40 mb-3" />
               <p className="text-sm text-muted-foreground">No properties yet.</p>
             </CardContent>
           </Card>
@@ -191,12 +179,12 @@ export default async function AccountDetailPage({ params }: Props) {
             {account.properties.map((property) => (
               <Card key={property.id} className="rounded-2xl border border-border shadow-warm">
                 <CardContent className="p-4">
-                  {/* Address */}
-                  <div className="flex items-start gap-2 mb-3">
-                    <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                  {/* Address + Edit trigger */}
+                  <div className="flex items-start justify-between gap-2 mb-3">
                     <p className="font-display text-base font-semibold text-foreground">
                       {property.address}
                     </p>
+                    <PropertySheet accountId={account.id} property={property} />
                   </div>
 
                   {/* Notes */}
@@ -223,32 +211,8 @@ export default async function AccountDetailPage({ params }: Props) {
                     </div>
                   )}
 
-                  {/* Service zones */}
-                  {property.service_zones.length > 0 && (
-                    <div className="border-t border-border pt-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-                        Service zones
-                      </p>
-                      <div className="space-y-2">
-                        {property.service_zones.map((zone) => (
-                          <div
-                            key={zone.id}
-                            className="flex items-center justify-between gap-2 text-sm"
-                          >
-                            <span className="text-foreground font-medium truncate">
-                              {zone.name}
-                            </span>
-                            <div className="flex items-center gap-2 shrink-0">
-                              {!zone.active && (
-                                <span className="text-xs text-muted-foreground italic">inactive</span>
-                              )}
-                              <FrequencyBadge frequency={zone.frequency} />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  {/* Service zones — interactive list with reorder + edit */}
+                  <ZoneList property={property} zones={property.service_zones} />
                 </CardContent>
               </Card>
             ))}

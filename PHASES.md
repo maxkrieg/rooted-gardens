@@ -228,7 +228,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   zone list with frequency badges, and crew notes. Include a QBO customer ID
   field with a "Link to QuickBooks" status indicator.
 
-- [ ] **2.5 — Property and service zone management**
+- [x] **2.5 — Property and service zone management**
   *Depends on: 2.4*
   Create `components/management/PropertyForm.tsx` for adding/editing a property:
   address, parking notes, access notes, crew notes. Below the property form,
@@ -237,7 +237,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   For simple accounts, auto-create one zone named "Full Property" on property
   creation. Zone sort order determines crew visit sequence.
 
-- [ ] **2.6 — Route group management**
+- [x] **2.6 — Route group management**
   *Depends on: 2.4*
   Create a "Route Groups" section within `app/management/accounts/page.tsx`
   or as a sub-page. Display geographic clusters. Allow creating new route groups
