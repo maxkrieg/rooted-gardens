@@ -32,6 +32,8 @@ export const accountFormSchema = z
     // status always has a value (Select defaults to 'active' via defaultValues)
     status: z.enum(ACCOUNT_STATUSES),
     notes: z.string().trim().optional(),
+    // QuickBooks customer ID — normally set by the QBO sync (Phase 7), but editable here.
+    qbo_customer_id: z.string().trim().optional(),
   })
   // Conditional requirements based on billing type
   .refine(

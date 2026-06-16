@@ -162,4 +162,22 @@
     background-color: #ede9df;
     color: #6e665a;
   }
+
+  /* Zone frequency badge colors */
+  .freq-weekly {
+    background-color: #e3f1e7;
+    color: #2f6e45;
+  }
+  .freq-biweekly {
+    background-color: #e3ede4;
+    color: #3a6347;
+  }
+  .freq-monthly {
+    background-color: #e4ecf2;
+    color: #3f6e97;
+  }
+  .freq-as_needed {
+    background-color: #ede9df;
+    color: #6e665a;
+  }
 }

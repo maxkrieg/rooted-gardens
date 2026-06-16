@@ -219,7 +219,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   Submit via Server Action that inserts into `accounts`. On success, close sheet
   and revalidate account list. Show inline field errors.
 
-- [ ] **2.4 — Account detail page**
+- [x] **2.4 — Account detail page**
   *Depends on: 2.2*
   Create `app/management/accounts/[id]/page.tsx`. Show three sections:
   (1) Account info card with edit button, (2) Properties section listing all

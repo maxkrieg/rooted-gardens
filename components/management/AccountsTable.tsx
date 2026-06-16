@@ -31,20 +31,8 @@ import {
 import { AccountCard } from '@/components/management/AccountCard'
 import { AccountForm } from '@/components/management/AccountForm'
 import { AccountStatusBadge, BillingTypeBadge } from '@/components/management/badges'
+import { formatAccountPrice } from '@/lib/utils/accounts'
 import type { AccountListRow, AccountStatus, BillingType } from '@/types/app'
-
-// ─── Price display ────────────────────────────────────────────────────────────
-
-function formatPrice(row: AccountListRow): string {
-  if (row.billing_type === 'per_visit' && row.price_per_visit != null) {
-    return `$${row.price_per_visit.toFixed(2)} / visit`
-  }
-  if (row.billing_type === 'contract' && row.contract_rate != null) {
-    const period = row.contract_period ?? 'period'
-    return `$${row.contract_rate.toFixed(2)} / ${period}`
-  }
-  return '—'
-}
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -188,7 +176,7 @@ export function AccountsTable({ accounts }: AccountsTableProps) {
                     <AccountStatusBadge status={account.status} />
                   </TableCell>
                   <TableCell className="tabular-nums text-sm">
-                    {formatPrice(account)}
+                    {formatAccountPrice(account)}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {account.propertyCount}

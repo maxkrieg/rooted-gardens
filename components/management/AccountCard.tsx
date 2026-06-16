@@ -3,18 +3,8 @@ import { format, parseISO } from 'date-fns'
 import { Building2, Calendar } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { AccountStatusBadge, BillingTypeBadge } from '@/components/management/badges'
+import { formatAccountPrice } from '@/lib/utils/accounts'
 import type { AccountListRow } from '@/types/app'
-
-function formatPrice(row: AccountListRow): string {
-  if (row.billing_type === 'per_visit' && row.price_per_visit != null) {
-    return `$${row.price_per_visit.toFixed(2)} / visit`
-  }
-  if (row.billing_type === 'contract' && row.contract_rate != null) {
-    const period = row.contract_period ?? 'period'
-    return `$${row.contract_rate.toFixed(2)} / ${period}`
-  }
-  return '—'
-}
 
 export function AccountCard({ account }: { account: AccountListRow }) {
   return (
@@ -38,7 +28,7 @@ export function AccountCard({ account }: { account: AccountListRow }) {
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
             <BillingTypeBadge billingType={account.billing_type} />
 
-            <span className="tabular-nums">{formatPrice(account)}</span>
+            <span className="tabular-nums">{formatAccountPrice(account)}</span>
 
             <span className="flex items-center gap-1">
               <Building2 className="h-3.5 w-3.5 shrink-0" />

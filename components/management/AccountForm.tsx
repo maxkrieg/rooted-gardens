@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -22,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { createAccount } from '@/app/management/accounts/actions'
+import { createAccount, updateAccount } from '@/app/management/accounts/actions'
 import { accountFormSchema, type AccountFormValues } from '@/lib/validators/account'
 import type { Account } from '@/types/app'
 
@@ -33,34 +34,57 @@ interface AccountFormProps {
   account?: Account
 }
 
-export function AccountForm({ onSuccess, account: _account }: AccountFormProps) {
+export function AccountForm({ onSuccess, account }: AccountFormProps) {
+  const isEdit = Boolean(account)
+
   const form = useForm<AccountFormValues>({
     resolver: zodResolver(accountFormSchema),
-    defaultValues: {
-      name: '',
-      contact_name: '',
-      email: '',
-      phone: '',
-      billing_type: 'per_visit' as const,
-      price_per_visit: undefined,
-      contract_rate: undefined,
-      contract_period: undefined,
-      status: 'active' as const,
-      notes: '',
-    },
+    defaultValues: account
+      ? {
+          name: account.name,
+          contact_name: account.contact_name ?? '',
+          email: account.email ?? '',
+          phone: account.phone ?? '',
+          billing_type: account.billing_type as AccountFormValues['billing_type'],
+          price_per_visit: account.price_per_visit ?? undefined,
+          contract_rate: account.contract_rate ?? undefined,
+          contract_period: (account.contract_period as AccountFormValues['contract_period']) ?? undefined,
+          status: account.status as AccountFormValues['status'],
+          notes: account.notes ?? '',
+          qbo_customer_id: account.qbo_customer_id ?? '',
+        }
+      : {
+          name: '',
+          contact_name: '',
+          email: '',
+          phone: '',
+          billing_type: 'per_visit' as const,
+          price_per_visit: undefined,
+          contract_rate: undefined,
+          contract_period: undefined,
+          status: 'active' as const,
+          notes: '',
+          qbo_customer_id: '',
+        },
   })
 
   const billingType = useWatch({ control: form.control, name: 'billing_type' })
   const isSubmitting = form.formState.isSubmitting
 
   async function onSubmit(values: AccountFormValues) {
-    const res = await createAccount(values)
+    const res = isEdit && account
+      ? await updateAccount(account.id, values)
+      : await createAccount(values)
+
     if (res.error) {
-      toast.error('Could not create account', { description: res.error })
+      toast.error(isEdit ? 'Could not update account' : 'Could not create account', {
+        description: res.error,
+      })
       return
     }
-    toast.success('Account created')
-    form.reset()
+
+    toast.success(isEdit ? 'Account updated' : 'Account created')
+    if (!isEdit) form.reset()
     onSuccess()
   }
 
@@ -296,13 +320,40 @@ export function AccountForm({ onSuccess, account: _account }: AccountFormProps) 
           )}
         />
 
+        {/* Integrations ── QuickBooks */}
+        <div className="border-t border-border pt-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+            Integrations
+          </p>
+          <FormField
+            control={form.control}
+            name="qbo_customer_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>QuickBooks Customer ID</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="e.g. 123"
+                    className="h-11 text-base font-mono"
+                    {...field}
+                  />
+                </FormControl>
+                <FormDescription className="text-xs">
+                  Normally set automatically by the QuickBooks sync. Edit only if linking manually.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
         {/* Submit */}
         <Button
           type="submit"
           disabled={isSubmitting}
           className="w-full h-11 font-semibold"
         >
-          {isSubmitting ? 'Saving…' : 'Create account'}
+          {isSubmitting ? 'Saving…' : isEdit ? 'Save changes' : 'Create account'}
         </Button>
       </form>
     </Form>

@@ -4,7 +4,7 @@
  */
 
 import { Badge } from '@/components/ui/badge'
-import type { AccountStatus, BillingType } from '@/types/app'
+import type { AccountStatus, BillingType, ZoneFrequency, VisitStatus } from '@/types/app'
 
 // ─── Account status ──────────────────────────────────────────────────────────
 
@@ -38,6 +38,48 @@ export function BillingTypeBadge({ billingType }: { billingType: string }) {
   const meta = BILLING_TYPE_META[billingType as BillingType] ?? {
     label: billingType,
     className: 'billing-as_needed',
+  }
+  return (
+    <Badge variant="outline" className={`border-transparent uppercase tracking-wide text-[10px] font-semibold ${meta.className}`}>
+      {meta.label}
+    </Badge>
+  )
+}
+
+// ─── Zone frequency ───────────────────────────────────────────────────────────
+
+const ZONE_FREQUENCY_META: Record<ZoneFrequency, { label: string; className: string }> = {
+  weekly:    { label: 'Weekly',    className: 'freq-weekly' },
+  biweekly:  { label: 'Bi-weekly', className: 'freq-biweekly' },
+  monthly:   { label: 'Monthly',   className: 'freq-monthly' },
+  as_needed: { label: 'As Needed', className: 'freq-as_needed' },
+}
+
+export function FrequencyBadge({ frequency }: { frequency: string }) {
+  const meta = ZONE_FREQUENCY_META[frequency as ZoneFrequency] ?? {
+    label: frequency,
+    className: 'freq-as_needed',
+  }
+  return (
+    <Badge variant="outline" className={`border-transparent uppercase tracking-wide text-[10px] font-semibold ${meta.className}`}>
+      {meta.label}
+    </Badge>
+  )
+}
+
+// ─── Visit status ─────────────────────────────────────────────────────────────
+
+const VISIT_STATUS_META: Record<VisitStatus, { label: string; className: string }> = {
+  scheduled: { label: 'Scheduled', className: 'status-scheduled' },
+  completed: { label: 'Completed', className: 'status-completed' },
+  skipped:   { label: 'Skipped',   className: 'status-skipped' },
+  invoiced:  { label: 'Invoiced',  className: 'status-invoiced' },
+}
+
+export function VisitStatusBadge({ status }: { status: string }) {
+  const meta = VISIT_STATUS_META[status as VisitStatus] ?? {
+    label: status,
+    className: 'status-scheduled',
   }
   return (
     <Badge variant="outline" className={`border-transparent uppercase tracking-wide text-[10px] font-semibold ${meta.className}`}>
