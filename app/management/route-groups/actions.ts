@@ -19,9 +19,20 @@ export async function createRouteGroup(
   }
 
   const supabase = await createClient()
+
+  // Append to end by using max existing sort_order + 1
+  const { data: maxRow } = await supabase
+    .from('route_groups')
+    .select('sort_order')
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .single()
+
+  const nextSortOrder = maxRow ? maxRow.sort_order + 1 : 0
+
   const { error } = await supabase.from('route_groups').insert({
     name: parsed.data.name,
-    sort_order: parsed.data.sort_order ?? 0,
+    sort_order: nextSortOrder,
   })
 
   if (error) {
@@ -43,18 +54,63 @@ export async function updateRouteGroup(
   }
 
   const supabase = await createClient()
+  // Only update name — sort_order is managed by moveRouteGroup
   const { error } = await supabase
     .from('route_groups')
-    .update({
-      name: parsed.data.name,
-      sort_order: parsed.data.sort_order ?? 0,
-    })
+    .update({ name: parsed.data.name })
     .eq('id', id)
 
   if (error) {
     console.error('[updateRouteGroup]', error)
     return { error: error.message }
   }
+
+  revalidate()
+  return {}
+}
+
+/**
+ * Move a route group up or down by swapping sort_order with its neighbor.
+ * Same pattern as moveZone in property-actions.ts.
+ */
+export async function moveRouteGroup(
+  id: string,
+  direction: 'up' | 'down',
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+
+  const { data: groups, error: fetchError } = await supabase
+    .from('route_groups')
+    .select('id, sort_order')
+    .order('sort_order', { ascending: true })
+
+  if (fetchError || !groups) {
+    return { error: fetchError?.message ?? 'Could not load route groups' }
+  }
+
+  const idx = groups.findIndex((g) => g.id === id)
+  const neighborIdx = direction === 'up' ? idx - 1 : idx + 1
+
+  if (idx === -1 || neighborIdx < 0 || neighborIdx >= groups.length) {
+    return {} // Already at boundary — no-op
+  }
+
+  const current = groups[idx]
+  const neighbor = groups[neighborIdx]
+
+  const { error: e1 } = await supabase
+    .from('route_groups')
+    .update({ sort_order: neighbor.sort_order })
+    .eq('id', current.id)
+
+  if (e1) return { error: e1.message }
+
+  const { error: e2 } = await supabase
+    .from('route_groups')
+    .update({ sort_order: current.sort_order })
+    .eq('id', neighbor.id)
+
+  if (e2) return { error: e2.message }
 
   revalidate()
   return {}

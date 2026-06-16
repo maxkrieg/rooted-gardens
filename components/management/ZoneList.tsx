@@ -67,12 +67,12 @@ export function ZoneList({ property, zones }: ZoneListProps) {
         {zones.map((zone, idx) => (
           <div
             key={zone.id}
-            className={`flex items-center gap-2 rounded-lg px-2 py-1.5 group ${
+            className={`flex items-start gap-2 rounded-lg px-2 py-1.5 group ${
               zone.active ? '' : 'opacity-50'
             }`}
           >
             {/* Reorder buttons */}
-            <div className="flex flex-col shrink-0">
+            <div className="flex flex-col shrink-0 mt-0.5">
               <Button
                 variant="ghost"
                 size="icon"
@@ -95,16 +95,23 @@ export function ZoneList({ property, zones }: ZoneListProps) {
               </Button>
             </div>
 
-            {/* Zone name */}
-            <span className="flex-1 text-sm font-medium text-foreground truncate min-w-0">
-              {zone.name}
-            </span>
+            {/* Zone name + notes */}
+            <div className="flex-1 min-w-0 py-0.5">
+              <span className="block text-sm font-medium text-foreground truncate">
+                {zone.name}
+              </span>
+              {zone.notes && (
+                <span className="block text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                  {zone.notes}
+                </span>
+              )}
+            </div>
 
             {/* Frequency badge */}
             <FrequencyBadge frequency={zone.frequency} />
 
-            {/* Actions — appear on hover on desktop, always visible on mobile */}
-            <div className="flex items-center gap-0.5 shrink-0">
+            {/* Actions */}
+            <div className="flex items-start gap-0.5 shrink-0 mt-0.5">
               {/* Edit */}
               <ServiceZoneSheet
                 propertyId={property.id}

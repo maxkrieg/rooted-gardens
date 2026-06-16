@@ -95,7 +95,7 @@ export default async function RouteGroupsPage() {
         </div>
       ) : (
         <div className="space-y-4 pb-8">
-          {routeGroups.map((group) => {
+          {routeGroups.map((group, idx) => {
             const assignedIds = assignmentMap.get(group.id) ?? new Set<string>()
             const assignedProperties = allProperties.filter((p) => assignedIds.has(p.id))
 
@@ -105,6 +105,8 @@ export default async function RouteGroupsPage() {
                 routeGroup={group}
                 assignedProperties={assignedProperties}
                 allProperties={allProperties}
+                isFirst={idx === 0}
+                isLast={idx === routeGroups.length - 1}
               />
             )
           })}

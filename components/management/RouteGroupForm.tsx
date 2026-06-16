@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button'
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -29,14 +28,8 @@ export function RouteGroupForm({ onSuccess, routeGroup }: RouteGroupFormProps) {
   const form = useForm<RouteGroupFormValues>({
     resolver: zodResolver(routeGroupFormSchema),
     defaultValues: routeGroup
-      ? {
-          name: routeGroup.name,
-          sort_order: routeGroup.sort_order,
-        }
-      : {
-          name: '',
-          sort_order: undefined,
-        },
+      ? { name: routeGroup.name }
+      : { name: '' },
   })
 
   const isSubmitting = form.formState.isSubmitting
@@ -75,33 +68,6 @@ export function RouteGroupForm({ onSuccess, routeGroup }: RouteGroupFormProps) {
                   {...field}
                 />
               </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="sort_order"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Sort order</FormLabel>
-              <FormControl>
-                <Input
-                  type="number"
-                  min="0"
-                  step="1"
-                  placeholder="0"
-                  className="h-11 text-base"
-                  value={field.value ?? ''}
-                  onChange={(e) =>
-                    field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))
-                  }
-                />
-              </FormControl>
-              <FormDescription className="text-xs">
-                Lower numbers appear first in the route list. Leave blank to append.
-              </FormDescription>
               <FormMessage />
             </FormItem>
           )}

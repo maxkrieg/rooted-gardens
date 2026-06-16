@@ -6,7 +6,9 @@
       "Bash(git checkout *)",
       "Bash(git push *)",
       "Bash(supabase status *)",
-      "WebFetch(domain:docs.claude.com)"
+      "WebFetch(domain:docs.claude.com)",
+      "Bash(npx shadcn@latest *)",
+      "Bash(npm run *)"
     ]
   }
 }

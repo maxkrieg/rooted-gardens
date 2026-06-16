@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Building2, Trash2 } from 'lucide-react'
+import { Building2, ChevronUp, ChevronDown, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { RouteGroupSheet } from '@/components/management/RouteGroupSheet'
 import { PropertyAssignmentSheet } from '@/components/management/PropertyAssignmentSheet'
-import { deleteRouteGroup } from '@/app/management/route-groups/actions'
+import { deleteRouteGroup, moveRouteGroup } from '@/app/management/route-groups/actions'
 import type { RouteGroup, Property } from '@/types/app'
 
 interface PropertyWithAccount extends Property {
@@ -18,15 +18,26 @@ interface RouteGroupCardProps {
   routeGroup: RouteGroup
   assignedProperties: PropertyWithAccount[]
   allProperties: PropertyWithAccount[]
+  isFirst: boolean
+  isLast: boolean
 }
 
 export function RouteGroupCard({
   routeGroup,
   assignedProperties,
   allProperties,
+  isFirst,
+  isLast,
 }: RouteGroupCardProps) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [pending, startTransition] = useTransition()
+
+  function handleMove(direction: 'up' | 'down') {
+    startTransition(async () => {
+      const res = await moveRouteGroup(routeGroup.id, direction)
+      if (res.error) toast.error('Could not reorder route group', { description: res.error })
+    })
+  }
 
   function handleDelete() {
     startTransition(async () => {
@@ -53,14 +64,36 @@ export function RouteGroupCard({
             <p className="text-xs text-muted-foreground mt-0.5">
               {assignedProperties.length}{' '}
               {assignedProperties.length === 1 ? 'property' : 'properties'}
-              {routeGroup.sort_order > 0 && (
-                <span className="ml-2 tabular-nums">· order {routeGroup.sort_order}</span>
-              )}
             </p>
           </div>
 
           {/* Action buttons */}
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-0.5 shrink-0">
+            {/* Reorder */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground disabled:opacity-30"
+              disabled={isFirst || pending}
+              onClick={() => handleMove('up')}
+              aria-label="Move route group up"
+            >
+              <ChevronUp className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground disabled:opacity-30"
+              disabled={isLast || pending}
+              onClick={() => handleMove('down')}
+              aria-label="Move route group down"
+            >
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+
+            {/* Separator */}
+            <span className="w-px h-4 bg-border mx-0.5" aria-hidden />
+
             <RouteGroupSheet routeGroup={routeGroup} />
 
             {confirmDelete ? (

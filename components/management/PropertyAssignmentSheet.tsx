@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Check, Map, X } from 'lucide-react'
+import { Map } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import {
   Sheet,
   SheetContent,
@@ -85,7 +86,7 @@ export function PropertyAssignmentSheet({
                   return (
                     <li
                       key={property.id}
-                      className="flex items-center justify-between gap-3 px-6 py-3"
+                      className="flex items-center justify-between gap-3 px-6 py-3.5"
                     >
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">
@@ -95,20 +96,13 @@ export function PropertyAssignmentSheet({
                           {property.accountName}
                         </p>
                       </div>
-                      <Button
-                        variant={isAssigned ? 'default' : 'outline'}
-                        size="icon"
-                        className="h-8 w-8 shrink-0"
+                      <Switch
+                        checked={isAssigned}
                         disabled={pending}
-                        onClick={() => handleToggle(property.id, isAssigned)}
+                        onCheckedChange={() => handleToggle(property.id, isAssigned)}
                         aria-label={isAssigned ? 'Remove from group' : 'Add to group'}
-                      >
-                        {isAssigned ? (
-                          <Check className="h-4 w-4" />
-                        ) : (
-                          <X className="h-4 w-4" />
-                        )}
-                      </Button>
+                        className="shrink-0"
+                      />
                     </li>
                   )
                 })}
