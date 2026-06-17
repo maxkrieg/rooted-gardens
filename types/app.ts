@@ -170,6 +170,17 @@ export type ScheduleWeek = {
   }>
 }
 
+// ─── Search ───────────────────────────────────────────────────────────────────
+
+/** Flat shape used by the global Cmd+K command palette search. */
+export type AccountSearchResult = {
+  id: string
+  name: string
+  contact_name: string | null
+  status: AccountStatus
+  addresses: string[]
+}
+
 // ─── Crew mobile helpers ──────────────────────────────────────────────────────
 
 /** A crew member's stop for today — what's shown on the Today list. */

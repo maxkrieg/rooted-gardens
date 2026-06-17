@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   LayoutDashboard,
   CalendarDays,
@@ -14,7 +14,9 @@ import {
   Menu,
   LogOut,
   Leaf,
+  Search,
 } from 'lucide-react'
+import { CommandPalette } from '@/components/management/CommandPalette'
 import { createClient } from '@/lib/supabase/client'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
@@ -103,6 +105,18 @@ export function ManagementNav({ userEmail }: ManagementNavProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [paletteOpen, setPaletteOpen] = useState(false)
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setPaletteOpen(true)
+      }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [])
 
   async function handleLogout() {
     const supabase = createClient()
@@ -121,6 +135,18 @@ export function ManagementNav({ userEmail }: ManagementNavProps) {
             Rooted Gardens
           </span>
         </div>
+        <div className="px-3 pt-3 pb-1">
+          <button
+            onClick={() => setPaletteOpen(true)}
+            className="w-full flex items-center gap-2 px-3 h-9 rounded-lg border border-border bg-background text-sm text-muted-foreground hover:text-foreground hover:border-input transition-colors"
+          >
+            <Search className="h-3.5 w-3.5 shrink-0" />
+            <span className="flex-1 text-left truncate">Search…</span>
+            <kbd className="hidden md:inline-flex items-center gap-0.5 text-[10px] text-muted-foreground/70 font-mono bg-muted px-1.5 py-0.5 rounded">
+              ⌘K
+            </kbd>
+          </button>
+        </div>
         <NavLinks pathname={pathname} />
         <SidebarFooter userEmail={userEmail} onLogout={handleLogout} />
       </aside>
@@ -136,13 +162,24 @@ export function ManagementNav({ userEmail }: ManagementNavProps) {
         >
           <Menu className="h-5 w-5" />
         </Button>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1">
           <Leaf className="h-4 w-4 text-primary" />
           <span className="font-display text-base font-semibold text-foreground">
             Rooted Gardens
           </span>
         </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 shrink-0"
+          onClick={() => setPaletteOpen(true)}
+          aria-label="Search accounts"
+        >
+          <Search className="h-5 w-5" />
+        </Button>
       </header>
+
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
 
       {/* Mobile nav drawer */}
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
