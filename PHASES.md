@@ -299,7 +299,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   all route groups → properties → service zones → visits for a given week,
   in route group sort order.
 
-- [ ] **3.2 — Schedule grid core component (desktop)**
+- [x] **3.2 — Schedule grid core component (desktop)**
   *Depends on: 3.1*
   Create `components/management/ScheduleGrid.tsx` — the **desktop / wide-screen**
   layout. Rows are service zones (grouped by route group, then property). Columns
