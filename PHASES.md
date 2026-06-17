@@ -244,14 +244,14 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   (name, sort order) and assigning properties to them via a multi-select. This
   is how the owner organizes the daily routes. Show a count of properties per group.
 
-- [ ] **2.7 — Account search and quick-lookup**
+- [x] **2.7 — Account search and quick-lookup**
   *Depends on: 2.2*
   Add a global search command palette (shadcn `CommandDialog`, triggered by
   `Cmd+K`). Search across account names, contact names, and addresses.
   Results navigate to the account detail page. This is critical for the owner to
   quickly pull up a client record.
 
-- [ ] **2.8 — RLS policies for visits, sessions, time & media**
+- [x] **2.8 — RLS policies for visits, sessions, time & media**
   *Depends on: 1.2 (independent of the rest of Phase 2 — can run in parallel with 2.1)*
   Write RLS policies for the operational tables not covered by 2.1: `visits`,
   `visit_crew`, `visit_sessions`, `time_entries`, `photos`, and `integrations`,
