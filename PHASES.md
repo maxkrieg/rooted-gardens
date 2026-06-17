@@ -290,7 +290,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 > this ships as two responsive faces over one data layer: a dense multi-week grid on
 > desktop (3.2) and a stacked single-week view on phone (3.10).
 
-- [ ] **3.1 — Schedule data layer**
+- [x] **3.1 — Schedule data layer**
   *Depends on: 1.5, 2.6, 2.8*
   Create `lib/utils/schedule.ts` with helpers: `getWeekStart(date)` → Monday,
   `getWeeksInRange(start, end)` → array of week-start dates,
