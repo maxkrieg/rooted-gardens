@@ -369,7 +369,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   `skip_reason`. Skipped cells show in yellow in the grid via the existing
   `status-skipped` CSS class. Skipped visits are NOT invoiced.
 
-- [ ] **3.9 — Schedule dashboard page**
+- [x] **3.9 — Schedule dashboard page**
   *Depends on: 3.1*
   Create `app/management/dashboard/page.tsx`. Show:
   (1) "Today at a glance" — visits scheduled for today, crew assignments, any
