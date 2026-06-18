@@ -9,8 +9,11 @@ import { createVisit } from '@/app/management/schedule/actions'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import type {
+  Account,
   Employee,
+  Property,
   RouteGroup,
   ScheduleWeek,
   ScheduleZoneRow,
@@ -161,35 +164,76 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit }: ScheduleGr
                     </div>
                   </td>
                 </tr>,
-                ...rows.map((row) => (
-                  <tr
-                    key={`${routeGroup.id}-${row.zone.id}`}
-                    className="border-b border-border/50 hover:bg-accent/20 transition-colors"
-                  >
-                    <td className="sticky left-0 bg-card z-10 border-r border-border px-4 py-3 min-w-[220px]">
-                      <p className="font-medium text-foreground text-sm leading-tight">
-                        {row.zone.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-[190px]">
-                        {row.property.address}
-                      </p>
-                    </td>
-                    {weeks.map((week) => {
-                      const visit = visitMap.get(row.zone.id)?.get(week.weekStart) ?? null
-                      const cellKey = `${row.zone.id}-${week.weekStart}`
-                      return (
-                        <td key={week.weekStart} className="px-2 py-2 align-top">
-                          <ScheduleCell
-                            visit={visit}
-                            isCreating={creatingKey === cellKey}
-                            onClick={() => handleCellClick(row, week.weekStart, visit)}
-                            onKeyDown={(e) => handleCellKeyDown(e, row, week.weekStart, visit)}
-                          />
+                ...(() => {
+                  // Group consecutive rows by property
+                  const propertyGroups = rows.reduce<
+                    { property: Property; account: Account; rows: ScheduleZoneRow[] }[]
+                  >((acc, row) => {
+                    const last = acc[acc.length - 1]
+                    if (last && last.property.id === row.property.id) {
+                      last.rows.push(row)
+                    } else {
+                      acc.push({ property: row.property, account: row.account, rows: [row] })
+                    }
+                    return acc
+                  }, [])
+
+                  return propertyGroups.flatMap(({ property, account, rows: zoneRows }) => [
+                    // Property header row
+                    <tr key={`prop-${routeGroup.id}-${property.id}`} className="group border-b border-border/30">
+                      <td className="sticky left-0 bg-card z-10 border-r border-border border-l-2 border-l-primary/25 px-4 py-2 min-w-[220px]">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-muted-foreground truncate max-w-[140px]">
+                            {property.address}
+                          </span>
+                          {account.billing_type === 'contract' && (
+                            <Badge variant="outline" className="text-[10px] billing-contract border-transparent shrink-0 py-0 h-auto">
+                              CONTRACT
+                            </Badge>
+                          )}
+                          {account.billing_type === 'per_visit' && account.price_per_visit && (
+                            <span className="text-[10px] text-transparent group-hover:text-muted-foreground transition-colors shrink-0">
+                              ${account.price_per_visit}/visit
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      {weeks.map((week) => (
+                        <td key={week.weekStart} />
+                      ))}
+                    </tr>,
+                    // Zone rows (indented)
+                    ...zoneRows.map((row) => (
+                      <tr
+                        key={`${routeGroup.id}-${row.zone.id}`}
+                        className="border-b border-border/50 hover:bg-accent/20 transition-colors"
+                      >
+                        <td className="sticky left-0 bg-card z-10 border-r border-border border-l-2 border-l-primary/10 pl-8 pr-4 py-3 min-w-[220px]">
+                          <p className="font-medium text-foreground text-sm leading-tight">
+                            {row.zone.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5 capitalize">
+                            {row.zone.frequency}
+                          </p>
                         </td>
-                      )
-                    })}
-                  </tr>
-                )),
+                        {weeks.map((week) => {
+                          const visit = visitMap.get(row.zone.id)?.get(week.weekStart) ?? null
+                          const cellKey = `${row.zone.id}-${week.weekStart}`
+                          return (
+                            <td key={week.weekStart} className="px-2 py-2 align-top">
+                              <ScheduleCell
+                                visit={visit}
+                                isCreating={creatingKey === cellKey}
+                                onClick={() => handleCellClick(row, week.weekStart, visit)}
+                                onKeyDown={(e) => handleCellKeyDown(e, row, week.weekStart, visit)}
+                              />
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    )),
+                  ])
+                })(),
               ])}
             </tbody>
           </table>

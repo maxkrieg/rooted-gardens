@@ -340,7 +340,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   the selected week in URL search params (`?week=2026-06-08`) so the URL
   is shareable. Add a mini calendar popover for jumping to any week.
 
-- [ ] **3.6 — Multi-zone property display**
+- [x] **3.6 — Multi-zone property display**
   *Depends on: 3.2*
   Service zones for the same property should visually group together in the
   grid with a subtle left border and indentation. Show the property address
