@@ -1,15 +1,21 @@
-import { format, addWeeks } from 'date-fns'
+import { format, addWeeks, parseISO } from 'date-fns'
 import { cookies } from 'next/headers'
 import { getWeekStart } from '@/lib/utils/schedule'
 import { createClient } from '@/lib/supabase/server'
 import { getScheduleForWeek } from './actions'
 import { ScheduleGrid } from '@/components/management/ScheduleGrid'
+import { ScheduleNav } from '@/components/management/ScheduleNav'
 
-export default async function SchedulePage() {
-  const supabase = await createClient()
-
-  const base = getWeekStart(new Date())
+export default async function SchedulePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ week?: string }>
+}) {
+  const { week } = await searchParams
+  const base = week ? getWeekStart(parseISO(week)) : getWeekStart(new Date())
   const weekStarts = [0, 1, 2, 3].map((n) => addWeeks(base, n))
+
+  const supabase = await createClient()
 
   const [weeks, employeesResult, vehiclesResult] = await Promise.all([
     Promise.all(weekStarts.map((w) => getScheduleForWeek(format(w, 'yyyy-MM-dd')))),
@@ -24,11 +30,12 @@ export default async function SchedulePage() {
   const vehicles = vehiclesResult.data ?? []
   const canEdit = role === 'owner' || role === 'lead'
 
-  console.log('SchedulePage', { role, canEdit, employees, vehicles })
-
   return (
     <div className="p-4 lg:p-6">
-      <h1 className="font-display text-2xl font-semibold text-foreground mb-6">Schedule</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="font-display text-2xl font-semibold text-foreground">Schedule</h1>
+        <ScheduleNav windowStart={format(base, 'yyyy-MM-dd')} />
+      </div>
       <ScheduleGrid
         weeks={weeks}
         employees={employees}

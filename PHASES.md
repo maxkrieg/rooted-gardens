@@ -333,7 +333,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   that opens a dialog to bulk-assign crew + vehicle for all visits in that
   group for the week.
 
-- [ ] **3.5 — Week navigation and "active week" indicator**
+- [x] **3.5 — Week navigation and "active week" indicator**
   *Depends on: 3.2*
   Add previous/next week navigation arrows to the schedule grid header.
   Highlight the current week column. Add a "Jump to today" button. Persist
