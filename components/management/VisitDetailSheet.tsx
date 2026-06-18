@@ -35,6 +35,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { VisitStatusBadge } from '@/components/management/badges'
 import { cn } from '@/lib/utils'
+import { FilePen } from 'lucide-react'
 import { saveVisitChanges } from '@/app/management/schedule/actions'
 import { visitUpdateSchema, type VisitUpdateValues } from '@/lib/validators/visit'
 import type { Employee, ScheduleZoneRow, Vehicle, VisitStatus } from '@/types/app'
@@ -144,7 +145,7 @@ export function VisitDetailSheet({
                   <FormItem>
                     <FormLabel className="flex items-center gap-1.5">
                       {visit.crew_instruction && (
-                        <span className="w-2 h-2 rounded-full bg-[var(--clay)] shrink-0" />
+                        <FilePen className="w-4 h-4 text-[var(--clay)] shrink-0" />
                       )}
                       Crew Instruction
                     </FormLabel>
