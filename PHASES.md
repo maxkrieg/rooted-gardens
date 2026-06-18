@@ -357,7 +357,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   view, if a crew instruction exists, show it in a highlighted orange banner
   at the very top of the stop detail, above everything else.
 
-- [ ] **3.8 — Skip visit workflow**
+- [x] **3.8 — Skip visit workflow**
   *Depends on: 3.3*
   In `VisitDetailSheet`, add a "Skip This Visit" button (destructive secondary
   style). Opens a dialog asking for a skip reason (optional freetext). Sets

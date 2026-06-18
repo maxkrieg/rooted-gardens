@@ -231,3 +231,31 @@ export async function saveVisitChanges(
   revalidatePath('/management/schedule')
   return {}
 }
+
+export async function skipVisit(visitId: string, reason?: string): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('visits')
+    .update({ status: 'skipped', skip_reason: reason ?? null })
+    .eq('id', visitId)
+  if (error) {
+    console.error('[skipVisit]', error)
+    return { error: error.message }
+  }
+  revalidatePath('/management/schedule')
+  return {}
+}
+
+export async function unskipVisit(visitId: string): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('visits')
+    .update({ status: 'scheduled', skip_reason: null })
+    .eq('id', visitId)
+  if (error) {
+    console.error('[unskipVisit]', error)
+    return { error: error.message }
+  }
+  revalidatePath('/management/schedule')
+  return {}
+}

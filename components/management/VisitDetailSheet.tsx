@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { format, parseISO } from 'date-fns'
@@ -14,6 +14,14 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   Form,
   FormControl,
@@ -36,7 +44,7 @@ import { Badge } from '@/components/ui/badge'
 import { VisitStatusBadge } from '@/components/management/badges'
 import { cn } from '@/lib/utils'
 import { FilePen } from 'lucide-react'
-import { saveVisitChanges } from '@/app/management/schedule/actions'
+import { saveVisitChanges, skipVisit, unskipVisit } from '@/app/management/schedule/actions'
 import { visitUpdateSchema, type VisitUpdateValues } from '@/lib/validators/visit'
 import type { Employee, ScheduleZoneRow, Vehicle, VisitStatus } from '@/types/app'
 
@@ -98,6 +106,10 @@ export function VisitDetailSheet({
     }
   }, [visit, reset])
 
+  const [skipDialogOpen, setSkipDialogOpen] = useState(false)
+  const [skipReason, setSkipReason] = useState('')
+  const [, startTransition] = useTransition()
+
   async function onSubmit(values: VisitUpdateValues) {
     if (!visit) return
     const res = await saveVisitChanges(visit.id, values)
@@ -109,11 +121,72 @@ export function VisitDetailSheet({
     onOpenChange(false)
   }
 
+  function handleSkipClick() {
+    setSkipReason('')
+    setSkipDialogOpen(true)
+  }
+
+  function handleConfirmSkip() {
+    if (!visit) return
+    startTransition(async () => {
+      const res = await skipVisit(visit.id, skipReason.trim() || undefined)
+      if (res.error) {
+        toast.error('Failed to skip visit', { description: res.error })
+        return
+      }
+      setSkipDialogOpen(false)
+      onOpenChange(false)
+      toast.success('Visit skipped')
+    })
+  }
+
+  function handleUnskip() {
+    if (!visit) return
+    startTransition(async () => {
+      const res = await unskipVisit(visit.id)
+      if (res.error) {
+        toast.error('Failed to undo skip', { description: res.error })
+        return
+      }
+      onOpenChange(false)
+      toast.success('Visit restored to scheduled')
+    })
+  }
+
   if (!visit) return null
 
   const crewEmployees = employees.filter((emp) => emp.role === 'crew')
 
   return (
+    <>
+    <Dialog open={skipDialogOpen} onOpenChange={setSkipDialogOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Skip this visit?</DialogTitle>
+          <DialogDescription>
+            {row.zone.name} · Week of {format(parseISO(weekStart), 'MMM d')}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-2">
+          <Textarea
+            value={skipReason}
+            onChange={(e) => setSkipReason(e.target.value)}
+            placeholder="Reason (optional)"
+            className="resize-none"
+            rows={3}
+          />
+        </div>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={() => setSkipDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button variant="destructive" onClick={handleConfirmSkip}>
+            Confirm Skip
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col p-0 gap-0">
         <SheetHeader className="px-6 pt-6 pb-4 border-b border-border shrink-0">
@@ -129,6 +202,16 @@ export function VisitDetailSheet({
             onSubmit={form.handleSubmit(onSubmit)}
             className="flex-1 overflow-y-auto px-6 py-6 space-y-6"
           >
+            {/* Skipped state banner */}
+            {visit.status === 'skipped' && (
+              <div className="rounded-lg bg-[#fbf0d6] border border-[#d9a441]/40 px-4 py-3 space-y-1">
+                <p className="text-sm font-semibold text-[#9a6b16]">Visit skipped</p>
+                {visit.skip_reason && (
+                  <p className="text-sm text-[#9a6b16]/80">{visit.skip_reason}</p>
+                )}
+              </div>
+            )}
+
             {/* Crew Instruction — top of form; highlighted when content exists */}
             {/* TODO (task 4.3): mirror this as an orange banner on app/crew/stop/[visitId]/page.tsx */}
             <div
@@ -172,7 +255,7 @@ export function VisitDetailSheet({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Status</FormLabel>
-                  <Select disabled={!canEdit} value={field.value} onValueChange={field.onChange}>
+                  <Select disabled={!canEdit || visit.status === 'skipped'} value={field.value} onValueChange={field.onChange}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue />
@@ -322,6 +405,30 @@ export function VisitDetailSheet({
                 )}
               </div>
             )}
+            {/* Skip / Undo skip */}
+            {canEdit && (
+              <div className="pt-2">
+                {visit.status === 'skipped' ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleUnskip}
+                  >
+                    Undo Skip
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full text-destructive border-destructive/30 hover:bg-destructive/5 hover:text-destructive"
+                    onClick={handleSkipClick}
+                  >
+                    Skip This Visit
+                  </Button>
+                )}
+              </div>
+            )}
           </form>
         </Form>
 
@@ -344,5 +451,6 @@ export function VisitDetailSheet({
         </SheetFooter>
       </SheetContent>
     </Sheet>
+    </>
   )
 }
