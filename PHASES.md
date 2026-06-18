@@ -321,7 +321,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   completion details if done. Owners can edit any field; crew can only view.
   Add keyboard shortcut: press `S` on a cell to quick-schedule.
 
-- [ ] **3.4 — Crew assignment on schedule**
+- [x] **3.4 — Crew assignment on schedule**
   *Depends on: 3.3*
   Add a crew assignment panel to the `VisitDetailSheet`. Show a multi-select
   of active employees. Assignments are written to `visit_crew` rows with

@@ -7,8 +7,11 @@ import { cn } from '@/lib/utils'
 import { getWeekStart } from '@/lib/utils/schedule'
 import { createVisit } from '@/app/management/schedule/actions'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
+import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
+import { Button } from '@/components/ui/button'
 import type {
   Employee,
+  RouteGroup,
   ScheduleWeek,
   ScheduleZoneRow,
   Vehicle,
@@ -33,6 +36,9 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit }: ScheduleGr
   const [sheetWeek, setSheetWeek] = useState('')
   const [creatingKey, setCreatingKey] = useState<string | null>(null)
   const [, startTransition] = useTransition()
+
+  const [assignOpen, setAssignOpen] = useState(false)
+  const [assignGroup, setAssignGroup] = useState<RouteGroup | null>(null)
 
   // Build visit lookup: zone_id → week_start → visit
   const visitMap = useMemo(() => {
@@ -136,7 +142,23 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit }: ScheduleGr
                     colSpan={1 + weeks.length}
                     className="bg-secondary text-secondary-foreground text-xs font-semibold uppercase tracking-widest px-4 py-2 border-b border-border"
                   >
-                    {routeGroup.name}
+                    <div className="flex items-center justify-between">
+                      <span>{routeGroup.name}</span>
+                      {canEdit && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 px-2 text-xs font-medium text-secondary-foreground/70 hover:text-foreground hover:bg-secondary-foreground/10 normal-case tracking-normal"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setAssignGroup(routeGroup)
+                            setAssignOpen(true)
+                          }}
+                        >
+                          Assign Route
+                        </Button>
+                      )}
+                    </div>
                   </td>
                 </tr>,
                 ...rows.map((row) => (
@@ -185,6 +207,17 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit }: ScheduleGr
           canEdit={canEdit}
         />
       )}
+
+      {assignGroup && (
+        <RouteAssignDialog
+          open={assignOpen}
+          onOpenChange={setAssignOpen}
+          routeGroup={assignGroup}
+          weeks={weeks}
+          employees={employees}
+          vehicles={vehicles}
+        />
+      )}
     </>
   )
 }
@@ -228,6 +261,12 @@ function ScheduleCell({
 
   const hasInstruction = Boolean(visit.crew_instruction)
 
+  const assignedCrew = visit.visit_crew
+    .filter((vc) => vc.relation === 'assigned' && vc.employee)
+    .map((vc) => vc.employee!)
+  const displayedCrew = assignedCrew.slice(0, 2)
+  const overflow = assignedCrew.length - 2
+
   return (
     <div
       role="button"
@@ -246,6 +285,21 @@ function ScheduleCell({
         <span className="text-[11px] opacity-80 tabular-nums">
           {format(parseISO(visit.actual_date), 'MMM d')}
         </span>
+      )}
+      {assignedCrew.length > 0 && (
+        <div className="flex flex-wrap gap-0.5 mt-0.5">
+          {displayedCrew.map((emp) => (
+            <span
+              key={emp.id}
+              className="text-[10px] bg-background/60 rounded px-1 leading-4 truncate max-w-[52px]"
+            >
+              {emp.name.split(' ')[0]}
+            </span>
+          ))}
+          {overflow > 0 && (
+            <span className="text-[10px] opacity-70 leading-4">+{overflow}</span>
+          )}
+        </div>
       )}
     </div>
   )
