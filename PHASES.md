@@ -312,7 +312,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   replaced by the stacked view in 3.10 (responsive swap on viewport) — keep all
   data fetching in the shared layer (3.1) so the two views never fork logic.
 
-- [ ] **3.3 — Visit cell interactions**
+- [x] **3.3 — Visit cell interactions**
   *Depends on: 3.2*
   Each visit cell is clickable. Clicking an empty cell creates a scheduled visit
   for that zone + week (Server Action). Clicking an existing visit opens a

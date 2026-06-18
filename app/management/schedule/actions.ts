@@ -1,6 +1,8 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { visitUpdateSchema, type VisitUpdateValues } from '@/lib/validators/visit'
 import type {
   Account,
   Property,
@@ -81,4 +83,83 @@ export async function getScheduleForWeek(weekStart: string): Promise<ScheduleWee
   })
 
   return { weekStart, routeGroups: scheduleRouteGroups }
+}
+
+export async function createVisit(
+  zoneId: string,
+  weekStart: string,
+  accountId: string,
+  propertyId: string,
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+
+  const { error } = await supabase.from('visits').insert({
+    service_zone_id: zoneId,
+    account_id: accountId,
+    property_id: propertyId,
+    week_start: weekStart,
+    status: 'scheduled',
+  })
+
+  if (error) {
+    console.error('[createVisit]', error)
+    return { error: error.message }
+  }
+
+  revalidatePath('/management/schedule')
+  return {}
+}
+
+export async function saveVisitChanges(
+  visitId: string,
+  values: VisitUpdateValues,
+): Promise<{ error?: string }> {
+  const parsed = visitUpdateSchema.safeParse(values)
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Invalid data' }
+  }
+
+  const supabase = await createClient()
+
+  const [updateResult, crewDeleteResult] = await Promise.all([
+    supabase
+      .from('visits')
+      .update({
+        status: parsed.data.status,
+        crew_instruction: parsed.data.crew_instruction ?? null,
+        vehicle_id: parsed.data.vehicle_id ?? null,
+      })
+      .eq('id', visitId),
+    supabase
+      .from('visit_crew')
+      .delete()
+      .eq('visit_id', visitId)
+      .eq('relation', 'assigned'),
+  ])
+
+  if (updateResult.error) {
+    console.error('[saveVisitChanges:update]', updateResult.error)
+    return { error: updateResult.error.message }
+  }
+  if (crewDeleteResult.error) {
+    console.error('[saveVisitChanges:delete crew]', crewDeleteResult.error)
+    return { error: crewDeleteResult.error.message }
+  }
+
+  if (parsed.data.assigned_crew_ids.length > 0) {
+    const { error: insertError } = await supabase.from('visit_crew').insert(
+      parsed.data.assigned_crew_ids.map((empId) => ({
+        visit_id: visitId,
+        employee_id: empId,
+        relation: 'assigned' as const,
+      }))
+    )
+    if (insertError) {
+      console.error('[saveVisitChanges:insert crew]', insertError)
+      return { error: insertError.message }
+    }
+  }
+
+  revalidatePath('/management/schedule')
+  return {}
 }
