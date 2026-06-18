@@ -359,11 +359,15 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 
 - [x] **3.8 — Skip visit workflow**
   *Depends on: 3.3*
-  In `VisitDetailSheet`, add a "Skip This Visit" button (destructive secondary
-  style). Opens a dialog asking for a skip reason (optional freetext). Sets
-  status to `skipped`, stores reason in `skip_reason`. Skipped cells show in
-  yellow in the grid. Skipped visits are NOT invoiced. Add an "Undo skip"
-  action that reverts to `scheduled`.
+  The status dropdown (moved to the top of `VisitDetailSheet` for prominence) is
+  the single control for all status changes. Selecting `skipped` intercepts the
+  change and opens a dialog for an optional skip reason; cancelling reverts the
+  dropdown. On confirm, sets status to `skipped` and stores reason in `skip_reason`
+  via a dedicated `skipVisit` server action. If a skip reason was provided, it is
+  shown inline below the status dropdown. Changing status back to `scheduled` (or
+  any other status) goes through the normal Save flow and automatically clears
+  `skip_reason`. Skipped cells show in yellow in the grid via the existing
+  `status-skipped` CSS class. Skipped visits are NOT invoiced.
 
 - [ ] **3.9 — Schedule dashboard page**
   *Depends on: 3.1*
