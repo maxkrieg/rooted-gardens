@@ -34,6 +34,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { VisitStatusBadge } from '@/components/management/badges'
+import { cn } from '@/lib/utils'
 import { saveVisitChanges } from '@/app/management/schedule/actions'
 import { visitUpdateSchema, type VisitUpdateValues } from '@/lib/validators/visit'
 import type { Employee, ScheduleZoneRow, Vehicle, VisitStatus } from '@/types/app'
@@ -127,6 +128,42 @@ export function VisitDetailSheet({
             onSubmit={form.handleSubmit(onSubmit)}
             className="flex-1 overflow-y-auto px-6 py-6 space-y-6"
           >
+            {/* Crew Instruction — top of form; highlighted when content exists */}
+            {/* TODO (task 4.3): mirror this as an orange banner on app/crew/stop/[visitId]/page.tsx */}
+            <div
+              className={cn(
+                'rounded-lg -mx-1 px-1',
+                visit.crew_instruction &&
+                  'bg-[var(--clay)]/[0.08] border border-[var(--clay)]/30 px-3 py-3',
+              )}
+            >
+              <FormField
+                control={form.control}
+                name="crew_instruction"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-1.5">
+                      {visit.crew_instruction && (
+                        <span className="w-2 h-2 rounded-full bg-[var(--clay)] shrink-0" />
+                      )}
+                      Crew Instruction
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        value={field.value ?? ''}
+                        disabled={!canEdit}
+                        placeholder="Add a note for crew…"
+                        className="resize-none"
+                        rows={3}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
             {/* Status */}
             <FormField
               control={form.control}
@@ -148,28 +185,6 @@ export function VisitDetailSheet({
                       ))}
                     </SelectContent>
                   </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Crew Instruction */}
-            <FormField
-              control={form.control}
-              name="crew_instruction"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Crew Instruction</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      {...field}
-                      value={field.value ?? ''}
-                      disabled={!canEdit}
-                      placeholder="Add a note for crew…"
-                      className="resize-none"
-                      rows={3}
-                    />
-                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

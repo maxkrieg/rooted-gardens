@@ -348,7 +348,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   (contract) accounts, show a "CONTRACT" badge on the property header row.
   Per-visit accounts show their price on hover.
 
-- [ ] **3.7 — Crew instruction ("orange cell") workflow**
+- [x] **3.7 — Crew instruction ("orange cell") workflow**
   *Depends on: 3.3 (crew-side banner also needs 4.3)*
   The `crew_instruction` field on a visit is a one-time note for crew for
   that specific visit. In the grid, cells with a crew instruction show an

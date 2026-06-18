@@ -10,6 +10,8 @@ import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { FilePen } from 'lucide-react'
 import type {
   Account,
   Employee,
@@ -319,11 +321,28 @@ function ScheduleCell({
       onKeyDown={onKeyDown}
       className={cn(
         base,
+        'relative',
         `status-${visit.status}`,
         'cursor-pointer hover:brightness-95',
-        hasInstruction && 'border-l-4 border-[var(--clay)]',
       )}
     >
+      {hasInstruction && (
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                className="absolute top-1 right-1 text-[var(--clay)] leading-none"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <FilePen className="w-4 h-4" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-[200px] text-xs whitespace-pre-wrap">
+              {visit.crew_instruction}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
       <span className="text-xs font-medium capitalize leading-tight">{visit.status}</span>
       {visit.status === 'completed' && visit.actual_date && (
         <span className="text-[11px] opacity-80 tabular-nums">
