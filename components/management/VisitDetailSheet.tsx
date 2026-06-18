@@ -44,7 +44,7 @@ import { Badge } from '@/components/ui/badge'
 import { VisitStatusBadge } from '@/components/management/badges'
 import { cn } from '@/lib/utils'
 import { FilePen } from 'lucide-react'
-import { saveVisitChanges, skipVisit, unskipVisit } from '@/app/management/schedule/actions'
+import { saveVisitChanges, skipVisit } from '@/app/management/schedule/actions'
 import { visitUpdateSchema, type VisitUpdateValues } from '@/lib/validators/visit'
 import type { Employee, ScheduleZoneRow, Vehicle, VisitStatus } from '@/types/app'
 
@@ -108,7 +108,39 @@ export function VisitDetailSheet({
 
   const [skipDialogOpen, setSkipDialogOpen] = useState(false)
   const [skipReason, setSkipReason] = useState('')
+  const [previousStatus, setPreviousStatus] = useState<VisitStatus>('scheduled')
   const [, startTransition] = useTransition()
+
+  function handleStatusChange(newValue: string) {
+    if (newValue === 'skipped') {
+      setPreviousStatus(form.getValues('status'))
+      form.setValue('status', 'skipped')
+      setSkipReason('')
+      setSkipDialogOpen(true)
+    } else {
+      form.setValue('status', newValue as VisitStatus)
+    }
+  }
+
+  function handleSkipCancel() {
+    form.setValue('status', previousStatus)
+    setSkipDialogOpen(false)
+  }
+
+  function handleConfirmSkip() {
+    if (!visit) return
+    startTransition(async () => {
+      const res = await skipVisit(visit.id, skipReason.trim() || undefined)
+      if (res.error) {
+        toast.error('Failed to skip visit', { description: res.error })
+        form.setValue('status', previousStatus)
+        return
+      }
+      setSkipDialogOpen(false)
+      onOpenChange(false)
+      toast.success('Visit skipped')
+    })
+  }
 
   async function onSubmit(values: VisitUpdateValues) {
     if (!visit) return
@@ -121,336 +153,281 @@ export function VisitDetailSheet({
     onOpenChange(false)
   }
 
-  function handleSkipClick() {
-    setSkipReason('')
-    setSkipDialogOpen(true)
-  }
-
-  function handleConfirmSkip() {
-    if (!visit) return
-    startTransition(async () => {
-      const res = await skipVisit(visit.id, skipReason.trim() || undefined)
-      if (res.error) {
-        toast.error('Failed to skip visit', { description: res.error })
-        return
-      }
-      setSkipDialogOpen(false)
-      onOpenChange(false)
-      toast.success('Visit skipped')
-    })
-  }
-
-  function handleUnskip() {
-    if (!visit) return
-    startTransition(async () => {
-      const res = await unskipVisit(visit.id)
-      if (res.error) {
-        toast.error('Failed to undo skip', { description: res.error })
-        return
-      }
-      onOpenChange(false)
-      toast.success('Visit restored to scheduled')
-    })
-  }
-
   if (!visit) return null
 
   const crewEmployees = employees.filter((emp) => emp.role === 'crew')
 
   return (
     <>
-    <Dialog open={skipDialogOpen} onOpenChange={setSkipDialogOpen}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Skip this visit?</DialogTitle>
-          <DialogDescription>
-            {row.zone.name} · Week of {format(parseISO(weekStart), 'MMM d')}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="py-2">
-          <Textarea
-            value={skipReason}
-            onChange={(e) => setSkipReason(e.target.value)}
-            placeholder="Reason (optional)"
-            className="resize-none"
-            rows={3}
-          />
-        </div>
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => setSkipDialogOpen(false)}>
-            Cancel
-          </Button>
-          <Button variant="destructive" onClick={handleConfirmSkip}>
-            Confirm Skip
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      <Dialog open={skipDialogOpen} onOpenChange={(o) => { if (!o) handleSkipCancel() }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Skip this visit?</DialogTitle>
+            <DialogDescription>
+              {row.zone.name} · Week of {format(parseISO(weekStart), 'MMM d')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Textarea
+              value={skipReason}
+              onChange={(e) => setSkipReason(e.target.value)}
+              placeholder="Reason (optional)"
+              className="resize-none"
+              rows={3}
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={handleSkipCancel}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmSkip}>
+              Confirm Skip
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col p-0 gap-0">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b border-border shrink-0">
-          <SheetTitle className="font-display text-lg leading-tight">{row.zone.name}</SheetTitle>
-          <SheetDescription>
-            {row.property.address} · Week of {format(parseISO(weekStart), 'MMM d')}
-          </SheetDescription>
-        </SheetHeader>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col p-0 gap-0">
+          <SheetHeader className="px-6 pt-6 pb-4 border-b border-border shrink-0">
+            <SheetTitle className="font-display text-lg leading-tight">{row.zone.name}</SheetTitle>
+            <SheetDescription>
+              {row.property.address} · Week of {format(parseISO(weekStart), 'MMM d')}
+            </SheetDescription>
+          </SheetHeader>
 
-        <Form {...form}>
-          <form
-            id="visit-detail-form"
-            onSubmit={form.handleSubmit(onSubmit)}
-            className="flex-1 overflow-y-auto px-6 py-6 space-y-6"
-          >
-            {/* Skipped state banner */}
-            {visit.status === 'skipped' && (
-              <div className="rounded-lg bg-[#fbf0d6] border border-[#d9a441]/40 px-4 py-3 space-y-1">
-                <p className="text-sm font-semibold text-[#9a6b16]">Visit skipped</p>
-                {visit.skip_reason && (
-                  <p className="text-sm text-[#9a6b16]/80">{visit.skip_reason}</p>
-                )}
-              </div>
-            )}
-
-            {/* Crew Instruction — top of form; highlighted when content exists */}
-            {/* TODO (task 4.3): mirror this as an orange banner on app/crew/stop/[visitId]/page.tsx */}
-            <div
-              className={cn(
-                'rounded-lg -mx-1 px-1',
-                visit.crew_instruction &&
-                  'bg-[var(--clay)]/[0.08] border border-[var(--clay)]/30 px-3 py-3',
-              )}
+          <Form {...form}>
+            <form
+              id="visit-detail-form"
+              onSubmit={form.handleSubmit(onSubmit)}
+              className="flex-1 overflow-y-auto px-6 py-6 space-y-6"
             >
+              {/* Status — top of form */}
               <FormField
                 control={form.control}
-                name="crew_instruction"
+                name="status"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="flex items-center gap-1.5">
-                      {visit.crew_instruction && (
-                        <FilePen className="w-4 h-4 text-[var(--clay)] shrink-0" />
-                      )}
-                      Crew Instruction
-                    </FormLabel>
-                    <FormControl>
-                      <Textarea
-                        {...field}
-                        value={field.value ?? ''}
-                        disabled={!canEdit}
-                        placeholder="Add a note for crew…"
-                        className="resize-none"
-                        rows={3}
-                      />
-                    </FormControl>
+                    <FormLabel>Status</FormLabel>
+                    <Select
+                      disabled={!canEdit}
+                      value={field.value}
+                      onValueChange={handleStatusChange}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {VISIT_STATUS_OPTIONS.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            <VisitStatusBadge status={s} />
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
 
-            {/* Status */}
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Status</FormLabel>
-                  <Select disabled={!canEdit || visit.status === 'skipped'} value={field.value} onValueChange={field.onChange}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {VISIT_STATUS_OPTIONS.map((s) => (
-                        <SelectItem key={s} value={s}>
-                          <VisitStatusBadge status={s} />
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
+              {/* Skip reason — shown below status when visit is skipped and reason exists */}
+              {visit.status === 'skipped' && visit.skip_reason && (
+                <p className="text-sm text-[#9a6b16] bg-[#fbf0d6] border border-[#d9a441]/40 rounded-lg px-3 py-2 -mt-3">
+                  {visit.skip_reason}
+                </p>
               )}
-            />
 
-            {/* Assigned Crew */}
-            <FormField
-              control={form.control}
-              name="assigned_crew_ids"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Assigned Crew</FormLabel>
-                  <div className="rounded-lg border border-border divide-y divide-border">
-                    {crewEmployees.length === 0 && (
-                      <p className="text-sm text-muted-foreground px-3 py-2.5">
-                        No active crew members.
-                      </p>
-                    )}
-                    {crewEmployees.map((emp) => {
-                      const checked = field.value.includes(emp.id)
-                      return (
-                        <label
-                          key={emp.id}
-                          className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-accent/30 transition-colors"
-                        >
-                          <Checkbox
-                            checked={checked}
-                            disabled={!canEdit}
-                            onCheckedChange={(c) => {
-                              const next = c
-                                ? [...field.value, emp.id]
-                                : field.value.filter((id) => id !== emp.id)
-                              field.onChange(next)
-                            }}
-                          />
-                          <span className="text-sm font-medium text-foreground flex-1 select-none">
-                            {emp.name}
-                          </span>
-                          <span className="text-xs text-muted-foreground capitalize select-none">
-                            {emp.role}
-                          </span>
-                        </label>
-                      )
-                    })}
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Vehicle */}
-            <FormField
-              control={form.control}
-              name="vehicle_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Vehicle</FormLabel>
-                  <Select
-                    disabled={!canEdit}
-                    value={field.value ?? 'none'}
-                    onValueChange={(v) => field.onChange(v === 'none' ? null : v)}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="None" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {vehicles.map((v) => (
-                        <SelectItem key={v.id} value={v.id}>
-                          <span className="flex items-center gap-2">
-                            <span>{v.name}</span>
-                            {v.plate && (
-                              <span className="text-xs text-muted-foreground">· {v.plate}</span>
-                            )}
-                            {v.status === 'maintenance' && (
-                              <Badge
-                                variant="outline"
-                                className="text-[10px] status-skipped border-transparent ml-1"
-                              >
-                                Maintenance
-                              </Badge>
-                            )}
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Completion details — read-only */}
-            {visit.status === 'completed' && (
-              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
-                <h3 className="text-sm font-semibold text-foreground">Completion Details</h3>
-                {visit.actual_date && (
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">
-                      Date completed
-                    </p>
-                    <p className="text-sm text-foreground">
-                      {format(parseISO(visit.actual_date), 'EEE, MMM d')}
-                    </p>
-                  </div>
+              {/* Crew Instruction */}
+              {/* TODO (task 4.3): mirror this as an orange banner on app/crew/stop/[visitId]/page.tsx */}
+              <div
+                className={cn(
+                  'rounded-lg -mx-1 px-1',
+                  visit.crew_instruction &&
+                    'bg-[var(--clay)]/[0.08] border border-[var(--clay)]/30 px-3 py-3',
                 )}
-                {visit.service_types && visit.service_types.length > 0 && (
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1.5">
-                      Services
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {visit.service_types.map((t) => (
-                        <Badge
-                          key={t}
-                          variant="outline"
-                          className="text-[10px] status-completed border-transparent"
-                        >
-                          {SERVICE_TYPE_LABELS[t] ?? t}
-                        </Badge>
-                      ))}
+              >
+                <FormField
+                  control={form.control}
+                  name="crew_instruction"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-1.5">
+                        {visit.crew_instruction && (
+                          <FilePen className="w-4 h-4 text-[var(--clay)] shrink-0" />
+                        )}
+                        Crew Instruction
+                      </FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          value={field.value ?? ''}
+                          disabled={!canEdit}
+                          placeholder="Add a note for crew…"
+                          className="resize-none"
+                          rows={3}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Assigned Crew */}
+              <FormField
+                control={form.control}
+                name="assigned_crew_ids"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Assigned Crew</FormLabel>
+                    <div className="rounded-lg border border-border divide-y divide-border">
+                      {crewEmployees.length === 0 && (
+                        <p className="text-sm text-muted-foreground px-3 py-2.5">
+                          No active crew members.
+                        </p>
+                      )}
+                      {crewEmployees.map((emp) => {
+                        const checked = field.value.includes(emp.id)
+                        return (
+                          <label
+                            key={emp.id}
+                            className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-accent/30 transition-colors"
+                          >
+                            <Checkbox
+                              checked={checked}
+                              disabled={!canEdit}
+                              onCheckedChange={(c) => {
+                                const next = c
+                                  ? [...field.value, emp.id]
+                                  : field.value.filter((id) => id !== emp.id)
+                                field.onChange(next)
+                              }}
+                            />
+                            <span className="text-sm font-medium text-foreground flex-1 select-none">
+                              {emp.name}
+                            </span>
+                            <span className="text-xs text-muted-foreground capitalize select-none">
+                              {emp.role}
+                            </span>
+                          </label>
+                        )
+                      })}
                     </div>
-                  </div>
+                    <FormMessage />
+                  </FormItem>
                 )}
-                {visit.completion_note && (
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">
-                      Note
-                    </p>
-                    <p className="text-sm text-foreground">{visit.completion_note}</p>
-                  </div>
-                )}
-              </div>
-            )}
-            {/* Skip / Undo skip */}
-            {canEdit && (visit.status === 'scheduled' || visit.status === 'skipped') && (
-              <div className="pt-2">
-                {visit.status === 'skipped' ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={handleUnskip}
-                  >
-                    Undo Skip
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full text-destructive border-destructive/30 hover:bg-destructive/5 hover:text-destructive"
-                    onClick={handleSkipClick}
-                  >
-                    Skip This Visit
-                  </Button>
-                )}
-              </div>
-            )}
-          </form>
-        </Form>
+              />
 
-        <SheetFooter className="px-6 py-4 border-t border-border shrink-0 flex-row gap-2">
-          <SheetClose asChild>
-            <Button type="button" variant="outline" className="flex-1 sm:flex-none">
-              Cancel
-            </Button>
-          </SheetClose>
-          {canEdit && (
-            <Button
-              type="submit"
-              form="visit-detail-form"
-              disabled={form.formState.isSubmitting}
-              className="flex-1 sm:flex-none"
-            >
-              {form.formState.isSubmitting ? 'Saving…' : 'Save Changes'}
-            </Button>
-          )}
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+              {/* Vehicle */}
+              <FormField
+                control={form.control}
+                name="vehicle_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Vehicle</FormLabel>
+                    <Select
+                      disabled={!canEdit}
+                      value={field.value ?? 'none'}
+                      onValueChange={(v) => field.onChange(v === 'none' ? null : v)}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="None" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {vehicles.map((v) => (
+                          <SelectItem key={v.id} value={v.id}>
+                            <span className="flex items-center gap-2">
+                              <span>{v.name}</span>
+                              {v.plate && (
+                                <span className="text-xs text-muted-foreground">· {v.plate}</span>
+                              )}
+                              {v.status === 'maintenance' && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] status-skipped border-transparent ml-1"
+                                >
+                                  Maintenance
+                                </Badge>
+                              )}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Completion details — read-only */}
+              {visit.status === 'completed' && (
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+                  <h3 className="text-sm font-semibold text-foreground">Completion Details</h3>
+                  {visit.actual_date && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">
+                        Date completed
+                      </p>
+                      <p className="text-sm text-foreground">
+                        {format(parseISO(visit.actual_date), 'EEE, MMM d')}
+                      </p>
+                    </div>
+                  )}
+                  {visit.service_types && visit.service_types.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1.5">
+                        Services
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {visit.service_types.map((t) => (
+                          <Badge
+                            key={t}
+                            variant="outline"
+                            className="text-[10px] status-completed border-transparent"
+                          >
+                            {SERVICE_TYPE_LABELS[t] ?? t}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {visit.completion_note && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">
+                        Note
+                      </p>
+                      <p className="text-sm text-foreground">{visit.completion_note}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </form>
+          </Form>
+
+          <SheetFooter className="px-6 py-4 border-t border-border shrink-0 flex-row gap-2">
+            <SheetClose asChild>
+              <Button type="button" variant="outline" className="flex-1 sm:flex-none">
+                Cancel
+              </Button>
+            </SheetClose>
+            {canEdit && (
+              <Button
+                type="submit"
+                form="visit-detail-form"
+                disabled={form.formState.isSubmitting}
+                className="flex-1 sm:flex-none"
+              >
+                {form.formState.isSubmitting ? 'Saving…' : 'Save Changes'}
+              </Button>
+            )}
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </>
   )
 }

@@ -196,6 +196,8 @@ export async function saveVisitChanges(
         status: parsed.data.status,
         crew_instruction: parsed.data.crew_instruction ?? null,
         vehicle_id: parsed.data.vehicle_id ?? null,
+        // clear skip_reason when moving away from skipped
+        ...(parsed.data.status !== 'skipped' && { skip_reason: null }),
       })
       .eq('id', visitId),
     supabase
