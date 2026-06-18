@@ -406,7 +406,7 @@ export function VisitDetailSheet({
               </div>
             )}
             {/* Skip / Undo skip */}
-            {canEdit && (
+            {canEdit && (visit.status === 'scheduled' || visit.status === 'skipped') && (
               <div className="pt-2">
                 {visit.status === 'skipped' ? (
                   <Button
