@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -8,6 +8,8 @@ import { getWeekStart } from '@/lib/utils/schedule'
 import { createVisit } from '@/app/management/schedule/actions'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
+import { useSessions } from '@/components/management/SessionsProvider'
+import { activeSessionsFor, formatElapsed } from '@/lib/utils/visits'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -20,6 +22,7 @@ import type {
   ScheduleWeek,
   ScheduleZoneRow,
   Vehicle,
+  VisitSessionWithEmployee,
   VisitWithCrew,
 } from '@/types/app'
 
@@ -35,6 +38,7 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit }: ScheduleGr
     () => format(getWeekStart(new Date()), 'yyyy-MM-dd'),
     []
   )
+  const sessions = useSessions()
 
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sheetRow, setSheetRow] = useState<ScheduleZoneRow | null>(null)
@@ -225,6 +229,7 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit }: ScheduleGr
                             <td key={week.weekStart} className="px-2 py-2 align-top">
                               <ScheduleCell
                                 visit={visit}
+                                activeSessions={visit ? activeSessionsFor(visit.id, sessions) : []}
                                 isCreating={creatingKey === cellKey}
                                 onClick={() => handleCellClick(row, week.weekStart, visit)}
                                 onKeyDown={(e) => handleCellKeyDown(e, row, week.weekStart, visit)}
@@ -270,15 +275,24 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit }: ScheduleGr
 
 function ScheduleCell({
   visit,
+  activeSessions,
   isCreating,
   onClick,
   onKeyDown,
 }: {
   visit: VisitWithCrew | null
+  activeSessions: VisitSessionWithEmployee[]
   isCreating: boolean
   onClick: () => void
   onKeyDown: (e: React.KeyboardEvent) => void
 }) {
+  // Tick elapsed time every 30s
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    if (activeSessions.length === 0) return
+    const id = setInterval(() => setTick((t) => t + 1), 30_000)
+    return () => clearInterval(id)
+  }, [activeSessions.length])
   const base =
     'min-h-[48px] rounded-lg px-2 py-2 flex flex-col justify-center gap-0.5 outline-none focus-visible:ring-2 focus-visible:ring-ring transition-opacity select-none'
 
@@ -306,6 +320,7 @@ function ScheduleCell({
   }
 
   const hasInstruction = Boolean(visit.crew_instruction)
+  const inProgress = activeSessions.length > 0
 
   const assignedCrew = visit.visit_crew
     .filter((vc) => vc.relation === 'assigned' && vc.employee)
@@ -343,26 +358,49 @@ function ScheduleCell({
           </Tooltip>
         </TooltipProvider>
       )}
-      <span className="text-xs font-medium capitalize leading-tight">{visit.status}</span>
-      {visit.status === 'completed' && visit.actual_date && (
-        <span className="text-[11px] opacity-80 tabular-nums">
-          {format(parseISO(visit.actual_date), 'MMM d')}
-        </span>
-      )}
-      {assignedCrew.length > 0 && (
-        <div className="flex flex-wrap gap-0.5 mt-0.5">
-          {displayedCrew.map((emp) => (
-            <span
-              key={emp.id}
-              className="text-[10px] bg-background/60 rounded px-1 leading-4 truncate max-w-[52px]"
-            >
-              {emp.name.split(' ')[0]}
+
+      {inProgress ? (
+        /* On-site overlay — replaces status text when crew is active */
+        <div className="flex flex-col gap-0.5">
+          <div className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--clay)] animate-pulse shrink-0" />
+            <span className="text-[11px] font-semibold text-[var(--clay)] leading-tight">
+              On site
             </span>
-          ))}
-          {overflow > 0 && (
-            <span className="text-[10px] opacity-70 leading-4">+{overflow}</span>
+          </div>
+          <span className="text-[11px] text-[var(--clay)]/80 tabular-nums leading-tight">
+            {formatElapsed(activeSessions[0].started_at)}
+          </span>
+          {activeSessions[0].employee && (
+            <span className="text-[10px] bg-[var(--clay)]/15 rounded px-1 leading-4 truncate max-w-[52px]">
+              {activeSessions[0].employee.name.split(' ')[0]}
+            </span>
           )}
         </div>
+      ) : (
+        <>
+          <span className="text-xs font-medium capitalize leading-tight">{visit.status}</span>
+          {visit.status === 'completed' && visit.actual_date && (
+            <span className="text-[11px] opacity-80 tabular-nums">
+              {format(parseISO(visit.actual_date), 'MMM d')}
+            </span>
+          )}
+          {assignedCrew.length > 0 && (
+            <div className="flex flex-wrap gap-0.5 mt-0.5">
+              {displayedCrew.map((emp) => (
+                <span
+                  key={emp.id}
+                  className="text-[10px] bg-background/60 rounded px-1 leading-4 truncate max-w-[52px]"
+                >
+                  {emp.name.split(' ')[0]}
+                </span>
+              ))}
+              {overflow > 0 && (
+                <span className="text-[10px] opacity-70 leading-4">+{overflow}</span>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   )

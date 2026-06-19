@@ -393,7 +393,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   on viewport (CSS / responsive), sharing the same data layer (3.1) and Server Actions
   — do not fork the scheduling logic.
 
-- [ ] **3.11 — In-progress visit visibility (management)**
+- [x] **3.11 — In-progress visit visibility (management)**
   *Depends on: 3.9, 4.10 (data producer) — buildable now against 1.9 seed, validate once 4.10 lands*
   Surface live "who's on site now" to owners off the `visit_sessions` table (job start/stop).
   The crew producer is task 4.10, so build this UI against seed data (1.9 includes an open

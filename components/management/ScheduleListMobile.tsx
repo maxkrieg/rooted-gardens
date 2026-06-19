@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
 import { FilePen } from 'lucide-react'
@@ -8,6 +8,8 @@ import { cn } from '@/lib/utils'
 import { createVisit } from '@/app/management/schedule/actions'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
+import { useSessions } from '@/components/management/SessionsProvider'
+import { activeSessionsFor, formatElapsed } from '@/lib/utils/visits'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { VisitStatusBadge, FrequencyBadge } from '@/components/management/badges'
@@ -31,6 +33,14 @@ interface ScheduleListMobileProps {
 
 export function ScheduleListMobile({ weeks, employees, vehicles, canEdit }: ScheduleListMobileProps) {
   const week = weeks[0]
+  const sessions = useSessions()
+
+  // Tick elapsed time every 30s
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 30_000)
+    return () => clearInterval(id)
+  }, [])
 
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sheetRow, setSheetRow] = useState<ScheduleZoneRow | null>(null)
@@ -139,6 +149,10 @@ export function ScheduleListMobile({ weeks, employees, vehicles, canEdit }: Sche
                       {zoneRows.map((row) => {
                         const cellKey = `${row.zone.id}-${week.weekStart}`
                         const isCreating = creatingKey === cellKey
+                        const activeSessions = row.visit
+                          ? activeSessionsFor(row.visit.id, sessions)
+                          : []
+                        const inProgress = activeSessions.length > 0
                         const assigned = row.visit
                           ? row.visit.visit_crew
                               .filter((vc) => vc.relation === 'assigned' && vc.employee)
@@ -170,36 +184,50 @@ export function ScheduleListMobile({ weeks, employees, vehicles, canEdit }: Sche
                               <FrequencyBadge frequency={row.zone.frequency} />
                             </div>
 
-                            {/* Right: crew + instruction + status */}
+                            {/* Right: on-site indicator or crew + status */}
                             <div className="flex items-center gap-2 shrink-0">
-                              {displayedCrew.length > 0 && (
-                                <div className="flex gap-0.5">
-                                  {displayedCrew.map((emp) => (
-                                    <span
-                                      key={emp.id}
-                                      className="text-[10px] bg-muted/60 rounded px-1 leading-5"
-                                    >
-                                      {emp.name.split(' ')[0]}
-                                    </span>
-                                  ))}
-                                  {overflow > 0 && (
-                                    <span className="text-[10px] text-muted-foreground leading-5">
-                                      +{overflow}
+                              {inProgress ? (
+                                <div className="flex items-center gap-1.5 rounded-full bg-[var(--clay)]/10 border border-[var(--clay)]/30 px-2.5 py-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--clay)] animate-pulse shrink-0" />
+                                  <span className="text-[11px] font-semibold text-[var(--clay)]">
+                                    On site
+                                  </span>
+                                  <span className="text-[11px] text-[var(--clay)]/70 tabular-nums">
+                                    {formatElapsed(activeSessions[0].started_at)}
+                                  </span>
+                                </div>
+                              ) : (
+                                <>
+                                  {displayedCrew.length > 0 && (
+                                    <div className="flex gap-0.5">
+                                      {displayedCrew.map((emp) => (
+                                        <span
+                                          key={emp.id}
+                                          className="text-[10px] bg-muted/60 rounded px-1 leading-5"
+                                        >
+                                          {emp.name.split(' ')[0]}
+                                        </span>
+                                      ))}
+                                      {overflow > 0 && (
+                                        <span className="text-[10px] text-muted-foreground leading-5">
+                                          +{overflow}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {row.visit?.crew_instruction && (
+                                    <FilePen className="w-4 h-4 text-[var(--clay)] shrink-0" />
+                                  )}
+
+                                  {row.visit ? (
+                                    <VisitStatusBadge status={row.visit.status} />
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground/50">
+                                      {isCreating ? '…' : '+ Schedule'}
                                     </span>
                                   )}
-                                </div>
-                              )}
-
-                              {row.visit?.crew_instruction && (
-                                <FilePen className="w-4 h-4 text-[var(--clay)] shrink-0" />
-                              )}
-
-                              {row.visit ? (
-                                <VisitStatusBadge status={row.visit.status} />
-                              ) : (
-                                <span className="text-xs text-muted-foreground/50">
-                                  {isCreating ? '…' : '+ Schedule'}
-                                </span>
+                                </>
                               )}
                             </div>
                           </button>

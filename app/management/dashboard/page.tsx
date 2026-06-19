@@ -3,6 +3,7 @@ import { FilePen, Wrench } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getWeekStart } from '@/lib/utils/schedule'
 import { cn } from '@/lib/utils'
+import { CrewsOnSitePanel } from '@/components/management/CrewsOnSitePanel'
 import type { Equipment, Vehicle, VisitWithDetails } from '@/types/app'
 
 export default async function DashboardPage() {
@@ -10,7 +11,7 @@ export default async function DashboardPage() {
   const today = new Date()
   const weekStart = format(getWeekStart(today), 'yyyy-MM-dd')
 
-  const [visitsResult, equipmentResult, vehiclesResult] = await Promise.all([
+  const [visitsResult, equipmentResult, vehiclesResult, openSessionsResult] = await Promise.all([
     supabase
       .from('visits')
       .select(`
@@ -23,11 +24,16 @@ export default async function DashboardPage() {
       .eq('week_start', weekStart),
     supabase.from('equipment').select('*').eq('status', 'maintenance').order('name'),
     supabase.from('vehicles').select('*').eq('status', 'maintenance').order('name'),
+    supabase
+      .from('visit_sessions')
+      .select('*, employee:employees(*), visit:visits(*, property:properties(*), service_zone:service_zones(*))')
+      .is('ended_at', null),
   ])
 
   const visits = (visitsResult.data ?? []) as unknown as VisitWithDetails[]
   const maintenanceEquipment = (equipmentResult.data ?? []) as Equipment[]
   const maintenanceVehicles = (vehiclesResult.data ?? []) as Vehicle[]
+  const openSessions = (openSessionsResult.data ?? []) as unknown as Parameters<typeof CrewsOnSitePanel>[0]['initialSessions']
 
   const scheduledVisits = visits.filter((v) => v.status === 'scheduled')
   const completedCount = visits.filter((v) => v.status === 'completed').length
@@ -65,6 +71,9 @@ export default async function DashboardPage() {
           <StatCard label="Uninvoiced" value={uninvoicedCount} colorClass="status-invoiced" />
         </div>
       </section>
+
+      {/* ── Crews on site now (live) ──────────────────────────────────────── */}
+      <CrewsOnSitePanel initialSessions={openSessions} />
 
       {/* ── Scheduled visits ───────────────────────────────────────────────── */}
       <section>
