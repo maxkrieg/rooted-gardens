@@ -379,7 +379,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   (4) Outstanding crew instructions that haven't been completed yet.
   This is the first thing the owner sees when they open the app.
 
-- [ ] **3.10 — Mobile-adapted schedule view (phone)**
+- [x] **3.10 — Mobile-adapted schedule view (phone)**
   *Depends on: 3.2, 3.5, 3.6*
   Owners are phone-primary, so the 4-week desktop grid (3.2) must collapse to a usable
   phone layout — never a horizontally-scrolling spreadsheet on a phone. Create a

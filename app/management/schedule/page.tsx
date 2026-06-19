@@ -4,6 +4,7 @@ import { getWeekStart } from '@/lib/utils/schedule'
 import { createClient } from '@/lib/supabase/server'
 import { getScheduleForWeek } from './actions'
 import { ScheduleGrid } from '@/components/management/ScheduleGrid'
+import { ScheduleListMobile } from '@/components/management/ScheduleListMobile'
 import { ScheduleNav } from '@/components/management/ScheduleNav'
 
 export default async function SchedulePage({
@@ -36,12 +37,22 @@ export default async function SchedulePage({
         <h1 className="font-display text-2xl font-semibold text-foreground">Schedule</h1>
         <ScheduleNav windowStart={format(base, 'yyyy-MM-dd')} />
       </div>
-      <ScheduleGrid
-        weeks={weeks}
-        employees={employees}
-        vehicles={vehicles}
-        canEdit={canEdit}
-      />
+      <div className="hidden lg:block">
+        <ScheduleGrid
+          weeks={weeks}
+          employees={employees}
+          vehicles={vehicles}
+          canEdit={canEdit}
+        />
+      </div>
+      <div className="lg:hidden">
+        <ScheduleListMobile
+          weeks={weeks}
+          employees={employees}
+          vehicles={vehicles}
+          canEdit={canEdit}
+        />
+      </div>
     </div>
   )
 }

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { format, parseISO, addWeeks, isBefore, isAfter } from 'date-fns'
+import { format, parseISO, addWeeks, addDays, isBefore, isAfter } from 'date-fns'
 import { ChevronLeft, ChevronRight, CalendarIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -38,6 +38,7 @@ export function ScheduleNav({ windowStart }: ScheduleNavProps) {
   }
 
   const rangeLabel = `${format(windowStartDate, 'MMM d')} – ${format(addWeeks(windowStartDate, 3), 'MMM d')}`
+  const singleWeekLabel = `${format(windowStartDate, 'MMM d')} – ${format(addDays(windowStartDate, 6), 'MMM d')}`
 
   return (
     <div className="flex items-center gap-1.5">
@@ -62,8 +63,13 @@ export function ScheduleNav({ windowStart }: ScheduleNavProps) {
         <ChevronLeft className="h-4 w-4" />
       </Button>
 
-      <span className="font-display text-sm font-medium text-foreground px-1 min-w-[120px] text-center">
+      {/* Desktop: 4-week window range */}
+      <span className="hidden lg:inline font-display text-sm font-medium text-foreground px-1 min-w-[120px] text-center">
         {rangeLabel}
+      </span>
+      {/* Mobile: single week */}
+      <span className="lg:hidden font-display text-sm font-medium text-foreground px-1 min-w-[100px] text-center">
+        {singleWeekLabel}
       </span>
 
       <Button
