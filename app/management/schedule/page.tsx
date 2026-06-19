@@ -7,7 +7,6 @@ import { ScheduleGrid } from '@/components/management/ScheduleGrid'
 import { ScheduleListMobile } from '@/components/management/ScheduleListMobile'
 import { ScheduleNav } from '@/components/management/ScheduleNav'
 import { SessionsProvider } from '@/components/management/SessionsProvider'
-import type { VisitSessionWithEmployee } from '@/types/app'
 
 export default async function SchedulePage({
   searchParams,
@@ -26,25 +25,17 @@ export default async function SchedulePage({
     supabase.from('vehicles').select('*').neq('status', 'retired').order('name'),
   ])
 
-  // Collect visit IDs across the 4-week window to fetch their sessions
+  // Collect visit IDs across the 4-week window — passed to SessionsProvider
+  // which fetches sessions client-side (avoids server-prop sync anti-pattern).
   const visitIds = weeks
     .flatMap((w) => w.routeGroups.flatMap((rg) => rg.rows.map((r) => r.visit?.id)))
     .filter((id): id is string => Boolean(id))
-
-  const sessionsResult =
-    visitIds.length > 0
-      ? await supabase
-          .from('visit_sessions')
-          .select('*, employee:employees(*)')
-          .in('visit_id', visitIds)
-      : { data: [] }
 
   const cookieStore = await cookies()
   const role = cookieStore.get('rg-role')?.value ?? 'crew'
 
   const employees = employeesResult.data ?? []
   const vehicles = vehiclesResult.data ?? []
-  const initialSessions = (sessionsResult.data ?? []) as unknown as VisitSessionWithEmployee[]
   const canEdit = role === 'owner' || role === 'lead'
 
   return (
@@ -53,7 +44,7 @@ export default async function SchedulePage({
         <h1 className="font-display text-2xl font-semibold text-foreground">Schedule</h1>
         <ScheduleNav windowStart={format(base, 'yyyy-MM-dd')} />
       </div>
-      <SessionsProvider initialSessions={initialSessions}>
+      <SessionsProvider visitIds={visitIds}>
         <div className="hidden lg:block">
           <ScheduleGrid
             weeks={weeks}

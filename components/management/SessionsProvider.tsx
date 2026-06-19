@@ -11,15 +11,34 @@ export function useSessions(): VisitSessionWithEmployee[] {
 }
 
 interface SessionsProviderProps {
-  initialSessions: VisitSessionWithEmployee[]
+  visitIds: string[]
   children: React.ReactNode
 }
 
-export function SessionsProvider({ initialSessions, children }: SessionsProviderProps) {
-  const [sessions, setSessions] = useState<VisitSessionWithEmployee[]>(initialSessions)
+export function SessionsProvider({ visitIds, children }: SessionsProviderProps) {
+  const [sessions, setSessions] = useState<VisitSessionWithEmployee[]>([])
+
+  // Join to a stable string so the effect dep is a primitive, not an array reference.
+  const visitIdsKey = visitIds.join(',')
 
   useEffect(() => {
     const supabase = createClient()
+
+    // Fetch current sessions for the visible visits — called on mount and whenever
+    // the visible visit set changes (week navigation).
+    async function loadSessions() {
+      if (!visitIdsKey) {
+        setSessions([])
+        return
+      }
+      const { data } = await supabase
+        .from('visit_sessions')
+        .select('*, employee:employees(*)')
+        .in('visit_id', visitIdsKey.split(','))
+      if (data) setSessions(data as unknown as VisitSessionWithEmployee[])
+    }
+
+    void loadSessions()
 
     const channel = supabase
       .channel('management_visit_sessions')
@@ -51,7 +70,7 @@ export function SessionsProvider({ initialSessions, children }: SessionsProvider
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [])
+  }, [visitIdsKey])
 
   return <SessionsContext.Provider value={sessions}>{children}</SessionsContext.Provider>
 }
