@@ -434,7 +434,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 > first because the crew side is offline-tolerant by design — every later task in this phase
 > builds on it.
 
-- [ ] **4.1 — Offline foundation for crew PWA**
+- [x] **4.1 — Offline foundation for crew PWA**
   *Depends on: 1.3, 1.7*
   Establish the offline-first substrate the rest of Phase 4 builds on (CLAUDE.md "Data
   Architecture" makes the crew side offline-tolerant by design — this is NOT end-of-project

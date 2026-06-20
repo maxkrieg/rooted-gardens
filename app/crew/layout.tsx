@@ -1,8 +1,11 @@
 'use client'
 
+import { useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Home, Clock, User } from 'lucide-react'
+import { OfflineBanner } from '@/components/crew/OfflineBanner'
+import { flushMutationQueue } from '@/lib/crew/mutation-queue'
 
 const navItems = [
   { href: '/crew/today', label: 'Today', Icon: Home },
@@ -13,8 +16,14 @@ const navItems = [
 export default function CrewLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
+  // Flush any mutations that were queued during a prior offline session
+  useEffect(() => {
+    flushMutationQueue()
+  }, [])
+
   return (
     <div className="flex flex-col min-h-[100dvh] bg-background">
+      <OfflineBanner />
       {/* Main scrollable content — leaves room for the bottom nav */}
       <main className="flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom,0px)]">
         {children}
