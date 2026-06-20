@@ -368,7 +368,10 @@ export function VisitDetailSheet({
   return (
     <>
       <Dialog open={skipDialogOpen} onOpenChange={(o) => { if (!o) handleSkipCancel() }}>
-        <DialogContent className="sm:max-w-md">
+        {/* Opens programmatically from inside the Sheet (no trigger to restore focus to).
+            preventDefault on close hands focus to the browser instead of Radix trying to
+            restore it into a tearing-down subtree — avoids the page-wide pointer-events lock. */}
+        <DialogContent className="sm:max-w-md" onCloseAutoFocus={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Skip this visit?</DialogTitle>
             <DialogDescription>
@@ -396,7 +399,15 @@ export function VisitDetailSheet({
       </Dialog>
 
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col p-0 gap-0">
+        {/* When the Sheet closes while a Select trigger inside it holds focus, Radix's
+            focus-restoration races with the closing subtree and can leave the page with a
+            stuck pointer-events lock (cells become unclickable). preventDefault sends focus
+            to document.body instead, which clears the lock. */}
+        <SheetContent
+          side="right"
+          className="w-full sm:max-w-lg flex flex-col p-0 gap-0"
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
           <SheetHeader className="px-6 pt-6 pb-4 border-b border-border shrink-0">
             <SheetTitle className="font-display text-lg leading-tight">{row.zone.name}</SheetTitle>
             <SheetDescription>
