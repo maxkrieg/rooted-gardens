@@ -446,7 +446,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   flush to Supabase when connectivity returns. Show a "You're offline" banner and a
   pending-sync indicator. Most crew stops are in rural Vermont — connectivity is not guaranteed.
 
-- [ ] **4.2 — Today's stops page (crew mobile)**
+- [x] **4.2 — Today's stops page (crew mobile)**
   *Depends on: 4.1, 1.2*
   Create `app/crew/today/page.tsx` as a **client** page using React Query over
   the Supabase browser client (this route must work from cache when offline — see
