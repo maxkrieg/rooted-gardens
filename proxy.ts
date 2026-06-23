@@ -63,16 +63,23 @@ export async function proxy(request: NextRequest) {
     return response
   }
 
-  // Authenticated user on the login page → their dashboard home
+  // Authenticated user on the login page → their dashboard home.
+  // Clear the role cookie so a previously-cached role from another user can't carry over.
   if (user && pathname === '/login') {
     const url = request.nextUrl.clone()
     url.pathname = '/management/dashboard'
-    return NextResponse.redirect(url)
+    const response = NextResponse.redirect(url)
+    response.cookies.delete(ROLE_COOKIE)
+    return response
   }
 
   // Role-based access control on protected routes
   if (user && isProtected) {
-    let role = request.cookies.get(ROLE_COOKIE)?.value as EmployeeRole | undefined
+    // Cookie stores "<userId>:<role>" so a stale cookie from a different user is ignored.
+    const rawCookie = request.cookies.get(ROLE_COOKIE)?.value
+    const [cookieUserId, cookieRole] = rawCookie?.split(':') ?? []
+    let role: EmployeeRole | undefined =
+      cookieUserId === user.id ? (cookieRole as EmployeeRole) : undefined
 
     if (!role && process.env.SUPABASE_SERVICE_ROLE_KEY) {
       // Use service role key to bypass RLS for this internal role lookup.
@@ -94,7 +101,7 @@ export async function proxy(request: NextRequest) {
 
       if (employee?.role) {
         role = employee.role as EmployeeRole
-        supabaseResponse.cookies.set(ROLE_COOKIE, role, {
+        supabaseResponse.cookies.set(ROLE_COOKIE, `${user.id}:${role}`, {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
           sameSite: 'lax',
@@ -104,18 +111,25 @@ export async function proxy(request: NextRequest) {
       }
     }
 
-    if (role) {
-      if (isManagement && !MANAGEMENT_ROLES.includes(role)) {
-        const url = request.nextUrl.clone()
-        url.pathname = ROLE_HOME[role] ?? '/crew/today'
-        return NextResponse.redirect(url)
-      }
+    // No employee record linked to this auth user — deny access to all protected routes.
+    if (!role) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      const response = NextResponse.redirect(url)
+      response.cookies.delete(ROLE_COOKIE)
+      return response
+    }
 
-      if (isCrew && !CREW_ROLES.includes(role)) {
-        const url = request.nextUrl.clone()
-        url.pathname = ROLE_HOME[role] ?? '/management/dashboard'
-        return NextResponse.redirect(url)
-      }
+    if (isManagement && !MANAGEMENT_ROLES.includes(role)) {
+      const url = request.nextUrl.clone()
+      url.pathname = ROLE_HOME[role] ?? '/crew/today'
+      return NextResponse.redirect(url)
+    }
+
+    if (isCrew && !CREW_ROLES.includes(role)) {
+      const url = request.nextUrl.clone()
+      url.pathname = ROLE_HOME[role] ?? '/management/dashboard'
+      return NextResponse.redirect(url)
     }
   }
 
