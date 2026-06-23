@@ -458,7 +458,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   If a crew instruction exists, show an orange banner on the card. No tables,
   no dense data — cards only. Empty state: "No stops scheduled for today."
 
-- [ ] **4.3 — Stop detail page (crew mobile)**
+- [x] **4.3 — Stop detail page (crew mobile)**
   *Depends on: 4.2*
   Create `app/crew/stop/[visitId]/page.tsx`. Full-screen mobile view with:
   (1) Orange banner at top if `crew_instruction` is set — large, prominent.
