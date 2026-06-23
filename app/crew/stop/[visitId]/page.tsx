@@ -228,8 +228,9 @@ export default function StopDetailPage() {
         <Button
           className="w-full h-12 text-base font-semibold"
           onClick={() => setCompletionOpen(true)}
+          disabled={visit.status === 'completed' || visit.status === 'invoiced'}
         >
-          Log Completion
+          {visit.status === 'completed' || visit.status === 'invoiced' ? 'Completed ✓' : 'Log Completion'}
         </Button>
         <Button
           variant="outline"
