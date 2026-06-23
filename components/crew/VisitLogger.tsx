@@ -16,6 +16,7 @@ import {
 import { ServiceTypeSelector } from '@/components/crew/ServiceTypeSelector'
 import { enqueueMutation } from '@/lib/crew/mutation-queue'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
+import type { TodayStop } from '@/hooks/crew/useTodayStops'
 
 interface VisitLoggerProps {
   visitId: string
@@ -69,7 +70,9 @@ export function VisitLogger({
       completionNote: completionNote.trim() || undefined,
     })
 
-    // Optimistic update: mark this visit completed in the cache immediately
+    // Optimistic update: mark this visit completed in both caches immediately.
+    // Do NOT invalidate crew-today-stops here — the mutation is queued but not yet
+    // flushed to the DB, so a refetch would return the stale SCHEDULED status.
     queryClient.setQueryData<StopDetail | null>(['stop-detail', visitId], (old) => {
       if (!old) return old
       return {
@@ -84,8 +87,23 @@ export function VisitLogger({
       }
     })
 
-    // Invalidate the Today list so the stop card reflects the new status
-    queryClient.invalidateQueries({ queryKey: ['crew-today-stops'] })
+    queryClient.setQueryData<TodayStop[]>(['crew-today-stops', employeeId], (old) => {
+      if (!old) return old
+      return old.map((stop) =>
+        stop.visitId === visitId
+          ? {
+              ...stop,
+              visit: {
+                ...stop.visit,
+                status: 'completed',
+                actual_date: actualDate,
+                service_types: serviceTypes,
+                completion_note: completionNote.trim() || null,
+              },
+            }
+          : stop
+      )
+    })
 
     resetForm()
     onOpenChange(false)
