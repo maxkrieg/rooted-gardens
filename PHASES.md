@@ -677,13 +677,19 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 
 - [ ] **7.1 — Team management page**
   *Depends on: 1.6, 1.4*
-  Create `app/management/team/page.tsx`. Show all employees as cards:
-  name, role badge, side (lawn/garden), phone, active status. Owners can
-  add employees (create employee record + invite to Supabase Auth via
-  `supabase.auth.admin.inviteUserByEmail()`). Include an "Invite to App"
-  button that sends the magic link. Show "Has app access" vs "No app access"
-  indicator based on whether `employees.user_id` is set. Capture SMS consent
-  here (used by 8.2) — a per-employee opt-in toggle backed by `sms_opt_out`.
+  Create `app/management/team/page.tsx`. Gate the entire page to `owner` role
+  only (proxy redirect + RLS) — leads and crew cannot access team management.
+  Show all employees as cards: name, role badge, side (lawn/garden), phone,
+  active status. The "Add Employee" form (slide-over sheet) collects: name,
+  phone, email, role (dropdown: Owner / Lead / Crew / Accountant), side
+  (lawn / garden / both), and creates the employee record. Role is set at
+  creation time — not at invite time — so there is no ambiguity about
+  what access a new hire gets. After saving, an "Invite to App" button on
+  the employee card sends the magic link via
+  `supabase.auth.admin.inviteUserByEmail()` and links the returned auth UUID
+  to `employees.user_id`. Show "Has app access" vs "No app access" indicator
+  based on whether `employees.user_id` is set. Capture SMS consent here (used
+  by 8.2) — a per-employee opt-in toggle backed by `sms_opt_out`.
 
 - [ ] **7.2 — Timesheet management (management view)**
   *Depends on: 7.1, 4.7*
