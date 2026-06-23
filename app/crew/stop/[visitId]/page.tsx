@@ -6,6 +6,8 @@ import { ArrowLeft, MapPin, ChevronDown, KeyRound, ClipboardList, Car } from 'lu
 import { Button } from '@/components/ui/button'
 import { FrequencyBadge, VisitStatusBadge } from '@/components/management/badges'
 import { useStopDetail } from '@/hooks/crew/useStopDetail'
+import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
+import { VisitLogger } from '@/components/crew/VisitLogger'
 import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
 import type { VisitSession } from '@/types/app'
 
@@ -35,7 +37,9 @@ export default function StopDetailPage() {
   const { visitId } = useParams<{ visitId: string }>()
   const router = useRouter()
   const { data: stop, isLoading } = useStopDetail(visitId)
+  const { data: employee } = useCurrentEmployee()
   const [notesOpen, setNotesOpen] = useState(false)
+  const [completionOpen, setCompletionOpen] = useState(false)
 
   if (isLoading && !stop) return <LoadingSkeleton />
 
@@ -223,9 +227,7 @@ export default function StopDetailPage() {
       >
         <Button
           className="w-full h-12 text-base font-semibold"
-          onClick={() => {
-            // Wired in task 4.4
-          }}
+          onClick={() => setCompletionOpen(true)}
         >
           Log Completion
         </Button>
@@ -239,6 +241,14 @@ export default function StopDetailPage() {
           Skip This Stop
         </Button>
       </div>
+
+      <VisitLogger
+        visitId={visitId}
+        employeeId={employee?.id ?? ''}
+        open={completionOpen}
+        onOpenChange={setCompletionOpen}
+        onSuccess={() => router.push('/crew/today')}
+      />
     </>
   )
 }

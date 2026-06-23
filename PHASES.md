@@ -469,7 +469,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   (5) "Log Completion" button (large, green, bottom of screen).
   (6) "Skip This Stop" button (small, secondary, below main button).
 
-- [ ] **4.4 — Visit completion logger (crew mobile)**
+- [x] **4.4 — Visit completion logger (crew mobile)**
   *Depends on: 4.1, 4.3*
   Tapping "Log Completion" on the stop detail slides up a bottom sheet.
   Fields: actual date (date picker, defaults to today), service types
