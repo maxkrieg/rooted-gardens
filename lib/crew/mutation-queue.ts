@@ -4,7 +4,8 @@ import { createClient } from '@/lib/supabase/client'
 // Payload types — filled in as tasks 4.4 and 4.10 are implemented
 export interface CompletionPayload {
   visitId: string
-  employeeId: string
+  employeeId: string       // the logger (audit trail)
+  presentEmployeeIds: string[]  // all crew confirmed on site
   actualDate: string
   serviceTypes: string[]
   completionNote?: string
@@ -114,11 +115,16 @@ export async function flushMutationQueue(): Promise<void> {
               completion_note: p.completionNote ?? null,
             })
             .eq('id', p.visitId)
-          await supabase.from('visit_crew').upsert({
-            visit_id: p.visitId,
-            employee_id: p.employeeId,
-            relation: 'completed',
-          })
+          // Upsert a completed row for every crew member confirmed on site.
+          // Fall back to just the logger for any mutations queued before this field existed.
+          const presentIds = p.presentEmployeeIds?.length ? p.presentEmployeeIds : [p.employeeId]
+          await supabase.from('visit_crew').upsert(
+            presentIds.map((empId) => ({
+              visit_id: p.visitId,
+              employee_id: empId,
+              relation: 'completed' as const,
+            }))
+          )
           break
         }
         case 'photo':

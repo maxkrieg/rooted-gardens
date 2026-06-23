@@ -47,6 +47,10 @@ export type StopDetail = {
     ended_at: string | null
     employee_id: string
   }>
+  assignedCrew: Array<{
+    employee_id: string
+    name: string
+  }>
 }
 
 export function useStopDetail(visitId: string | undefined) {
@@ -68,7 +72,8 @@ export function useStopDetail(visitId: string | undefined) {
             service_zones(id, name, frequency, sort_order, active)
           ),
           account:accounts!inner(id, name, billing_type),
-          visit_sessions(id, started_at, ended_at, employee_id)
+          visit_sessions(id, started_at, ended_at, employee_id),
+          visit_crew(employee_id, relation, employees(id, name))
         `)
         .eq('id', visitId)
         .single()
@@ -79,6 +84,11 @@ export function useStopDetail(visitId: string | undefined) {
       const property = data.property as unknown as StopDetail['property']
       const account = data.account as unknown as StopDetail['account']
       const sessions = (data.visit_sessions ?? []) as StopDetail['sessions']
+
+      type RawVisitCrew = { employee_id: string; relation: string; employees: { id: string; name: string } | null }
+      const assignedCrew = ((data.visit_crew ?? []) as unknown as RawVisitCrew[])
+        .filter((vc) => vc.relation === 'assigned' && vc.employees)
+        .map((vc) => ({ employee_id: vc.employee_id, name: vc.employees!.name }))
 
       return {
         visitId: data.id,
@@ -96,6 +106,7 @@ export function useStopDetail(visitId: string | undefined) {
         property,
         account,
         sessions,
+        assignedCrew,
       }
     },
     enabled: !!visitId,
