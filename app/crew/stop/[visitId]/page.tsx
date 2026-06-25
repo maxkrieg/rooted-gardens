@@ -246,7 +246,7 @@ export default function StopDetailPage() {
       <VisitLogger
         visitId={visitId}
         employeeId={employee?.id ?? ''}
-        assignedCrew={stop.assignedCrew}
+        assignedCrew={stop.assignedCrew ?? []}
         open={completionOpen}
         onOpenChange={setCompletionOpen}
         onSuccess={() => router.push('/crew/today')}

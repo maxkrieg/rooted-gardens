@@ -4,9 +4,8 @@ import { useEffect, useState } from 'react'
 import { getPendingCount, flushMutationQueue } from '@/lib/crew/mutation-queue'
 
 export function useOfflineStatus() {
-  const [isOnline, setIsOnline] = useState(
-    typeof navigator !== 'undefined' ? navigator.onLine : true
-  )
+  // Always start true to match SSR; useEffect corrects it on the client.
+  const [isOnline, setIsOnline] = useState(true)
   const [pendingCount, setPendingCount] = useState(0)
 
   function refreshCount() {
@@ -16,6 +15,8 @@ export function useOfflineStatus() {
   }
 
   useEffect(() => {
+    // Correct the online state from navigator on mount (SSR started as true)
+    setIsOnline(navigator.onLine)
     // Seed the pending count from IDB on mount
     refreshCount()
 
