@@ -1,6 +1,7 @@
 import { format, addWeeks, parseISO } from 'date-fns'
 import { cookies } from 'next/headers'
 import { getWeekStart } from '@/lib/utils/schedule'
+import { parseRoleCookie } from '@/lib/utils/role-cookie'
 import { createClient } from '@/lib/supabase/server'
 import { getScheduleForWeek } from './actions'
 import { ScheduleGrid } from '@/components/management/ScheduleGrid'
@@ -32,7 +33,7 @@ export default async function SchedulePage({
     .filter((id): id is string => Boolean(id))
 
   const cookieStore = await cookies()
-  const role = cookieStore.get('rg-role')?.value ?? 'crew'
+  const role = parseRoleCookie(cookieStore.get('rg-role')?.value)?.role ?? 'crew'
 
   const employees = employeesResult.data ?? []
   const vehicles = vehiclesResult.data ?? []

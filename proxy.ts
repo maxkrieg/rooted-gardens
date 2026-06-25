@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import type { Database } from '@/types/database'
+import { formatRoleCookie, parseRoleCookie } from '@/lib/utils/role-cookie'
 
 type EmployeeRole = 'owner' | 'lead' | 'crew' | 'accountant'
 
@@ -75,11 +76,11 @@ export async function proxy(request: NextRequest) {
 
   // Role-based access control on protected routes
   if (user && isProtected) {
-    // Cookie stores "<userId>:<role>" so a stale cookie from a different user is ignored.
+    // Cookie stores "<userId>_<role>" so a stale cookie from a different user is ignored.
     const rawCookie = request.cookies.get(ROLE_COOKIE)?.value
-    const [cookieUserId, cookieRole] = rawCookie?.split(':') ?? []
+    const parsed = parseRoleCookie(rawCookie)
     let role: EmployeeRole | undefined =
-      cookieUserId === user.id ? (cookieRole as EmployeeRole) : undefined
+      parsed?.userId === user.id ? (parsed.role as EmployeeRole) : undefined
 
     if (!role && process.env.SUPABASE_SERVICE_ROLE_KEY) {
       // Use service role key to bypass RLS for this internal role lookup.
@@ -101,7 +102,7 @@ export async function proxy(request: NextRequest) {
 
       if (employee?.role) {
         role = employee.role as EmployeeRole
-        supabaseResponse.cookies.set(ROLE_COOKIE, `${user.id}:${role}`, {
+        supabaseResponse.cookies.set(ROLE_COOKIE, formatRoleCookie(user.id, role), {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
           sameSite: 'lax',
