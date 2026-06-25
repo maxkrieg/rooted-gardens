@@ -3,12 +3,14 @@
 import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, MapPin, ChevronDown, KeyRound, ClipboardList, Car } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { FrequencyBadge, VisitStatusBadge } from '@/components/management/badges'
 import { useStopDetail } from '@/hooks/crew/useStopDetail'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { VisitLogger } from '@/components/crew/VisitLogger'
 import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
+import { createClient } from '@/lib/supabase/client'
 import type { VisitSession } from '@/types/app'
 
 function SkeletonBlock({ className }: { className?: string }) {
@@ -40,6 +42,24 @@ export default function StopDetailPage() {
   const { data: employee } = useCurrentEmployee()
   const [notesOpen, setNotesOpen] = useState(false)
   const [completionOpen, setCompletionOpen] = useState(false)
+
+  const photoStoragePaths = stop?.photos.map((p) => p.storage_path) ?? []
+  const { data: signedPhotoUrls } = useQuery({
+    queryKey: ['photo-urls', photoStoragePaths],
+    queryFn: async () => {
+      const supabase = createClient()
+      return Promise.all(
+        photoStoragePaths.map((path) =>
+          supabase.storage
+            .from('photos')
+            .createSignedUrl(path, 3600)
+            .then((r) => r.data?.signedUrl ?? null)
+        )
+      )
+    },
+    enabled: photoStoragePaths.length > 0,
+    staleTime: 50 * 60 * 1000, // 50 min — well under the 1-hr signed URL expiry
+  })
 
   if (isLoading && !stop) return <LoadingSkeleton />
 
@@ -202,6 +222,31 @@ export default function StopDetailPage() {
           </div>
         )}
 
+        {/* Photos (completed visits) */}
+        {stop.photos.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide px-1">
+              Photos
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              {stop.photos.map((photo, i) => {
+                const url = signedPhotoUrls?.[i]
+                return url ? (
+                  <a key={photo.id} href={url} target="_blank" rel="noopener noreferrer">
+                    <img
+                      src={url}
+                      alt={photo.caption ?? `Visit photo ${i + 1}`}
+                      className="h-20 w-20 rounded-xl object-cover border border-[--border]"
+                    />
+                  </a>
+                ) : (
+                  <div key={photo.id} className="h-20 w-20 rounded-xl bg-muted animate-pulse" />
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Multi-zone list */}
         {isMultiZone && allZones.length > 0 && (
           <div className="space-y-2">
@@ -246,6 +291,7 @@ export default function StopDetailPage() {
       <VisitLogger
         visitId={visitId}
         employeeId={employee?.id ?? ''}
+        propertyId={stop.property.id}
         assignedCrew={stop.assignedCrew ?? []}
         open={completionOpen}
         onOpenChange={setCompletionOpen}

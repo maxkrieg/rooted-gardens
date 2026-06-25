@@ -482,7 +482,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   flushed to Supabase when online. On success, return to today's list with the
   stop marked done (green check).
 
-- [ ] **4.5 — Photo capture on mobile**
+- [x] **4.5 — Photo capture on mobile**
   *Depends on: 4.4*
   Add a "Add Photo" button in the completion logger bottom sheet. On mobile,
   this triggers the device camera via `<input type="file" accept="image/*" capture="environment">`.

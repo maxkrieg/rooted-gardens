@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { format } from 'date-fns'
-import { Camera } from 'lucide-react'
+import { Camera, X } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -16,12 +16,19 @@ import {
 } from '@/components/ui/sheet'
 import { ServiceTypeSelector } from '@/components/crew/ServiceTypeSelector'
 import { enqueueMutation } from '@/lib/crew/mutation-queue'
+import { createClient } from '@/lib/supabase/client'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
 import type { TodayStop } from '@/hooks/crew/useTodayStops'
+
+interface CapturedPhoto {
+  localUrl: string
+  storagePath: string // empty string while upload is in-flight
+}
 
 interface VisitLoggerProps {
   visitId: string
   employeeId: string
+  propertyId: string
   assignedCrew: Array<{ employee_id: string; name: string }>
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -31,6 +38,7 @@ interface VisitLoggerProps {
 export function VisitLogger({
   visitId,
   employeeId,
+  propertyId,
   assignedCrew,
   open,
   onOpenChange,
@@ -38,6 +46,7 @@ export function VisitLogger({
 }: VisitLoggerProps) {
   const queryClient = useQueryClient()
   const today = format(new Date(), 'yyyy-MM-dd')
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [actualDate, setActualDate] = useState(today)
   const [serviceTypes, setServiceTypes] = useState<string[]>([])
@@ -45,6 +54,9 @@ export function VisitLogger({
   const [serviceTypeError, setServiceTypeError] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [presentIds, setPresentIds] = useState<string[]>([])
+  const [photos, setPhotos] = useState<CapturedPhoto[]>([])
+  const [photoError, setPhotoError] = useState<string | null>(null)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
 
   // Pre-check all assigned crew every time the sheet opens
   useEffect(() => {
@@ -59,6 +71,15 @@ export function VisitLogger({
     )
   }
 
+  function removePhoto(index: number) {
+    setPhotos((prev) => {
+      const next = [...prev]
+      URL.revokeObjectURL(next[index].localUrl)
+      next.splice(index, 1)
+      return next
+    })
+  }
+
   function resetForm() {
     setActualDate(today)
     setServiceTypes([])
@@ -66,11 +87,53 @@ export function VisitLogger({
     setServiceTypeError(false)
     setSubmitting(false)
     setPresentIds(assignedCrew.map((c) => c.employee_id))
+    setPhotos((prev) => {
+      prev.forEach((p) => URL.revokeObjectURL(p.localUrl))
+      return []
+    })
+    setPhotoError(null)
+    setUploadingPhoto(false)
   }
 
   function handleOpenChange(next: boolean) {
     if (!next) resetForm()
     onOpenChange(next)
+  }
+
+  async function handlePhotoCapture(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Reset the input so the same file can be picked again if removed
+    e.target.value = ''
+
+    if (!navigator.onLine) {
+      setPhotoError('Photos need a connection — connect and try again.')
+      return
+    }
+
+    setPhotoError(null)
+    const localUrl = URL.createObjectURL(file)
+    const placeholder: CapturedPhoto = { localUrl, storagePath: '' }
+    setPhotos((prev) => [...prev, placeholder])
+    setUploadingPhoto(true)
+
+    const storagePath = `photos/${propertyId}/${visitId}/${Date.now()}.jpg`
+    const supabase = createClient()
+    const { error } = await supabase.storage.from('photos').upload(storagePath, file)
+
+    setUploadingPhoto(false)
+
+    if (error) {
+      URL.revokeObjectURL(localUrl)
+      setPhotos((prev) => prev.filter((p) => p.localUrl !== localUrl))
+      setPhotoError('Upload failed — please try again.')
+      return
+    }
+
+    setPhotos((prev) =>
+      prev.map((p) => (p.localUrl === localUrl ? { ...p, storagePath } : p))
+    )
   }
 
   async function handleSubmit() {
@@ -91,6 +154,17 @@ export function VisitLogger({
       serviceTypes,
       completionNote: completionNote.trim() || undefined,
     })
+
+    // Enqueue metadata for each successfully uploaded photo
+    for (const photo of photos.filter((p) => p.storagePath)) {
+      await enqueueMutation('photo', {
+        visitId,
+        propertyId,
+        storagePath: photo.storagePath,
+        uploadedBy: employeeId,
+        type: 'visit',
+      })
+    }
 
     // Optimistic update: mark this visit completed in both caches immediately.
     // Do NOT invalidate crew-today-stops here — the mutation is queued but not yet
@@ -218,25 +292,72 @@ export function VisitLogger({
             />
           </div>
 
-          {/* Photo upload — wired in task 4.5 */}
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full h-11 gap-2"
-            onClick={() => {
-              // Wired in task 4.5
-            }}
-          >
-            <Camera className="h-4 w-4" />
-            Add Photo
-          </Button>
+          {/* Photo capture */}
+          <div className="space-y-2">
+            {/* Hidden file input — capture="environment" opens rear camera on mobile */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="sr-only"
+              onChange={handlePhotoCapture}
+            />
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full h-11 gap-2"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={photos.length >= 4 || uploadingPhoto || submitting}
+            >
+              <Camera className="h-4 w-4" />
+              {uploadingPhoto
+                ? 'Uploading…'
+                : photos.length > 0
+                  ? `Add Photo (${photos.length}/4)`
+                  : 'Add Photo'}
+            </Button>
+
+            {photoError && (
+              <p className="text-xs text-destructive">{photoError}</p>
+            )}
+
+            {/* Thumbnail strip */}
+            {photos.length > 0 && (
+              <div className="flex gap-2 flex-wrap">
+                {photos.map((photo, i) => (
+                  <div key={photo.localUrl} className="relative">
+                    <img
+                      src={photo.localUrl}
+                      alt={`Photo ${i + 1}`}
+                      className={[
+                        'h-16 w-16 rounded-xl object-cover border border-[--border]',
+                        !photo.storagePath ? 'opacity-50' : '',
+                      ].join(' ')}
+                    />
+                    {photo.storagePath && (
+                      <button
+                        type="button"
+                        onClick={() => removePhoto(i)}
+                        className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-foreground text-background flex items-center justify-center"
+                        aria-label="Remove photo"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <SheetFooter className="px-4 pt-2 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] border-t border-[--border] bg-background">
           <Button
             className="w-full h-12 text-base font-semibold"
             onClick={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || uploadingPhoto}
           >
             {submitting ? 'Saving…' : 'Complete Stop'}
           </Button>

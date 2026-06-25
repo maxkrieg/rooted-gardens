@@ -51,6 +51,13 @@ export type StopDetail = {
     employee_id: string
     name: string
   }>
+  photos: Array<{
+    id: string
+    storage_path: string
+    type: string
+    created_at: string
+    caption: string | null
+  }>
 }
 
 export function useStopDetail(visitId: string | undefined) {
@@ -73,7 +80,8 @@ export function useStopDetail(visitId: string | undefined) {
           ),
           account:accounts!inner(id, name, billing_type),
           visit_sessions(id, started_at, ended_at, employee_id),
-          visit_crew(employee_id, relation, employees(id, name))
+          visit_crew(employee_id, relation, employees(id, name)),
+          photos(id, storage_path, type, created_at, caption)
         `)
         .eq('id', visitId)
         .single()
@@ -89,6 +97,8 @@ export function useStopDetail(visitId: string | undefined) {
       const assignedCrew = ((data.visit_crew ?? []) as unknown as RawVisitCrew[])
         .filter((vc) => vc.relation === 'assigned' && vc.employees)
         .map((vc) => ({ employee_id: vc.employee_id, name: vc.employees!.name }))
+
+      const photos = (data.photos ?? []) as StopDetail['photos']
 
       return {
         visitId: data.id,
@@ -107,6 +117,7 @@ export function useStopDetail(visitId: string | undefined) {
         account,
         sessions,
         assignedCrew,
+        photos,
       }
     },
     enabled: !!visitId,
