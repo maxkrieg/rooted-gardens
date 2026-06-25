@@ -20,6 +20,9 @@ import { createClient } from '@/lib/supabase/client'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
 import type { TodayStop } from '@/hooks/crew/useTodayStops'
 
+const MAX_PHOTO_BYTES = 20 * 1024 * 1024
+const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+
 interface CapturedPhoto {
   localUrl: string
   storagePath: string // empty string while upload is in-flight
@@ -107,6 +110,14 @@ export function VisitLogger({
     // Reset the input so the same file can be picked again if removed
     e.target.value = ''
 
+    if (file.size > MAX_PHOTO_BYTES) {
+      setPhotoError('Photo is too large — max 20 MB.')
+      return
+    }
+    if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+      setPhotoError('Unsupported format — use JPEG, PNG, or WebP.')
+      return
+    }
     if (!navigator.onLine) {
       setPhotoError('Photos need a connection — connect and try again.')
       return
