@@ -25,7 +25,7 @@ export default function CrewLayout({ children }: { children: React.ReactNode }) 
     <div className="flex flex-col min-h-[100dvh] bg-background">
       <OfflineBanner />
       {/* Main scrollable content — leaves room for the bottom nav */}
-      <main className="flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom,0px)]">
+      <main className="flex-1 overflow-y-auto pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))]">
         {children}
       </main>
 
