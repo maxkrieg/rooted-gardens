@@ -150,33 +150,52 @@ export default function ProfilePage() {
               Today&apos;s Sessions
             </p>
             <div className="space-y-2">
-              {entries.map((e, i) => (
-                <div
-                  key={e.id}
-                  className="grid grid-cols-3 gap-2 text-center py-2 rounded-xl bg-secondary/50"
-                >
-                  <div>
-                    <p className="font-display text-base font-semibold text-foreground tabular-nums">
-                      {e.clock_in ? formatTime(e.clock_in) : '—'}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">In</p>
+              {entries.map((e, i) => {
+                const isActive = i === 0 && isClockedIn
+                return (
+                  <div
+                    key={e.id}
+                    className={[
+                      'grid grid-cols-3 gap-2 text-center py-2 rounded-xl',
+                      isActive ? '' : 'bg-secondary/50',
+                    ].join(' ')}
+                    style={isActive ? { backgroundColor: 'color-mix(in srgb, var(--clay) 12%, transparent)' } : undefined}
+                  >
+                    <div>
+                      <p
+                        className="font-display text-base font-semibold tabular-nums"
+                        style={isActive ? { color: 'var(--clay)' } : { color: 'var(--foreground)' }}
+                      >
+                        {e.clock_in ? formatTime(e.clock_in) : '—'}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">In</p>
+                    </div>
+                    <div>
+                      <p
+                        className="font-display text-base font-semibold tabular-nums"
+                        style={isActive ? { color: 'var(--clay)' } : { color: 'var(--foreground)' }}
+                      >
+                        {e.clock_out ? formatTime(e.clock_out) : '—'}
+                      </p>
+                      <p
+                        className="text-[11px] mt-0.5"
+                        style={isActive ? { color: 'var(--clay)' } : { color: 'var(--muted-foreground)' }}
+                      >
+                        {isActive ? 'Running' : 'Out'}
+                      </p>
+                    </div>
+                    <div>
+                      <p
+                        className="font-display text-base font-semibold tabular-nums"
+                        style={isActive ? { color: 'var(--clay)' } : { color: 'var(--foreground)' }}
+                      >
+                        {e.clock_in ? computeDuration(e) : '—'}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">Total</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-display text-base font-semibold text-foreground tabular-nums">
-                      {e.clock_out ? formatTime(e.clock_out) : '—'}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      {i === 0 && isClockedIn ? 'Running' : 'Out'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="font-display text-base font-semibold text-foreground tabular-nums">
-                      {e.clock_in ? computeDuration(e) : '—'}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">Total</p>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
