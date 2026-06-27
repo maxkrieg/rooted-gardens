@@ -499,7 +499,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   (grayed out, strikethrough) but keep them visible so crew has a record
   of what they passed on.
 
-- [ ] **4.7 — Clock in / clock out (crew mobile)**
+- [x] **4.7 — Clock in / clock out (crew mobile)**
   *Depends on: 4.1, 1.2*
   Add clock in/out to the crew Profile tab (`app/crew/profile/page.tsx`).
   Show current clock state (in or out) with elapsed time if clocked in.

@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/sheet'
 import { ServiceTypeSelector } from '@/components/crew/ServiceTypeSelector'
 import { enqueueMutation, flushMutationQueue } from '@/lib/crew/mutation-queue'
+import { useTodayTimeEntry } from '@/hooks/crew/useTodayTimeEntry'
 import { createClient } from '@/lib/supabase/client'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
 import type { TodayStop } from '@/hooks/crew/useTodayStops'
@@ -49,6 +50,8 @@ export function VisitLogger({
 }: VisitLoggerProps) {
   const queryClient = useQueryClient()
   const today = format(new Date(), 'yyyy-MM-dd')
+  const { data: todayEntries = [] } = useTodayTimeEntry(employeeId)
+  const isClockedIn = todayEntries.length > 0 && todayEntries[0].clock_out === null
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [actualDate, setActualDate] = useState(today)
@@ -235,6 +238,13 @@ export function VisitLogger({
         </SheetHeader>
 
         <div className="px-4 space-y-5 pb-4">
+          {/* Not-clocked-in reminder — non-blocking */}
+          {!isClockedIn && (
+            <div className="rounded-lg px-3 py-2 text-sm bg-[#FBF0D6] text-[--bark] border border-[#d9a441]/40">
+              You&apos;re not clocked in — remember to clock in on the Profile tab.
+            </div>
+          )}
+
           {/* Date */}
           <div className="space-y-1.5">
             <label className="text-sm font-semibold text-foreground" htmlFor="completion-date">
