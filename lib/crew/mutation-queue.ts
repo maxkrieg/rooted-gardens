@@ -31,11 +31,17 @@ export interface PhotoPayload {
   caption?: string
 }
 
+export interface SkipPayload {
+  visitId: string
+  skipReason?: string
+}
+
 type MutationPayload =
   | { type: 'completion'; payload: CompletionPayload }
   | { type: 'job_start'; payload: JobStartPayload }
   | { type: 'job_stop'; payload: JobStopPayload }
   | { type: 'photo'; payload: PhotoPayload }
+  | { type: 'skip'; payload: SkipPayload }
 
 export async function enqueueMutation(
   type: MutationType,
@@ -125,6 +131,14 @@ export async function flushMutationQueue(): Promise<void> {
               relation: 'completed' as const,
             }))
           )
+          break
+        }
+        case 'skip': {
+          const p = mutation.payload as SkipPayload
+          await supabase
+            .from('visits')
+            .update({ status: 'skipped', skip_reason: p.skipReason ?? null })
+            .eq('id', p.visitId)
           break
         }
         case 'photo':

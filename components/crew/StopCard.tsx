@@ -27,7 +27,10 @@ export function StopCard({ stop }: StopCardProps) {
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') router.push(`/crew/stop/${stop.visitId}`)
       }}
-      className="block rounded-2xl border border-[--border] bg-card overflow-hidden shadow-[0_1px_2px_rgba(43,42,36,.04),_0_6px_16px_-4px_rgba(43,42,36,.08)] cursor-pointer active:scale-[0.99] transition-transform select-none"
+      className={[
+        'block rounded-2xl border border-[--border] bg-card overflow-hidden shadow-[0_1px_2px_rgba(43,42,36,.04),_0_6px_16px_-4px_rgba(43,42,36,.08)] cursor-pointer active:scale-[0.99] transition-transform select-none',
+        visit.status === 'skipped' ? 'opacity-60' : '',
+      ].join(' ')}
     >
       {/* Crew instruction banner */}
       {visit.crew_instruction && (
@@ -65,14 +68,17 @@ export function StopCard({ stop }: StopCardProps) {
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="font-display text-lg font-semibold leading-tight text-foreground hover:text-[--primary] transition-colors"
+            className={[
+              'font-display text-lg font-semibold leading-tight text-foreground hover:text-[--primary] transition-colors',
+              visit.status === 'skipped' ? 'line-through' : '',
+            ].join(' ')}
           >
             {property.address}
           </a>
         </div>
 
         {/* Account name */}
-        <p className="pl-6 text-sm text-muted-foreground">{account.name}</p>
+        <p className={['pl-6 text-sm text-muted-foreground', visit.status === 'skipped' ? 'line-through' : ''].join(' ')}>{account.name}</p>
 
         {/* Zone name + frequency badge */}
         <div className="pl-6 flex items-center gap-2 flex-wrap">

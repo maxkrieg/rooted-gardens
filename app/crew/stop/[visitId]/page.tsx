@@ -9,6 +9,7 @@ import { FrequencyBadge, VisitStatusBadge } from '@/components/management/badges
 import { useStopDetail } from '@/hooks/crew/useStopDetail'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { VisitLogger } from '@/components/crew/VisitLogger'
+import { SkipSheet } from '@/components/crew/SkipSheet'
 import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
 import { createClient } from '@/lib/supabase/client'
 import type { VisitSession } from '@/types/app'
@@ -42,6 +43,7 @@ export default function StopDetailPage() {
   const { data: employee } = useCurrentEmployee()
   const [notesOpen, setNotesOpen] = useState(false)
   const [completionOpen, setCompletionOpen] = useState(false)
+  const [skipOpen, setSkipOpen] = useState(false)
 
   const photoStoragePaths = stop?.photos.map((p) => p.storage_path) ?? []
   const { data: signedPhotoUrls } = useQuery({
@@ -280,11 +282,10 @@ export default function StopDetailPage() {
         <Button
           variant="outline"
           className="w-full h-11"
-          onClick={() => {
-            // Wired in task 4.6
-          }}
+          onClick={() => setSkipOpen(true)}
+          disabled={visit.status === 'skipped' || visit.status === 'invoiced'}
         >
-          Skip This Stop
+          {visit.status === 'skipped' ? 'Skipped ✓' : 'Skip This Stop'}
         </Button>
       </div>
 
@@ -295,6 +296,14 @@ export default function StopDetailPage() {
         assignedCrew={stop.assignedCrew ?? []}
         open={completionOpen}
         onOpenChange={setCompletionOpen}
+        onSuccess={() => router.push('/crew/today')}
+      />
+
+      <SkipSheet
+        visitId={visitId}
+        employeeId={employee?.id ?? ''}
+        open={skipOpen}
+        onOpenChange={setSkipOpen}
         onSuccess={() => router.push('/crew/today')}
       />
     </>

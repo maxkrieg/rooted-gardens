@@ -491,7 +491,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   photos per visit. Store photo record in `photos` table with `type = 'visit'`. Show
   photo thumbnails on the stop detail page for completed visits.
 
-- [ ] **4.6 — Skip stop workflow (crew mobile)**
+- [x] **4.6 — Skip stop workflow (crew mobile)**
   *Depends on: 4.3*
   Tapping "Skip This Stop" opens a simple bottom sheet with an optional
   text field for skip reason and a large "Confirm Skip" button. Sets visit
