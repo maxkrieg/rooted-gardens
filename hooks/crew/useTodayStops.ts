@@ -45,6 +45,7 @@ export type TodayStop = {
     ended_at: string | null
     employee_id: string
   }>
+  photoCount: number
 }
 
 export function useTodayStops(employeeId: string | undefined) {
@@ -80,7 +81,8 @@ export function useTodayStops(employeeId: string | undefined) {
             property_route_groups(sort_order, route_group:route_groups(id, name, sort_order))
           ),
           account:accounts!inner(id, name, billing_type),
-          visit_sessions(id, started_at, ended_at, employee_id)
+          visit_sessions(id, started_at, ended_at, employee_id),
+          photos(id)
         `)
         .eq('week_start', weekStart)
         .in('id', visitIds)
@@ -92,6 +94,7 @@ export function useTodayStops(employeeId: string | undefined) {
         const property = v.property as unknown as TodayStop['property']
         const account = v.account as unknown as TodayStop['account']
         const sessions = (v.visit_sessions ?? []) as TodayStop['sessions']
+        const photoCount = (v.photos as Array<{ id: string }> | null)?.length ?? 0
 
         return {
           visitId: v.id,
@@ -109,6 +112,7 @@ export function useTodayStops(employeeId: string | undefined) {
           property,
           account,
           sessions,
+          photoCount,
         }
       })
 

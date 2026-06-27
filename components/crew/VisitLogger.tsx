@@ -15,7 +15,7 @@ import {
   SheetFooter,
 } from '@/components/ui/sheet'
 import { ServiceTypeSelector } from '@/components/crew/ServiceTypeSelector'
-import { enqueueMutation } from '@/lib/crew/mutation-queue'
+import { enqueueMutation, flushMutationQueue } from '@/lib/crew/mutation-queue'
 import { createClient } from '@/lib/supabase/client'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
 import type { TodayStop } from '@/hooks/crew/useTodayStops'
@@ -177,9 +177,16 @@ export function VisitLogger({
       })
     }
 
+    // Flush mutations now — we know we're online because photo upload enforces it.
+    // Without this, the photo row sits in the IDB queue until the next layout mount.
+    await flushMutationQueue()
+
+    // Invalidate stop-detail so photos appear if user navigates back to this stop.
+    queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
+
     // Optimistic update: mark this visit completed in both caches immediately.
-    // Do NOT invalidate crew-today-stops here — the mutation is queued but not yet
-    // flushed to the DB, so a refetch would return the stale SCHEDULED status.
+    // Use setQueryData rather than invalidating crew-today-stops to avoid a loading
+    // flash on the today list when we redirect back to it.
     queryClient.setQueryData<StopDetail | null>(['stop-detail', visitId], (old) => {
       if (!old) return old
       return {

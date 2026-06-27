@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { MapPin } from 'lucide-react'
+import { MapPin, Camera } from 'lucide-react'
 import { FrequencyBadge, VisitStatusBadge } from '@/components/management/badges'
 import { formatElapsed } from '@/lib/utils/visits'
 import type { TodayStop } from '@/hooks/crew/useTodayStops'
@@ -82,9 +82,12 @@ export function StopCard({ stop }: StopCardProps) {
           <FrequencyBadge frequency={zone.frequency} />
         </div>
 
-        {/* Status chip */}
-        <div className="pl-6">
+        {/* Status chip + photo indicator */}
+        <div className="pl-6 flex items-center gap-2">
           <VisitStatusBadge status={visit.status} />
+          {stop.photoCount > 0 && (
+            <Camera className="h-3.5 w-3.5 text-muted-foreground" aria-label="Has photos" />
+          )}
         </div>
       </div>
     </div>
