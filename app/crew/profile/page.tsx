@@ -1,12 +1,14 @@
 'use client'
 
 import { format, parseISO, differenceInMinutes } from 'date-fns'
+import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { useTodayTimeEntry } from '@/hooks/crew/useTodayTimeEntry'
 import { enqueueMutation, flushMutationQueue } from '@/lib/crew/mutation-queue'
 import { formatElapsed } from '@/lib/utils/visits'
+import { createClient } from '@/lib/supabase/client'
 import type { TimeEntry } from '@/types/app'
 
 function formatTime(iso: string) {
@@ -22,9 +24,16 @@ function computeDuration(entry: TimeEntry): string {
 }
 
 export default function ProfilePage() {
+  const router = useRouter()
   const queryClient = useQueryClient()
   const { data: employee } = useCurrentEmployee()
   const { data: entries = [], isLoading } = useTodayTimeEntry(employee?.id)
+
+  async function handleSignOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
 
   // Most recent entry first (DESC order from hook)
   const activeEntry = entries[0] ?? null
@@ -200,6 +209,15 @@ export default function ProfilePage() {
           </div>
         )}
       </div>
+
+      {/* Sign out */}
+      <Button
+        variant="ghost"
+        className="w-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+        onClick={handleSignOut}
+      >
+        Sign Out
+      </Button>
     </div>
   )
 }

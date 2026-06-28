@@ -508,7 +508,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   If a crew member tries to log a visit completion without being clocked in,
   show a reminder (not a blocker).
 
-- [ ] **4.8 — Visit history (crew mobile)**
+- [x] **4.8 — Visit history (crew mobile)**
   *Depends on: 4.1, 1.2*
   Create `app/crew/history/page.tsx` (the History tab). Show the last 30
   completed visits for the current crew member (join `visit_crew` on
