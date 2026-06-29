@@ -8,6 +8,7 @@ import { OfflineBanner } from '@/components/crew/OfflineBanner'
 import { flushMutationQueue } from '@/lib/crew/mutation-queue'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { useTodayTimeEntry } from '@/hooks/crew/useTodayTimeEntry'
+import { useCrewRealtimeSync } from '@/hooks/crew/useCrewRealtimeSync'
 
 const navItems = [
   { href: '/crew/today', label: 'Today', Icon: Home },
@@ -26,6 +27,9 @@ export default function CrewLayout({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     flushMutationQueue()
   }, [])
+
+  // Push schedule changes to the React Query cache in real time
+  useCrewRealtimeSync(employee?.id)
 
   return (
     <div className="flex flex-col min-h-[100dvh] bg-background">
