@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Clock, User } from 'lucide-react'
+import { Home, Clock, User, CalendarRange } from 'lucide-react'
 import { OfflineBanner } from '@/components/crew/OfflineBanner'
 import { flushMutationQueue } from '@/lib/crew/mutation-queue'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
@@ -11,6 +11,7 @@ import { useTodayTimeEntry } from '@/hooks/crew/useTodayTimeEntry'
 
 const navItems = [
   { href: '/crew/today', label: 'Today', Icon: Home },
+  { href: '/crew/schedule', label: 'Schedule', Icon: CalendarRange },
   { href: '/crew/history', label: 'History', Icon: Clock },
   { href: '/crew/profile', label: 'Profile', Icon: User },
 ]

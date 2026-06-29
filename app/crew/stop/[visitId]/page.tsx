@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, MapPin, ChevronDown, KeyRound, ClipboardList, Car } from 'lucide-react'
+import { ArrowLeft, MapPin, ChevronDown, KeyRound, ClipboardList, Car, Users } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { FrequencyBadge, VisitStatusBadge } from '@/components/management/badges'
@@ -10,6 +10,7 @@ import { useStopDetail } from '@/hooks/crew/useStopDetail'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { VisitLogger } from '@/components/crew/VisitLogger'
 import { SkipSheet } from '@/components/crew/SkipSheet'
+import { CrewAssignSheet } from '@/components/crew/CrewAssignSheet'
 import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
 import { createClient } from '@/lib/supabase/client'
 import type { VisitSession } from '@/types/app'
@@ -44,6 +45,7 @@ export default function StopDetailPage() {
   const [notesOpen, setNotesOpen] = useState(false)
   const [completionOpen, setCompletionOpen] = useState(false)
   const [skipOpen, setSkipOpen] = useState(false)
+  const [assignOpen, setAssignOpen] = useState(false)
 
   const photoStoragePaths = stop?.photos.map((p) => p.storage_path) ?? []
   const { data: signedPhotoUrls } = useQuery({
@@ -167,6 +169,40 @@ export default function StopDetailPage() {
             <FrequencyBadge frequency={zone.frequency} />
           </div>
         )}
+
+        {/* Assigned crew — viewable + editable by any crew member */}
+        <div className="rounded-2xl border border-[--border] bg-card overflow-hidden shadow-[0_1px_2px_rgba(43,42,36,.04),_0_6px_16px_-4px_rgba(43,42,36,.08)]">
+          <div className="flex items-center justify-between px-4 py-3.5">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-sm font-semibold text-foreground">Assigned Crew</span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9"
+              onClick={() => setAssignOpen(true)}
+            >
+              Manage
+            </Button>
+          </div>
+          <div className="border-t border-[--border] px-4 py-3">
+            {stop.assignedCrew.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {stop.assignedCrew.map((c) => (
+                  <span
+                    key={c.employee_id}
+                    className="inline-flex items-center rounded-full bg-accent px-3 py-1 text-sm text-accent-foreground"
+                  >
+                    {c.name}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">No crew assigned yet.</p>
+            )}
+          </div>
+        </div>
 
         {/* Property notes — collapsible */}
         {hasPropertyNotes && (
@@ -305,6 +341,13 @@ export default function StopDetailPage() {
         open={skipOpen}
         onOpenChange={setSkipOpen}
         onSuccess={() => router.push('/crew/today')}
+      />
+
+      <CrewAssignSheet
+        visitId={visitId}
+        assignedCrew={stop.assignedCrew ?? []}
+        open={assignOpen}
+        onOpenChange={setAssignOpen}
       />
     </>
   )

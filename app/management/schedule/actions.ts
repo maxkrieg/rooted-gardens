@@ -3,15 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { visitUpdateSchema, type VisitUpdateValues } from '@/lib/validators/visit'
-import type {
-  Account,
-  Property,
-  RouteGroup,
-  ScheduleWeek,
-  ScheduleZoneRow,
-  ServiceZone,
-  VisitWithCrew,
-} from '@/types/app'
+import { buildScheduleWeek, type ScheduleAssignment } from '@/lib/utils/schedule'
+import type { RouteGroup, ScheduleWeek, VisitWithCrew } from '@/types/app'
 
 export async function getScheduleForWeek(weekStart: string): Promise<ScheduleWeek> {
   const supabase = await createClient()
@@ -39,50 +32,10 @@ export async function getScheduleForWeek(weekStart: string): Promise<ScheduleWee
   if (visitsResult.error) throw new Error(visitsResult.error.message)
 
   const routeGroups = routeGroupsResult.data as RouteGroup[]
-  const assignments = assignmentsResult.data ?? []
-  const visits = visitsResult.data ?? []
+  const assignments = (assignmentsResult.data ?? []) as unknown as ScheduleAssignment[]
+  const visits = (visitsResult.data ?? []) as unknown as VisitWithCrew[]
 
-  // Build visit lookup by service_zone_id
-  const visitByZoneId = new Map<string, VisitWithCrew>()
-  for (const v of visits) {
-    visitByZoneId.set(v.service_zone_id, v as unknown as VisitWithCrew)
-  }
-
-  const scheduleRouteGroups: ScheduleWeek['routeGroups'] = routeGroups.map((routeGroup) => {
-    // Get assignments for this route group, sorted by sort_order within the group
-    const groupAssignments = assignments
-      .filter((a) => a.route_group_id === routeGroup.id)
-      .sort((a, b) => a.sort_order - b.sort_order)
-
-    const rows: ScheduleZoneRow[] = []
-
-    for (const assignment of groupAssignments) {
-      const property = assignment.property as unknown as Property & {
-        account: Account
-        service_zones: ServiceZone[]
-      }
-      if (!property) continue
-
-      const account = property.account as Account
-      const zones = (property.service_zones as ServiceZone[])
-        .filter((z) => z.active)
-        .sort((a, b) => a.sort_order - b.sort_order)
-
-      for (const zone of zones) {
-        rows.push({
-          zone,
-          property: { ...property, account: undefined } as unknown as Property,
-          account,
-          routeGroup,
-          visit: visitByZoneId.get(zone.id) ?? null,
-        })
-      }
-    }
-
-    return { routeGroup, rows }
-  })
-
-  return { weekStart, routeGroups: scheduleRouteGroups }
+  return buildScheduleWeek(weekStart, routeGroups, assignments, visits)
 }
 
 export async function createVisit(

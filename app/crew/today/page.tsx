@@ -1,9 +1,10 @@
 'use client'
 
-import { format } from 'date-fns'
+import { format, addDays } from 'date-fns'
 import { Leaf } from 'lucide-react'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { useTodayStops } from '@/hooks/crew/useTodayStops'
+import { getWeekStart } from '@/lib/utils/schedule'
 import { StopCard } from '@/components/crew/StopCard'
 
 function StopCardSkeleton() {
@@ -30,10 +31,17 @@ export default function TodayPage() {
 
   const isInitialLoad = isLoading && !stops
 
+  const weekStart = getWeekStart(new Date())
+  const weekEnd = addDays(weekStart, 6)
+  const weekLabel =
+    weekStart.getMonth() === weekEnd.getMonth()
+      ? `${format(weekStart, 'MMM d')} – ${format(weekEnd, 'd')}`
+      : `${format(weekStart, 'MMM d')} – ${format(weekEnd, 'MMM d')}`
+
   return (
     <div className="p-4 pb-6 space-y-4">
       <h1 className="font-display text-2xl font-semibold text-foreground">
-        Today · {format(new Date(), 'EEE MMM d')}
+        Week of {weekLabel}
       </h1>
 
       {isInitialLoad && (
