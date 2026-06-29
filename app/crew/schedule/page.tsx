@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from 'react'
 import { addWeeks, format } from 'date-fns'
-import { ChevronLeft, ChevronRight, CalendarRange } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CalendarRange, SlidersHorizontal, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScheduleStopRow } from '@/components/crew/ScheduleStopRow'
 import {
-  CrewScheduleFilters,
+  ScheduleFilterSheet,
+  activeFilterChips,
   EMPTY_FILTERS,
   type ScheduleFilters,
 } from '@/components/crew/CrewScheduleFilters'
@@ -32,6 +33,11 @@ function rowMatches(
     if (!assigned) return false
   }
 
+  if (filters.status !== 'all') {
+    // A row with no visit yet isn't in any status, so it's excluded when filtering by one
+    if (row.visit?.status !== filters.status) return false
+  }
+
   const q = filters.search.trim().toLowerCase()
   if (q) {
     const hay = `${row.property.address} ${row.account.name}`.toLowerCase()
@@ -44,6 +50,7 @@ function rowMatches(
 export default function CrewSchedulePage() {
   const [week, setWeek] = useState(() => getWeekStart(new Date()))
   const [filters, setFilters] = useState<ScheduleFilters>(EMPTY_FILTERS)
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   const thisWeek = getWeekStart(new Date())
   const isCurrentWeek = week.getTime() === thisWeek.getTime()
@@ -51,6 +58,12 @@ export default function CrewSchedulePage() {
   const { data: schedule, isLoading } = useWeekSchedule(week)
   const { data: employees = [] } = useActiveEmployees()
   const { data: me } = useCurrentEmployee()
+
+  const routeGroups = useMemo(
+    () => schedule?.routeGroups.map((g) => g.routeGroup) ?? [],
+    [schedule]
+  )
+  const chips = activeFilterChips(filters, employees, routeGroups)
 
   const filteredGroups = useMemo(() => {
     if (!schedule) return []
@@ -66,31 +79,12 @@ export default function CrewSchedulePage() {
 
   return (
     <div className="flex flex-col">
-      {/* Header + week nav */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-[--border] px-4 py-3 space-y-3">
+      {/* Header — week nav is the hero; filters live in a sheet */}
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-[--border] px-4 py-3 space-y-2.5">
+        {/* Row 1: title + week nav */}
         <div className="flex items-center justify-between gap-2">
           <h1 className="font-display text-xl font-semibold text-foreground">Schedule</h1>
           <div className="flex items-center gap-1">
-            <Button
-              variant={filters.crew === 'me' ? 'default' : 'outline'}
-              size="sm"
-              className="h-9 text-xs"
-              onClick={() =>
-                setFilters((f) => ({ ...f, crew: f.crew === 'me' ? 'all' : 'me' }))
-              }
-            >
-              My stops
-            </Button>
-            {!isCurrentWeek && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 ml-1 text-xs"
-                onClick={() => setWeek(thisWeek)}
-              >
-                This week
-              </Button>
-            )}
             <Button
               variant="ghost"
               size="icon"
@@ -100,7 +94,7 @@ export default function CrewSchedulePage() {
             >
               <ChevronLeft className="h-5 w-5" />
             </Button>
-            <span className="text-sm font-medium text-muted-foreground tabular-nums min-w-[92px] text-center">
+            <span className="text-sm font-medium text-muted-foreground tabular-nums min-w-[64px] text-center">
               {format(week, 'MMM d')}
             </span>
             <Button
@@ -115,12 +109,64 @@ export default function CrewSchedulePage() {
           </div>
         </div>
 
-        <CrewScheduleFilters
-          filters={filters}
-          onChange={setFilters}
-          employees={employees}
-          routeGroups={schedule?.routeGroups.map((g) => g.routeGroup) ?? []}
-        />
+        {/* Row 2: quick toggles + Filters */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant={filters.crew === 'me' ? 'default' : 'outline'}
+              size="sm"
+              className="h-9 text-xs"
+              onClick={() =>
+                setFilters((f) => ({ ...f, crew: f.crew === 'me' ? 'all' : 'me' }))
+              }
+            >
+              My stops
+            </Button>
+            {!isCurrentWeek && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 text-xs"
+                onClick={() => setWeek(thisWeek)}
+              >
+                This week
+              </Button>
+            )}
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 text-xs gap-1.5"
+            onClick={() => setFiltersOpen(true)}
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            Filters
+            {chips.length > 0 && (
+              <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[--primary] px-1 text-[10px] font-semibold text-[--primary-foreground] tabular-nums">
+                {chips.length}
+              </span>
+            )}
+          </Button>
+        </div>
+
+        {/* Active filter chips */}
+        {chips.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {chips.map((chip) => (
+              <button
+                key={chip.key}
+                type="button"
+                onClick={() => setFilters((f) => ({ ...f, ...chip.clear }))}
+                className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground active:bg-accent transition-colors"
+                aria-label={`Remove ${chip.key} filter`}
+              >
+                {chip.label}
+                <X className="h-3 w-3 opacity-60" />
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Body */}
@@ -159,6 +205,15 @@ export default function CrewSchedulePage() {
           ))
         )}
       </div>
+
+      <ScheduleFilterSheet
+        open={filtersOpen}
+        onOpenChange={setFiltersOpen}
+        filters={filters}
+        onChange={setFilters}
+        employees={employees}
+        routeGroups={routeGroups}
+      />
     </div>
   )
 }
