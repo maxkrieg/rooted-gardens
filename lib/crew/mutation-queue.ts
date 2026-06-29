@@ -45,6 +45,9 @@ export interface PhotoPayload {
 export interface SkipPayload {
   visitId: string
   skipReason?: string
+  // If a session was running when the stop was skipped, close it (set ended_at).
+  closeSessionId?: string
+  endedAt?: string
 }
 
 export interface ClockInPayload {
@@ -144,6 +147,9 @@ export async function flushMutationQueue(): Promise<void> {
               actual_date: p.actualDate,
               service_types: p.serviceTypes,
               completion_note: p.completionNote ?? null,
+              // Clear any leftover skip reason — finishing a previously-skipped
+              // stop fully un-skips it (mirrors the management 3.8 behavior).
+              skip_reason: null,
             })
             .eq('id', p.visitId)
           // Upsert a completed row for every crew member confirmed on site.
@@ -180,6 +186,14 @@ export async function flushMutationQueue(): Promise<void> {
             .from('visits')
             .update({ status: 'skipped', skip_reason: p.skipReason ?? null })
             .eq('id', p.visitId)
+          // Close any session that was running when the stop was skipped, so the
+          // "On site" indicator doesn't keep ticking on an abandoned visit.
+          if (p.closeSessionId && p.endedAt) {
+            await supabase
+              .from('visit_sessions')
+              .update({ ended_at: p.endedAt })
+              .eq('id', p.closeSessionId)
+          }
           break
         }
         case 'photo':

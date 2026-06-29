@@ -244,6 +244,7 @@ export function VisitLogger({
           actual_date: actualDate,
           service_types: serviceTypes,
           completion_note: completionNote.trim() || null,
+          skip_reason: null,
         },
       }
     })
@@ -260,6 +261,7 @@ export function VisitLogger({
                 actual_date: actualDate,
                 service_types: serviceTypes,
                 completion_note: completionNote.trim() || null,
+                skip_reason: null,
               },
             }
           : stop

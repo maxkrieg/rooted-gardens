@@ -18,6 +18,8 @@ import type { TodayStop } from '@/hooks/crew/useTodayStops'
 interface SkipSheetProps {
   visitId: string
   employeeId: string
+  // The open on-site session, if one is running — skipping closes it.
+  openSessionId?: string | null
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
@@ -26,6 +28,7 @@ interface SkipSheetProps {
 export function SkipSheet({
   visitId,
   employeeId,
+  openSessionId,
   open,
   onOpenChange,
   onSuccess,
@@ -42,14 +45,19 @@ export function SkipSheet({
   async function handleConfirm() {
     setSubmitting(true)
 
+    const endedAt = new Date().toISOString()
+
     await enqueueMutation('skip', {
       visitId,
       skipReason: skipReason.trim() || undefined,
+      closeSessionId: openSessionId ?? undefined,
+      endedAt: openSessionId ? endedAt : undefined,
     })
 
     await flushMutationQueue()
 
     queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
+    queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
 
     queryClient.setQueryData<TodayStop[]>(['crew-today-stops', employeeId], (old) => {
       if (!old) return old
@@ -62,6 +70,10 @@ export function SkipSheet({
                 status: 'skipped',
                 skip_reason: skipReason.trim() || null,
               },
+              // Close the running session so the On site pulse clears on the today list
+              sessions: stop.sessions.map((s) =>
+                s.ended_at === null ? { ...s, ended_at: endedAt } : s
+              ),
             }
           : stop
       )
@@ -76,6 +88,9 @@ export function SkipSheet({
           status: 'skipped',
           skip_reason: skipReason.trim() || null,
         },
+        sessions: old.sessions.map((s) =>
+          s.ended_at === null ? { ...s, ended_at: endedAt } : s
+        ),
       }
     })
 

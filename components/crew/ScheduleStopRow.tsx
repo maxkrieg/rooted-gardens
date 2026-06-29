@@ -58,6 +58,25 @@ export function ScheduleStopRow({ row }: ScheduleStopRowProps) {
         visit.status === 'skipped' ? 'opacity-60' : '',
       ].join(' ')}
     >
+      {/* In-progress indicator — same treatment as the Today list (StopCard) */}
+      {inProgress && openSession && (
+        <div className="flex items-center gap-1.5" style={{ color: 'var(--clay)' }}>
+          <span className="relative flex h-2 w-2 shrink-0">
+            <span
+              className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+              style={{ backgroundColor: 'var(--clay)' }}
+            />
+            <span
+              className="relative inline-flex rounded-full h-2 w-2"
+              style={{ backgroundColor: 'var(--clay)' }}
+            />
+          </span>
+          <span className="text-xs font-semibold uppercase tracking-wide">
+            On site · {formatElapsed(openSession.started_at)}
+          </span>
+        </div>
+      )}
+
       <div className="flex items-start justify-between gap-3">
         <p
           className={[
@@ -67,22 +86,7 @@ export function ScheduleStopRow({ row }: ScheduleStopRowProps) {
         >
           {property.address}
         </p>
-        {inProgress && openSession ? (
-          <div className="flex items-center gap-1 shrink-0" style={{ color: 'var(--clay)' }}>
-            <span className="relative flex h-1.5 w-1.5 shrink-0">
-              <span
-                className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
-                style={{ backgroundColor: 'var(--clay)' }}
-              />
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ backgroundColor: 'var(--clay)' }} />
-            </span>
-            <span className="text-[11px] font-semibold uppercase tracking-wide">
-              {formatElapsed(openSession.started_at)}
-            </span>
-          </div>
-        ) : (
-          <VisitStatusBadge status={visit.status} />
-        )}
+        <VisitStatusBadge status={visit.status} />
       </div>
 
       <p className="text-xs text-muted-foreground">{account.name}</p>

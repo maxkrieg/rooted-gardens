@@ -444,6 +444,7 @@ export default function StopDetailPage() {
       <SkipSheet
         visitId={visitId}
         employeeId={employee?.id ?? ''}
+        openSessionId={activeSession ? activeSession.id : null}
         open={skipOpen}
         onOpenChange={setSkipOpen}
         onSuccess={() => router.push('/crew/today')}
