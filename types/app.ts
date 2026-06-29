@@ -119,6 +119,14 @@ export type VisitWithLocation = Visit & {
 /** Visit with crew assignment/completion rows and the associated employees. */
 export type VisitWithCrew = Visit & {
   visit_crew: VisitCrewWithEmployee[]
+  // Included by the crew client hook (useWeekSchedule) for in-progress indicators;
+  // absent from the management Server Action which sources sessions separately.
+  visit_sessions?: Array<{
+    id: string
+    started_at: string
+    ended_at: string | null
+    employee_id: string
+  }>
 }
 
 /** Full visit: zone, property, account, crew, and vehicle. */

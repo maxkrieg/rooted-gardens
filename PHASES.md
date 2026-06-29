@@ -516,7 +516,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   date, property address, service types. Tapping a row shows the visit detail
   (read-only). This helps crew confirm what they did and when.
 
-- [ ] **4.9 — Realtime schedule updates**
+- [x] **4.9 — Realtime schedule updates**
   *Depends on: 4.2*
   Use Supabase Realtime to push schedule changes to crew phones without refresh.
   Two subscriptions (the old `assigned_crew @> [...]` array filter is not supported
@@ -528,20 +528,54 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   On a relevant change, invalidate the React Query cache and show a subtle toast:
   "Your schedule was updated." This replaces the texting workflow entirely.
 
-- [ ] **4.10 — Job start/stop tracking (crew mobile)**
+- [x] **4.10 — Job start/stop tracking (crew mobile)**
   *Depends on: 4.1, 4.3*
-  On the stop detail page (4.3), add a large **Start** button. Tapping it opens a
-  `visit_sessions` row (`started_at = device now`, `ended_at = null`, `source = 'crew_app'`)
-  and flips the button to a running **Stop** button showing elapsed time. Tapping Stop sets
-  `ended_at = device now`. Both writes go through the **offline mutation queue** (built in 4.1;
+  **Shared session model** — one session per visit, not per employee. On the stop detail page
+  (4.3), a large **Start Visit** button opens one `visit_sessions` row for the whole team
+  (`started_at = device now`, `ended_at = null`, `source = 'crew_app'`). The button flips to a
+  running **Stop** button (showing elapsed time). Any assigned crew member — not just the
+  initiator — can tap Stop to set `ended_at = device now`. If the crew forgot to tap Start, a
+  **"Set start time"** link opens a datetime picker (`SetStartTimeSheet`) that creates a session
+  retroactively with `source = 'manual'` and the crew-chosen `started_at`.
+  Both writes go through the **offline mutation queue** (`lib/crew/mutation-queue.ts`;
   NOT a Server Action — see CLAUDE.md "Data Architecture"), captured with device timestamps so
-  they stay correct if logged offline and synced later; the button reflects local state
-  optimistically. Stopping does NOT change `visits.status` — after Stop, prompt
-  (non-blocking) "Log completion now?" to chain into the 4.4 completion flow. Allow multiple
-  crew to each run their own session on the same visit (concurrent sessions). Highlight an
-  in-progress stop on the today list (4.2). RLS for sessions is defined in 2.8. If the crew
-  member isn't clocked in (4.7), show the same non-blocking reminder. Realtime-enable the
-  `visit_sessions` table so the management subscription in 3.11 receives start/stop events.
+  they stay correct if logged offline and synced later; the button reflects local optimistic state
+  immediately. Stopping does NOT change `visits.status` — after Stop, a non-blocking "Log
+  completion now?" banner appears to chain into the 4.4 completion flow.
+  **Attendance** (who was there) is tracked via `visit_crew.relation='completed'` rows written by
+  the 4.4 completion logger, not by separate sessions. The session is a visit timer only.
+  **RLS changes** (migration `20260628220414_visit_session_shared_model.sql`):
+  - Partial unique index `visit_sessions_one_open_per_visit` enforces one open session per visit.
+  - SELECT: crew can now see sessions for visits they're assigned to (not just their own `employee_id`).
+  - INSERT: crew may now insert `source = 'manual'` for retroactive start time.
+  - UPDATE: any crew member assigned to the visit can stop the session (not just the initiator).
+  Highlight an in-progress stop on **both** the today list (4.2) and the crew schedule list
+  (4.11) using `isVisitInProgress` / `formatElapsed` from `lib/utils/visits.ts`.
+  `useWeekSchedule` (`hooks/crew/useWeekSchedule.ts`) fetches `visit_sessions` on the visits
+  query; `ScheduleStopRow` (`components/crew/ScheduleStopRow.tsx`) renders the terracotta pulse.
+  Realtime-enable the `visit_sessions` table so the management subscription in 3.11 receives
+  start/stop events live.
+
+- [x] **4.11 — Crew schedule view & self-reassignment (crew mobile)**
+  *Depends on: 4.1, 4.2, 4.9*
+  (Added during the build — not in the original plan.) Beyond their own assigned stops
+  (Today, 4.2), crew can view the **full week's schedule** for all route groups and
+  self-organize coverage. Adds a 4th crew nav tab (Today | **Schedule** | History | Profile,
+  `CalendarRange` icon) in `app/crew/layout.tsx`. The page `app/crew/schedule/page.tsx` is a
+  client page using `useWeekSchedule(week)` (`hooks/crew/useWeekSchedule.ts`) — the
+  client-first analogue of the management `getScheduleForWeek` Server Action — with week
+  navigation (prev/next + "This week"). Rows render via `components/crew/ScheduleStopRow.tsx`
+  (address, account, zone, frequency + status badge, assigned crew first names), grouped by
+  route group → property → zone (`buildScheduleWeek` in `lib/utils/schedule.ts`), and link
+  into the same `/crew/stop/[visitId]` detail. `components/crew/CrewScheduleFilters.tsx`
+  provides search + crew ("My stops" / by employee) + route-group filters. Crew can
+  self-reassign via `components/crew/CrewAssignSheet.tsx` + `hooks/crew/useReassignCrew.ts`
+  (writes `visit_crew` `relation='assigned'` rows; online-required, NOT offline-queued).
+  RLS migration `supabase/migrations/20260628150000_crew_schedule_visibility.sql` lets crew
+  SELECT all visits / visit_crew / the employee roster and INSERT/DELETE their own `assigned`
+  rows. The page inherits the layout-level realtime sync (4.9) and the IndexedDB React Query
+  cache (4.1) for free — no separate wiring. (In-progress "On site" indicators on the schedule
+  rows are added by 4.10.)
 
 ### ✅ Verifying Phase 4 — Crew PWA
 
@@ -553,7 +587,8 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 - Today list shows assigned stops in route order; stop detail shows notes / maps / zones; history lists the last 30 completed (4.2 / 4.3 / 4.8).
 - Completion writes `visit_crew` (`relation='completed'`) + status; photos upload to Storage + a `photos` row; skip works (4.4 / 4.5 / 4.6).
 - Clock in/out writes/updates `time_entries`; a completion-without-clock-in shows the reminder (4.7).
-- Editing a visit in management pushes a realtime toast to the crew view (4.9); Start/Stop writes `visit_sessions` and the 3.11 overlay updates live (4.10).
+- Editing a visit in management pushes a realtime toast to the crew view (4.9); Start/Stop writes `visit_sessions` and the 3.11 overlay updates live, and the in-progress "On site" pulse shows on **both** the today list and the crew schedule list (4.10).
+- The Schedule tab shows the full week grouped by route group; prev/next + "This week" nav works; search / crew / route-group filters narrow the list; rows open the same stop detail; crew self-reassignment writes `visit_crew` `assigned` rows (4.11).
 
 ---
 
@@ -787,7 +822,10 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 - [ ] **8.6 — Mobile experience polish**
   *Depends on: Phase 4, 3.10*
   Audit the crew PWA and the phone-primary management views on real iOS and Android devices
-  (or browser DevTools device emulation). Check: tap target sizes (min 44px), no horizontal
+  (or browser DevTools device emulation). Cover every crew surface, including the
+  `/crew/schedule` page (4.11) — verify its week-nav buttons are easily tappable, the
+  search/crew/route-group filter row doesn't cause horizontal scroll, and rows aren't hidden
+  under the bottom nav. Check: tap target sizes (min 44px), no horizontal
   scroll, inputs don't zoom on focus (font-size ≥ 16px on inputs), bottom sheet doesn't get
   covered by keyboard, "Add to Home Screen" prompt works, back navigation works
   naturally. Fix any rough edges found.

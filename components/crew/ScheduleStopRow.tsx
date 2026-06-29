@@ -3,7 +3,8 @@
 import { useRouter } from 'next/navigation'
 import { Users } from 'lucide-react'
 import { FrequencyBadge, VisitStatusBadge } from '@/components/management/badges'
-import type { ScheduleZoneRow } from '@/types/app'
+import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
+import type { ScheduleZoneRow, VisitSession } from '@/types/app'
 
 interface ScheduleStopRowProps {
   row: ScheduleZoneRow
@@ -20,6 +21,10 @@ export function ScheduleStopRow({ row }: ScheduleStopRowProps) {
   const assignedCrew = (visit?.visit_crew ?? [])
     .filter((vc) => vc.relation === 'assigned' && vc.employee)
     .map((vc) => vc.employee)
+
+  const sessions = (visit?.visit_sessions ?? []) as VisitSession[]
+  const inProgress = isVisitInProgress(sessions)
+  const openSession = sessions.find((s) => s.ended_at === null)
 
   const showZoneName = account.billing_type === 'contract' || zone.name !== 'Full Property'
 
@@ -62,7 +67,22 @@ export function ScheduleStopRow({ row }: ScheduleStopRowProps) {
         >
           {property.address}
         </p>
-        <VisitStatusBadge status={visit.status} />
+        {inProgress && openSession ? (
+          <div className="flex items-center gap-1 shrink-0" style={{ color: 'var(--clay)' }}>
+            <span className="relative flex h-1.5 w-1.5 shrink-0">
+              <span
+                className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                style={{ backgroundColor: 'var(--clay)' }}
+              />
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ backgroundColor: 'var(--clay)' }} />
+            </span>
+            <span className="text-[11px] font-semibold uppercase tracking-wide">
+              {formatElapsed(openSession.started_at)}
+            </span>
+          </div>
+        ) : (
+          <VisitStatusBadge status={visit.status} />
+        )}
       </div>
 
       <p className="text-xs text-muted-foreground">{account.name}</p>

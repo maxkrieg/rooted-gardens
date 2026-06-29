@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, MapPin, Map, ChevronDown, KeyRound, ClipboardList, Car, Users, User } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { ArrowLeft, MapPin, Map, ChevronDown, KeyRound, ClipboardList, Car, Users, User, Play, Flag, SkipForward, Check } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { FrequencyBadge, VisitStatusBadge } from '@/components/management/badges'
@@ -12,6 +13,7 @@ import { VisitLogger } from '@/components/crew/VisitLogger'
 import { SkipSheet } from '@/components/crew/SkipSheet'
 import { CrewAssignSheet } from '@/components/crew/CrewAssignSheet'
 import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
+import { enqueueMutation, flushMutationQueue } from '@/lib/crew/mutation-queue'
 import { createClient } from '@/lib/supabase/client'
 import type { VisitSession } from '@/types/app'
 
@@ -40,12 +42,26 @@ function LoadingSkeleton() {
 export default function StopDetailPage() {
   const { visitId } = useParams<{ visitId: string }>()
   const router = useRouter()
+  const queryClient = useQueryClient()
   const { data: stop, isLoading } = useStopDetail(visitId)
   const { data: employee } = useCurrentEmployee()
   const [notesOpen, setNotesOpen] = useState(false)
   const [completionOpen, setCompletionOpen] = useState(false)
   const [skipOpen, setSkipOpen] = useState(false)
   const [assignOpen, setAssignOpen] = useState(false)
+
+  // Optimistic session so the Start cell flips to a running timer immediately,
+  // before the queued insert syncs. Cleared once real data carries the session.
+  const [optimisticSession, setOptimisticSession] = useState<
+    { sessionId: string; startedAt: string; employeeId: string } | null
+  >(null)
+
+  // Re-render every 30s so the running duration on the Start cell stays current.
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 30_000)
+    return () => clearInterval(id)
+  }, [])
 
   const photoStoragePaths = stop?.photos.map((p) => p.storage_path) ?? []
   const { data: signedPhotoUrls } = useQuery({
@@ -65,6 +81,35 @@ export default function StopDetailPage() {
     staleTime: 50 * 60 * 1000, // 50 min — well under the 1-hr signed URL expiry
   })
 
+  // Derive the display sessions from real data + any optimistic flip.
+  // Must be before early returns to satisfy Rules of Hooks.
+  // Use stop?.sessions (stable cache ref) as the dep rather than stop?.sessions ?? []
+  // to avoid creating a new array on every render when stop is undefined.
+  const stopSessions = stop?.sessions
+  const effectiveSessions = useMemo((): VisitSession[] => {
+    const rawSessions = (stopSessions ?? []) as VisitSession[]
+    if (!optimisticSession) return rawSessions
+    // Don't add a duplicate if the real data already carries an open session
+    if (rawSessions.some((s) => s.ended_at === null)) return rawSessions
+    return [
+      ...rawSessions,
+      {
+        id: optimisticSession.sessionId,
+        visit_id: visitId,
+        started_at: optimisticSession.startedAt,
+        ended_at: null,
+        employee_id: optimisticSession.employeeId,
+        source: 'crew_app',
+        note: null,
+        created_at: optimisticSession.startedAt,
+        updated_at: optimisticSession.startedAt,
+      } as unknown as VisitSession,
+    ]
+  }, [stopSessions, optimisticSession, visitId])
+
+  const inProgress = isVisitInProgress(effectiveSessions)
+  const activeSession = effectiveSessions.find((s) => s.ended_at === null)
+
   if (isLoading && !stop) return <LoadingSkeleton />
 
   if (!stop) {
@@ -75,11 +120,21 @@ export default function StopDetailPage() {
     )
   }
 
-  const { visit, zone, property, account, sessions } = stop
-
+  const { visit, zone, property, account } = stop
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(property.address)}`
-  const inProgress = isVisitInProgress(sessions as VisitSession[])
-  const activeSession = sessions.find((s) => s.ended_at === null)
+  const isActive = visit.status !== 'completed' && visit.status !== 'invoiced' && visit.status !== 'skipped'
+
+  async function handleStart() {
+    if (!employee?.id || inProgress) return
+    const startedAt = new Date().toISOString()
+    const sessionId = crypto.randomUUID()
+    setOptimisticSession({ sessionId, startedAt, employeeId: employee.id })
+    await enqueueMutation('job_start', { visitId, employeeId: employee.id, startedAt, sessionId })
+    await flushMutationQueue()
+    queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
+    queryClient.invalidateQueries({ queryKey: ['crew-today-stops'] })
+    queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
+  }
 
   const allZones = [...property.service_zones]
     .filter((z) => z.active)
@@ -310,26 +365,69 @@ export default function StopDetailPage() {
         )}
       </div>
 
-      {/* Fixed action bar — sits above the bottom nav */}
+      {/* Fixed action bar — three inline icon+label actions above the bottom nav */}
       <div
-        className="fixed inset-x-0 z-40 bg-background/95 backdrop-blur border-t border-[--border] px-4 pt-3 pb-3 space-y-2"
+        className="fixed inset-x-0 z-40 bg-background/95 backdrop-blur border-t border-[--border] px-4 pt-2 pb-2"
         style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }}
       >
-        <Button
-          className="w-full h-12 text-base font-semibold"
-          onClick={() => setCompletionOpen(true)}
-          disabled={visit.status === 'completed' || visit.status === 'invoiced'}
-        >
-          {visit.status === 'completed' || visit.status === 'invoiced' ? 'Completed ✓' : 'Log Completion'}
-        </Button>
-        <Button
-          variant="outline"
-          className="w-full h-11"
-          onClick={() => setSkipOpen(true)}
-          disabled={visit.status === 'skipped' || visit.status === 'invoiced'}
-        >
-          {visit.status === 'skipped' ? 'Skipped ✓' : 'Skip This Stop'}
-        </Button>
+        <div className="flex items-stretch gap-2">
+          {/* Start — flips to a non-clickable running timer once started */}
+          {inProgress && activeSession ? (
+            <div
+              className="flex-1 flex flex-col items-center justify-center gap-0.5 rounded-lg border min-h-[60px] py-2"
+              style={{ borderColor: 'var(--clay)', color: 'var(--clay)' }}
+              aria-label="Visit in progress"
+            >
+              <span className="font-display text-lg font-semibold leading-none tabular-nums">
+                {formatElapsed(activeSession.started_at)}
+              </span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide">On site</span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="flex-1 flex flex-col items-center justify-center gap-1 rounded-lg border border-[--border] bg-card min-h-[60px] py-2 active:bg-accent/40 disabled:opacity-40 transition-colors"
+              onClick={handleStart}
+              disabled={!isActive}
+            >
+              <Play className="h-5 w-5" style={{ color: 'var(--primary)' }} />
+              <span className="text-xs font-medium text-foreground">Start</span>
+            </button>
+          )}
+
+          {/* Finish — opens the completion form, which also closes the session */}
+          <button
+            type="button"
+            className="flex-1 flex flex-col items-center justify-center gap-1 rounded-lg border border-[--border] bg-card min-h-[60px] py-2 active:bg-accent/40 disabled:opacity-40 transition-colors"
+            onClick={() => setCompletionOpen(true)}
+            disabled={visit.status === 'completed' || visit.status === 'invoiced'}
+          >
+            {visit.status === 'completed' || visit.status === 'invoiced' ? (
+              <>
+                <Check className="h-5 w-5" style={{ color: 'var(--primary)' }} />
+                <span className="text-xs font-medium text-foreground">Done</span>
+              </>
+            ) : (
+              <>
+                <Flag className="h-5 w-5 text-foreground" />
+                <span className="text-xs font-medium text-foreground">Finish</span>
+              </>
+            )}
+          </button>
+
+          {/* Skip */}
+          <button
+            type="button"
+            className="flex-1 flex flex-col items-center justify-center gap-1 rounded-lg border border-[--border] bg-card min-h-[60px] py-2 active:bg-accent/40 disabled:opacity-40 transition-colors"
+            onClick={() => setSkipOpen(true)}
+            disabled={visit.status === 'skipped' || visit.status === 'invoiced'}
+          >
+            <SkipForward className="h-5 w-5 text-muted-foreground" />
+            <span className="text-xs font-medium text-foreground">
+              {visit.status === 'skipped' ? 'Skipped' : 'Skip'}
+            </span>
+          </button>
+        </div>
       </div>
 
       <VisitLogger
@@ -337,6 +435,7 @@ export default function StopDetailPage() {
         employeeId={employee?.id ?? ''}
         propertyId={stop.property.id}
         assignedCrew={stop.assignedCrew ?? []}
+        openSession={activeSession ? { id: activeSession.id, started_at: activeSession.started_at } : null}
         open={completionOpen}
         onOpenChange={setCompletionOpen}
         onSuccess={() => router.push('/crew/today')}

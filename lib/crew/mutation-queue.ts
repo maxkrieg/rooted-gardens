@@ -9,12 +9,23 @@ export interface CompletionPayload {
   actualDate: string
   serviceTypes: string[]
   completionNote?: string
+  // Optional on-site session to close (or create) as part of finishing the visit.
+  // isNew=false → update the existing open session's started_at/ended_at;
+  // isNew=true  → insert a manual session (crew forgot to tap Start).
+  session?: {
+    id: string
+    startedAt: string
+    endedAt: string
+    isNew: boolean
+  }
 }
 
 export interface JobStartPayload {
   visitId: string
   employeeId: string
   startedAt: string
+  sessionId: string
+  source?: 'crew_app' | 'manual'
 }
 
 export interface JobStopPayload {
@@ -107,11 +118,12 @@ export async function flushMutationQueue(): Promise<void> {
         case 'job_start': {
           const p = mutation.payload as JobStartPayload
           await supabase.from('visit_sessions').insert({
+            id: p.sessionId,
             visit_id: p.visitId,
             employee_id: p.employeeId,
             started_at: p.startedAt,
             ended_at: null,
-            source: 'crew_app',
+            source: p.source ?? 'crew_app',
           })
           break
         }
@@ -144,6 +156,22 @@ export async function flushMutationQueue(): Promise<void> {
               relation: 'completed' as const,
             }))
           )
+          // Close (or create) the on-site session as part of finishing the visit.
+          if (p.session?.isNew) {
+            await supabase.from('visit_sessions').insert({
+              id: p.session.id,
+              visit_id: p.visitId,
+              employee_id: p.employeeId,
+              started_at: p.session.startedAt,
+              ended_at: p.session.endedAt,
+              source: 'manual',
+            })
+          } else if (p.session) {
+            await supabase
+              .from('visit_sessions')
+              .update({ started_at: p.session.startedAt, ended_at: p.session.endedAt })
+              .eq('id', p.session.id)
+          }
           break
         }
         case 'skip': {

@@ -5,7 +5,6 @@ import { format } from 'date-fns'
 import { Camera, X } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Sheet,
@@ -15,11 +14,20 @@ import {
   SheetFooter,
 } from '@/components/ui/sheet'
 import { ServiceTypeSelector } from '@/components/crew/ServiceTypeSelector'
+import { CrewMultiSelect } from '@/components/crew/CrewMultiSelect'
 import { enqueueMutation, flushMutationQueue } from '@/lib/crew/mutation-queue'
 import { useTodayTimeEntry } from '@/hooks/crew/useTodayTimeEntry'
+import { useActiveEmployees } from '@/hooks/crew/useActiveEmployees'
 import { createClient } from '@/lib/supabase/client'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
 import type { TodayStop } from '@/hooks/crew/useTodayStops'
+
+// datetime-local input expects "YYYY-MM-DDTHH:mm" in local time
+function toDatetimeLocalValue(iso: string): string {
+  const date = new Date(iso)
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+  return local.toISOString().slice(0, 16)
+}
 
 const MAX_PHOTO_BYTES = 20 * 1024 * 1024
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
@@ -34,6 +42,8 @@ interface VisitLoggerProps {
   employeeId: string
   propertyId: string
   assignedCrew: Array<{ employee_id: string; name: string }>
+  // The open on-site session, if one was started. When present, finishing closes it.
+  openSession?: { id: string; started_at: string } | null
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
@@ -44,6 +54,7 @@ export function VisitLogger({
   employeeId,
   propertyId,
   assignedCrew,
+  openSession,
   open,
   onOpenChange,
   onSuccess,
@@ -51,6 +62,7 @@ export function VisitLogger({
   const queryClient = useQueryClient()
   const today = format(new Date(), 'yyyy-MM-dd')
   const { data: todayEntries = [] } = useTodayTimeEntry(employeeId)
+  const { data: activeEmployees = [] } = useActiveEmployees()
   const isClockedIn = todayEntries.length > 0 && todayEntries[0].clock_out === null
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -63,19 +75,26 @@ export function VisitLogger({
   const [photos, setPhotos] = useState<CapturedPhoto[]>([])
   const [photoError, setPhotoError] = useState<string | null>(null)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  // Start-time control: prefilled from an open session, or manually set if the crew
+  // forgot to tap Start. `manualStart` enables the field when there's no open session.
+  const [startTime, setStartTime] = useState('')
+  const [manualStart, setManualStart] = useState(false)
 
-  // Pre-check all assigned crew every time the sheet opens
+  // Pre-check all assigned crew + seed the start time every time the sheet opens
   useEffect(() => {
     if (open) {
       setPresentIds(assignedCrew.map((c) => c.employee_id))
+      if (openSession) {
+        setStartTime(toDatetimeLocalValue(openSession.started_at))
+        setManualStart(false)
+      } else {
+        setStartTime(toDatetimeLocalValue(new Date().toISOString()))
+        setManualStart(false)
+      }
     }
-  }, [open, assignedCrew])
+  }, [open, assignedCrew, openSession])
 
-  function toggleCrewMember(empId: string) {
-    setPresentIds((prev) =>
-      prev.includes(empId) ? prev.filter((id) => id !== empId) : [...prev, empId]
-    )
-  }
+  const crewOptions = activeEmployees.map((e) => ({ id: e.id, name: e.name, role: e.role }))
 
   function removePhoto(index: number) {
     setPhotos((prev) => {
@@ -93,6 +112,8 @@ export function VisitLogger({
     setServiceTypeError(false)
     setSubmitting(false)
     setPresentIds(assignedCrew.map((c) => c.employee_id))
+    setStartTime('')
+    setManualStart(false)
     setPhotos((prev) => {
       prev.forEach((p) => URL.revokeObjectURL(p.localUrl))
       return []
@@ -160,6 +181,26 @@ export function VisitLogger({
     // At minimum, credit the logger even if they unchecked themselves
     const presentEmployeeIds = presentIds.length > 0 ? presentIds : [employeeId]
 
+    // Build the on-site session to record/close. Finishing closes an open session,
+    // or creates one retroactively if the crew set a start time without tapping Start.
+    const endedAt = new Date().toISOString()
+    let session: { id: string; startedAt: string; endedAt: string; isNew: boolean } | undefined
+    if (openSession) {
+      session = {
+        id: openSession.id,
+        startedAt: new Date(startTime).toISOString(),
+        endedAt,
+        isNew: false,
+      }
+    } else if (manualStart && startTime) {
+      session = {
+        id: crypto.randomUUID(),
+        startedAt: new Date(startTime).toISOString(),
+        endedAt,
+        isNew: true,
+      }
+    }
+
     await enqueueMutation('completion', {
       visitId,
       employeeId,
@@ -167,6 +208,7 @@ export function VisitLogger({
       actualDate,
       serviceTypes,
       completionNote: completionNote.trim() || undefined,
+      session,
     })
 
     // Enqueue metadata for each successfully uploaded photo
@@ -184,8 +226,10 @@ export function VisitLogger({
     // Without this, the photo row sits in the IDB queue until the next layout mount.
     await flushMutationQueue()
 
-    // Invalidate stop-detail so photos appear if user navigates back to this stop.
+    // Invalidate stop-detail so photos appear if user navigates back to this stop,
+    // and the week schedule so its in-progress pulse clears on completion.
     queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
+    queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
 
     // Optimistic update: mark this visit completed in both caches immediately.
     // Use setQueryData rather than invalidating crew-today-stops to avoid a loading
@@ -259,35 +303,57 @@ export function VisitLogger({
             />
           </div>
 
-          {/* Who was on site — only shown when crew are assigned */}
-          {assignedCrew.length > 0 && (
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-foreground">
-                Who was on site?
-              </label>
-              <div className="rounded-2xl border border-[--border] bg-card divide-y divide-[--border] overflow-hidden">
-                {assignedCrew.map((crew) => {
-                  const checked = presentIds.includes(crew.employee_id)
-                  return (
-                    <label
-                      key={crew.employee_id}
-                      className={[
-                        'flex items-center gap-3 px-4 min-h-[48px] cursor-pointer select-none transition-colors',
-                        checked ? 'bg-accent' : 'hover:bg-accent/50',
-                      ].join(' ')}
-                    >
-                      <Checkbox
-                        checked={checked}
-                        onCheckedChange={() => toggleCrewMember(crew.employee_id)}
-                        aria-label={crew.name}
-                      />
-                      <span className="text-sm font-medium text-foreground">{crew.name}</span>
-                    </label>
-                  )
-                })}
-              </div>
-            </div>
-          )}
+          {/* Start time — prefilled when a session is open; otherwise optional/manual */}
+          <div className="space-y-1.5">
+            {openSession ? (
+              <>
+                <label className="text-sm font-semibold text-foreground" htmlFor="start-time">
+                  Start time
+                </label>
+                <input
+                  id="start-time"
+                  type="datetime-local"
+                  value={startTime}
+                  max={toDatetimeLocalValue(new Date().toISOString())}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="h-11 w-full rounded-lg border border-[--border] bg-card px-3 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-[--ring]"
+                />
+              </>
+            ) : (
+              <>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={manualStart}
+                    onChange={(e) => setManualStart(e.target.checked)}
+                    className="h-4 w-4 accent-[--primary]"
+                  />
+                  <span className="text-sm font-semibold text-foreground">
+                    Forgot to start? Set start time
+                  </span>
+                </label>
+                {manualStart && (
+                  <input
+                    type="datetime-local"
+                    value={startTime}
+                    max={toDatetimeLocalValue(new Date().toISOString())}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="h-11 w-full rounded-lg border border-[--border] bg-card px-3 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-[--ring]"
+                  />
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Who was on site — full roster, assigned crew pre-selected */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-semibold text-foreground">Who was on site?</label>
+            <CrewMultiSelect
+              options={crewOptions}
+              value={presentIds}
+              onChange={setPresentIds}
+            />
+          </div>
 
           {/* Service types */}
           <div className="space-y-1.5">
