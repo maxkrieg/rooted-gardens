@@ -40,6 +40,7 @@ export type StopDetail = {
     id: string
     name: string
     billing_type: string
+    contact_name: string | null
   }
   sessions: Array<{
     id: string
@@ -78,7 +79,7 @@ export function useStopDetail(visitId: string | undefined) {
             id, address, crew_notes, access_notes, parking_notes,
             service_zones(id, name, frequency, sort_order, active)
           ),
-          account:accounts!inner(id, name, billing_type),
+          account:accounts!inner(id, name, billing_type, contact_name),
           visit_sessions(id, started_at, ended_at, employee_id),
           visit_crew(employee_id, relation, employees(id, name)),
           photos(id, storage_path, type, created_at, caption)

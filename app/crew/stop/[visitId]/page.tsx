@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, MapPin, ChevronDown, KeyRound, ClipboardList, Car, Users } from 'lucide-react'
+import { ArrowLeft, MapPin, Map, ChevronDown, KeyRound, ClipboardList, Car, Users, User } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { FrequencyBadge, VisitStatusBadge } from '@/components/management/badges'
@@ -134,10 +134,17 @@ export default function StopDetailPage() {
             href={mapsUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="ml-7 inline-flex items-center gap-1 text-sm font-medium text-[--primary] hover:underline"
+            className="ml-7 inline-flex items-center gap-1.5 text-sm font-medium text-[--primary] hover:underline"
           >
+            <Map className="h-3.5 w-3.5 shrink-0" />
             Open in Maps →
           </a>
+          {account.contact_name && (
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-muted-foreground shrink-0" />
+              <p className="text-sm text-muted-foreground">{account.contact_name}</p>
+            </div>
+          )}
         </div>
 
         {/* Status row */}
