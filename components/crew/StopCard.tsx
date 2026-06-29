@@ -13,7 +13,6 @@ interface StopCardProps {
 export function StopCard({ stop }: StopCardProps) {
   const router = useRouter()
   const { visit, zone, property, account, sessions } = stop
-  console.log({ encodedURI: encodeURIComponent(property.address) })
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(property.address)}`
   const inProgress = sessions.some((s) => s.ended_at === null)
   const activeSession = sessions.find((s) => s.ended_at === null)
@@ -88,13 +87,16 @@ export function StopCard({ stop }: StopCardProps) {
           <FrequencyBadge frequency={zone.frequency} />
         </div>
 
-        {/* Status chip + photo indicator */}
-        <div className="pl-6 flex items-center gap-2">
-          <VisitStatusBadge status={visit.status} />
-          {stop.photoCount > 0 && (
-            <Camera className="h-3.5 w-3.5 text-muted-foreground" aria-label="Has photos" />
-          )}
-        </div>
+        {/* Status chip + photo indicator — hide the row entirely for a plain scheduled stop.
+            Only show a status badge for non-default states (completed / skipped / invoiced). */}
+        {(visit.status !== 'scheduled' || stop.photoCount > 0) && (
+          <div className="pl-6 flex items-center gap-2">
+            {visit.status !== 'scheduled' && <VisitStatusBadge status={visit.status} />}
+            {stop.photoCount > 0 && (
+              <Camera className="h-3.5 w-3.5 text-muted-foreground" aria-label="Has photos" />
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
