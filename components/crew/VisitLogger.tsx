@@ -246,6 +246,10 @@ export function VisitLogger({
           completion_note: completionNote.trim() || null,
           skip_reason: null,
         },
+        // Close any open session so the "On site" indicator clears immediately
+        sessions: old.sessions.map((s) =>
+          s.ended_at === null ? { ...s, ended_at: endedAt } : s
+        ),
       }
     })
 
@@ -263,6 +267,10 @@ export function VisitLogger({
                 completion_note: completionNote.trim() || null,
                 skip_reason: null,
               },
+              // Close any open session so the "On site" indicator clears immediately
+              sessions: stop.sessions.map((s) =>
+                s.ended_at === null ? { ...s, ended_at: endedAt } : s
+              ),
             }
           : stop
       )
