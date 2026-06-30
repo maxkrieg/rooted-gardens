@@ -15,10 +15,10 @@ import { useWeekSchedule } from '@/hooks/crew/useWeekSchedule'
 import { useActiveEmployees } from '@/hooks/crew/useActiveEmployees'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { getWeekStart } from '@/lib/utils/schedule'
-import type { ScheduleZoneRow } from '@/types/app'
+import type { SchedulePropertyRow } from '@/types/app'
 
 function rowMatches(
-  row: ScheduleZoneRow,
+  row: SchedulePropertyRow,
   filters: ScheduleFilters,
   myId: string | undefined
 ): boolean {
@@ -201,7 +201,7 @@ export default function CrewSchedulePage() {
               </div>
               <div className="divide-y divide-[--border]">
                 {group.rows.map((row) => (
-                  <ScheduleStopRow key={row.zone.id} row={row} />
+                  <ScheduleStopRow key={row.property.id} row={row} />
                 ))}
               </div>
             </div>

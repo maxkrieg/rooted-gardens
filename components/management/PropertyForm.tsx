@@ -14,9 +14,23 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { createProperty, updateProperty } from '@/app/management/accounts/property-actions'
 import { propertyFormSchema, type PropertyFormValues } from '@/lib/validators/property'
 import type { Property } from '@/types/app'
+
+const FREQUENCY_LABELS: Record<PropertyFormValues['frequency'], string> = {
+  weekly: 'Weekly',
+  biweekly: 'Bi-weekly',
+  monthly: 'Monthly',
+  as_needed: 'As Needed',
+}
 
 interface PropertyFormProps {
   accountId: string
@@ -33,12 +47,14 @@ export function PropertyForm({ accountId, onSuccess, property }: PropertyFormPro
     defaultValues: property
       ? {
           address: property.address,
+          frequency: property.frequency as PropertyFormValues['frequency'],
           parking_notes: property.parking_notes ?? '',
           access_notes: property.access_notes ?? '',
           crew_notes: property.crew_notes ?? '',
         }
       : {
           address: '',
+          frequency: 'weekly',
           parking_notes: '',
           access_notes: '',
           crew_notes: '',
@@ -81,6 +97,31 @@ export function PropertyForm({ accountId, onSuccess, property }: PropertyFormPro
                   {...field}
                 />
               </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="frequency"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Frequency <span className="text-destructive">*</span></FormLabel>
+              <Select value={field.value} onValueChange={field.onChange}>
+                <FormControl>
+                  <SelectTrigger className="h-11 text-base">
+                    <SelectValue />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {Object.entries(FREQUENCY_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <FormMessage />
             </FormItem>
           )}

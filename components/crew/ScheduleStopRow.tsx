@@ -4,10 +4,10 @@ import { useRouter } from 'next/navigation'
 import { Users } from 'lucide-react'
 import { FrequencyBadge, VisitStatusBadge } from '@/components/management/badges'
 import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
-import type { ScheduleZoneRow } from '@/types/app'
+import type { SchedulePropertyRow } from '@/types/app'
 
 interface ScheduleStopRowProps {
-  row: ScheduleZoneRow
+  row: SchedulePropertyRow
 }
 
 function firstName(name: string): string {
@@ -16,15 +16,13 @@ function firstName(name: string): string {
 
 export function ScheduleStopRow({ row }: ScheduleStopRowProps) {
   const router = useRouter()
-  const { zone, property, account, visit } = row
+  const { property, account, visit } = row
 
   const assignedCrew = (visit?.visit_crew ?? [])
     .filter((vc) => vc.relation === 'assigned' && vc.employee)
     .map((vc) => vc.employee)
 
   const inProgress = visit ? isVisitInProgress(visit) : false
-
-  const showZoneName = account.billing_type === 'contract' || zone.name !== 'Full Property'
 
   // No visit yet → not tappable (nothing to view/edit), shown muted
   if (!visit) {
@@ -35,8 +33,7 @@ export function ScheduleStopRow({ row }: ScheduleStopRowProps) {
         </p>
         <p className="text-xs text-muted-foreground">{account.name}</p>
         <div className="flex items-center gap-2 flex-wrap">
-          {showZoneName && <span className="text-xs text-foreground">{zone.name}</span>}
-          <FrequencyBadge frequency={zone.frequency} />
+          <FrequencyBadge frequency={property.frequency} />
           <span className="text-[11px] text-muted-foreground">Not scheduled</span>
         </div>
       </div>
@@ -93,8 +90,7 @@ export function ScheduleStopRow({ row }: ScheduleStopRowProps) {
       <p className="text-xs text-muted-foreground">{account.name}</p>
 
       <div className="flex items-center gap-2 flex-wrap">
-        {showZoneName && <span className="text-xs text-foreground">{zone.name}</span>}
-        <FrequencyBadge frequency={zone.frequency} />
+        <FrequencyBadge frequency={property.frequency} />
       </div>
 
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">

@@ -95,7 +95,7 @@ export default function StopDetailPage() {
     )
   }
 
-  const { visit, zone, property, account } = stop
+  const { visit, property, account } = stop
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(property.address)}`
   const isActive = visit.status !== 'completed' && visit.status !== 'invoiced' && visit.status !== 'skipped'
 
@@ -108,11 +108,6 @@ export default function StopDetailPage() {
     queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
     queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
   }
-
-  const allZones = [...property.service_zones]
-    .filter((z) => z.active)
-    .sort((a, b) => a.sort_order - b.sort_order)
-  const isMultiZone = account.billing_type === 'contract' || allZones.length > 1
 
   const hasPropertyNotes = !!(property.access_notes || property.crew_notes || property.parking_notes)
 
@@ -208,13 +203,10 @@ export default function StopDetailPage() {
           />
         )}
 
-        {/* Zone context (single-zone: show the zone name + frequency) */}
-        {!isMultiZone && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-foreground">{zone.name}</span>
-            <FrequencyBadge frequency={zone.frequency} />
-          </div>
-        )}
+        {/* Frequency */}
+        <div className="flex items-center gap-2">
+          <FrequencyBadge frequency={property.frequency} />
+        </div>
 
         {/* Assigned crew — viewable + editable by any crew member */}
         <div className="rounded-2xl border border-[--border] bg-card overflow-hidden shadow-[0_1px_2px_rgba(43,42,36,.04),_0_6px_16px_-4px_rgba(43,42,36,.08)]">
@@ -331,22 +323,6 @@ export default function StopDetailPage() {
           </div>
         )}
 
-        {/* Multi-zone list */}
-        {isMultiZone && allZones.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide px-1">
-              This visit&apos;s zones
-            </p>
-            <div className="rounded-2xl border border-[--border] bg-card divide-y divide-[--border] shadow-[0_1px_2px_rgba(43,42,36,.04),_0_6px_16px_-4px_rgba(43,42,36,.08)]">
-              {allZones.map((z) => (
-                <div key={z.id} className="flex items-center justify-between px-4 py-3 min-h-[44px]">
-                  <span className="text-sm font-medium text-foreground">{z.name}</span>
-                  <FrequencyBadge frequency={z.frequency} />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Fixed action bar — three inline icon+label actions above the bottom nav */}

@@ -214,26 +214,16 @@ properties (
   address text NOT NULL,
   lat numeric(10,7),
   lng numeric(10,7),
+  frequency text NOT NULL DEFAULT 'weekly'  -- 'weekly' | 'biweekly' | 'monthly' | 'as_needed'
+    CHECK (frequency IN ('weekly', 'biweekly', 'monthly', 'as_needed')),
   parking_notes text,
   access_notes text,          -- gate codes, key location, etc.
   crew_notes text,            -- standing instructions for all visits
   created_at, updated_at
 )
-
--- Named work areas within a property. Simple properties have one zone.
--- Complex/commercial properties have multiple zones with different frequencies.
-service_zones (
-  id uuid PK,
-  property_id uuid FK → properties,
-  account_id uuid FK → accounts,  -- denormalized for query convenience
-  name text NOT NULL,             -- e.g. "Pool House & Steep Hills", "Front Lawn"
-  frequency text NOT NULL         -- 'weekly' | 'biweekly' | 'monthly' | 'as_needed'
-    CHECK (frequency IN ('weekly', 'biweekly', 'monthly', 'as_needed')),
-  sort_order integer DEFAULT 0,   -- crew visit sequence within property
-  notes text,                     -- zone-specific standing instructions
-  active boolean DEFAULT true,
-  created_at, updated_at
-)
+-- service_zones DROPPED (migration 20260630130000_drop_service_zones). A property no
+-- longer has multiple named work areas with independent frequencies — frequency is a
+-- single value on the property, and a visit anchors directly to a property (see below).
 
 -- Route groupings (geographic clusters of properties)
 route_groups (
@@ -296,13 +286,13 @@ equipment (
 ### Scheduling & Visits
 
 ```sql
--- Visits are the core operational record. One row per (service_zone, week).
+-- Visits are the core operational record. One row per (property, week) — enforced
+-- by a UNIQUE index on (property_id, week_start).
 -- A visit starts as 'scheduled' and progresses through status.
 visits (
   id uuid PK,
-  service_zone_id uuid FK → service_zones,
   account_id uuid FK → accounts,        -- denormalized
-  property_id uuid FK → properties,     -- denormalized
+  property_id uuid FK → properties,
   week_start date NOT NULL,             -- always a Monday; the "column" in the old sheet
   
   -- Planning (set by owner/lead before the week)
@@ -436,19 +426,23 @@ users to their employee record.
 Two fundamentally different account types — never conflate them:
 
 - **`per_visit`** — residential, one price per completed visit. Each visit = one QBO invoice line. Price stored on `accounts.price_per_visit`.
-- **`contract`** — commercial or large multi-zone properties. Flat periodic rate regardless of how many zones were serviced. Multiple service zones with different frequencies. Invoice is periodic (monthly/seasonal), not per-visit. Price stored on `accounts.contract_rate`.
+- **`contract`** — commercial or large properties. Flat periodic rate regardless of how many visits occurred. Invoice is periodic (monthly/seasonal), not per-visit. Price stored on `accounts.contract_rate`.
 - **`as_needed`** — quoted per engagement, no set schedule.
 
-### Service Zones
-A `service_zone` is a named work area within a property. It is NOT a billing unit.
-- Simple residential property: one zone named "Property" (or just the address)
-- Complex/commercial property: multiple zones (e.g. "Pool House", "Tennis Court", "Entry Hill")
-- Zones have their own `frequency` — within a multi-zone account, some zones are weekly while others are monthly
-- On the crew mobile view for multi-zone stops, show the full zone list with frequency badges so crew knows what's due this week
+### Properties & Frequency
+A `property` is the unit of scheduling — there is no sub-property work-area concept.
+(`service_zones` — named work areas within a property with independent frequencies —
+was eliminated in migration `20260630130000_drop_service_zones`; the multi-frequency-
+per-area capability was intentionally dropped.) Each property carries a single
+`frequency` (`'weekly' | 'biweekly' | 'monthly' | 'as_needed'`), shown via
+`FrequencyBadge`. A formerly multi-zone property (e.g. a commercial site with a lawn on
+one cadence and garden beds on another) is represented as one property at its most-
+frequent cadence, with the per-area breakdown folded into `crew_notes` as freeform text.
 
 ### Visits
-A `visit` is a (service_zone × week) record. The `week_start` is always a Monday.
-- Created by the owner when scheduling ("this zone needs to happen week of June 8")
+A `visit` is a (property × week) record — enforced by a UNIQUE index on
+`(property_id, week_start)`. The `week_start` is always a Monday.
+- Created by the owner when scheduling ("this property needs service week of June 8")
 - May have a `crew_instruction` — a one-time note for this specific visit (distinct from property standing notes)
 - Crew completes it in the field: sets `ended_at`, `service_types[]`, `completion_note`
 - Completion date is derived from `ended_at` (fallback: `week_start`); display with `parseISO`

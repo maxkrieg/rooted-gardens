@@ -16,7 +16,6 @@ export default async function DashboardPage() {
       .from('visits')
       .select(`
         *,
-        service_zone:service_zones(*),
         property:properties(*),
         account:accounts(*),
         visit_crew(*, employee:employees(*))
@@ -27,7 +26,7 @@ export default async function DashboardPage() {
     supabase
       .from('visits')
       .select(
-        'id, started_at, property:properties(address), service_zone:service_zones(name), visit_crew(relation, employee:employees(name))',
+        'id, started_at, property:properties(address), visit_crew(relation, employee:employees(name))',
       )
       .not('started_at', 'is', null)
       .is('ended_at', null),
@@ -162,7 +161,7 @@ function VisitCard({ visit }: { visit: VisitWithDetails }) {
             {visit.property.address}
           </p>
           <p className="text-xs text-muted-foreground mt-0.5 truncate">
-            {visit.service_zone.name} · {visit.account.name}
+            {visit.account.name}
           </p>
         </div>
         {assignedCrew.length > 0 && (
@@ -185,7 +184,7 @@ function InstructionCard({ visit }: { visit: VisitWithDetails }) {
       <div className="flex items-center gap-1.5">
         <FilePen className="w-3.5 h-3.5 text-[var(--clay)] shrink-0" />
         <p className="text-xs font-semibold text-[var(--clay)] truncate">
-          {visit.property.address} · {visit.service_zone.name}
+          {visit.property.address}
         </p>
       </div>
       <p className="text-sm text-foreground">{visit.crew_instruction}</p>

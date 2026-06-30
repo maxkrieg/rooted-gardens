@@ -14,13 +14,12 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { FilePen } from 'lucide-react'
+import { FrequencyBadge } from '@/components/management/badges'
 import type {
-  Account,
   Employee,
-  Property,
   RouteGroup,
   ScheduleWeek,
-  ScheduleZoneRow,
+  SchedulePropertyRow,
   Vehicle,
   VisitWithCrew,
 } from '@/types/app'
@@ -40,7 +39,7 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit }: ScheduleGr
   const visitTimings = useVisitTimings()
 
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [sheetRow, setSheetRow] = useState<ScheduleZoneRow | null>(null)
+  const [sheetRow, setSheetRow] = useState<SchedulePropertyRow | null>(null)
   const [sheetWeek, setSheetWeek] = useState('')
   const [creatingKey, setCreatingKey] = useState<string | null>(null)
   const [, startTransition] = useTransition()
@@ -48,30 +47,30 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit }: ScheduleGr
   const [assignOpen, setAssignOpen] = useState(false)
   const [assignGroup, setAssignGroup] = useState<RouteGroup | null>(null)
 
-  // Build visit lookup: zone_id → week_start → visit
+  // Build visit lookup: property_id → week_start → visit
   const visitMap = useMemo(() => {
     const map = new Map<string, Map<string, VisitWithCrew>>()
     for (const week of weeks) {
       for (const { rows } of week.routeGroups) {
         for (const row of rows) {
-          if (!map.has(row.zone.id)) map.set(row.zone.id, new Map())
-          if (row.visit) map.get(row.zone.id)!.set(week.weekStart, row.visit)
+          if (!map.has(row.property.id)) map.set(row.property.id, new Map())
+          if (row.visit) map.get(row.property.id)!.set(week.weekStart, row.visit)
         }
       }
     }
     return map
   }, [weeks])
 
-  function handleCellClick(row: ScheduleZoneRow, weekStart: string, visit: VisitWithCrew | null) {
+  function handleCellClick(row: SchedulePropertyRow, weekStart: string, visit: VisitWithCrew | null) {
     if (visit) {
       setSheetRow({ ...row, visit })
       setSheetWeek(weekStart)
       setSheetOpen(true)
     } else {
-      const cellKey = `${row.zone.id}-${weekStart}`
+      const cellKey = `${row.property.id}-${weekStart}`
       setCreatingKey(cellKey)
       startTransition(async () => {
-        const res = await createVisit(row.zone.id, weekStart, row.account.id, row.property.id)
+        const res = await createVisit(row.property.id, weekStart, row.account.id)
         setCreatingKey(null)
         if (res.error) {
           toast.error('Failed to create visit', { description: res.error })
@@ -82,7 +81,7 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit }: ScheduleGr
 
   function handleCellKeyDown(
     e: React.KeyboardEvent,
-    row: ScheduleZoneRow,
+    row: SchedulePropertyRow,
     weekStart: string,
     visit: VisitWithCrew | null,
   ) {
@@ -117,7 +116,7 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit }: ScheduleGr
               <tr>
                 <th className="sticky left-0 z-30 bg-card border-r border-border px-4 py-3 text-left min-w-[220px]">
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
-                    Zone / Property
+                    Property
                   </span>
                 </th>
                 {weeks.map((week) => {
@@ -169,87 +168,58 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit }: ScheduleGr
                     </div>
                   </td>
                 </tr>,
-                ...(() => {
-                  // Group consecutive rows by property
-                  const propertyGroups = rows.reduce<
-                    { property: Property; account: Account; rows: ScheduleZoneRow[] }[]
-                  >((acc, row) => {
-                    const last = acc[acc.length - 1]
-                    if (last && last.property.id === row.property.id) {
-                      last.rows.push(row)
-                    } else {
-                      acc.push({ property: row.property, account: row.account, rows: [row] })
-                    }
-                    return acc
-                  }, [])
-
-                  return propertyGroups.flatMap(({ property, account, rows: zoneRows }) => [
-                    // Property header row
-                    <tr key={`prop-${routeGroup.id}-${property.id}`} className="group border-b border-border/30">
-                      <td className="sticky left-0 bg-card z-10 border-r border-border border-l-2 border-l-primary/25 px-4 py-2 min-w-[220px]">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-muted-foreground truncate max-w-[140px]">
-                            {property.address}
+                ...rows.map((row) => (
+                  <tr
+                    key={`${routeGroup.id}-${row.property.id}`}
+                    className="group border-b border-border/50 hover:bg-accent/20 transition-colors"
+                  >
+                    <td className="sticky left-0 bg-card z-10 border-r border-border border-l-2 border-l-primary/25 px-4 py-3 min-w-[220px]">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-foreground text-sm leading-tight truncate max-w-[140px]">
+                          {row.property.address}
+                        </span>
+                        {row.account.billing_type === 'contract' && (
+                          <Badge variant="outline" className="text-[10px] billing-contract border-transparent shrink-0 py-0 h-auto">
+                            CONTRACT
+                          </Badge>
+                        )}
+                        {row.account.billing_type === 'per_visit' && row.account.price_per_visit && (
+                          <span className="text-[10px] text-transparent group-hover:text-muted-foreground transition-colors shrink-0">
+                            ${row.account.price_per_visit}/visit
                           </span>
-                          {account.billing_type === 'contract' && (
-                            <Badge variant="outline" className="text-[10px] billing-contract border-transparent shrink-0 py-0 h-auto">
-                              CONTRACT
-                            </Badge>
-                          )}
-                          {account.billing_type === 'per_visit' && account.price_per_visit && (
-                            <span className="text-[10px] text-transparent group-hover:text-muted-foreground transition-colors shrink-0">
-                              ${account.price_per_visit}/visit
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      {weeks.map((week) => (
-                        <td key={week.weekStart} />
-                      ))}
-                    </tr>,
-                    // Zone rows (indented)
-                    ...zoneRows.map((row) => (
-                      <tr
-                        key={`${routeGroup.id}-${row.zone.id}`}
-                        className="border-b border-border/50 hover:bg-accent/20 transition-colors"
-                      >
-                        <td className="sticky left-0 bg-card z-10 border-r border-border border-l-2 border-l-primary/10 pl-8 pr-4 py-3 min-w-[220px]">
-                          <p className="font-medium text-foreground text-sm leading-tight">
-                            {row.zone.name}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-0.5 capitalize">
-                            {row.zone.frequency}
-                          </p>
+                        )}
+                      </div>
+                      <div className="mt-0.5">
+                        <FrequencyBadge frequency={row.property.frequency} />
+                      </div>
+                    </td>
+                    {weeks.map((week) => {
+                      const visit = visitMap.get(row.property.id)?.get(week.weekStart) ?? null
+                      const cellKey = `${row.property.id}-${week.weekStart}`
+                      // Merge live realtime overlay with server-fetched visit timing
+                      const overlay = visit ? visitTimings.get(visit.id) : undefined
+                      const effectiveStartedAt =
+                        overlay !== undefined ? overlay.started_at : (visit?.started_at ?? null)
+                      const effectiveEndedAt =
+                        overlay !== undefined ? overlay.ended_at : (visit?.ended_at ?? null)
+                      const inProgress = visit
+                        ? isVisitInProgress({ started_at: effectiveStartedAt, ended_at: effectiveEndedAt })
+                        : false
+                      return (
+                        <td key={week.weekStart} className="px-2 py-2 align-top">
+                          <ScheduleCell
+                            visit={visit}
+                            inProgress={inProgress}
+                            startedAt={effectiveStartedAt}
+                            isCreating={creatingKey === cellKey}
+                            onClick={() => handleCellClick(row, week.weekStart, visit)}
+                            onKeyDown={(e) => handleCellKeyDown(e, row, week.weekStart, visit)}
+                          />
                         </td>
-                        {weeks.map((week) => {
-                          const visit = visitMap.get(row.zone.id)?.get(week.weekStart) ?? null
-                          const cellKey = `${row.zone.id}-${week.weekStart}`
-                          // Merge live realtime overlay with server-fetched visit timing
-                          const overlay = visit ? visitTimings.get(visit.id) : undefined
-                          const effectiveStartedAt =
-                            overlay !== undefined ? overlay.started_at : (visit?.started_at ?? null)
-                          const effectiveEndedAt =
-                            overlay !== undefined ? overlay.ended_at : (visit?.ended_at ?? null)
-                          const inProgress = visit
-                            ? isVisitInProgress({ started_at: effectiveStartedAt, ended_at: effectiveEndedAt })
-                            : false
-                          return (
-                            <td key={week.weekStart} className="px-2 py-2 align-top">
-                              <ScheduleCell
-                                visit={visit}
-                                inProgress={inProgress}
-                                startedAt={effectiveStartedAt}
-                                isCreating={creatingKey === cellKey}
-                                onClick={() => handleCellClick(row, week.weekStart, visit)}
-                                onKeyDown={(e) => handleCellKeyDown(e, row, week.weekStart, visit)}
-                              />
-                            </td>
-                          )
-                        })}
-                      </tr>
-                    )),
-                  ])
-                })(),
+                      )
+                    })}
+                  </tr>
+                )),
               ])}
             </tbody>
           </table>

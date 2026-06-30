@@ -16,26 +16,13 @@ export type StopDetail = {
     completion_note: string | null
     skip_reason: string | null
   }
-  zone: {
-    id: string
-    name: string
-    frequency: string
-    sort_order: number
-    notes: string | null
-  }
   property: {
     id: string
     address: string
+    frequency: string
     crew_notes: string | null
     access_notes: string | null
     parking_notes: string | null
-    service_zones: Array<{
-      id: string
-      name: string
-      frequency: string
-      sort_order: number
-      active: boolean
-    }>
   }
   account: {
     id: string
@@ -73,10 +60,8 @@ export function useStopDetail(visitId: string | undefined) {
         .select(`
           id, status, crew_instruction, week_start, started_at, ended_at,
           service_types, completion_note, skip_reason,
-          service_zone:service_zones!inner(id, name, frequency, sort_order, notes),
           property:properties!inner(
-            id, address, crew_notes, access_notes, parking_notes,
-            service_zones(id, name, frequency, sort_order, active)
+            id, address, frequency, crew_notes, access_notes, parking_notes
           ),
           account:accounts!inner(id, name, billing_type, contact_name),
           visit_crew(employee_id, relation, employees(id, name)),
@@ -87,7 +72,6 @@ export function useStopDetail(visitId: string | undefined) {
 
       if (error) throw error
 
-      const zone = data.service_zone as unknown as StopDetail['zone']
       const property = data.property as unknown as StopDetail['property']
       const account = data.account as unknown as StopDetail['account']
 
@@ -115,7 +99,6 @@ export function useStopDetail(visitId: string | undefined) {
           completion_note: data.completion_note,
           skip_reason: data.skip_reason,
         },
-        zone,
         property,
         account,
         assignedCrew,

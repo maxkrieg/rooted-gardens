@@ -4,7 +4,7 @@
  */
 
 import { Badge } from '@/components/ui/badge'
-import type { AccountStatus, BillingType, ZoneFrequency, VisitStatus } from '@/types/app'
+import type { AccountStatus, BillingType, Frequency, VisitStatus } from '@/types/app'
 
 // ─── Account status ──────────────────────────────────────────────────────────
 
@@ -46,9 +46,9 @@ export function BillingTypeBadge({ billingType }: { billingType: string }) {
   )
 }
 
-// ─── Zone frequency ───────────────────────────────────────────────────────────
+// ─── Frequency ────────────────────────────────────────────────────────────────
 
-const ZONE_FREQUENCY_META: Record<ZoneFrequency, { label: string; className: string }> = {
+const FREQUENCY_META: Record<Frequency, { label: string; className: string }> = {
   weekly:    { label: 'Weekly',    className: 'freq-weekly' },
   biweekly:  { label: 'Bi-weekly', className: 'freq-biweekly' },
   monthly:   { label: 'Monthly',   className: 'freq-monthly' },
@@ -56,7 +56,7 @@ const ZONE_FREQUENCY_META: Record<ZoneFrequency, { label: string; className: str
 }
 
 export function FrequencyBadge({ frequency }: { frequency: string }) {
-  const meta = ZONE_FREQUENCY_META[frequency as ZoneFrequency] ?? {
+  const meta = FREQUENCY_META[frequency as Frequency] ?? {
     label: frequency,
     className: 'freq-as_needed',
   }

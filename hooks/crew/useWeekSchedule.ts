@@ -30,8 +30,7 @@ export function useWeekSchedule(weekStart: Date) {
           sort_order,
           property:properties(
             *,
-            account:accounts(*),
-            service_zones(*)
+            account:accounts(*)
           )
         `),
         supabase

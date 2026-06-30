@@ -3,6 +3,15 @@
 This file tracks the phased build of the Rooted Gardens internal business app.
 See `CLAUDE.md` for full context, tech stack, schema, and conventions.
 
+> **Post-launch schema change (2026-06-30):** `service_zones` — referenced throughout
+> Phases 1–4 below as the named-work-area layer between properties and visits — was
+> eliminated in migration `20260630130000_drop_service_zones`. Frequency moved to
+> `properties`; visits now anchor directly to a property (one visit per property per
+> week); the multi-zone/multi-frequency-per-area capability described in tasks like 2.5,
+> 3.6, and 3.11 was intentionally dropped. The task descriptions below are left as-is —
+> they're a historical record of what was built at the time — but `service_zones` no
+> longer exists. See `CLAUDE.md` for the current schema.
+
 Each task is written to be handed directly to Claude Code as a prompt. Phases are ordered
 as a sensible default build sequence, but the authoritative dependency graph is the
 `Depends on:` line under each task — tasks with disjoint dependencies can be built in

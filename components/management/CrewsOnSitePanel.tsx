@@ -8,7 +8,6 @@ type InProgressVisit = {
   id: string
   started_at: string
   property: { address: string }
-  service_zone: { name: string }
   visit_crew: Array<{ relation: string; employee: { name: string } | null }>
 }
 
@@ -51,7 +50,7 @@ export function CrewsOnSitePanel({ initialVisits }: CrewsOnSitePanelProps) {
           const { data } = await supabase
             .from('visits')
             .select(
-              'id, started_at, property:properties(address), service_zone:service_zones(name), visit_crew(relation, employee:employees(name))',
+              'id, started_at, property:properties(address), visit_crew(relation, employee:employees(name))',
             )
             .eq('id', id)
             .single()
@@ -97,7 +96,6 @@ export function CrewsOnSitePanel({ initialVisits }: CrewsOnSitePanelProps) {
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {assignedNames || '—'}
-                  {v.service_zone?.name ? ` · ${v.service_zone.name}` : ''}
                 </p>
               </div>
               <span className="text-sm font-semibold text-[var(--clay)] tabular-nums shrink-0">

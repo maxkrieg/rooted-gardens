@@ -17,8 +17,7 @@ export async function getScheduleForWeek(weekStart: string): Promise<ScheduleWee
       sort_order,
       property:properties(
         *,
-        account:accounts(*),
-        service_zones(*)
+        account:accounts(*)
       )
     `),
     supabase
@@ -39,15 +38,13 @@ export async function getScheduleForWeek(weekStart: string): Promise<ScheduleWee
 }
 
 export async function createVisit(
-  zoneId: string,
+  propertyId: string,
   weekStart: string,
   accountId: string,
-  propertyId: string,
 ): Promise<{ error?: string }> {
   const supabase = await createClient()
 
   const { error } = await supabase.from('visits').insert({
-    service_zone_id: zoneId,
     account_id: accountId,
     property_id: propertyId,
     week_start: weekStart,

@@ -19,10 +19,12 @@ import {
 } from '@/components/management/badges'
 import { EditAccountSheet } from '@/components/management/EditAccountSheet'
 import { PropertySheet } from '@/components/management/PropertySheet'
-import { ZoneList } from '@/components/management/ZoneList'
+import { FrequencyBadge } from '@/components/management/badges'
 import { createClient } from '@/lib/supabase/server'
 import { formatAccountPrice } from '@/lib/utils/accounts'
-import type { AccountWithDetails, VisitWithZone } from '@/types/app'
+import type { AccountWithDetails, Visit } from '@/types/app'
+
+type VisitWithPropertyAddress = Visit & { property: { address: string } | null }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -34,10 +36,10 @@ export default async function AccountDetailPage({ params }: Props) {
   const { id } = await params
   const supabase = await createClient()
 
-  // ── 1. Account + properties + zones in one query ─────────────────────────
+  // ── 1. Account + properties in one query ──────────────────────────────────
   const { data: accountData, error: accountError } = await supabase
     .from('accounts')
-    .select('*, properties(*, service_zones(*))')
+    .select('*, properties(*)')
     .eq('id', id)
     .single()
 
@@ -45,26 +47,20 @@ export default async function AccountDetailPage({ params }: Props) {
     notFound()
   }
 
-  // Sort zones within each property by sort_order
   const account = {
     ...accountData,
-    properties: [...accountData.properties]
-      .sort((a, b) => a.address.localeCompare(b.address))
-      .map((p) => ({
-        ...p,
-        service_zones: [...p.service_zones].sort((a, b) => a.sort_order - b.sort_order),
-      })),
+    properties: [...accountData.properties].sort((a, b) => a.address.localeCompare(b.address)),
   } as AccountWithDetails
 
   // ── 2. Recent visits (last 10) ────────────────────────────────────────────
   const { data: visitsData } = await supabase
     .from('visits')
-    .select('*, service_zone:service_zones(name)')
+    .select('*, property:properties(address)')
     .eq('account_id', id)
     .order('week_start', { ascending: false })
     .limit(10)
 
-  const visits = (visitsData ?? []) as VisitWithZone[]
+  const visits = (visitsData ?? []) as VisitWithPropertyAddress[]
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -179,11 +175,16 @@ export default async function AccountDetailPage({ params }: Props) {
             {account.properties.map((property) => (
               <Card key={property.id} className="rounded-2xl border border-border shadow-warm">
                 <CardContent className="p-4">
-                  {/* Address + Edit trigger */}
+                  {/* Address + frequency + Edit trigger */}
                   <div className="flex items-start justify-between gap-2 mb-3">
-                    <p className="font-display text-base font-semibold text-foreground">
-                      {property.address}
-                    </p>
+                    <div className="min-w-0">
+                      <p className="font-display text-base font-semibold text-foreground">
+                        {property.address}
+                      </p>
+                      <div className="mt-1">
+                        <FrequencyBadge frequency={property.frequency} />
+                      </div>
+                    </div>
                     <PropertySheet accountId={account.id} property={property} />
                   </div>
 
@@ -210,9 +211,6 @@ export default async function AccountDetailPage({ params }: Props) {
                       )}
                     </div>
                   )}
-
-                  {/* Service zones — interactive list with reorder + edit */}
-                  <ZoneList property={property} zones={property.service_zones} />
                 </CardContent>
               </Card>
             ))}
@@ -238,9 +236,9 @@ export default async function AccountDetailPage({ params }: Props) {
                 {visits.map((visit) => (
                   <li key={visit.id} className="px-4 py-3 flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      {/* Zone name */}
+                      {/* Property address */}
                       <p className="text-sm font-medium text-foreground truncate">
-                        {visit.service_zone?.name ?? 'Unknown zone'}
+                        {visit.property?.address ?? 'Unknown property'}
                       </p>
                       {/* Date */}
                       <p className="text-xs text-muted-foreground mt-0.5 tabular-nums">

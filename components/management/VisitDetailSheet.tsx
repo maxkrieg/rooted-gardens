@@ -49,7 +49,7 @@ import { setVisitTimes } from '@/app/management/schedule/session-actions'
 import { useVisitTimings } from '@/components/management/SessionsProvider'
 import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
 import { visitUpdateSchema, type VisitUpdateValues } from '@/lib/validators/visit'
-import type { Employee, ScheduleZoneRow, Vehicle, VisitStatus } from '@/types/app'
+import type { Employee, SchedulePropertyRow, Vehicle, VisitStatus } from '@/types/app'
 
 const VISIT_STATUS_OPTIONS: VisitStatus[] = ['scheduled', 'completed', 'skipped', 'invoiced']
 
@@ -206,7 +206,7 @@ const SERVICE_TYPE_LABELS: Record<string, string> = {
 interface VisitDetailSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  row: ScheduleZoneRow
+  row: SchedulePropertyRow
   weekStart: string
   employees: Employee[]
   vehicles: Vehicle[]
@@ -321,7 +321,7 @@ export function VisitDetailSheet({
           <DialogHeader>
             <DialogTitle>Skip this visit?</DialogTitle>
             <DialogDescription>
-              {row.zone.name} · Week of {format(parseISO(weekStart), 'MMM d')}
+              {row.property.address} · Week of {format(parseISO(weekStart), 'MMM d')}
             </DialogDescription>
           </DialogHeader>
           <div className="py-2">
@@ -355,9 +355,9 @@ export function VisitDetailSheet({
           onCloseAutoFocus={(e) => e.preventDefault()}
         >
           <SheetHeader className="px-6 pt-6 pb-4 border-b border-border shrink-0">
-            <SheetTitle className="font-display text-lg leading-tight">{row.zone.name}</SheetTitle>
+            <SheetTitle className="font-display text-lg leading-tight">{row.property.address}</SheetTitle>
             <SheetDescription>
-              {row.property.address} · Week of {format(parseISO(weekStart), 'MMM d')}
+              {row.account.name} · Week of {format(parseISO(weekStart), 'MMM d')}
             </SheetDescription>
           </SheetHeader>
 

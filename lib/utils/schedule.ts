@@ -1,11 +1,10 @@
-import { startOfWeek, addWeeks, differenceInDays, isBefore } from 'date-fns'
+import { startOfWeek, addWeeks, isBefore } from 'date-fns'
 import type {
   Account,
   Property,
   RouteGroup,
   ScheduleWeek,
-  ScheduleZoneRow,
-  ServiceZone,
+  SchedulePropertyRow,
   VisitWithCrew,
 } from '@/types/app'
 
@@ -23,40 +22,16 @@ export function getWeeksInRange(start: Date, end: Date): Date[] {
   return weeks
 }
 
-export function isZoneDueThisWeek(
-  zone: ServiceZone,
-  weekStart: Date,
-  lastVisitDate?: Date | null
-): boolean {
-  if (!zone.active) return false
-  switch (zone.frequency) {
-    case 'weekly':
-      return true
-    case 'as_needed':
-      return false
-    case 'biweekly':
-      if (!lastVisitDate) return true
-      return differenceInDays(weekStart, lastVisitDate) >= 14
-    case 'monthly':
-      if (!lastVisitDate) return true
-      return differenceInDays(weekStart, lastVisitDate) >= 28
-    default:
-      return false
-  }
-}
-
-/** Raw property_route_groups row with its nested property/account/zones. */
+/** Raw property_route_groups row with its nested property/account. */
 export type ScheduleAssignment = {
   property_id: string
   route_group_id: string
   sort_order: number
-  property:
-    | (Property & { account: Account; service_zones: ServiceZone[] })
-    | null
+  property: (Property & { account: Account }) | null
 }
 
 /**
- * Assembles the route group → property → zone → visit grid for a single week.
+ * Assembles the route group → property → visit grid for a single week.
  * Pure (no I/O) so it can be reused by both the management Server Action
  * (getScheduleForWeek) and the crew client hook (useWeekSchedule).
  */
@@ -66,10 +41,10 @@ export function buildScheduleWeek(
   assignments: ScheduleAssignment[],
   visits: VisitWithCrew[]
 ): ScheduleWeek {
-  // Build visit lookup by service_zone_id
-  const visitByZoneId = new Map<string, VisitWithCrew>()
+  // Build visit lookup by property_id
+  const visitByPropertyId = new Map<string, VisitWithCrew>()
   for (const v of visits) {
-    visitByZoneId.set(v.service_zone_id, v)
+    visitByPropertyId.set(v.property_id, v)
   }
 
   const scheduleRouteGroups: ScheduleWeek['routeGroups'] = routeGroups.map((routeGroup) => {
@@ -77,26 +52,20 @@ export function buildScheduleWeek(
       .filter((a) => a.route_group_id === routeGroup.id)
       .sort((a, b) => a.sort_order - b.sort_order)
 
-    const rows: ScheduleZoneRow[] = []
+    const rows: SchedulePropertyRow[] = []
 
     for (const assignment of groupAssignments) {
       const property = assignment.property
       if (!property) continue
 
       const account = property.account as Account
-      const zones = (property.service_zones as ServiceZone[])
-        .filter((z) => z.active)
-        .sort((a, b) => a.sort_order - b.sort_order)
 
-      for (const zone of zones) {
-        rows.push({
-          zone,
-          property: { ...property, account: undefined } as unknown as Property,
-          account,
-          routeGroup,
-          visit: visitByZoneId.get(zone.id) ?? null,
-        })
-      }
+      rows.push({
+        property: { ...property, account: undefined } as unknown as Property,
+        account,
+        routeGroup,
+        visit: visitByPropertyId.get(property.id) ?? null,
+      })
     }
 
     return { routeGroup, rows }

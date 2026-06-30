@@ -263,6 +263,7 @@ export type Database = {
           address: string
           created_at: string
           crew_notes: string | null
+          frequency: string
           id: string
           lat: number | null
           lng: number | null
@@ -275,6 +276,7 @@ export type Database = {
           address: string
           created_at?: string
           crew_notes?: string | null
+          frequency?: string
           id?: string
           lat?: number | null
           lng?: number | null
@@ -287,6 +289,7 @@ export type Database = {
           address?: string
           created_at?: string
           crew_notes?: string | null
+          frequency?: string
           id?: string
           lat?: number | null
           lng?: number | null
@@ -359,60 +362,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
-      }
-      service_zones: {
-        Row: {
-          account_id: string
-          active: boolean
-          created_at: string
-          frequency: string
-          id: string
-          name: string
-          notes: string | null
-          property_id: string
-          sort_order: number
-          updated_at: string
-        }
-        Insert: {
-          account_id: string
-          active?: boolean
-          created_at?: string
-          frequency: string
-          id?: string
-          name: string
-          notes?: string | null
-          property_id: string
-          sort_order?: number
-          updated_at?: string
-        }
-        Update: {
-          account_id?: string
-          active?: boolean
-          created_at?: string
-          frequency?: string
-          id?: string
-          name?: string
-          notes?: string | null
-          property_id?: string
-          sort_order?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "service_zones_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "service_zones_property_id_fkey"
-            columns: ["property_id"]
-            isOneToOne: false
-            referencedRelation: "properties"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       time_entries: {
         Row: {
@@ -563,7 +512,6 @@ export type Database = {
           property_id: string
           qbo_invoice_id: string | null
           service_types: string[] | null
-          service_zone_id: string
           skip_reason: string | null
           started_at: string | null
           status: string
@@ -583,7 +531,6 @@ export type Database = {
           property_id: string
           qbo_invoice_id?: string | null
           service_types?: string[] | null
-          service_zone_id: string
           skip_reason?: string | null
           started_at?: string | null
           status?: string
@@ -603,7 +550,6 @@ export type Database = {
           property_id?: string
           qbo_invoice_id?: string | null
           service_types?: string[] | null
-          service_zone_id?: string
           skip_reason?: string | null
           started_at?: string | null
           status?: string
@@ -627,13 +573,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "visits_service_zone_id_fkey"
-            columns: ["service_zone_id"]
-            isOneToOne: false
-            referencedRelation: "service_zones"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "visits_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
@@ -647,6 +586,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_my_employee_id: { Args: never; Returns: string }
       get_my_role: { Args: never; Returns: string }
     }
     Enums: {
