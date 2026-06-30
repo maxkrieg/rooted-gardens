@@ -1,24 +1,17 @@
 import { differenceInMinutes, parseISO } from 'date-fns'
-import type { VisitSession, VisitSessionWithEmployee } from '@/types/app'
 
-export function isVisitInProgress(sessions: VisitSession[]): boolean {
-  return sessions.some((s) => s.ended_at === null)
+/** The on-site timing fields now live directly on the visit row. */
+export type VisitTiming = {
+  started_at: string | null
+  ended_at: string | null
 }
 
-export function activeSessionsFor(
-  visitId: string,
-  sessions: VisitSessionWithEmployee[]
-): VisitSessionWithEmployee[] {
-  return sessions.filter((s) => s.visit_id === visitId && s.ended_at === null)
-}
-
-export function allSessionsFor(
-  visitId: string,
-  sessions: VisitSessionWithEmployee[]
-): VisitSessionWithEmployee[] {
-  return sessions
-    .filter((s) => s.visit_id === visitId)
-    .sort((a, b) => (a.started_at > b.started_at ? -1 : 1))
+/**
+ * A visit is "in progress" when work has started but not yet ended. This is a
+ * derived state — never a value of visits.status.
+ */
+export function isVisitInProgress(v: VisitTiming): boolean {
+  return !!v.started_at && !v.ended_at
 }
 
 export function formatElapsed(startedAt: string): string {

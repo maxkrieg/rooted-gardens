@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { MapPin, Camera } from 'lucide-react'
 import { FrequencyBadge, VisitStatusBadge } from '@/components/management/badges'
-import { formatElapsed } from '@/lib/utils/visits'
+import { formatElapsed, isVisitInProgress } from '@/lib/utils/visits'
 import type { TodayStop } from '@/hooks/crew/useTodayStops'
 
 interface StopCardProps {
@@ -12,10 +12,9 @@ interface StopCardProps {
 
 export function StopCard({ stop }: StopCardProps) {
   const router = useRouter()
-  const { visit, zone, property, account, sessions } = stop
+  const { visit, zone, property, account } = stop
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(property.address)}`
-  const inProgress = sessions.some((s) => s.ended_at === null)
-  const activeSession = sessions.find((s) => s.ended_at === null)
+  const inProgress = isVisitInProgress(visit)
   const showZoneName = account.billing_type === 'contract' || zone.name !== 'Full Property'
 
   return (
@@ -41,7 +40,7 @@ export function StopCard({ stop }: StopCardProps) {
 
       <div className="p-4 flex flex-col gap-2.5">
         {/* In-progress indicator */}
-        {inProgress && activeSession && (
+        {inProgress && visit.started_at && (
           <div className="flex items-center gap-1.5" style={{ color: 'var(--clay)' }}>
             <span className="relative flex h-2 w-2 shrink-0">
               <span
@@ -54,7 +53,7 @@ export function StopCard({ stop }: StopCardProps) {
               />
             </span>
             <span className="text-xs font-semibold uppercase tracking-wide">
-              On site · {formatElapsed(activeSession.started_at)}
+              On site · {formatElapsed(visit.started_at)}
             </span>
           </div>
         )}

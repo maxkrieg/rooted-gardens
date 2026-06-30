@@ -36,7 +36,7 @@ export function useWeekSchedule(weekStart: Date) {
         `),
         supabase
           .from('visits')
-          .select(`*, visit_crew(*, employee:employees(*)), visit_sessions(id, started_at, ended_at, employee_id)`)
+          .select(`*, visit_crew(*, employee:employees(*))`)
           .eq('week_start', weekStartISO),
       ])
 

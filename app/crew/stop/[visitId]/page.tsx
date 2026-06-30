@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, MapPin, Map, ChevronDown, KeyRound, ClipboardList, Car, Users, User, Play, Flag, SkipForward, Check } from 'lucide-react'
@@ -15,7 +15,6 @@ import { CrewAssignSheet } from '@/components/crew/CrewAssignSheet'
 import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
 import { enqueueMutation, flushMutationQueue } from '@/lib/crew/mutation-queue'
 import { createClient } from '@/lib/supabase/client'
-import type { VisitSession } from '@/types/app'
 
 function SkeletonBlock({ className }: { className?: string }) {
   return <div className={`rounded-lg bg-muted animate-pulse ${className}`} />
@@ -50,11 +49,9 @@ export default function StopDetailPage() {
   const [skipOpen, setSkipOpen] = useState(false)
   const [assignOpen, setAssignOpen] = useState(false)
 
-  // Optimistic session so the Start cell flips to a running timer immediately,
-  // before the queued insert syncs. Cleared once real data carries the session.
-  const [optimisticSession, setOptimisticSession] = useState<
-    { sessionId: string; startedAt: string; employeeId: string } | null
-  >(null)
+  // Optimistic start so the Start cell flips to a running timer immediately, before
+  // the queued visit update syncs. Real data (visit.started_at) takes over once present.
+  const [optimisticStartedAt, setOptimisticStartedAt] = useState<string | null>(null)
 
   // Re-render every 30s so the running duration on the Start cell stays current.
   const [, setTick] = useState(0)
@@ -81,34 +78,11 @@ export default function StopDetailPage() {
     staleTime: 50 * 60 * 1000, // 50 min — well under the 1-hr signed URL expiry
   })
 
-  // Derive the display sessions from real data + any optimistic flip.
-  // Must be before early returns to satisfy Rules of Hooks.
-  // Use stop?.sessions (stable cache ref) as the dep rather than stop?.sessions ?? []
-  // to avoid creating a new array on every render when stop is undefined.
-  const stopSessions = stop?.sessions
-  const effectiveSessions = useMemo((): VisitSession[] => {
-    const rawSessions = (stopSessions ?? []) as VisitSession[]
-    if (!optimisticSession) return rawSessions
-    // Don't add a duplicate if the real data already carries an open session
-    if (rawSessions.some((s) => s.ended_at === null)) return rawSessions
-    return [
-      ...rawSessions,
-      {
-        id: optimisticSession.sessionId,
-        visit_id: visitId,
-        started_at: optimisticSession.startedAt,
-        ended_at: null,
-        employee_id: optimisticSession.employeeId,
-        source: 'crew_app',
-        note: null,
-        created_at: optimisticSession.startedAt,
-        updated_at: optimisticSession.startedAt,
-      } as unknown as VisitSession,
-    ]
-  }, [stopSessions, optimisticSession, visitId])
-
-  const inProgress = isVisitInProgress(effectiveSessions)
-  const activeSession = effectiveSessions.find((s) => s.ended_at === null)
+  // On-site timing now lives on the visit row. Prefer real data; fall back to the
+  // optimistic start until the queued update syncs back.
+  const visitStartedAt = stop?.visit.started_at ?? optimisticStartedAt ?? null
+  const visitEndedAt = stop?.visit.ended_at ?? null
+  const inProgress = isVisitInProgress({ started_at: visitStartedAt, ended_at: visitEndedAt })
 
   if (isLoading && !stop) return <LoadingSkeleton />
 
@@ -127,9 +101,8 @@ export default function StopDetailPage() {
   async function handleStart() {
     if (!employee?.id || inProgress) return
     const startedAt = new Date().toISOString()
-    const sessionId = crypto.randomUUID()
-    setOptimisticSession({ sessionId, startedAt, employeeId: employee.id })
-    await enqueueMutation('job_start', { visitId, employeeId: employee.id, startedAt, sessionId })
+    setOptimisticStartedAt(startedAt)
+    await enqueueMutation('job_start', { visitId, startedAt })
     await flushMutationQueue()
     queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
     queryClient.invalidateQueries({ queryKey: ['crew-today-stops'] })
@@ -205,7 +178,7 @@ export default function StopDetailPage() {
         {/* Status row */}
         <div className="flex items-center gap-3">
           <VisitStatusBadge status={visit.status} />
-          {inProgress && activeSession && (
+          {inProgress && visitStartedAt && (
             <div className="flex items-center gap-1.5" style={{ color: 'var(--clay)' }}>
               <span className="relative flex h-2 w-2 shrink-0">
                 <span
@@ -218,7 +191,7 @@ export default function StopDetailPage() {
                 />
               </span>
               <span className="text-xs font-semibold uppercase tracking-wide">
-                On site · {formatElapsed(activeSession.started_at)}
+                On site · {formatElapsed(visitStartedAt)}
               </span>
             </div>
           )}
@@ -372,14 +345,14 @@ export default function StopDetailPage() {
       >
         <div className="flex items-stretch gap-2">
           {/* Start — flips to a non-clickable running timer once started */}
-          {inProgress && activeSession ? (
+          {inProgress && visitStartedAt ? (
             <div
               className="flex-1 flex flex-col items-center justify-center gap-0.5 rounded-lg border min-h-[60px] py-2"
               style={{ borderColor: 'var(--clay)', color: 'var(--clay)' }}
               aria-label="Visit in progress"
             >
               <span className="font-display text-lg font-semibold leading-none tabular-nums">
-                {formatElapsed(activeSession.started_at)}
+                {formatElapsed(visitStartedAt)}
               </span>
               <span className="text-[10px] font-semibold uppercase tracking-wide">On site</span>
             </div>
@@ -435,7 +408,7 @@ export default function StopDetailPage() {
         employeeId={employee?.id ?? ''}
         propertyId={stop.property.id}
         assignedCrew={stop.assignedCrew ?? []}
-        openSession={activeSession ? { id: activeSession.id, started_at: activeSession.started_at } : null}
+        startedAt={visitStartedAt}
         open={completionOpen}
         onOpenChange={setCompletionOpen}
         onSuccess={() => router.push('/crew/today')}
@@ -444,7 +417,7 @@ export default function StopDetailPage() {
       <SkipSheet
         visitId={visitId}
         employeeId={employee?.id ?? ''}
-        openSessionId={activeSession ? activeSession.id : null}
+        inProgress={inProgress}
         open={skipOpen}
         onOpenChange={setSkipOpen}
         onSuccess={() => router.push('/crew/today')}

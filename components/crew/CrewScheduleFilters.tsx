@@ -41,7 +41,6 @@ const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'scheduled', label: 'Scheduled' },
   { value: 'completed', label: 'Completed' },
   { value: 'skipped', label: 'Skipped' },
-  { value: 'invoiced', label: 'Invoiced' },
 ]
 
 export type FilterChip = {

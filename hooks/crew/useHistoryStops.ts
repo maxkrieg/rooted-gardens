@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 
 export type HistoryStop = {
   visitId: string
-  actual_date: string | null
+  ended_at: string | null
   week_start: string
   service_types: string[] | null
   address: string
@@ -26,7 +26,7 @@ export function useHistoryStops(employeeId: string | undefined) {
         .select(`
           created_at,
           visits (
-            id, actual_date, week_start, service_types, status,
+            id, ended_at, week_start, service_types, status,
             properties ( address ),
             accounts ( name )
           )
@@ -48,7 +48,7 @@ export function useHistoryStops(employeeId: string | undefined) {
         .map((row) => {
           const v = row.visits as {
             id: string
-            actual_date: string | null
+            ended_at: string | null
             week_start: string
             service_types: string[] | null
             status: string
@@ -57,7 +57,7 @@ export function useHistoryStops(employeeId: string | undefined) {
           }
           return {
             visitId: v.id,
-            actual_date: v.actual_date,
+            ended_at: v.ended_at,
             week_start: v.week_start,
             service_types: v.service_types,
             address: v.properties?.address ?? '',

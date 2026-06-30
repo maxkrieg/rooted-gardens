@@ -68,7 +68,7 @@ export default function HistoryPage() {
       {stops && stops.length > 0 && (
         <div className="divide-y divide-[--border]">
           {stops.map((stop) => {
-            const dateStr = stop.actual_date ?? stop.week_start
+            const dateStr = stop.ended_at ?? stop.week_start
             const formattedDate = format(parseISO(dateStr), 'EEE MMM d')
             const [dayPart, ...rest] = formattedDate.split(' ')
             const monthDay = rest.join(' ')

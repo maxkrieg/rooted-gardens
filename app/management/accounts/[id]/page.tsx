@@ -244,8 +244,8 @@ export default async function AccountDetailPage({ params }: Props) {
                       </p>
                       {/* Date */}
                       <p className="text-xs text-muted-foreground mt-0.5 tabular-nums">
-                        {visit.actual_date
-                          ? format(parseISO(visit.actual_date), 'EEE MMM d')
+                        {visit.ended_at
+                          ? format(parseISO(visit.ended_at), 'EEE MMM d, yyyy')
                           : `Week of ${format(parseISO(visit.week_start), 'EEE MMM d')}`}
                       </p>
                       {/* Service types */}

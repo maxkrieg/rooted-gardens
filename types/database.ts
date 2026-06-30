@@ -550,64 +550,13 @@ export type Database = {
           },
         ]
       }
-      visit_sessions: {
-        Row: {
-          created_at: string
-          employee_id: string
-          ended_at: string | null
-          id: string
-          note: string | null
-          source: string
-          started_at: string
-          updated_at: string
-          visit_id: string
-        }
-        Insert: {
-          created_at?: string
-          employee_id: string
-          ended_at?: string | null
-          id?: string
-          note?: string | null
-          source?: string
-          started_at: string
-          updated_at?: string
-          visit_id: string
-        }
-        Update: {
-          created_at?: string
-          employee_id?: string
-          ended_at?: string | null
-          id?: string
-          note?: string | null
-          source?: string
-          started_at?: string
-          updated_at?: string
-          visit_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "visit_sessions_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: false
-            referencedRelation: "employees"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "visit_sessions_visit_id_fkey"
-            columns: ["visit_id"]
-            isOneToOne: false
-            referencedRelation: "visits"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       visits: {
         Row: {
           account_id: string
-          actual_date: string | null
           completion_note: string | null
           created_at: string
           crew_instruction: string | null
+          ended_at: string | null
           id: string
           invoice_amount: number | null
           invoiced_at: string | null
@@ -616,6 +565,7 @@ export type Database = {
           service_types: string[] | null
           service_zone_id: string
           skip_reason: string | null
+          started_at: string | null
           status: string
           updated_at: string
           vehicle_id: string | null
@@ -623,10 +573,10 @@ export type Database = {
         }
         Insert: {
           account_id: string
-          actual_date?: string | null
           completion_note?: string | null
           created_at?: string
           crew_instruction?: string | null
+          ended_at?: string | null
           id?: string
           invoice_amount?: number | null
           invoiced_at?: string | null
@@ -635,6 +585,7 @@ export type Database = {
           service_types?: string[] | null
           service_zone_id: string
           skip_reason?: string | null
+          started_at?: string | null
           status?: string
           updated_at?: string
           vehicle_id?: string | null
@@ -642,10 +593,10 @@ export type Database = {
         }
         Update: {
           account_id?: string
-          actual_date?: string | null
           completion_note?: string | null
           created_at?: string
           crew_instruction?: string | null
+          ended_at?: string | null
           id?: string
           invoice_amount?: number | null
           invoiced_at?: string | null
@@ -654,6 +605,7 @@ export type Database = {
           service_types?: string[] | null
           service_zone_id?: string
           skip_reason?: string | null
+          started_at?: string | null
           status?: string
           updated_at?: string
           vehicle_id?: string | null

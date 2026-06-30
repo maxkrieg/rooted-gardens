@@ -12,7 +12,8 @@ export type TodayStop = {
     status: string
     crew_instruction: string | null
     week_start: string
-    actual_date: string | null
+    started_at: string | null
+    ended_at: string | null
     service_types: string[] | null
     completion_note: string | null
     skip_reason: string | null
@@ -39,12 +40,6 @@ export type TodayStop = {
     name: string
     billing_type: string
   }
-  sessions: Array<{
-    id: string
-    started_at: string
-    ended_at: string | null
-    employee_id: string
-  }>
   photoCount: number
 }
 
@@ -73,7 +68,7 @@ export function useTodayStops(employeeId: string | undefined) {
       const { data: visits, error: visitErr } = await supabase
         .from('visits')
         .select(`
-          id, status, crew_instruction, week_start, actual_date, service_types,
+          id, status, crew_instruction, week_start, started_at, ended_at, service_types,
           completion_note, skip_reason,
           service_zone:service_zones!inner(id, name, frequency, sort_order),
           property:properties!inner(
@@ -81,7 +76,6 @@ export function useTodayStops(employeeId: string | undefined) {
             property_route_groups(sort_order, route_group:route_groups(id, name, sort_order))
           ),
           account:accounts!inner(id, name, billing_type),
-          visit_sessions(id, started_at, ended_at, employee_id),
           photos(id)
         `)
         .eq('week_start', weekStart)
@@ -93,7 +87,6 @@ export function useTodayStops(employeeId: string | undefined) {
         const zone = v.service_zone as unknown as TodayStop['zone']
         const property = v.property as unknown as TodayStop['property']
         const account = v.account as unknown as TodayStop['account']
-        const sessions = (v.visit_sessions ?? []) as TodayStop['sessions']
         const photoCount = (v.photos as Array<{ id: string }> | null)?.length ?? 0
 
         return {
@@ -103,7 +96,8 @@ export function useTodayStops(employeeId: string | undefined) {
             status: v.status ?? 'scheduled',
             crew_instruction: v.crew_instruction,
             week_start: v.week_start,
-            actual_date: v.actual_date,
+            started_at: v.started_at,
+            ended_at: v.ended_at,
             service_types: v.service_types,
             completion_note: v.completion_note,
             skip_reason: v.skip_reason,
@@ -111,7 +105,6 @@ export function useTodayStops(employeeId: string | undefined) {
           zone,
           property,
           account,
-          sessions,
           photoCount,
         }
       })

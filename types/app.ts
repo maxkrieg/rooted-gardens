@@ -11,7 +11,6 @@ export type Vehicle = Tables<'vehicles'>
 export type Equipment = Tables<'equipment'>
 export type Visit = Tables<'visits'>
 export type VisitCrew = Tables<'visit_crew'>
-export type VisitSession = Tables<'visit_sessions'>
 export type TimeEntry = Tables<'time_entries'>
 export type Photo = Tables<'photos'>
 export type Integration = Tables<'integrations'>
@@ -53,9 +52,6 @@ export type ServiceType = (typeof SERVICE_TYPES)[number]
 export const CREW_RELATIONS = ['assigned', 'completed'] as const
 export type CrewRelation = (typeof CREW_RELATIONS)[number]
 
-export const SESSION_SOURCES = ['crew_app', 'manual'] as const
-export type SessionSource = (typeof SESSION_SOURCES)[number]
-
 export const VEHICLE_STATUSES = ['available', 'in_use', 'maintenance', 'retired'] as const
 export type VehicleStatus = (typeof VEHICLE_STATUSES)[number]
 
@@ -90,7 +86,7 @@ export type AccountWithDetails = Account & {
 /** Flat row used by the account list — augments base account with aggregated counts. */
 export type AccountListRow = Account & {
   propertyCount: number
-  lastVisitDate: string | null // ISO date string of most recent actual_date, or null
+  lastVisitDate: string | null // ISO timestamp of most recent ended_at, or null
 }
 
 /** Service zone with its parent property and account info. */
@@ -119,14 +115,6 @@ export type VisitWithLocation = Visit & {
 /** Visit with crew assignment/completion rows and the associated employees. */
 export type VisitWithCrew = Visit & {
   visit_crew: VisitCrewWithEmployee[]
-  // Included by the crew client hook (useWeekSchedule) for in-progress indicators;
-  // absent from the management Server Action which sources sessions separately.
-  visit_sessions?: Array<{
-    id: string
-    started_at: string
-    ended_at: string | null
-    employee_id: string
-  }>
 }
 
 /** Full visit: zone, property, account, crew, and vehicle. */
@@ -136,21 +124,6 @@ export type VisitWithDetails = Visit & {
   account: Account
   visit_crew: VisitCrewWithEmployee[]
   vehicle: Vehicle | null
-}
-
-/** visit_session row joined to the employee. */
-export type VisitSessionWithEmployee = VisitSession & {
-  employee: Employee
-}
-
-/** Visit with its open and closed sessions (for in-progress / elapsed-time UI). */
-export type VisitWithSessions = Visit & {
-  visit_sessions: VisitSession[]
-}
-
-/** Full visit including sessions (for management in-progress view). */
-export type VisitWithDetailsAndSessions = VisitWithDetails & {
-  visit_sessions: VisitSessionWithEmployee[]
 }
 
 /** Route group with its assigned properties (via property_route_groups). */

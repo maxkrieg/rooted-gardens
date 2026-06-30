@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { format } from 'date-fns'
 import { Camera, X } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
@@ -42,8 +41,9 @@ interface VisitLoggerProps {
   employeeId: string
   propertyId: string
   assignedCrew: Array<{ employee_id: string; name: string }>
-  // The open on-site session, if one was started. When present, finishing closes it.
-  openSession?: { id: string; started_at: string } | null
+  // The visit's start time, if the job was started. When set, the Start time field
+  // is shown prefilled and editable; otherwise the crew can opt into a manual start.
+  startedAt?: string | null
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
@@ -54,19 +54,17 @@ export function VisitLogger({
   employeeId,
   propertyId,
   assignedCrew,
-  openSession,
+  startedAt,
   open,
   onOpenChange,
   onSuccess,
 }: VisitLoggerProps) {
   const queryClient = useQueryClient()
-  const today = format(new Date(), 'yyyy-MM-dd')
   const { data: todayEntries = [] } = useTodayTimeEntry(employeeId)
   const { data: activeEmployees = [] } = useActiveEmployees()
   const isClockedIn = todayEntries.length > 0 && todayEntries[0].clock_out === null
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [actualDate, setActualDate] = useState(today)
   const [serviceTypes, setServiceTypes] = useState<string[]>([])
   const [completionNote, setCompletionNote] = useState('')
   const [serviceTypeError, setServiceTypeError] = useState(false)
@@ -75,24 +73,26 @@ export function VisitLogger({
   const [photos, setPhotos] = useState<CapturedPhoto[]>([])
   const [photoError, setPhotoError] = useState<string | null>(null)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
-  // Start-time control: prefilled from an open session, or manually set if the crew
-  // forgot to tap Start. `manualStart` enables the field when there's no open session.
+  // Start-time control: prefilled from the visit's started_at, or manually set if the
+  // crew forgot to tap Start. `manualStart` enables the field when there's no start yet.
   const [startTime, setStartTime] = useState('')
   const [manualStart, setManualStart] = useState(false)
+  // End time — the completion timestamp (= visits.ended_at), prefilled to now.
+  const [endTime, setEndTime] = useState('')
 
-  // Pre-check all assigned crew + seed the start time every time the sheet opens
+  // Pre-check all assigned crew + seed the start/end times every time the sheet opens
   useEffect(() => {
     if (open) {
       setPresentIds(assignedCrew.map((c) => c.employee_id))
-      if (openSession) {
-        setStartTime(toDatetimeLocalValue(openSession.started_at))
-        setManualStart(false)
+      setEndTime(toDatetimeLocalValue(new Date().toISOString()))
+      if (startedAt) {
+        setStartTime(toDatetimeLocalValue(startedAt))
       } else {
         setStartTime(toDatetimeLocalValue(new Date().toISOString()))
-        setManualStart(false)
       }
+      setManualStart(false)
     }
-  }, [open, assignedCrew, openSession])
+  }, [open, assignedCrew, startedAt])
 
   const crewOptions = activeEmployees.map((e) => ({ id: e.id, name: e.name, role: e.role }))
 
@@ -106,13 +106,13 @@ export function VisitLogger({
   }
 
   function resetForm() {
-    setActualDate(today)
     setServiceTypes([])
     setCompletionNote('')
     setServiceTypeError(false)
     setSubmitting(false)
     setPresentIds(assignedCrew.map((c) => c.employee_id))
     setStartTime('')
+    setEndTime('')
     setManualStart(false)
     setPhotos((prev) => {
       prev.forEach((p) => URL.revokeObjectURL(p.localUrl))
@@ -181,34 +181,25 @@ export function VisitLogger({
     // At minimum, credit the logger even if they unchecked themselves
     const presentEmployeeIds = presentIds.length > 0 ? presentIds : [employeeId]
 
-    // Build the on-site session to record/close. Finishing closes an open session,
-    // or creates one retroactively if the crew set a start time without tapping Start.
-    const endedAt = new Date().toISOString()
-    let session: { id: string; startedAt: string; endedAt: string; isNew: boolean } | undefined
-    if (openSession) {
-      session = {
-        id: openSession.id,
-        startedAt: new Date(startTime).toISOString(),
-        endedAt,
-        isNew: false,
-      }
+    // ended_at is the completion timestamp (and the visit's effective date).
+    // started_at is recorded when the job was started, or set retroactively if the
+    // crew entered a start time without tapping Start.
+    const endedAt = endTime ? new Date(endTime).toISOString() : new Date().toISOString()
+    let startedAtISO: string | undefined
+    if (startedAt) {
+      startedAtISO = new Date(startTime).toISOString()
     } else if (manualStart && startTime) {
-      session = {
-        id: crypto.randomUUID(),
-        startedAt: new Date(startTime).toISOString(),
-        endedAt,
-        isNew: true,
-      }
+      startedAtISO = new Date(startTime).toISOString()
     }
 
     await enqueueMutation('completion', {
       visitId,
       employeeId,
       presentEmployeeIds,
-      actualDate,
       serviceTypes,
       completionNote: completionNote.trim() || undefined,
-      session,
+      startedAt: startedAtISO,
+      endedAt,
     })
 
     // Enqueue metadata for each successfully uploaded photo
@@ -241,15 +232,13 @@ export function VisitLogger({
         visit: {
           ...old.visit,
           status: 'completed',
-          actual_date: actualDate,
           service_types: serviceTypes,
           completion_note: completionNote.trim() || null,
           skip_reason: null,
+          // Set the visit's timing; ended_at clears the "On site" indicator immediately
+          started_at: startedAtISO ?? old.visit.started_at,
+          ended_at: endedAt,
         },
-        // Close any open session so the "On site" indicator clears immediately
-        sessions: old.sessions.map((s) =>
-          s.ended_at === null ? { ...s, ended_at: endedAt } : s
-        ),
       }
     })
 
@@ -262,15 +251,12 @@ export function VisitLogger({
               visit: {
                 ...stop.visit,
                 status: 'completed',
-                actual_date: actualDate,
                 service_types: serviceTypes,
                 completion_note: completionNote.trim() || null,
                 skip_reason: null,
+                started_at: startedAtISO ?? stop.visit.started_at,
+                ended_at: endedAt,
               },
-              // Close any open session so the "On site" indicator clears immediately
-              sessions: stop.sessions.map((s) =>
-                s.ended_at === null ? { ...s, ended_at: endedAt } : s
-              ),
             }
           : stop
       )
@@ -299,23 +285,9 @@ export function VisitLogger({
             </div>
           )}
 
-          {/* Date */}
+          {/* Start time — prefilled when the job was started; otherwise optional/manual */}
           <div className="space-y-1.5">
-            <label className="text-sm font-semibold text-foreground" htmlFor="completion-date">
-              Date
-            </label>
-            <input
-              id="completion-date"
-              type="date"
-              value={actualDate}
-              onChange={(e) => setActualDate(e.target.value)}
-              className="h-11 w-full rounded-lg border border-[--border] bg-card px-3 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-[--ring]"
-            />
-          </div>
-
-          {/* Start time — prefilled when a session is open; otherwise optional/manual */}
-          <div className="space-y-1.5">
-            {openSession ? (
+            {startedAt ? (
               <>
                 <label className="text-sm font-semibold text-foreground" htmlFor="start-time">
                   Start time
@@ -353,6 +325,21 @@ export function VisitLogger({
                 )}
               </>
             )}
+          </div>
+
+          {/* End time — completion timestamp, prefilled to now */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-semibold text-foreground" htmlFor="end-time">
+              End time
+            </label>
+            <input
+              id="end-time"
+              type="datetime-local"
+              value={endTime}
+              max={toDatetimeLocalValue(new Date().toISOString())}
+              onChange={(e) => setEndTime(e.target.value)}
+              className="h-11 w-full rounded-lg border border-[--border] bg-card px-3 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-[--ring]"
+            />
           </div>
 
           {/* Who was on site — full roster, assigned crew pre-selected */}

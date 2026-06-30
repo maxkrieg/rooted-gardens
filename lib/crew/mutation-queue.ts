@@ -1,35 +1,27 @@
 import { getDB, type MutationType, type QueuedMutation } from './idb'
 import { createClient } from '@/lib/supabase/client'
 
-// Payload types — filled in as tasks 4.4 and 4.10 are implemented
+// Payload types
 export interface CompletionPayload {
   visitId: string
   employeeId: string       // the logger (audit trail)
   presentEmployeeIds: string[]  // all crew confirmed on site
-  actualDate: string
   serviceTypes: string[]
   completionNote?: string
-  // Optional on-site session to close (or create) as part of finishing the visit.
-  // isNew=false → update the existing open session's started_at/ended_at;
-  // isNew=true  → insert a manual session (crew forgot to tap Start).
-  session?: {
-    id: string
-    startedAt: string
-    endedAt: string
-    isNew: boolean
-  }
+  // On-site timing now lives on the visit row. endedAt is always set on completion
+  // (it's the completion timestamp, and the source of the visit's "date"). startedAt
+  // is set only when the crew started the job (Start tap or a manual start time).
+  startedAt?: string
+  endedAt: string
 }
 
 export interface JobStartPayload {
   visitId: string
-  employeeId: string
   startedAt: string
-  sessionId: string
-  source?: 'crew_app' | 'manual'
 }
 
 export interface JobStopPayload {
-  sessionId: string
+  visitId: string
   endedAt: string
 }
 
@@ -45,8 +37,7 @@ export interface PhotoPayload {
 export interface SkipPayload {
   visitId: string
   skipReason?: string
-  // If a session was running when the stop was skipped, close it (set ended_at).
-  closeSessionId?: string
+  // If the visit was in progress when skipped, stop the on-site clock (set ended_at).
   endedAt?: string
 }
 
@@ -120,22 +111,21 @@ export async function flushMutationQueue(): Promise<void> {
       switch (mutation.type) {
         case 'job_start': {
           const p = mutation.payload as JobStartPayload
-          await supabase.from('visit_sessions').insert({
-            id: p.sessionId,
-            visit_id: p.visitId,
-            employee_id: p.employeeId,
-            started_at: p.startedAt,
-            ended_at: null,
-            source: p.source ?? 'crew_app',
-          })
+          // Start the on-site clock on the visit itself; clear any prior end.
+          await supabase
+            .from('visits')
+            .update({ started_at: p.startedAt, ended_at: null })
+            .eq('id', p.visitId)
+            .throwOnError()
           break
         }
         case 'job_stop': {
           const p = mutation.payload as JobStopPayload
           await supabase
-            .from('visit_sessions')
+            .from('visits')
             .update({ ended_at: p.endedAt })
-            .eq('id', p.sessionId)
+            .eq('id', p.visitId)
+            .throwOnError()
           break
         }
         case 'completion': {
@@ -144,56 +134,42 @@ export async function flushMutationQueue(): Promise<void> {
             .from('visits')
             .update({
               status: 'completed',
-              actual_date: p.actualDate,
               service_types: p.serviceTypes,
               completion_note: p.completionNote ?? null,
+              // ended_at is the completion time and the visit's effective date.
+              ended_at: p.endedAt,
+              // Only set started_at when the crew actually started the job; never
+              // overwrite an existing start with null.
+              ...(p.startedAt ? { started_at: p.startedAt } : {}),
               // Clear any leftover skip reason — finishing a previously-skipped
               // stop fully un-skips it (mirrors the management 3.8 behavior).
               skip_reason: null,
             })
             .eq('id', p.visitId)
-          // Upsert a completed row for every crew member confirmed on site.
-          // Fall back to just the logger for any mutations queued before this field existed.
-          const presentIds = p.presentEmployeeIds?.length ? p.presentEmployeeIds : [p.employeeId]
-          await supabase.from('visit_crew').upsert(
-            presentIds.map((empId) => ({
-              visit_id: p.visitId,
-              employee_id: empId,
-              relation: 'completed' as const,
-            }))
-          )
-          // Close (or create) the on-site session as part of finishing the visit.
-          if (p.session?.isNew) {
-            await supabase.from('visit_sessions').insert({
-              id: p.session.id,
-              visit_id: p.visitId,
-              employee_id: p.employeeId,
-              started_at: p.session.startedAt,
-              ended_at: p.session.endedAt,
-              source: 'manual',
-            })
-          } else if (p.session) {
-            await supabase
-              .from('visit_sessions')
-              .update({ started_at: p.session.startedAt, ended_at: p.session.endedAt })
-              .eq('id', p.session.id)
-          }
+            .throwOnError()
+          // Upsert the logged-in crew member's own completed row.
+          // RLS only permits employee_id = self for completed relation; crediting
+          // other crew is an owner/lead action done from the management detail sheet.
+          await supabase.from('visit_crew').upsert({
+            visit_id: p.visitId,
+            employee_id: p.employeeId,
+            relation: 'completed' as const,
+          }).throwOnError()
           break
         }
         case 'skip': {
           const p = mutation.payload as SkipPayload
           await supabase
             .from('visits')
-            .update({ status: 'skipped', skip_reason: p.skipReason ?? null })
+            .update({
+              status: 'skipped',
+              skip_reason: p.skipReason ?? null,
+              // If the visit was in progress when skipped, stop the on-site clock so
+              // the "On site" indicator doesn't keep ticking on an abandoned visit.
+              ...(p.endedAt ? { ended_at: p.endedAt } : {}),
+            })
             .eq('id', p.visitId)
-          // Close any session that was running when the stop was skipped, so the
-          // "On site" indicator doesn't keep ticking on an abandoned visit.
-          if (p.closeSessionId && p.endedAt) {
-            await supabase
-              .from('visit_sessions')
-              .update({ ended_at: p.endedAt })
-              .eq('id', p.closeSessionId)
-          }
+            .throwOnError()
           break
         }
         case 'photo':
@@ -208,7 +184,7 @@ export async function flushMutationQueue(): Promise<void> {
               uploaded_by: p.uploadedBy,
               type: (p.type ?? 'visit') as 'visit' | 'how_to' | 'customer_request' | 'before' | 'after',
               caption: p.caption ?? null,
-            })
+            }).throwOnError()
           }
           break
         case 'clock_in': {
@@ -217,7 +193,7 @@ export async function flushMutationQueue(): Promise<void> {
             employee_id: p.employeeId,
             date: p.date,
             clock_in: p.clockIn,
-          })
+          }).throwOnError()
           break
         }
         case 'clock_out': {
@@ -226,6 +202,7 @@ export async function flushMutationQueue(): Promise<void> {
             .from('time_entries')
             .update({ clock_out: p.clockOut })
             .eq('id', p.timeEntryId)
+            .throwOnError()
           break
         }
         default:

@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { Users } from 'lucide-react'
 import { FrequencyBadge, VisitStatusBadge } from '@/components/management/badges'
 import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
-import type { ScheduleZoneRow, VisitSession } from '@/types/app'
+import type { ScheduleZoneRow } from '@/types/app'
 
 interface ScheduleStopRowProps {
   row: ScheduleZoneRow
@@ -22,9 +22,7 @@ export function ScheduleStopRow({ row }: ScheduleStopRowProps) {
     .filter((vc) => vc.relation === 'assigned' && vc.employee)
     .map((vc) => vc.employee)
 
-  const sessions = (visit?.visit_sessions ?? []) as VisitSession[]
-  const inProgress = isVisitInProgress(sessions)
-  const openSession = sessions.find((s) => s.ended_at === null)
+  const inProgress = visit ? isVisitInProgress(visit) : false
 
   const showZoneName = account.billing_type === 'contract' || zone.name !== 'Full Property'
 
@@ -59,7 +57,7 @@ export function ScheduleStopRow({ row }: ScheduleStopRowProps) {
       ].join(' ')}
     >
       {/* In-progress indicator — same treatment as the Today list (StopCard) */}
-      {inProgress && openSession && (
+      {inProgress && visit.started_at && (
         <div className="flex items-center gap-1.5" style={{ color: 'var(--clay)' }}>
           <span className="relative flex h-2 w-2 shrink-0">
             <span
@@ -72,7 +70,7 @@ export function ScheduleStopRow({ row }: ScheduleStopRowProps) {
             />
           </span>
           <span className="text-xs font-semibold uppercase tracking-wide">
-            On site · {formatElapsed(openSession.started_at)}
+            On site · {formatElapsed(visit.started_at)}
           </span>
         </div>
       )}

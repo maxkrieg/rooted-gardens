@@ -24,19 +24,19 @@ export default async function AccountsPage() {
     )
   }
 
-  // ── 2. Last visit per account (max actual_date of any completed visit) ───
+  // ── 2. Last visit per account (max ended_at of any completed visit) ─────
   const { data: visitsData } = await supabase
     .from('visits')
-    .select('account_id, actual_date')
-    .not('actual_date', 'is', null)
-    .order('actual_date', { ascending: false })
+    .select('account_id, ended_at')
+    .not('ended_at', 'is', null)
+    .order('ended_at', { ascending: false })
 
-  // Reduce to a map of account_id → most recent actual_date.
+  // Reduce to a map of account_id → most recent ended_at.
   // Since rows are ordered DESC, the first occurrence per account is the max.
   const lastVisitMap = new Map<string, string>()
   for (const v of visitsData ?? []) {
-    if (v.account_id && v.actual_date && !lastVisitMap.has(v.account_id)) {
-      lastVisitMap.set(v.account_id, v.actual_date)
+    if (v.account_id && v.ended_at && !lastVisitMap.has(v.account_id)) {
+      lastVisitMap.set(v.account_id, v.ended_at)
     }
   }
 

@@ -8,8 +8,8 @@ import { cn } from '@/lib/utils'
 import { createVisit } from '@/app/management/schedule/actions'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
-import { useSessions } from '@/components/management/SessionsProvider'
-import { activeSessionsFor, formatElapsed } from '@/lib/utils/visits'
+import { useVisitTimings } from '@/components/management/SessionsProvider'
+import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { VisitStatusBadge, FrequencyBadge } from '@/components/management/badges'
@@ -33,7 +33,7 @@ interface ScheduleListMobileProps {
 
 export function ScheduleListMobile({ weeks, employees, vehicles, canEdit }: ScheduleListMobileProps) {
   const week = weeks[0]
-  const sessions = useSessions()
+  const visitTimings = useVisitTimings()
 
   // Tick elapsed time every 30s
   const [, setTick] = useState(0)
@@ -149,10 +149,15 @@ export function ScheduleListMobile({ weeks, employees, vehicles, canEdit }: Sche
                       {zoneRows.map((row) => {
                         const cellKey = `${row.zone.id}-${week.weekStart}`
                         const isCreating = creatingKey === cellKey
-                        const activeSessions = row.visit
-                          ? activeSessionsFor(row.visit.id, sessions)
-                          : []
-                        const inProgress = activeSessions.length > 0
+                        // Merge live realtime overlay with server-fetched visit timing
+                        const overlay = row.visit ? visitTimings.get(row.visit.id) : undefined
+                        const effectiveStartedAt =
+                          overlay !== undefined ? overlay.started_at : (row.visit?.started_at ?? null)
+                        const effectiveEndedAt =
+                          overlay !== undefined ? overlay.ended_at : (row.visit?.ended_at ?? null)
+                        const inProgress = row.visit
+                          ? isVisitInProgress({ started_at: effectiveStartedAt, ended_at: effectiveEndedAt })
+                          : false
                         const assigned = row.visit
                           ? row.visit.visit_crew
                               .filter((vc) => vc.relation === 'assigned' && vc.employee)
@@ -186,14 +191,14 @@ export function ScheduleListMobile({ weeks, employees, vehicles, canEdit }: Sche
 
                             {/* Right: on-site indicator or crew + status */}
                             <div className="flex items-center gap-2 shrink-0">
-                              {inProgress ? (
+                              {inProgress && effectiveStartedAt ? (
                                 <div className="flex items-center gap-1.5 rounded-full bg-[var(--clay)]/10 border border-[var(--clay)]/30 px-2.5 py-1">
                                   <span className="w-1.5 h-1.5 rounded-full bg-[var(--clay)] animate-pulse shrink-0" />
                                   <span className="text-[11px] font-semibold text-[var(--clay)]">
                                     On site
                                   </span>
                                   <span className="text-[11px] text-[var(--clay)]/70 tabular-nums">
-                                    {formatElapsed(activeSessions[0].started_at)}
+                                    {formatElapsed(effectiveStartedAt)}
                                   </span>
                                 </div>
                               ) : (

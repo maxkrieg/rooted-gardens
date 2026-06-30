@@ -10,7 +10,8 @@ export type StopDetail = {
     status: string
     crew_instruction: string | null
     week_start: string
-    actual_date: string | null
+    started_at: string | null
+    ended_at: string | null
     service_types: string[] | null
     completion_note: string | null
     skip_reason: string | null
@@ -42,12 +43,6 @@ export type StopDetail = {
     billing_type: string
     contact_name: string | null
   }
-  sessions: Array<{
-    id: string
-    started_at: string
-    ended_at: string | null
-    employee_id: string
-  }>
   assignedCrew: Array<{
     employee_id: string
     name: string
@@ -72,7 +67,7 @@ export function useStopDetail(visitId: string | undefined) {
       const { data, error } = await supabase
         .from('visits')
         .select(`
-          id, status, crew_instruction, week_start, actual_date,
+          id, status, crew_instruction, week_start, started_at, ended_at,
           service_types, completion_note, skip_reason,
           service_zone:service_zones!inner(id, name, frequency, sort_order, notes),
           property:properties!inner(
@@ -80,7 +75,6 @@ export function useStopDetail(visitId: string | undefined) {
             service_zones(id, name, frequency, sort_order, active)
           ),
           account:accounts!inner(id, name, billing_type, contact_name),
-          visit_sessions(id, started_at, ended_at, employee_id),
           visit_crew(employee_id, relation, employees(id, name)),
           photos(id, storage_path, type, created_at, caption)
         `)
@@ -92,7 +86,6 @@ export function useStopDetail(visitId: string | undefined) {
       const zone = data.service_zone as unknown as StopDetail['zone']
       const property = data.property as unknown as StopDetail['property']
       const account = data.account as unknown as StopDetail['account']
-      const sessions = (data.visit_sessions ?? []) as StopDetail['sessions']
 
       type RawVisitCrew = { employee_id: string; relation: string; employees: { id: string; name: string } | null }
       const assignedCrew = ((data.visit_crew ?? []) as unknown as RawVisitCrew[])
@@ -108,7 +101,8 @@ export function useStopDetail(visitId: string | undefined) {
           status: data.status ?? 'scheduled',
           crew_instruction: data.crew_instruction,
           week_start: data.week_start,
-          actual_date: data.actual_date,
+          started_at: data.started_at,
+          ended_at: data.ended_at,
           service_types: data.service_types,
           completion_note: data.completion_note,
           skip_reason: data.skip_reason,
@@ -116,7 +110,6 @@ export function useStopDetail(visitId: string | undefined) {
         zone,
         property,
         account,
-        sessions,
         assignedCrew,
         photos,
       }

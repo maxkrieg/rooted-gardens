@@ -130,7 +130,7 @@ INSERT INTO equipment (id, name, type, status, last_serviced, notes) VALUES
 
 -- W1: 2026-05-25 — 12 visits (5 weekly + 3 biweekly + 4 monthly), all completed
 INSERT INTO visits (id, service_zone_id, account_id, property_id, week_start, vehicle_id,
-                    status, actual_date, service_types, completion_note,
+                    status, ended_at, service_types, completion_note,
                     invoiced_at, qbo_invoice_id, invoice_amount) VALUES
   ('00000000-0000-0000-0008-000000000001',
    '00000000-0000-0000-0003-000000000001','00000000-0000-0000-0001-000000000001','00000000-0000-0000-0002-000000000001',
@@ -185,7 +185,7 @@ INSERT INTO visits (id, service_zone_id, account_id, property_id, week_start, ve
 
 -- W2: 2026-06-01 — 5 visits (weekly zones only)
 INSERT INTO visits (id, service_zone_id, account_id, property_id, week_start, vehicle_id,
-                    status, actual_date, service_types,
+                    status, ended_at, service_types,
                     invoiced_at, qbo_invoice_id, invoice_amount) VALUES
   ('00000000-0000-0000-0008-000000000013',
    '00000000-0000-0000-0003-000000000001','00000000-0000-0000-0001-000000000001','00000000-0000-0000-0002-000000000001',
@@ -212,7 +212,7 @@ INSERT INTO visits (id, service_zone_id, account_id, property_id, week_start, ve
 
 -- W3: 2026-06-08 — 8 visits (5 weekly + 3 biweekly), mixed statuses
 INSERT INTO visits (id, service_zone_id, account_id, property_id, week_start, vehicle_id,
-                    status, actual_date, service_types, completion_note, crew_instruction, skip_reason) VALUES
+                    status, ended_at, service_types, completion_note, crew_instruction, skip_reason) VALUES
   ('00000000-0000-0000-0008-000000000018',
    '00000000-0000-0000-0003-000000000001','00000000-0000-0000-0001-000000000001','00000000-0000-0000-0002-000000000001',
    '2026-06-08','00000000-0000-0000-0006-000000000001',
@@ -367,29 +367,25 @@ INSERT INTO visit_crew (visit_id, employee_id, relation) VALUES
   ('00000000-0000-0000-0008-000000000025','00000000-0000-0000-0005-000000000004','assigned');
 
 -- =====================
--- VISIT SESSIONS (6)
--- ses06 is the open session: Sarah on site at Old Stone Front Lawn right now
+-- VISIT TIMES (started_at / ended_at now live on visits)
+-- Give a handful of completed visits a coherent start→end interval (overrides the
+-- midnight ended_at from the date-only seed above), and leave one visit open to
+-- exercise the in-progress / "On site" state.
 -- =====================
-INSERT INTO visit_sessions (id, visit_id, employee_id, started_at, ended_at, source) VALUES
-  ('00000000-0000-0000-0009-000000000001',
-   '00000000-0000-0000-0008-000000000001','00000000-0000-0000-0005-000000000002',
-   '2026-05-27 08:30:00+00','2026-05-27 10:15:00+00','crew_app'),
-  ('00000000-0000-0000-0009-000000000002',
-   '00000000-0000-0000-0008-000000000005','00000000-0000-0000-0005-000000000003',
-   '2026-05-28 11:00:00+00','2026-05-28 12:30:00+00','crew_app'),
-  ('00000000-0000-0000-0009-000000000003',
-   '00000000-0000-0000-0008-000000000013','00000000-0000-0000-0005-000000000002',
-   '2026-06-02 08:45:00+00','2026-06-02 10:30:00+00','crew_app'),
-  ('00000000-0000-0000-0009-000000000004',
-   '00000000-0000-0000-0008-000000000015','00000000-0000-0000-0005-000000000002',
-   '2026-06-03 11:15:00+00','2026-06-03 12:45:00+00','crew_app'),
-  ('00000000-0000-0000-0009-000000000005',
-   '00000000-0000-0000-0008-000000000018','00000000-0000-0000-0005-000000000002',
-   '2026-06-09 09:00:00+00','2026-06-09 10:45:00+00','crew_app'),
-  -- OPEN: Sarah tapped Start on Old Stone Front Lawn — ended_at IS NULL
-  ('00000000-0000-0000-0009-000000000006',
-   '00000000-0000-0000-0008-000000000024','00000000-0000-0000-0005-000000000002',
-   '2026-06-13 10:00:00+00',NULL,'crew_app');
+-- Completed visits with a realistic on-site interval
+UPDATE visits SET started_at = '2026-05-27 08:30:00+00', ended_at = '2026-05-27 10:15:00+00'
+  WHERE id = '00000000-0000-0000-0008-000000000001';
+UPDATE visits SET started_at = '2026-05-28 11:00:00+00', ended_at = '2026-05-28 12:30:00+00'
+  WHERE id = '00000000-0000-0000-0008-000000000005';
+UPDATE visits SET started_at = '2026-06-02 08:45:00+00', ended_at = '2026-06-02 10:30:00+00'
+  WHERE id = '00000000-0000-0000-0008-000000000013';
+UPDATE visits SET started_at = '2026-06-03 11:15:00+00', ended_at = '2026-06-03 12:45:00+00'
+  WHERE id = '00000000-0000-0000-0008-000000000015';
+UPDATE visits SET started_at = '2026-06-09 09:00:00+00', ended_at = '2026-06-09 10:45:00+00'
+  WHERE id = '00000000-0000-0000-0008-000000000018';
+-- OPEN: Sarah tapped Start on Old Stone Front Lawn (vis24) — ended_at IS NULL → in progress
+UPDATE visits SET started_at = '2026-06-13 10:00:00+00', ended_at = NULL
+  WHERE id = '00000000-0000-0000-0008-000000000024';
 
 -- =====================
 -- TIME ENTRIES (2)

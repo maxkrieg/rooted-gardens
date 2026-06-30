@@ -311,10 +311,16 @@ visits (
   -- crew assignment + completion are tracked in the visit_crew join table (below),
   -- NOT as uuid[] arrays — keeps RLS, Realtime filters, and joins relational
   
+  -- Timing (set by crew via Start/Stop taps; editable by owner/lead in the detail sheet)
+  started_at timestamptz,               -- when work began; NULL until crew taps Start
+  ended_at timestamptz,                 -- when work finished; NULL while in progress or not started
+  -- Derived in-progress: started_at IS NOT NULL AND ended_at IS NULL
+  -- Do NOT add 'in_progress' to the status enum — it is always derived.
+  -- Completion date is derived from ended_at (fallback: week_start); actual_date was dropped.
+
   -- Completion (set by crew in the field)
   status text DEFAULT 'scheduled'
     CHECK (status IN ('scheduled', 'completed', 'skipped', 'invoiced')),
-  actual_date date,                     -- the real day it was done
   service_types text[],                 -- ['mow', 'double_cut', 'trim', 'edge', 'leaf_mulch', 'other']
   completion_note text,                 -- freeform note from crew
   skip_reason text,                     -- if status = 'skipped'
@@ -344,30 +350,14 @@ visit_crew (
 -- Index for "my stops" queries and Realtime subscriptions:
 --   CREATE INDEX visit_crew_employee_idx ON visit_crew (employee_id, relation);
 
--- Job start/stop tracking. One row per crew member's work session on a visit.
--- Crew tap "Start" on arrival and "Stop" when done; a visit is "in progress" while
--- it has any session with ended_at IS NULL. This is OPERATIONAL on-site time and is
--- distinct from BOTH the planning/billing lifecycle (visits.status) and payroll shift
--- time (time_entries). Stopping does NOT mark the visit completed — completion is still
--- logged separately (service_types, photos). started_at/ended_at are recorded on the
--- device at tap time so they stay correct even when logged offline and synced later.
-visit_sessions (
-  id uuid PK,
-  visit_id uuid FK → visits ON DELETE CASCADE,
-  employee_id uuid FK → employees,
-  started_at timestamptz NOT NULL,      -- client-recorded; survives offline queueing
-  ended_at timestamptz,                 -- NULL = still in progress
-  source text DEFAULT 'crew_app'        -- 'crew_app' | 'manual' (owner-entered/edited)
-    CHECK (source IN ('crew_app', 'manual')),
-  note text,
-  created_at, updated_at
-)
--- Indexes for "what's in progress now" and per-visit / per-employee lookups:
---   CREATE INDEX visit_sessions_active_idx ON visit_sessions (visit_id) WHERE ended_at IS NULL;
---   CREATE INDEX visit_sessions_employee_idx ON visit_sessions (employee_id, started_at);
+-- visit_sessions TABLE DROPPED (migration 20260629120000_collapse_visit_sessions).
+-- started_at / ended_at now live directly on visits (see above).
+-- Partial index on visits for "in progress" queries:
+--   CREATE INDEX visits_in_progress_idx ON visits (id)
+--     WHERE started_at IS NOT NULL AND ended_at IS NULL;
 
 -- Time tracking — payroll shift clock (one shift per employee per day, approved for
--- payroll). Distinct from visit_sessions above: that is per-job on-site time; this is
+-- payroll). Distinct from visits.started_at/ended_at (per-job on-site time); this is
 -- the daily clock-in/out. They are not auto-derived from each other.
 time_entries (
   id uuid PK,
@@ -460,28 +450,26 @@ A `service_zone` is a named work area within a property. It is NOT a billing uni
 A `visit` is a (service_zone × week) record. The `week_start` is always a Monday.
 - Created by the owner when scheduling ("this zone needs to happen week of June 8")
 - May have a `crew_instruction` — a one-time note for this specific visit (distinct from property standing notes)
-- Crew completes it in the field: sets `actual_date`, `service_types[]`, `completion_note`
+- Crew completes it in the field: sets `ended_at`, `service_types[]`, `completion_note`
+- Completion date is derived from `ended_at` (fallback: `week_start`); display with `parseISO`
 - Accountant marks as `invoiced` after pushing to QBO
 
-### Job Sessions & In-Progress State
-A `visit_session` records a crew member actively working a visit between a **Start** and
-**Stop** tap (table `visit_sessions`). It answers "who is on site right now and for how long."
-- **Start** inserts a session (`started_at = now`, `ended_at = null`); **Stop** sets `ended_at`.
-- A visit is **in progress** when it has ≥1 session with `ended_at IS NULL`. This is a
-  *derived* state, NOT a value of `visits.status` — a visit stays `scheduled`/`completed`
-  for planning/billing while independently being "in progress" operationally. Do not add
-  `in_progress` to the `visits.status` enum.
-- Multiple crew can have concurrent sessions on the same visit (whole crew on one lawn).
-- **Stop ≠ done with the work.** Stopping only closes the on-site clock. Crew still log
-  completion (`actual_date`, `service_types[]`, photos) via the separate completion flow.
-  The Stop action may *offer* to open the completion logger, but never sets status itself.
-- Owners see in-progress live and are notified on every start/stop.
-- Sessions are **operational**, not payroll. They do not write `time_entries`; payroll
-  stays on the daily clock-in/out. (A future reconciliation could cross-check the two.)
+### Job Start/Stop & In-Progress State
+Start/stop timing lives directly on the visit row: `visits.started_at` and `visits.ended_at`.
+(The separate `visit_sessions` table was dropped in migration `20260629120000`.)
+- **Start** → crew app sets `visits.started_at = now()`, `ended_at = NULL` via the offline queue.
+- **Stop** → crew app sets `visits.ended_at = now()` via the offline queue.
+- A visit is **in progress** when `started_at IS NOT NULL AND ended_at IS NULL`. This is a
+  *derived* state, NOT a value of `visits.status`. Do not add `in_progress` to the enum.
+- **Stop ≠ completion.** Stopping only closes the on-site clock. Crew still log
+  completion (`service_types[]`, photos) via the separate completion form (VisitLogger).
+  When the Log Completion form is submitted, `ended_at` is always written (either from
+  the Stop time they tapped, or prefilled to now if they never tapped Stop).
+- `ended_at` on a completed visit is the authoritative completion date. Use it for display
+  and sorting; never use `actual_date` (that column was dropped).
+- Owners can manually edit `started_at`/`ended_at` via the management VisitDetailSheet.
 - Because start/stop happen in the field, they go through the crew **offline queue** like
-  completions — so live in-progress state and owner notifications are only as fresh as the
-  crew member's connectivity. A session opened and closed while fully offline arrives as an
-  already-ended session on sync; notifications must coalesce / idempotently handle that.
+  completions — so live in-progress state is only as fresh as the crew member's connectivity.
 
 ### Service Types (multi-select on completion)
 ```
@@ -546,7 +534,8 @@ Dark theme ("soil at dusk", for dawn/dusk field use): `--background #1C1A15`, `-
 - invoiced → `#E4ECF2` / `#3F6E97` (denim — the one cool hue, marks the "billed" track)
 - **on-site / in-progress (live)** → `--clay` terracotta with a pulsing dot + elapsed ("On site •
   0:42"); deliberately warm so it pops against the green UI and is never confused with
-  completed-green or skipped-amber. Derived from open `visit_sessions`, never a `visits.status` value.
+  completed-green or skipped-amber. Derived from `visit.started_at IS NOT NULL AND visit.ended_at IS NULL`,
+  never a `visits.status` value. Use `isVisitInProgress(visit)` from `lib/utils/visits.ts`.
 
 **Shape, spacing, depth:**
 - Radius: base 0.75rem; cards `rounded-2xl` (organic), badges/pills full, buttons/inputs `rounded-lg`.
@@ -605,7 +594,8 @@ Dark theme ("soil at dusk", for dawn/dusk field use): `--background #1C1A15`, `-
 - Visit status badges: use the **Design System** status colors (scheduled / completed / skipped /
   invoiced) — pill shape, tinted bg + darker text
 - **In-progress** = the `--clay` terracotta on-site indicator from the Design System (pulsing dot +
-  elapsed), overlaid on the status badge — derived from open `visit_sessions`, never a `visits.status` value
+  elapsed), overlaid on the status badge — derived from `visit.started_at IS NOT NULL AND ended_at IS NULL`,
+  never a `visits.status` value. Use `isVisitInProgress(visit)` from `lib/utils/visits.ts`
 - All dates displayed as human-readable ("Mon Jun 8" not "2026-06-08")
 
 ---
@@ -654,11 +644,14 @@ subscriptions are relational and filterable:
   At this company's scale (≤ a few hundred visits/week) this is cheap.
 
 **Management** (`/management/*`) — owners need live in-progress state, so the schedule and
-dashboard subscribe to `visit_sessions` (INSERT = a start, UPDATE setting `ended_at` = a
-stop). This is the one place management leans on realtime; treat it as a best-effort live
-overlay on top of the server-rendered schedule, never the source of truth. Owner start/stop
-alerts are **in-app only** — a toast on this same subscription, with no email / SMS / push
-(Phase 8.3). If an owner doesn't have the app open, they simply catch up on next open.
+dashboard subscribe to `visits` UPDATE events. `SessionsProvider` (schedule page) tracks a
+`Map<visitId, { started_at, ended_at }>` overlay updated by realtime; the schedule grid and
+mobile list merge this with server-fetched visit data. `CrewsOnSitePanel` (dashboard) queries
+visits where `started_at IS NOT NULL AND ended_at IS NULL` on mount, then subscribes to
+`visits` UPDATE to add/remove entries live. Treat realtime as a best-effort live overlay on
+top of server-rendered data, never the source of truth. Owner start/stop alerts are
+**in-app only** — no email / SMS / push (Phase 8.3). If an owner doesn't have the app open,
+they simply catch up on next open.
 
 > Why this matters: the old `assigned_crew uuid[]` design could not be filtered by
 > Supabase Realtime (its `postgres_changes` filters don't support array containment),

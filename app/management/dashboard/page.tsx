@@ -11,7 +11,7 @@ export default async function DashboardPage() {
   const today = new Date()
   const weekStart = format(getWeekStart(today), 'yyyy-MM-dd')
 
-  const [visitsResult, equipmentResult, vehiclesResult, openSessionsResult] = await Promise.all([
+  const [visitsResult, equipmentResult, vehiclesResult, inProgressResult] = await Promise.all([
     supabase
       .from('visits')
       .select(`
@@ -25,15 +25,18 @@ export default async function DashboardPage() {
     supabase.from('equipment').select('*').eq('status', 'maintenance').order('name'),
     supabase.from('vehicles').select('*').eq('status', 'maintenance').order('name'),
     supabase
-      .from('visit_sessions')
-      .select('*, employee:employees(*), visit:visits(*, property:properties(*), service_zone:service_zones(*))')
+      .from('visits')
+      .select(
+        'id, started_at, property:properties(address), service_zone:service_zones(name), visit_crew(relation, employee:employees(name))',
+      )
+      .not('started_at', 'is', null)
       .is('ended_at', null),
   ])
 
   const visits = (visitsResult.data ?? []) as unknown as VisitWithDetails[]
   const maintenanceEquipment = (equipmentResult.data ?? []) as Equipment[]
   const maintenanceVehicles = (vehiclesResult.data ?? []) as Vehicle[]
-  const openSessions = (openSessionsResult.data ?? []) as unknown as Parameters<typeof CrewsOnSitePanel>[0]['initialSessions']
+  const inProgressVisits = (inProgressResult.data ?? []) as unknown as Parameters<typeof CrewsOnSitePanel>[0]['initialVisits']
 
   const scheduledVisits = visits.filter((v) => v.status === 'scheduled')
   const completedCount = visits.filter((v) => v.status === 'completed').length
@@ -73,7 +76,7 @@ export default async function DashboardPage() {
       </section>
 
       {/* ── Crews on site now (live) ──────────────────────────────────────── */}
-      <CrewsOnSitePanel initialSessions={openSessions} />
+      <CrewsOnSitePanel initialVisits={inProgressVisits} />
 
       {/* ── Scheduled visits ───────────────────────────────────────────────── */}
       <section>

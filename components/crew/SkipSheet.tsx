@@ -18,8 +18,8 @@ import type { TodayStop } from '@/hooks/crew/useTodayStops'
 interface SkipSheetProps {
   visitId: string
   employeeId: string
-  // The open on-site session, if one is running — skipping closes it.
-  openSessionId?: string | null
+  // Whether the visit is currently in progress — skipping stops the on-site clock.
+  inProgress?: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
@@ -28,7 +28,7 @@ interface SkipSheetProps {
 export function SkipSheet({
   visitId,
   employeeId,
-  openSessionId,
+  inProgress,
   open,
   onOpenChange,
   onSuccess,
@@ -50,8 +50,7 @@ export function SkipSheet({
     await enqueueMutation('skip', {
       visitId,
       skipReason: skipReason.trim() || undefined,
-      closeSessionId: openSessionId ?? undefined,
-      endedAt: openSessionId ? endedAt : undefined,
+      endedAt: inProgress ? endedAt : undefined,
     })
 
     await flushMutationQueue()
@@ -69,11 +68,9 @@ export function SkipSheet({
                 ...stop.visit,
                 status: 'skipped',
                 skip_reason: skipReason.trim() || null,
+                // Stop the on-site clock so the pulse clears on the today list
+                ...(inProgress ? { ended_at: endedAt } : {}),
               },
-              // Close the running session so the On site pulse clears on the today list
-              sessions: stop.sessions.map((s) =>
-                s.ended_at === null ? { ...s, ended_at: endedAt } : s
-              ),
             }
           : stop
       )
@@ -87,10 +84,8 @@ export function SkipSheet({
           ...old.visit,
           status: 'skipped',
           skip_reason: skipReason.trim() || null,
+          ...(inProgress ? { ended_at: endedAt } : {}),
         },
-        sessions: old.sessions.map((s) =>
-          s.ended_at === null ? { ...s, ended_at: endedAt } : s
-        ),
       }
     })
 
