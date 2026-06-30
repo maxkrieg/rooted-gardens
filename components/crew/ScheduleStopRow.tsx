@@ -86,8 +86,10 @@ export function ScheduleStopRow({ row }: ScheduleStopRowProps) {
         >
           {property.address}
         </p>
-        {/* Only surface a status badge for non-default states */}
-        {visit.status !== 'scheduled' && <VisitStatusBadge status={visit.status} />}
+        {/* Only surface a status badge for non-default states; crew see invoiced as completed */}
+        {visit.status !== 'scheduled' && (
+          <VisitStatusBadge status={visit.status === 'invoiced' ? 'completed' : visit.status} />
+        )}
       </div>
 
       <p className="text-xs text-muted-foreground">{account.name}</p>
