@@ -19,7 +19,6 @@ import { useTodayTimeEntry } from '@/hooks/crew/useTodayTimeEntry'
 import { useActiveEmployees } from '@/hooks/crew/useActiveEmployees'
 import { createClient } from '@/lib/supabase/client'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
-import type { TodayStop } from '@/hooks/crew/useTodayStops'
 
 // datetime-local input expects "YYYY-MM-DDTHH:mm" in local time
 function toDatetimeLocalValue(iso: string): string {
@@ -222,9 +221,6 @@ export function VisitLogger({
     queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
     queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
 
-    // Optimistic update: mark this visit completed in both caches immediately.
-    // Use setQueryData rather than invalidating crew-today-stops to avoid a loading
-    // flash on the today list when we redirect back to it.
     queryClient.setQueryData<StopDetail | null>(['stop-detail', visitId], (old) => {
       if (!old) return old
       return {
@@ -240,26 +236,6 @@ export function VisitLogger({
           ended_at: endedAt,
         },
       }
-    })
-
-    queryClient.setQueryData<TodayStop[]>(['crew-today-stops', employeeId], (old) => {
-      if (!old) return old
-      return old.map((stop) =>
-        stop.visitId === visitId
-          ? {
-              ...stop,
-              visit: {
-                ...stop.visit,
-                status: 'completed',
-                service_types: serviceTypes,
-                completion_note: completionNote.trim() || null,
-                skip_reason: null,
-                started_at: startedAtISO ?? stop.visit.started_at,
-                ended_at: endedAt,
-              },
-            }
-          : stop
-      )
     })
 
     resetForm()

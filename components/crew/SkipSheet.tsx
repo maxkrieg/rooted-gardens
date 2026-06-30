@@ -13,7 +13,6 @@ import {
 } from '@/components/ui/sheet'
 import { enqueueMutation, flushMutationQueue } from '@/lib/crew/mutation-queue'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
-import type { TodayStop } from '@/hooks/crew/useTodayStops'
 
 interface SkipSheetProps {
   visitId: string
@@ -57,24 +56,6 @@ export function SkipSheet({
 
     queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
     queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
-
-    queryClient.setQueryData<TodayStop[]>(['crew-today-stops', employeeId], (old) => {
-      if (!old) return old
-      return old.map((stop) =>
-        stop.visitId === visitId
-          ? {
-              ...stop,
-              visit: {
-                ...stop.visit,
-                status: 'skipped',
-                skip_reason: skipReason.trim() || null,
-                // Stop the on-site clock so the pulse clears on the today list
-                ...(inProgress ? { ended_at: endedAt } : {}),
-              },
-            }
-          : stop
-      )
-    })
 
     queryClient.setQueryData<StopDetail | null>(['stop-detail', visitId], (old) => {
       if (!old) return old

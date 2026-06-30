@@ -105,7 +105,6 @@ export default function StopDetailPage() {
     await enqueueMutation('job_start', { visitId, startedAt })
     await flushMutationQueue()
     queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
-    queryClient.invalidateQueries({ queryKey: ['crew-today-stops'] })
     queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
   }
 
@@ -411,7 +410,7 @@ export default function StopDetailPage() {
         startedAt={visitStartedAt}
         open={completionOpen}
         onOpenChange={setCompletionOpen}
-        onSuccess={() => router.push('/crew/today')}
+        onSuccess={() => router.push('/crew/schedule')}
       />
 
       <SkipSheet
@@ -420,7 +419,7 @@ export default function StopDetailPage() {
         inProgress={inProgress}
         open={skipOpen}
         onOpenChange={setSkipOpen}
-        onSuccess={() => router.push('/crew/today')}
+        onSuccess={() => router.push('/crew/schedule')}
       />
 
       <CrewAssignSheet

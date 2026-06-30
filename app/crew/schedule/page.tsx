@@ -52,7 +52,7 @@ function rowMatches(
 
 export default function CrewSchedulePage() {
   const [week, setWeek] = useState(() => getWeekStart(new Date()))
-  const [filters, setFilters] = useState<ScheduleFilters>(EMPTY_FILTERS)
+  const [filters, setFilters] = useState<ScheduleFilters>({ ...EMPTY_FILTERS, crew: 'me' })
   const [filtersOpen, setFiltersOpen] = useState(false)
 
   const thisWeek = getWeekStart(new Date())
