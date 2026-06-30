@@ -43,6 +43,10 @@ interface VisitLoggerProps {
   // The visit's start time, if the job was started. When set, the Start time field
   // is shown prefilled and editable; otherwise the crew can opt into a manual start.
   startedAt?: string | null
+  // Pre-fill props for editing an existing completion
+  initialServiceTypes?: string[]
+  initialCompletionNote?: string
+  initialPresentIds?: string[]
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
@@ -54,6 +58,9 @@ export function VisitLogger({
   propertyId,
   assignedCrew,
   startedAt,
+  initialServiceTypes,
+  initialCompletionNote,
+  initialPresentIds,
   open,
   onOpenChange,
   onSuccess,
@@ -79,10 +86,12 @@ export function VisitLogger({
   // End time — the completion timestamp (= visits.ended_at), prefilled to now.
   const [endTime, setEndTime] = useState('')
 
-  // Pre-check all assigned crew + seed the start/end times every time the sheet opens
+  // Seed state every time the sheet opens, using pre-fill values when editing
   useEffect(() => {
     if (open) {
-      setPresentIds(assignedCrew.map((c) => c.employee_id))
+      setPresentIds(initialPresentIds ?? assignedCrew.map((c) => c.employee_id))
+      setServiceTypes(initialServiceTypes ?? [])
+      setCompletionNote(initialCompletionNote ?? '')
       setEndTime(toDatetimeLocalValue(new Date().toISOString()))
       if (startedAt) {
         setStartTime(toDatetimeLocalValue(startedAt))
@@ -91,7 +100,7 @@ export function VisitLogger({
       }
       setManualStart(false)
     }
-  }, [open, assignedCrew, startedAt])
+  }, [open, assignedCrew, startedAt, initialServiceTypes, initialCompletionNote, initialPresentIds])
 
   const crewOptions = activeEmployees.map((e) => ({ id: e.id, name: e.name, role: e.role }))
 

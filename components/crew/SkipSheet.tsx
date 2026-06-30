@@ -19,6 +19,7 @@ interface SkipSheetProps {
   employeeId: string
   // Whether the visit is currently in progress — skipping stops the on-site clock.
   inProgress?: boolean
+  initialSkipReason?: string
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
@@ -28,16 +29,16 @@ export function SkipSheet({
   visitId,
   employeeId,
   inProgress,
+  initialSkipReason,
   open,
   onOpenChange,
   onSuccess,
 }: SkipSheetProps) {
   const queryClient = useQueryClient()
-  const [skipReason, setSkipReason] = useState('')
+  const [skipReason, setSkipReason] = useState(initialSkipReason ?? '')
   const [submitting, setSubmitting] = useState(false)
 
   function handleOpenChange(next: boolean) {
-    if (!next) setSkipReason('')
     onOpenChange(next)
   }
 

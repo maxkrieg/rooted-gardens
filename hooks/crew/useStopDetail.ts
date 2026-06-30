@@ -47,6 +47,10 @@ export type StopDetail = {
     employee_id: string
     name: string
   }>
+  completedBy: Array<{
+    employee_id: string
+    name: string
+  }>
   photos: Array<{
     id: string
     storage_path: string
@@ -88,8 +92,12 @@ export function useStopDetail(visitId: string | undefined) {
       const account = data.account as unknown as StopDetail['account']
 
       type RawVisitCrew = { employee_id: string; relation: string; employees: { id: string; name: string } | null }
-      const assignedCrew = ((data.visit_crew ?? []) as unknown as RawVisitCrew[])
+      const rawCrew = (data.visit_crew ?? []) as unknown as RawVisitCrew[]
+      const assignedCrew = rawCrew
         .filter((vc) => vc.relation === 'assigned' && vc.employees)
+        .map((vc) => ({ employee_id: vc.employee_id, name: vc.employees!.name }))
+      const completedBy = rawCrew
+        .filter((vc) => vc.relation === 'completed' && vc.employees)
         .map((vc) => ({ employee_id: vc.employee_id, name: vc.employees!.name }))
 
       const photos = (data.photos ?? []) as StopDetail['photos']
@@ -111,6 +119,7 @@ export function useStopDetail(visitId: string | undefined) {
         property,
         account,
         assignedCrew,
+        completedBy,
         photos,
       }
     },

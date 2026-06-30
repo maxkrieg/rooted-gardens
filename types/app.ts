@@ -49,6 +49,16 @@ export const SERVICE_TYPES = [
 ] as const
 export type ServiceType = (typeof SERVICE_TYPES)[number]
 
+export const SERVICE_TYPE_LABELS: Record<string, string> = {
+  mow: 'Mow',
+  double_cut: 'Double Cut',
+  trim: 'Trim',
+  edge: 'Edge',
+  leaf_mulch: 'Leaf Mulch',
+  cleanup: 'Cleanup',
+  other: 'Other',
+}
+
 export const CREW_RELATIONS = ['assigned', 'completed'] as const
 export type CrewRelation = (typeof CREW_RELATIONS)[number]
 

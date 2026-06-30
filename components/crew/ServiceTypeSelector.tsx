@@ -1,17 +1,7 @@
 'use client'
 
 import { Checkbox } from '@/components/ui/checkbox'
-import { SERVICE_TYPES } from '@/types/app'
-
-const LABELS: Record<string, string> = {
-  mow: 'Mow',
-  double_cut: 'Double Cut',
-  trim: 'Trim',
-  edge: 'Edge',
-  leaf_mulch: 'Leaf Mulch',
-  cleanup: 'Cleanup',
-  other: 'Other',
-}
+import { SERVICE_TYPES, SERVICE_TYPE_LABELS } from '@/types/app'
 
 interface ServiceTypeSelectorProps {
   value: string[]
@@ -40,9 +30,9 @@ export function ServiceTypeSelector({ value, onChange }: ServiceTypeSelectorProp
             <Checkbox
               checked={checked}
               onCheckedChange={() => toggle(type)}
-              aria-label={LABELS[type]}
+              aria-label={SERVICE_TYPE_LABELS[type]}
             />
-            <span className="text-sm font-medium text-foreground">{LABELS[type]}</span>
+            <span className="text-sm font-medium text-foreground">{SERVICE_TYPE_LABELS[type]}</span>
           </label>
         )
       })}

@@ -142,19 +142,32 @@ export async function flushMutationQueue(): Promise<void> {
               // overwrite an existing start with null.
               ...(p.startedAt ? { started_at: p.startedAt } : {}),
               // Clear any leftover skip reason — finishing a previously-skipped
-              // stop fully un-skips it (mirrors the management 3.8 behavior).
+              // stop fully un-skips it.
               skip_reason: null,
             })
             .eq('id', p.visitId)
             .throwOnError()
-          // Upsert the logged-in crew member's own completed row.
-          // RLS only permits employee_id = self for completed relation; crediting
-          // other crew is an owner/lead action done from the management detail sheet.
-          await supabase.from('visit_crew').upsert({
-            visit_id: p.visitId,
-            employee_id: p.employeeId,
-            relation: 'completed' as const,
-          }).throwOnError()
+          // Replace all completed rows atomically: clear the old set, then insert
+          // the new set from presentEmployeeIds. This handles initial completion and
+          // edits (adding / removing crew) in one idempotent operation.
+          await supabase
+            .from('visit_crew')
+            .delete()
+            .eq('visit_id', p.visitId)
+            .eq('relation', 'completed')
+            .throwOnError()
+          if (p.presentEmployeeIds.length > 0) {
+            await supabase
+              .from('visit_crew')
+              .insert(
+                p.presentEmployeeIds.map((empId) => ({
+                  visit_id: p.visitId,
+                  employee_id: empId,
+                  relation: 'completed' as const,
+                }))
+              )
+              .throwOnError()
+          }
           break
         }
         case 'skip': {

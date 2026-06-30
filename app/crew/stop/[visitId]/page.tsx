@@ -12,6 +12,7 @@ import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { VisitLogger } from '@/components/crew/VisitLogger'
 import { SkipSheet } from '@/components/crew/SkipSheet'
 import { CrewAssignSheet } from '@/components/crew/CrewAssignSheet'
+import { CompletionSummary } from '@/components/crew/CompletionSummary'
 import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
 import { enqueueMutation, flushMutationQueue } from '@/lib/crew/mutation-queue'
 import { createClient } from '@/lib/supabase/client'
@@ -195,6 +196,17 @@ export default function StopDetailPage() {
             </div>
           )}
         </div>
+
+        {/* Completion summary — shown when the visit is done */}
+        {(visit.status === 'completed' || visit.status === 'skipped' || visit.status === 'invoiced') && (
+          <CompletionSummary
+            visit={visit}
+            completedBy={stop.completedBy ?? []}
+            assignedCrew={stop.assignedCrew}
+            onEdit={() => setCompletionOpen(true)}
+            onEditSkip={() => setSkipOpen(true)}
+          />
+        )}
 
         {/* Zone context (single-zone: show the zone name + frequency) */}
         {!isMultiZone && (
@@ -408,6 +420,13 @@ export default function StopDetailPage() {
         propertyId={stop.property.id}
         assignedCrew={stop.assignedCrew ?? []}
         startedAt={visitStartedAt}
+        initialServiceTypes={visit.service_types ?? undefined}
+        initialCompletionNote={visit.completion_note ?? undefined}
+        initialPresentIds={
+          (stop.completedBy?.length ?? 0) > 0
+            ? stop.completedBy.map((c) => c.employee_id)
+            : undefined
+        }
         open={completionOpen}
         onOpenChange={setCompletionOpen}
         onSuccess={() => router.push('/crew/schedule')}
@@ -417,6 +436,7 @@ export default function StopDetailPage() {
         visitId={visitId}
         employeeId={employee?.id ?? ''}
         inProgress={inProgress}
+        initialSkipReason={visit.skip_reason ?? undefined}
         open={skipOpen}
         onOpenChange={setSkipOpen}
         onSuccess={() => router.push('/crew/schedule')}
