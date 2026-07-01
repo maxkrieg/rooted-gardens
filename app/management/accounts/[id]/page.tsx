@@ -57,6 +57,7 @@ export default async function AccountDetailPage({ params }: Props) {
     .from('visits')
     .select('*, property:properties(address)')
     .eq('account_id', id)
+    .eq('status', 'completed')
     .order('week_start', { ascending: false })
     .limit(10)
 

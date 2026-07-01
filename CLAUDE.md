@@ -310,12 +310,14 @@ visits (
 
   -- Completion (set by crew in the field)
   status text DEFAULT 'scheduled'
-    CHECK (status IN ('scheduled', 'completed', 'skipped', 'invoiced')),
+    CHECK (status IN ('scheduled', 'completed', 'skipped')),
   service_types text[],                 -- ['mow', 'double_cut', 'trim', 'edge', 'leaf_mulch', 'other']
   completion_note text,                 -- freeform note from crew
   skip_reason text,                     -- if status = 'skipped'
   
   -- Billing
+  -- Derived invoiced flag: invoiced_at IS NOT NULL. Same convention as in-progress
+  -- (started_at/ended_at) above — NOT a value of status. (migration 20260630140000)
   invoiced_at timestamptz,
   qbo_invoice_id text,
   invoice_amount numeric(8,2),          -- snapshot of price at time of invoicing
@@ -446,7 +448,11 @@ A `visit` is a (property × week) record — enforced by a UNIQUE index on
 - May have a `crew_instruction` — a one-time note for this specific visit (distinct from property standing notes)
 - Crew completes it in the field: sets `ended_at`, `service_types[]`, `completion_note`
 - Completion date is derived from `ended_at` (fallback: `week_start`); display with `parseISO`
-- Accountant marks as `invoiced` after pushing to QBO
+- `status` is `scheduled | completed | skipped` — never `invoiced`. Billing is a
+  *derived* flag (`invoiced_at IS NOT NULL`), the same convention as the in-progress
+  state below. The owner/accountant marks a completed visit invoiced after pushing to
+  QBO (today: a manual toggle in `VisitDetailSheet`, standing in for the real QBO push
+  which is still unbuilt — see Phase 5 in PHASES.md).
 
 ### Job Start/Stop & In-Progress State
 Start/stop timing lives directly on the visit row: `visits.started_at` and `visits.ended_at`.
@@ -525,7 +531,9 @@ Dark theme ("soil at dusk", for dawn/dusk field use): `--background #1C1A15`, `-
 - scheduled → `#ECE8DF` / `#6E665A` (warm stone gray)
 - completed → `#E3F1E7` / `#2F6E45` (leaf green)
 - skipped → `#FBF0D6` / `#9A6B16` (ochre/amber)
-- invoiced → `#E4ECF2` / `#3F6E97` (denim — the one cool hue, marks the "billed" track)
+- `.status-invoiced` → `#E4ECF2` / `#3F6E97` (denim — the one cool hue, marks the "billed"
+  track). Not a visit-status badge (invoiced is a derived flag, not a `status` value) —
+  this class is kept alive solely for the dashboard's "Uninvoiced" stat card.
 - **on-site / in-progress (live)** → `--clay` terracotta with a pulsing dot + elapsed ("On site •
   0:42"); deliberately warm so it pops against the green UI and is never confused with
   completed-green or skipped-amber. Derived from `visit.started_at IS NOT NULL AND visit.ended_at IS NULL`,
@@ -585,8 +593,8 @@ Dark theme ("soil at dusk", for dawn/dusk field use): `--background #1C1A15`, `-
 ### Shared Components
 - Use shadcn/ui primitives as the base (Button, Card, Dialog, etc.)
 - `service_types` multi-select: always rendered as a checkbox group, never a dropdown
-- Visit status badges: use the **Design System** status colors (scheduled / completed / skipped /
-  invoiced) — pill shape, tinted bg + darker text
+- Visit status badges: use the **Design System** status colors (scheduled / completed /
+  skipped) — pill shape, tinted bg + darker text
 - **In-progress** = the `--clay` terracotta on-site indicator from the Design System (pulsing dot +
   elapsed), overlaid on the status badge — derived from `visit.started_at IS NOT NULL AND ended_at IS NULL`,
   never a `visits.status` value. Use `isVisitInProgress(visit)` from `lib/utils/visits.ts`

@@ -7,6 +7,7 @@ import { ArrowLeft, MapPin, Map, ChevronDown, KeyRound, ClipboardList, Car, User
 import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { FrequencyBadge, VisitStatusBadge } from '@/components/management/badges'
+import { PropertyVisitHistory } from '@/components/PropertyVisitHistory'
 import { useStopDetail } from '@/hooks/crew/useStopDetail'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { VisitLogger } from '@/components/crew/VisitLogger'
@@ -97,7 +98,7 @@ export default function StopDetailPage() {
 
   const { visit, property, account } = stop
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(property.address)}`
-  const isActive = visit.status !== 'completed' && visit.status !== 'invoiced' && visit.status !== 'skipped'
+  const isActive = visit.status !== 'completed' && visit.status !== 'skipped'
 
   async function handleStart() {
     if (!employee?.id || inProgress) return
@@ -193,7 +194,7 @@ export default function StopDetailPage() {
         </div>
 
         {/* Completion summary — shown when the visit is done */}
-        {(visit.status === 'completed' || visit.status === 'skipped' || visit.status === 'invoiced') && (
+        {(visit.status === 'completed' || visit.status === 'skipped') && (
           <CompletionSummary
             visit={visit}
             completedBy={stop.completedBy ?? []}
@@ -298,6 +299,8 @@ export default function StopDetailPage() {
           </div>
         )}
 
+        <PropertyVisitHistory propertyId={property.id} beforeWeekStart={visit.week_start} />
+
         {/* Photos (completed visits) */}
         {stop.photos.length > 0 && (
           <div className="space-y-2">
@@ -360,9 +363,9 @@ export default function StopDetailPage() {
             type="button"
             className="flex-1 flex flex-col items-center justify-center gap-1 rounded-lg border border-[--border] bg-card min-h-[60px] py-2 active:bg-accent/40 disabled:opacity-40 transition-colors"
             onClick={() => setCompletionOpen(true)}
-            disabled={visit.status === 'completed' || visit.status === 'invoiced'}
+            disabled={visit.status === 'completed'}
           >
-            {visit.status === 'completed' || visit.status === 'invoiced' ? (
+            {visit.status === 'completed' ? (
               <>
                 <Check className="h-5 w-5" style={{ color: 'var(--primary)' }} />
                 <span className="text-xs font-medium text-foreground">Done</span>
@@ -380,7 +383,7 @@ export default function StopDetailPage() {
             type="button"
             className="flex-1 flex flex-col items-center justify-center gap-1 rounded-lg border border-[--border] bg-card min-h-[60px] py-2 active:bg-accent/40 disabled:opacity-40 transition-colors"
             onClick={() => setSkipOpen(true)}
-            disabled={visit.status === 'skipped' || visit.status === 'invoiced'}
+            disabled={visit.status === 'skipped'}
           >
             <SkipForward className="h-5 w-5 text-muted-foreground" />
             <span className="text-xs font-medium text-foreground">

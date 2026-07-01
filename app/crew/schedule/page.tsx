@@ -35,10 +35,7 @@ function rowMatches(
 
   if (filters.status !== 'all') {
     // A row with no visit yet isn't in any status, so it's excluded when filtering by one.
-    // Invoiced is treated as completed from the crew's perspective.
-    const visitStatus = row.visit?.status
-    const effectiveStatus = visitStatus === 'invoiced' ? 'completed' : visitStatus
-    if (effectiveStatus !== filters.status) return false
+    if (row.visit?.status !== filters.status) return false
   }
 
   const q = filters.search.trim().toLowerCase()

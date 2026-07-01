@@ -211,3 +211,26 @@ export async function unskipVisit(visitId: string): Promise<{ error?: string }> 
   revalidatePath('/management/schedule')
   return {}
 }
+
+/**
+ * Toggle the invoiced flag on a completed visit. Billing state is derived from
+ * `invoiced_at` (nullable), never a `visits.status` value — same convention as
+ * the in-progress derived state. Stands in for the real QuickBooks push (task
+ * 5.x, not yet built).
+ */
+export async function setVisitInvoiced(
+  visitId: string,
+  invoiced: boolean,
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('visits')
+    .update({ invoiced_at: invoiced ? new Date().toISOString() : null })
+    .eq('id', visitId)
+  if (error) {
+    console.error('[setVisitInvoiced]', error)
+    return { error: error.message }
+  }
+  revalidatePath('/management/schedule')
+  return {}
+}

@@ -10,6 +10,7 @@ interface CompletionSummaryProps {
   visit: StopDetail['visit']
   completedBy: StopDetail['completedBy']
   assignedCrew: StopDetail['assignedCrew']
+  canEdit?: boolean
   onEdit: () => void
   onEditSkip: () => void
 }
@@ -30,11 +31,12 @@ export function CompletionSummary({
   visit,
   completedBy,
   assignedCrew,
+  canEdit = true,
   onEdit,
   onEditSkip,
 }: CompletionSummaryProps) {
   const isSkipped = visit.status === 'skipped'
-  const isCompleted = visit.status === 'completed' || visit.status === 'invoiced'
+  const isCompleted = visit.status === 'completed'
 
   // Show who was on site only if it differs from who was assigned
   const assignedIds = new Set(assignedCrew.map((c) => c.employee_id))
@@ -61,15 +63,18 @@ export function CompletionSummary({
             {headerLabel}
           </span>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-9 gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
-          onClick={handleEdit}
-        >
-          <Pencil className="h-3.5 w-3.5" />
-          Edit
-        </Button>
+        {canEdit && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-9 gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+            onClick={handleEdit}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Edit
+          </Button>
+        )}
       </div>
 
       {/* Body */}

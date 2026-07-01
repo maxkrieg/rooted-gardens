@@ -73,7 +73,6 @@ const VISIT_STATUS_META: Record<VisitStatus, { label: string; className: string 
   scheduled: { label: 'Scheduled', className: 'status-scheduled' },
   completed: { label: 'Completed', className: 'status-completed' },
   skipped:   { label: 'Skipped',   className: 'status-skipped' },
-  invoiced:  { label: 'Invoiced',  className: 'status-invoiced' },
 }
 
 export function VisitStatusBadge({ status }: { status: string }) {

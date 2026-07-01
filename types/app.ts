@@ -34,7 +34,7 @@ export type ServiceSide = (typeof SERVICE_SIDES)[number]
 export const PROPERTY_FREQUENCIES = ['weekly', 'biweekly', 'monthly', 'as_needed'] as const
 export type Frequency = (typeof PROPERTY_FREQUENCIES)[number]
 
-export const VISIT_STATUSES = ['scheduled', 'completed', 'skipped', 'invoiced'] as const
+export const VISIT_STATUSES = ['scheduled', 'completed', 'skipped'] as const
 export type VisitStatus = (typeof VISIT_STATUSES)[number]
 
 export const SERVICE_TYPES = [

@@ -42,7 +42,7 @@ export function useHistoryStops(employeeId: string | undefined) {
         .filter((row) => {
           if (!row.visits) return false
           const status = (row.visits as { status: string | null }).status
-          return status === 'completed' || status === 'invoiced'
+          return status === 'completed'
         })
         .slice(0, 30)
         .map((row) => {
