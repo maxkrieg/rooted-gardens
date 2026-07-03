@@ -8,11 +8,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { RouteGroupSheet } from '@/components/management/RouteGroupSheet'
 import { PropertyAssignmentSheet } from '@/components/management/PropertyAssignmentSheet'
 import { deleteRouteGroup, moveRouteGroup } from '@/app/management/route-groups/actions'
-import type { RouteGroup, Property } from '@/types/app'
-
-interface PropertyWithAccount extends Property {
-  accountName: string
-}
+import type { RouteGroup, PropertyWithAccount } from '@/types/app'
 
 interface RouteGroupCardProps {
   routeGroup: RouteGroup
@@ -49,8 +45,6 @@ export function RouteGroupCard({
       // On success, revalidatePath removes this card from the list
     })
   }
-
-  const assignedIds = new Set(assignedProperties.map((p) => p.id))
 
   return (
     <Card className="rounded-2xl border border-border shadow-warm">
@@ -154,7 +148,6 @@ export function RouteGroupCard({
           routeGroupId={routeGroup.id}
           routeGroupName={routeGroup.name}
           allProperties={allProperties}
-          assignedIds={assignedIds}
         />
       </CardContent>
     </Card>

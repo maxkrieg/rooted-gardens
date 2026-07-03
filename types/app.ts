@@ -14,6 +14,16 @@ export type TimeEntry = Tables<'time_entries'>
 export type Photo = Tables<'photos'>
 export type Integration = Tables<'integrations'>
 
+// A property enriched with its account name and current route group — used by
+// the route-groups management page and its Assign Properties sheet.
+export interface PropertyWithAccount extends Property {
+  accountName: string
+  /** The route group this property currently belongs to, if any — null means
+   *  unassigned everywhere. At most one, enforced by
+   *  property_route_groups_property_idx. */
+  currentRouteGroup: { id: string; name: string } | null
+}
+
 // ─── Domain constants ─────────────────────────────────────────────────────────
 
 export const BILLING_TYPES = ['per_visit', 'contract', 'as_needed'] as const

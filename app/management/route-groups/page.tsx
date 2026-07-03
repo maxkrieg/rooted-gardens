@@ -2,12 +2,7 @@ import { Route } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { RouteGroupCard } from '@/components/management/RouteGroupCard'
 import { RouteGroupSheet } from '@/components/management/RouteGroupSheet'
-import type { Property, RouteGroup } from '@/types/app'
-
-// A property enriched with its account name for display
-interface PropertyWithAccount extends Property {
-  accountName: string
-}
+import type { Property, PropertyWithAccount, RouteGroup } from '@/types/app'
 
 /**
  * Route Groups management page.
@@ -50,6 +45,16 @@ export default async function RouteGroupsPage() {
     }
   }
 
+  // Reverse lookup — which route group (if any) each property currently
+  // belongs to, so the Assign Properties sheet can lock properties that are
+  // already assigned elsewhere. Built from data already fetched above.
+  const routeGroupNameById = new Map(routeGroups.map((g) => [g.id, g.name]))
+  const propertyGroupMap = new Map<string, { id: string; name: string }>()
+  for (const row of assignmentsData ?? []) {
+    const name = routeGroupNameById.get(row.route_group_id)
+    if (name) propertyGroupMap.set(row.property_id, { id: row.route_group_id, name })
+  }
+
   // ── 3. All properties with their account name ─────────────────────────
   const { data: propertiesData } = await supabase
     .from('properties')
@@ -63,6 +68,7 @@ export default async function RouteGroupsPage() {
     return {
       ...(property as Property),
       accountName: accountData?.name ?? '—',
+      currentRouteGroup: propertyGroupMap.get(property.id) ?? null,
     }
   })
 
@@ -81,7 +87,7 @@ export default async function RouteGroupsPage() {
 
       <p className="text-sm text-muted-foreground -mt-2">
         Geographic clusters that organize properties into daily crew routes.
-        Each property can belong to multiple groups.
+        Each property belongs to one route group at a time.
       </p>
 
       {/* Route group cards */}

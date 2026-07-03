@@ -137,23 +137,79 @@ export async function deleteRouteGroup(id: string): Promise<{ error?: string }> 
 
 /**
  * Assign a property to a route group.
- * Idempotent — uses upsert with onConflict on the composite PK
- * so re-assigning an already-assigned property is a no-op.
+ * A property belongs to at most one route group (property_route_groups_property_idx).
+ * The Assign Properties sheet already disables assignment for properties in
+ * another group, so this pre-check is defense-in-depth for races (stale tab,
+ * concurrent edit) — it returns a clear error instead of a raw Postgres
+ * unique-violation, and onConflict targets the new unique index (not the old
+ * composite PK) so a same-property upsert never throws.
  */
 export async function assignProperty(
   propertyId: string,
   routeGroupId: string,
 ): Promise<{ error?: string }> {
   const supabase = await createClient()
+
+  const { data: existing } = await supabase
+    .from('property_route_groups')
+    .select('route_group_id')
+    .eq('property_id', propertyId)
+    .maybeSingle()
+
+  if (existing && existing.route_group_id !== routeGroupId) {
+    return { error: 'This property is already assigned to another route group.' }
+  }
+
   const { error } = await supabase
     .from('property_route_groups')
     .upsert(
       { property_id: propertyId, route_group_id: routeGroupId, sort_order: 0 },
-      { onConflict: 'property_id,route_group_id', ignoreDuplicates: true },
+      { onConflict: 'property_id', ignoreDuplicates: true },
     )
 
   if (error) {
     console.error('[assignProperty]', error)
+    return { error: error.message }
+  }
+
+  revalidate()
+  return {}
+}
+
+/**
+ * Assign multiple properties to a route group in one call — used by the
+ * account-level bulk toggle in the Assign Properties sheet. Same
+ * defense-in-depth pre-check as assignProperty, batched.
+ */
+export async function assignProperties(
+  propertyIds: string[],
+  routeGroupId: string,
+): Promise<{ error?: string }> {
+  if (propertyIds.length === 0) return {}
+
+  const supabase = await createClient()
+
+  const { data: existingRows } = await supabase
+    .from('property_route_groups')
+    .select('property_id, route_group_id')
+    .in('property_id', propertyIds)
+
+  const blocked = (existingRows ?? []).filter((r) => r.route_group_id !== routeGroupId)
+  if (blocked.length > 0) {
+    return {
+      error: `${blocked.length} propert${blocked.length === 1 ? 'y is' : 'ies are'} already assigned to another route group.`,
+    }
+  }
+
+  const { error } = await supabase
+    .from('property_route_groups')
+    .upsert(
+      propertyIds.map((id) => ({ property_id: id, route_group_id: routeGroupId, sort_order: 0 })),
+      { onConflict: 'property_id', ignoreDuplicates: true },
+    )
+
+  if (error) {
+    console.error('[assignProperties]', error)
     return { error: error.message }
   }
 
@@ -177,6 +233,32 @@ export async function unassignProperty(
 
   if (error) {
     console.error('[unassignProperty]', error)
+    return { error: error.message }
+  }
+
+  revalidate()
+  return {}
+}
+
+/**
+ * Remove multiple properties from a route group in one call — the unassign
+ * counterpart to assignProperties for the account-level bulk toggle.
+ */
+export async function unassignProperties(
+  propertyIds: string[],
+  routeGroupId: string,
+): Promise<{ error?: string }> {
+  if (propertyIds.length === 0) return {}
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('property_route_groups')
+    .delete()
+    .in('property_id', propertyIds)
+    .eq('route_group_id', routeGroupId)
+
+  if (error) {
+    console.error('[unassignProperties]', error)
     return { error: error.message }
   }
 
