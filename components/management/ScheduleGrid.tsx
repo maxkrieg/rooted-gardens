@@ -360,7 +360,12 @@ function ScheduleCell({
         </div>
       ) : (
         <>
-          <span className="text-xs font-medium capitalize leading-tight">{visit.status}</span>
+          <div className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />
+            <span className="text-[11px] font-semibold uppercase tracking-wider leading-tight">
+              {visit.status}
+            </span>
+          </div>
           {visit.status === 'completed' && visit.ended_at && (
             <span className="text-[11px] opacity-80 tabular-nums">
               {format(parseISO(visit.ended_at), 'MMM d')}
