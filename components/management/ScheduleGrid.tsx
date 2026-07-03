@@ -4,17 +4,17 @@ import { useEffect, useMemo, useState, useTransition } from 'react'
 import { format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { getWeekStart } from '@/lib/utils/schedule'
+import { getWeekStart, groupRowsByAccount } from '@/lib/utils/schedule'
+import { formatAccountPrice } from '@/lib/utils/accounts'
 import { createVisit } from '@/app/management/schedule/actions'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
 import { useVisitTimings } from '@/components/management/SessionsProvider'
 import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { FilePen } from 'lucide-react'
-import { FrequencyBadge } from '@/components/management/badges'
+import { FrequencyBadge, BillingTypeBadge } from '@/components/management/badges'
 import type {
   Employee,
   EmployeeRole,
@@ -170,58 +170,64 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role }: Sche
                     </div>
                   </td>
                 </tr>,
-                ...rows.map((row) => (
-                  <tr
-                    key={`${routeGroup.id}-${row.property.id}`}
-                    className="group border-b border-border/50 hover:bg-accent/20 transition-colors"
-                  >
-                    <td className="sticky left-0 bg-card z-10 border-r border-border border-l-2 border-l-primary/25 px-4 py-3 min-w-[220px]">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-foreground text-sm leading-tight truncate max-w-[140px]">
-                          {row.property.address}
+                ...groupRowsByAccount(rows).flatMap(({ account, rows: acctRows }) => [
+                  <tr key={`${routeGroup.id}-acct-${account.id}`}>
+                    <td
+                      colSpan={1 + weeks.length}
+                      className="pl-6 pr-4 pt-3 pb-1.5 border-t border-border/70"
+                    >
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-display text-sm text-foreground truncate">
+                          {account.name}
                         </span>
-                        {row.account.billing_type === 'contract' && (
-                          <Badge variant="outline" className="text-[10px] billing-contract border-transparent shrink-0 py-0 h-auto">
-                            CONTRACT
-                          </Badge>
-                        )}
-                        {row.account.billing_type === 'per_visit' && row.account.price_per_visit && (
-                          <span className="text-[10px] text-transparent group-hover:text-muted-foreground transition-colors shrink-0">
-                            ${row.account.price_per_visit}/visit
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-0.5">
-                        <FrequencyBadge frequency={row.property.frequency} />
+                        <span className="text-xs tabular-nums text-muted-foreground shrink-0">
+                          {formatAccountPrice(account)}
+                        </span>
+                        <BillingTypeBadge billingType={account.billing_type} />
                       </div>
                     </td>
-                    {weeks.map((week) => {
-                      const visit = visitMap.get(row.property.id)?.get(week.weekStart) ?? null
-                      const cellKey = `${row.property.id}-${week.weekStart}`
-                      // Merge live realtime overlay with server-fetched visit timing
-                      const overlay = visit ? visitTimings.get(visit.id) : undefined
-                      const effectiveStartedAt =
-                        overlay !== undefined ? overlay.started_at : (visit?.started_at ?? null)
-                      const effectiveEndedAt =
-                        overlay !== undefined ? overlay.ended_at : (visit?.ended_at ?? null)
-                      const inProgress = visit
-                        ? isVisitInProgress({ started_at: effectiveStartedAt, ended_at: effectiveEndedAt })
-                        : false
-                      return (
-                        <td key={week.weekStart} className="px-2 py-2 align-top">
-                          <ScheduleCell
-                            visit={visit}
-                            inProgress={inProgress}
-                            startedAt={effectiveStartedAt}
-                            isCreating={creatingKey === cellKey}
-                            onClick={() => handleCellClick(row, week.weekStart, visit)}
-                            onKeyDown={(e) => handleCellKeyDown(e, row, week.weekStart, visit)}
-                          />
-                        </td>
-                      )
-                    })}
-                  </tr>
-                )),
+                  </tr>,
+                  ...acctRows.map((row) => (
+                    <tr
+                      key={`${routeGroup.id}-${row.property.id}`}
+                      className="group border-b border-border/50 hover:bg-accent/20 transition-colors"
+                    >
+                      <td className="sticky left-0 bg-card z-10 border-r border-border border-l-2 border-l-primary/25 pl-8 pr-4 py-3 min-w-[220px]">
+                        <span className="font-medium text-foreground text-sm leading-tight truncate max-w-[140px] block">
+                          {row.property.address}
+                        </span>
+                        <div className="mt-0.5">
+                          <FrequencyBadge frequency={row.property.frequency} />
+                        </div>
+                      </td>
+                      {weeks.map((week) => {
+                        const visit = visitMap.get(row.property.id)?.get(week.weekStart) ?? null
+                        const cellKey = `${row.property.id}-${week.weekStart}`
+                        // Merge live realtime overlay with server-fetched visit timing
+                        const overlay = visit ? visitTimings.get(visit.id) : undefined
+                        const effectiveStartedAt =
+                          overlay !== undefined ? overlay.started_at : (visit?.started_at ?? null)
+                        const effectiveEndedAt =
+                          overlay !== undefined ? overlay.ended_at : (visit?.ended_at ?? null)
+                        const inProgress = visit
+                          ? isVisitInProgress({ started_at: effectiveStartedAt, ended_at: effectiveEndedAt })
+                          : false
+                        return (
+                          <td key={week.weekStart} className="px-2 py-2 align-top">
+                            <ScheduleCell
+                              visit={visit}
+                              inProgress={inProgress}
+                              startedAt={effectiveStartedAt}
+                              isCreating={creatingKey === cellKey}
+                              onClick={() => handleCellClick(row, week.weekStart, visit)}
+                              onKeyDown={(e) => handleCellKeyDown(e, row, week.weekStart, visit)}
+                            />
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  )),
+                ]),
               ])}
             </tbody>
           </table>

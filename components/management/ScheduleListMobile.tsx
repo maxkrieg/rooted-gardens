@@ -10,9 +10,10 @@ import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
 import { useVisitTimings } from '@/components/management/SessionsProvider'
 import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
+import { groupRowsByAccount } from '@/lib/utils/schedule'
+import { formatAccountPrice } from '@/lib/utils/accounts'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { VisitStatusBadge, FrequencyBadge } from '@/components/management/badges'
+import { VisitStatusBadge, FrequencyBadge, BillingTypeBadge } from '@/components/management/badges'
 import type {
   Employee,
   EmployeeRole,
@@ -112,110 +113,123 @@ export function ScheduleListMobile({ weeks, employees, vehicles, canEdit, role }
               )}
             </div>
 
-            {/* Properties */}
-            <div className="divide-y divide-border/50">
-              {rows.map((row) => {
-                const cellKey = `${row.property.id}-${week.weekStart}`
-                const isCreating = creatingKey === cellKey
-                // Merge live realtime overlay with server-fetched visit timing
-                const overlay = row.visit ? visitTimings.get(row.visit.id) : undefined
-                const effectiveStartedAt =
-                  overlay !== undefined ? overlay.started_at : (row.visit?.started_at ?? null)
-                const effectiveEndedAt =
-                  overlay !== undefined ? overlay.ended_at : (row.visit?.ended_at ?? null)
-                const inProgress = row.visit
-                  ? isVisitInProgress({ started_at: effectiveStartedAt, ended_at: effectiveEndedAt })
-                  : false
-                const assigned = row.visit
-                  ? row.visit.visit_crew
-                      .filter((vc) => vc.relation === 'assigned' && vc.employee)
-                      .map((vc) => vc.employee!)
-                  : []
-                const displayedCrew = assigned.slice(0, 2)
-                const overflow = assigned.length - 2
-
-                return (
-                  <button
-                    key={row.property.id}
-                    type="button"
-                    disabled={isCreating}
-                    onClick={() => handleRowClick(row, row.visit)}
+            {/* Properties, nested by account */}
+            <div>
+              {groupRowsByAccount(rows).map(({ account, rows: acctRows }, acctIdx) => (
+                <div key={account.id}>
+                  {/* Account header — subordinate to the route-group header above:
+                      a thin rule (no fill) with the account name in Fraunces, breaking
+                      from the route header's all-caps sans, plus the billing rate. */}
+                  <div
                     className={cn(
-                      'w-full text-left px-4 py-3 min-h-[56px]',
-                      'flex items-center justify-between gap-3',
-                      'border-l-2 border-l-primary/25',
-                      'hover:bg-accent/20 active:bg-accent/30 transition-colors',
-                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
-                      isCreating && 'opacity-50 cursor-wait',
+                      'flex items-baseline gap-2 px-5 pt-2.5 pb-1.5',
+                      acctIdx > 0 && 'border-t border-border/60',
                     )}
                   >
-                    {/* Left: address + contract badge + frequency */}
-                    <div className="flex flex-col gap-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-foreground leading-tight truncate">
-                          {row.property.address}
-                        </span>
-                        {row.account.billing_type === 'contract' && (
-                          <Badge
-                            variant="outline"
-                            className="text-[10px] billing-contract border-transparent shrink-0 py-0 h-auto"
-                          >
-                            CONTRACT
-                          </Badge>
-                        )}
-                      </div>
-                      <FrequencyBadge frequency={row.property.frequency} />
-                    </div>
+                    <span className="font-display text-sm text-foreground truncate min-w-0">
+                      {account.name}
+                    </span>
+                    <span className="text-xs tabular-nums text-muted-foreground shrink-0">
+                      {formatAccountPrice(account)}
+                    </span>
+                    <BillingTypeBadge billingType={account.billing_type} />
+                  </div>
 
-                    {/* Right: on-site indicator or crew + status */}
-                    <div className="flex items-center gap-2 shrink-0">
-                      {inProgress && effectiveStartedAt ? (
-                        <div className="flex items-center gap-1.5 rounded-full bg-[var(--clay)]/10 border border-[var(--clay)]/30 px-2.5 py-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--clay)] animate-pulse shrink-0" />
-                          <span className="text-[11px] font-semibold text-[var(--clay)]">
-                            On site
+                  {acctRows.map((row, rowIdx) => {
+                    const cellKey = `${row.property.id}-${week.weekStart}`
+                    const isCreating = creatingKey === cellKey
+                    // Merge live realtime overlay with server-fetched visit timing
+                    const overlay = row.visit ? visitTimings.get(row.visit.id) : undefined
+                    const effectiveStartedAt =
+                      overlay !== undefined ? overlay.started_at : (row.visit?.started_at ?? null)
+                    const effectiveEndedAt =
+                      overlay !== undefined ? overlay.ended_at : (row.visit?.ended_at ?? null)
+                    const inProgress = row.visit
+                      ? isVisitInProgress({ started_at: effectiveStartedAt, ended_at: effectiveEndedAt })
+                      : false
+                    const assigned = row.visit
+                      ? row.visit.visit_crew
+                          .filter((vc) => vc.relation === 'assigned' && vc.employee)
+                          .map((vc) => vc.employee!)
+                      : []
+                    const displayedCrew = assigned.slice(0, 2)
+                    const overflow = assigned.length - 2
+
+                    return (
+                      <button
+                        key={row.property.id}
+                        type="button"
+                        disabled={isCreating}
+                        onClick={() => handleRowClick(row, row.visit)}
+                        className={cn(
+                          'w-full text-left pl-7 pr-4 py-3 min-h-[56px]',
+                          'flex items-center justify-between gap-3',
+                          'border-l-2 border-l-primary/25',
+                          rowIdx > 0 && 'border-t border-border/50',
+                          'hover:bg-accent/20 active:bg-accent/30 transition-colors',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+                          isCreating && 'opacity-50 cursor-wait',
+                        )}
+                      >
+                        {/* Left: address + frequency */}
+                        <div className="flex flex-col gap-1 min-w-0">
+                          <span className="text-sm font-medium text-foreground leading-tight truncate">
+                            {row.property.address}
                           </span>
-                          <span className="text-[11px] text-[var(--clay)]/70 tabular-nums">
-                            {formatElapsed(effectiveStartedAt)}
-                          </span>
+                          <FrequencyBadge frequency={row.property.frequency} />
                         </div>
-                      ) : (
-                        <>
-                          {displayedCrew.length > 0 && (
-                            <div className="flex gap-0.5">
-                              {displayedCrew.map((emp) => (
-                                <span
-                                  key={emp.id}
-                                  className="text-[10px] bg-muted/60 rounded px-1 leading-5"
-                                >
-                                  {emp.name.split(' ')[0]}
-                                </span>
-                              ))}
-                              {overflow > 0 && (
-                                <span className="text-[10px] text-muted-foreground leading-5">
-                                  +{overflow}
+
+                        {/* Right: on-site indicator or crew + status */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {inProgress && effectiveStartedAt ? (
+                            <div className="flex items-center gap-1.5 rounded-full bg-[var(--clay)]/10 border border-[var(--clay)]/30 px-2.5 py-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-[var(--clay)] animate-pulse shrink-0" />
+                              <span className="text-[11px] font-semibold text-[var(--clay)]">
+                                On site
+                              </span>
+                              <span className="text-[11px] text-[var(--clay)]/70 tabular-nums">
+                                {formatElapsed(effectiveStartedAt)}
+                              </span>
+                            </div>
+                          ) : (
+                            <>
+                              {displayedCrew.length > 0 && (
+                                <div className="flex gap-0.5">
+                                  {displayedCrew.map((emp) => (
+                                    <span
+                                      key={emp.id}
+                                      className="text-[10px] bg-muted/60 rounded px-1 leading-5"
+                                    >
+                                      {emp.name.split(' ')[0]}
+                                    </span>
+                                  ))}
+                                  {overflow > 0 && (
+                                    <span className="text-[10px] text-muted-foreground leading-5">
+                                      +{overflow}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              {row.visit?.crew_instruction && (
+                                <FilePen className="w-4 h-4 text-[var(--clay)] shrink-0" />
+                              )}
+
+                              {row.visit ? (
+                                <VisitStatusBadge status={row.visit.status} />
+                              ) : (
+                                <span className="text-xs text-muted-foreground/50">
+                                  {isCreating ? '…' : '+ Schedule'}
                                 </span>
                               )}
-                            </div>
+                            </>
                           )}
-
-                          {row.visit?.crew_instruction && (
-                            <FilePen className="w-4 h-4 text-[var(--clay)] shrink-0" />
-                          )}
-
-                          {row.visit ? (
-                            <VisitStatusBadge status={row.visit.status} />
-                          ) : (
-                            <span className="text-xs text-muted-foreground/50">
-                              {isCreating ? '…' : '+ Schedule'}
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </button>
-                )
-              })}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              ))}
             </div>
           </div>
         ))}

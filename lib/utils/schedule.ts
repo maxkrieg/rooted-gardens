@@ -73,3 +73,30 @@ export function buildScheduleWeek(
 
   return { weekStart, routeGroups: scheduleRouteGroups }
 }
+
+/**
+ * Clusters a route group's rows by account, preserving each account's first-
+ * occurrence order (rows arrive pre-sorted by sort_order, so this naturally
+ * keeps the route's drive order). Presentation-only — does not reshape
+ * ScheduleWeek, so it doesn't touch buildScheduleWeek's crew-shared output.
+ * An account whose properties span multiple route groups will legitimately
+ * appear once per route group when this is applied per-group.
+ */
+export function groupRowsByAccount(
+  rows: SchedulePropertyRow[]
+): Array<{ account: SchedulePropertyRow['account']; rows: SchedulePropertyRow[] }> {
+  const groups: Array<{ account: SchedulePropertyRow['account']; rows: SchedulePropertyRow[] }> = []
+  const indexByAccountId = new Map<string, number>()
+
+  for (const row of rows) {
+    let idx = indexByAccountId.get(row.account.id)
+    if (idx === undefined) {
+      idx = groups.length
+      indexByAccountId.set(row.account.id, idx)
+      groups.push({ account: row.account, rows: [] })
+    }
+    groups[idx].rows.push(row)
+  }
+
+  return groups
+}
