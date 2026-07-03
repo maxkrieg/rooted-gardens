@@ -2,7 +2,6 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { visitUpdateSchema, type VisitUpdateValues } from '@/lib/validators/visit'
 import { buildScheduleWeek, type ScheduleAssignment } from '@/lib/utils/schedule'
 import type { RouteGroup, ScheduleWeek, VisitWithCrew } from '@/types/app'
 
@@ -126,111 +125,4 @@ export async function bulkAssignRoute(
 
   revalidatePath('/management/schedule')
   return { count: visitIds.length }
-}
-
-export async function saveVisitChanges(
-  visitId: string,
-  values: VisitUpdateValues,
-): Promise<{ error?: string }> {
-  const parsed = visitUpdateSchema.safeParse(values)
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? 'Invalid data' }
-  }
-
-  const supabase = await createClient()
-
-  const [updateResult, crewDeleteResult] = await Promise.all([
-    supabase
-      .from('visits')
-      .update({
-        status: parsed.data.status,
-        crew_instruction: parsed.data.crew_instruction ?? null,
-        vehicle_id: parsed.data.vehicle_id ?? null,
-        // clear skip_reason when moving away from skipped
-        ...(parsed.data.status !== 'skipped' && { skip_reason: null }),
-      })
-      .eq('id', visitId),
-    supabase
-      .from('visit_crew')
-      .delete()
-      .eq('visit_id', visitId)
-      .eq('relation', 'assigned'),
-  ])
-
-  if (updateResult.error) {
-    console.error('[saveVisitChanges:update]', updateResult.error)
-    return { error: updateResult.error.message }
-  }
-  if (crewDeleteResult.error) {
-    console.error('[saveVisitChanges:delete crew]', crewDeleteResult.error)
-    return { error: crewDeleteResult.error.message }
-  }
-
-  if (parsed.data.assigned_crew_ids.length > 0) {
-    const { error: insertError } = await supabase.from('visit_crew').insert(
-      parsed.data.assigned_crew_ids.map((empId) => ({
-        visit_id: visitId,
-        employee_id: empId,
-        relation: 'assigned' as const,
-      }))
-    )
-    if (insertError) {
-      console.error('[saveVisitChanges:insert crew]', insertError)
-      return { error: insertError.message }
-    }
-  }
-
-  revalidatePath('/management/schedule')
-  return {}
-}
-
-export async function skipVisit(visitId: string, reason?: string): Promise<{ error?: string }> {
-  const supabase = await createClient()
-  const { error } = await supabase
-    .from('visits')
-    .update({ status: 'skipped', skip_reason: reason ?? null })
-    .eq('id', visitId)
-  if (error) {
-    console.error('[skipVisit]', error)
-    return { error: error.message }
-  }
-  revalidatePath('/management/schedule')
-  return {}
-}
-
-export async function unskipVisit(visitId: string): Promise<{ error?: string }> {
-  const supabase = await createClient()
-  const { error } = await supabase
-    .from('visits')
-    .update({ status: 'scheduled', skip_reason: null })
-    .eq('id', visitId)
-  if (error) {
-    console.error('[unskipVisit]', error)
-    return { error: error.message }
-  }
-  revalidatePath('/management/schedule')
-  return {}
-}
-
-/**
- * Toggle the invoiced flag on a completed visit. Billing state is derived from
- * `invoiced_at` (nullable), never a `visits.status` value — same convention as
- * the in-progress derived state. Stands in for the real QuickBooks push (task
- * 5.x, not yet built).
- */
-export async function setVisitInvoiced(
-  visitId: string,
-  invoiced: boolean,
-): Promise<{ error?: string }> {
-  const supabase = await createClient()
-  const { error } = await supabase
-    .from('visits')
-    .update({ invoiced_at: invoiced ? new Date().toISOString() : null })
-    .eq('id', visitId)
-  if (error) {
-    console.error('[setVisitInvoiced]', error)
-    return { error: error.message }
-  }
-  revalidatePath('/management/schedule')
-  return {}
 }

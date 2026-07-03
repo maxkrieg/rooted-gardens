@@ -117,6 +117,14 @@ export type VisitWithDetails = Visit & {
   vehicle: Vehicle | null
 }
 
+/**
+ * Visit with crew and a (possibly missing) property — used by account-scoped
+ * visit history views, e.g. the account detail page's Recent visits list.
+ */
+export type RecentVisit = VisitWithCrew & {
+  property: Property | null
+}
+
 /** Route group with its assigned properties (via property_route_groups). */
 export type RouteGroupWithProperties = RouteGroup & {
   properties: Property[]

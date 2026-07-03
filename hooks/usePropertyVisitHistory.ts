@@ -31,7 +31,9 @@ const PAGE_SIZE = 5
  * visit's week — not just by excluding its id — so a visit being viewed ahead of
  * schedule never shows other future-scheduled visits at the same property as
  * "history." Because visits has a UNIQUE(property_id, week_start) index, ordering
- * by week_start alone is deterministic (no duplicate-week ties to break).
+ * by week_start alone is deterministic (no duplicate-week ties to break). Only
+ * completed/skipped visits count as history — scheduled ones (e.g. a property
+ * whose next visit already exists but hasn't happened) aren't real history yet.
  */
 export function usePropertyVisitHistory(
   propertyId: string | undefined,
@@ -49,6 +51,7 @@ export function usePropertyVisitHistory(
           { count: 'exact' }
         )
         .eq('property_id', propertyId!)
+        .in('status', ['completed', 'skipped'])
         .lt('week_start', beforeWeekStart!)
         .order('week_start', { ascending: false })
         .range(0, PAGE_SIZE - 1)

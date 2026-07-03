@@ -8,6 +8,7 @@ import { ScheduleGrid } from '@/components/management/ScheduleGrid'
 import { ScheduleListMobile } from '@/components/management/ScheduleListMobile'
 import { ScheduleNav } from '@/components/management/ScheduleNav'
 import { SessionsProvider } from '@/components/management/SessionsProvider'
+import type { EmployeeRole } from '@/types/app'
 
 export default async function SchedulePage({
   searchParams,
@@ -52,6 +53,7 @@ export default async function SchedulePage({
             employees={employees}
             vehicles={vehicles}
             canEdit={canEdit}
+            role={role as EmployeeRole}
           />
         </div>
         <div className="lg:hidden">
@@ -60,6 +62,7 @@ export default async function SchedulePage({
             employees={employees}
             vehicles={vehicles}
             canEdit={canEdit}
+            role={role as EmployeeRole}
           />
         </div>
       </SessionsProvider>

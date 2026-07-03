@@ -3,20 +3,16 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, MapPin, Map, ChevronDown, KeyRound, ClipboardList, Car, Users, User, Play, Flag, SkipForward, Check } from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
+import { ArrowLeft, Play, Flag, SkipForward, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { FrequencyBadge, VisitStatusBadge } from '@/components/management/badges'
-import { PropertyVisitHistory } from '@/components/PropertyVisitHistory'
+import { VisitDetailContent } from '@/components/VisitDetailContent'
 import { useStopDetail } from '@/hooks/crew/useStopDetail'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { VisitLogger } from '@/components/crew/VisitLogger'
 import { SkipSheet } from '@/components/crew/SkipSheet'
-import { CrewAssignSheet } from '@/components/crew/CrewAssignSheet'
-import { CompletionSummary } from '@/components/crew/CompletionSummary'
 import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
 import { enqueueMutation, flushMutationQueue } from '@/lib/crew/mutation-queue'
-import { createClient } from '@/lib/supabase/client'
+import type { EmployeeRole } from '@/types/app'
 
 function SkeletonBlock({ className }: { className?: string }) {
   return <div className={`rounded-lg bg-muted animate-pulse ${className}`} />
@@ -46,10 +42,8 @@ export default function StopDetailPage() {
   const queryClient = useQueryClient()
   const { data: stop, isLoading } = useStopDetail(visitId)
   const { data: employee } = useCurrentEmployee()
-  const [notesOpen, setNotesOpen] = useState(false)
   const [completionOpen, setCompletionOpen] = useState(false)
   const [skipOpen, setSkipOpen] = useState(false)
-  const [assignOpen, setAssignOpen] = useState(false)
 
   // Optimistic start so the Start cell flips to a running timer immediately, before
   // the queued visit update syncs. Real data (visit.started_at) takes over once present.
@@ -61,24 +55,6 @@ export default function StopDetailPage() {
     const id = setInterval(() => setTick((t) => t + 1), 30_000)
     return () => clearInterval(id)
   }, [])
-
-  const photoStoragePaths = stop?.photos.map((p) => p.storage_path) ?? []
-  const { data: signedPhotoUrls } = useQuery({
-    queryKey: ['photo-urls', photoStoragePaths],
-    queryFn: async () => {
-      const supabase = createClient()
-      return Promise.all(
-        photoStoragePaths.map((path) =>
-          supabase.storage
-            .from('photos')
-            .createSignedUrl(path, 3600)
-            .then((r) => r.data?.signedUrl ?? null)
-        )
-      )
-    },
-    enabled: photoStoragePaths.length > 0,
-    staleTime: 50 * 60 * 1000, // 50 min — well under the 1-hr signed URL expiry
-  })
 
   // On-site timing now lives on the visit row. Prefer real data; fall back to the
   // optimistic start until the queued update syncs back.
@@ -96,8 +72,7 @@ export default function StopDetailPage() {
     )
   }
 
-  const { visit, property, account } = stop
-  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(property.address)}`
+  const { visit, account } = stop
   const isActive = visit.status !== 'completed' && visit.status !== 'skipped'
 
   async function handleStart() {
@@ -109,8 +84,6 @@ export default function StopDetailPage() {
     queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
     queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
   }
-
-  const hasPropertyNotes = !!(property.access_notes || property.crew_notes || property.parking_notes)
 
   return (
     <>
@@ -133,199 +106,14 @@ export default function StopDetailPage() {
         </span>
       </div>
 
-      {/* Crew instruction banner */}
-      {visit.crew_instruction && (
-        <div className="flex items-start gap-3 px-4 py-3 bg-[#FBF0D6] border-b border-[--border]">
-          <span className="w-1 shrink-0 self-stretch rounded-full mt-0.5" style={{ backgroundColor: 'var(--clay)' }} />
-          <p className="font-display text-base font-semibold text-[--bark] leading-snug">
-            {visit.crew_instruction}
-          </p>
-        </div>
-      )}
-
       {/* Scrollable body — bottom padding clears the sticky action bar + bottom nav */}
-      <div className="p-4 space-y-5 pb-52">
-
-        {/* Address */}
-        <div className="space-y-1.5">
-          <div className="flex items-start gap-2">
-            <MapPin className="h-5 w-5 mt-1 text-muted-foreground shrink-0" />
-            <p className="font-display text-2xl font-semibold leading-snug text-foreground">
-              {property.address}
-            </p>
-          </div>
-          <a
-            href={mapsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="ml-7 inline-flex items-center gap-1.5 text-sm font-medium text-[--primary] hover:underline"
-          >
-            <Map className="h-3.5 w-3.5 shrink-0" />
-            Open in Maps →
-          </a>
-          {account.contact_name && (
-            <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-muted-foreground shrink-0" />
-              <p className="text-sm text-muted-foreground">{account.contact_name}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Status row */}
-        <div className="flex items-center gap-3">
-          <VisitStatusBadge status={visit.status} />
-          {inProgress && visitStartedAt && (
-            <div className="flex items-center gap-1.5" style={{ color: 'var(--clay)' }}>
-              <span className="relative flex h-2 w-2 shrink-0">
-                <span
-                  className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
-                  style={{ backgroundColor: 'var(--clay)' }}
-                />
-                <span
-                  className="relative inline-flex rounded-full h-2 w-2"
-                  style={{ backgroundColor: 'var(--clay)' }}
-                />
-              </span>
-              <span className="text-xs font-semibold uppercase tracking-wide">
-                On site · {formatElapsed(visitStartedAt)}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Completion summary — shown when the visit is done */}
-        {(visit.status === 'completed' || visit.status === 'skipped') && (
-          <CompletionSummary
-            visit={visit}
-            completedBy={stop.completedBy ?? []}
-            assignedCrew={stop.assignedCrew}
-            onEdit={() => setCompletionOpen(true)}
-            onEditSkip={() => setSkipOpen(true)}
-          />
-        )}
-
-        {/* Frequency */}
-        <div className="flex items-center gap-2">
-          <FrequencyBadge frequency={property.frequency} />
-        </div>
-
-        {/* Assigned crew — viewable + editable by any crew member */}
-        <div className="rounded-2xl border border-[--border] bg-card overflow-hidden shadow-[0_1px_2px_rgba(43,42,36,.04),_0_6px_16px_-4px_rgba(43,42,36,.08)]">
-          <div className="flex items-center justify-between px-4 py-3.5">
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="text-sm font-semibold text-foreground">Assigned Crew</span>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9"
-              onClick={() => setAssignOpen(true)}
-            >
-              Manage
-            </Button>
-          </div>
-          <div className="border-t border-[--border] px-4 py-3">
-            {stop.assignedCrew.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {stop.assignedCrew.map((c) => (
-                  <span
-                    key={c.employee_id}
-                    className="inline-flex items-center rounded-full bg-accent px-3 py-1 text-sm text-accent-foreground"
-                  >
-                    {c.name}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground italic">No crew assigned yet.</p>
-            )}
-          </div>
-        </div>
-
-        {/* Property notes — collapsible */}
-        {hasPropertyNotes && (
-          <div className="rounded-2xl border border-[--border] bg-card overflow-hidden shadow-[0_1px_2px_rgba(43,42,36,.04),_0_6px_16px_-4px_rgba(43,42,36,.08)]">
-            <button
-              type="button"
-              onClick={() => setNotesOpen((prev) => !prev)}
-              className="w-full flex items-center justify-between px-4 py-3.5 text-left"
-              aria-expanded={notesOpen}
-            >
-              <span className="text-sm font-semibold text-foreground">Property Notes</span>
-              <ChevronDown
-                className="h-4 w-4 text-muted-foreground transition-transform duration-200"
-                style={{ transform: notesOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
-              />
-            </button>
-
-            {notesOpen && (
-              <div className="border-t border-[--border] px-4 pb-4 space-y-3.5 pt-3.5">
-                {property.access_notes && (
-                  <div className="flex items-start gap-3">
-                    <KeyRound className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
-                    <div>
-                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">
-                        Access
-                      </p>
-                      <p className="text-sm text-foreground leading-relaxed">{property.access_notes}</p>
-                    </div>
-                  </div>
-                )}
-                {property.crew_notes && (
-                  <div className="flex items-start gap-3">
-                    <ClipboardList className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
-                    <div>
-                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">
-                        Crew Notes
-                      </p>
-                      <p className="text-sm text-foreground leading-relaxed">{property.crew_notes}</p>
-                    </div>
-                  </div>
-                )}
-                {property.parking_notes && (
-                  <div className="flex items-start gap-3">
-                    <Car className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
-                    <div>
-                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">
-                        Parking
-                      </p>
-                      <p className="text-sm text-foreground leading-relaxed">{property.parking_notes}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        <PropertyVisitHistory propertyId={property.id} beforeWeekStart={visit.week_start} />
-
-        {/* Photos (completed visits) */}
-        {stop.photos.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide px-1">
-              Photos
-            </p>
-            <div className="flex gap-2 flex-wrap">
-              {stop.photos.map((photo, i) => {
-                const url = signedPhotoUrls?.[i]
-                return url ? (
-                  <a key={photo.id} href={url} target="_blank" rel="noopener noreferrer">
-                    <img
-                      src={url}
-                      alt={photo.caption ?? `Visit photo ${i + 1}`}
-                      className="h-20 w-20 rounded-xl object-cover border border-[--border]"
-                    />
-                  </a>
-                ) : (
-                  <div key={photo.id} className="h-20 w-20 rounded-xl bg-muted animate-pulse" />
-                )
-              })}
-            </div>
-          </div>
-        )}
-
+      <div className="p-4 pb-52">
+        <VisitDetailContent
+          data={stop}
+          role={employee?.role as EmployeeRole | undefined}
+          onOpenCompletion={() => setCompletionOpen(true)}
+          onOpenSkip={() => setSkipOpen(true)}
+        />
       </div>
 
       {/* Fixed action bar — three inline icon+label actions above the bottom nav */}
@@ -419,13 +207,6 @@ export default function StopDetailPage() {
         open={skipOpen}
         onOpenChange={setSkipOpen}
         onSuccess={() => router.push('/crew/schedule')}
-      />
-
-      <CrewAssignSheet
-        visitId={visitId}
-        assignedCrew={stop.assignedCrew ?? []}
-        open={assignOpen}
-        onOpenChange={setAssignOpen}
       />
     </>
   )

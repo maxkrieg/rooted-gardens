@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { VisitStatusBadge, FrequencyBadge } from '@/components/management/badges'
 import type {
   Employee,
+  EmployeeRole,
   RouteGroup,
   ScheduleWeek,
   SchedulePropertyRow,
@@ -27,9 +28,10 @@ interface ScheduleListMobileProps {
   employees: Employee[]
   vehicles: Vehicle[]
   canEdit: boolean
+  role: EmployeeRole | undefined
 }
 
-export function ScheduleListMobile({ weeks, employees, vehicles, canEdit }: ScheduleListMobileProps) {
+export function ScheduleListMobile({ weeks, employees, vehicles, canEdit, role }: ScheduleListMobileProps) {
   const week = weeks[0]
   const visitTimings = useVisitTimings()
 
@@ -225,9 +227,7 @@ export function ScheduleListMobile({ weeks, employees, vehicles, canEdit }: Sche
           onOpenChange={setSheetOpen}
           row={sheetRow}
           weekStart={sheetWeek}
-          employees={employees}
-          vehicles={vehicles}
-          canEdit={canEdit}
+          role={role}
         />
       )}
 

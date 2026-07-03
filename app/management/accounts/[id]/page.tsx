@@ -1,9 +1,8 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { format, parseISO } from 'date-fns'
+import { cookies } from 'next/headers'
 import {
   ArrowLeft,
-  Building2,
   CheckCircle2,
   Link2,
   Link2Off,
@@ -11,20 +10,18 @@ import {
   Phone,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import {
   AccountStatusBadge,
   BillingTypeBadge,
-  VisitStatusBadge,
 } from '@/components/management/badges'
 import { EditAccountSheet } from '@/components/management/EditAccountSheet'
 import { PropertySheet } from '@/components/management/PropertySheet'
 import { FrequencyBadge } from '@/components/management/badges'
+import { RecentVisitsList } from '@/components/management/RecentVisitsList'
 import { createClient } from '@/lib/supabase/server'
 import { formatAccountPrice } from '@/lib/utils/accounts'
-import type { AccountWithDetails, Visit } from '@/types/app'
-
-type VisitWithPropertyAddress = Visit & { property: { address: string } | null }
+import { parseRoleCookie } from '@/lib/utils/role-cookie'
+import type { AccountWithDetails, EmployeeRole, RecentVisit } from '@/types/app'
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -36,32 +33,34 @@ export default async function AccountDetailPage({ params }: Props) {
   const { id } = await params
   const supabase = await createClient()
 
-  // ── 1. Account + properties in one query ──────────────────────────────────
-  const { data: accountData, error: accountError } = await supabase
-    .from('accounts')
-    .select('*, properties(*)')
-    .eq('id', id)
-    .single()
+  // ── 1-2. Account + properties, recent visits ──────────────────────────────
+  const [accountResult, visitsResult] = await Promise.all([
+    supabase.from('accounts').select('*, properties(*)').eq('id', id).single(),
+    // Full property + visit_crew(employee) join — needed to open VisitDetailSheet
+    // directly from a row, same shape it already gets from the schedule grid.
+    supabase
+      .from('visits')
+      .select('*, property:properties(*), visit_crew(*, employee:employees(*))')
+      .eq('account_id', id)
+      .eq('status', 'completed')
+      .order('week_start', { ascending: false })
+      .limit(10),
+  ])
 
-  if (accountError || !accountData) {
+  if (accountResult.error || !accountResult.data) {
     notFound()
   }
 
   const account = {
-    ...accountData,
-    properties: [...accountData.properties].sort((a, b) => a.address.localeCompare(b.address)),
+    ...accountResult.data,
+    properties: [...accountResult.data.properties].sort((a, b) => a.address.localeCompare(b.address)),
   } as AccountWithDetails
 
-  // ── 2. Recent visits (last 10) ────────────────────────────────────────────
-  const { data: visitsData } = await supabase
-    .from('visits')
-    .select('*, property:properties(address)')
-    .eq('account_id', id)
-    .eq('status', 'completed')
-    .order('week_start', { ascending: false })
-    .limit(10)
+  const visits = (visitsResult.data ?? []) as RecentVisit[]
 
-  const visits = (visitsData ?? []) as VisitWithPropertyAddress[]
+  // role mirrors app/management/schedule/page.tsx's derivation from the rg-role cookie.
+  const cookieStore = await cookies()
+  const role = parseRoleCookie(cookieStore.get('rg-role')?.value)?.role ?? 'crew'
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -222,55 +221,11 @@ export default async function AccountDetailPage({ params }: Props) {
       {/* ── (3) Recent visits timeline ─────────────────────────────────────── */}
       <section className="pb-8">
         <h2 className="font-display text-lg font-semibold text-foreground mb-3">Recent visits</h2>
-
-        {visits.length === 0 ? (
-          <Card className="rounded-2xl border border-border shadow-warm">
-            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-              <Building2 className="h-8 w-8 text-muted-foreground/40 mb-3" />
-              <p className="text-sm text-muted-foreground">No visits recorded yet.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="rounded-2xl border border-border shadow-warm overflow-hidden">
-            <CardContent className="p-0">
-              <ul className="divide-y divide-border">
-                {visits.map((visit) => (
-                  <li key={visit.id} className="px-4 py-3 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      {/* Property address */}
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {visit.property?.address ?? 'Unknown property'}
-                      </p>
-                      {/* Date */}
-                      <p className="text-xs text-muted-foreground mt-0.5 tabular-nums">
-                        {visit.ended_at
-                          ? format(parseISO(visit.ended_at), 'EEE MMM d, yyyy')
-                          : `Week of ${format(parseISO(visit.week_start), 'EEE MMM d')}`}
-                      </p>
-                      {/* Service types */}
-                      {visit.service_types && visit.service_types.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1.5">
-                          {visit.service_types.map((type) => (
-                            <Badge
-                              key={type}
-                              variant="outline"
-                              className="text-[10px] h-4 px-1.5 border-border text-muted-foreground font-normal"
-                            >
-                              {type.replace(/_/g, ' ')}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="shrink-0 pt-0.5">
-                      <VisitStatusBadge status={visit.status} />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        )}
+        <RecentVisitsList
+          visits={visits}
+          account={account}
+          role={role as EmployeeRole}
+        />
       </section>
     </div>
   )

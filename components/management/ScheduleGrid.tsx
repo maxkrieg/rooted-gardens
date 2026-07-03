@@ -17,6 +17,7 @@ import { FilePen } from 'lucide-react'
 import { FrequencyBadge } from '@/components/management/badges'
 import type {
   Employee,
+  EmployeeRole,
   RouteGroup,
   ScheduleWeek,
   SchedulePropertyRow,
@@ -29,9 +30,10 @@ interface ScheduleGridProps {
   employees: Employee[]
   vehicles: Vehicle[]
   canEdit: boolean
+  role: EmployeeRole | undefined
 }
 
-export function ScheduleGrid({ weeks, employees, vehicles, canEdit }: ScheduleGridProps) {
+export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role }: ScheduleGridProps) {
   const currentWeekStart = useMemo(
     () => format(getWeekStart(new Date()), 'yyyy-MM-dd'),
     []
@@ -232,9 +234,7 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit }: ScheduleGr
           onOpenChange={setSheetOpen}
           row={sheetRow}
           weekStart={sheetWeek}
-          employees={employees}
-          vehicles={vehicles}
-          canEdit={canEdit}
+          role={role}
         />
       )}
 

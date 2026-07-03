@@ -55,10 +55,6 @@ export function CompletionSummary({
       {/* Header */}
       <div className={`flex items-center justify-between px-4 py-3 ${headerBg}`}>
         <div className="flex items-center gap-2.5">
-          <span
-            className="w-[3px] self-stretch rounded-full shrink-0"
-            style={{ backgroundColor: accentColor }}
-          />
           <span className="text-sm font-semibold" style={{ color: accentColor }}>
             {headerLabel}
           </span>
