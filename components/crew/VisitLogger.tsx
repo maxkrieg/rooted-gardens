@@ -79,12 +79,14 @@ export function VisitLogger({
   const [photos, setPhotos] = useState<CapturedPhoto[]>([])
   const [photoError, setPhotoError] = useState<string | null>(null)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
-  // Start-time control: prefilled from the visit's started_at, or manually set if the
-  // crew forgot to tap Start. `manualStart` enables the field when there's no start yet.
+  // Start time — required. Prefilled from the visit's started_at, or defaults to now
+  // if the crew forgot to tap Start; either way they must confirm/set a value.
   const [startTime, setStartTime] = useState('')
-  const [manualStart, setManualStart] = useState(false)
-  // End time — the completion timestamp (= visits.ended_at), prefilled to now.
+  const [startTimeError, setStartTimeError] = useState(false)
+  // End time — the completion timestamp (= visits.ended_at), prefilled to now; required.
   const [endTime, setEndTime] = useState('')
+  const [endTimeError, setEndTimeError] = useState(false)
+  const [presentIdsError, setPresentIdsError] = useState(false)
 
   // Seed state every time the sheet opens, using pre-fill values when editing
   useEffect(() => {
@@ -93,12 +95,10 @@ export function VisitLogger({
       setServiceTypes(initialServiceTypes ?? [])
       setCompletionNote(initialCompletionNote ?? '')
       setEndTime(toDatetimeLocalValue(new Date().toISOString()))
-      if (startedAt) {
-        setStartTime(toDatetimeLocalValue(startedAt))
-      } else {
-        setStartTime(toDatetimeLocalValue(new Date().toISOString()))
-      }
-      setManualStart(false)
+      setStartTime(toDatetimeLocalValue(startedAt ?? new Date().toISOString()))
+      setStartTimeError(false)
+      setEndTimeError(false)
+      setPresentIdsError(false)
     }
   }, [open, assignedCrew, startedAt, initialServiceTypes, initialCompletionNote, initialPresentIds])
 
@@ -120,8 +120,10 @@ export function VisitLogger({
     setSubmitting(false)
     setPresentIds(assignedCrew.map((c) => c.employee_id))
     setStartTime('')
+    setStartTimeError(false)
     setEndTime('')
-    setManualStart(false)
+    setEndTimeError(false)
+    setPresentIdsError(false)
     setPhotos((prev) => {
       prev.forEach((p) => URL.revokeObjectURL(p.localUrl))
       return []
@@ -180,30 +182,34 @@ export function VisitLogger({
   }
 
   async function handleSubmit() {
+    if (!startTime) {
+      setStartTimeError(true)
+      return
+    }
+    if (!endTime) {
+      setEndTimeError(true)
+      return
+    }
+    if (presentIds.length === 0) {
+      setPresentIdsError(true)
+      return
+    }
     if (serviceTypes.length === 0) {
       setServiceTypeError(true)
       return
     }
     setSubmitting(true)
 
-    // At minimum, credit the logger even if they unchecked themselves
-    const presentEmployeeIds = presentIds.length > 0 ? presentIds : [employeeId]
-
     // ended_at is the completion timestamp (and the visit's effective date).
     // started_at is recorded when the job was started, or set retroactively if the
-    // crew entered a start time without tapping Start.
-    const endedAt = endTime ? new Date(endTime).toISOString() : new Date().toISOString()
-    let startedAtISO: string | undefined
-    if (startedAt) {
-      startedAtISO = new Date(startTime).toISOString()
-    } else if (manualStart && startTime) {
-      startedAtISO = new Date(startTime).toISOString()
-    }
+    // crew entered a start time without tapping Start — it's required either way.
+    const endedAt = new Date(endTime).toISOString()
+    const startedAtISO = new Date(startTime).toISOString()
 
     await enqueueMutation('completion', {
       visitId,
       employeeId,
-      presentEmployeeIds,
+      presentEmployeeIds: presentIds,
       serviceTypes,
       completionNote: completionNote.trim() || undefined,
       startedAt: startedAtISO,
@@ -241,7 +247,7 @@ export function VisitLogger({
           completion_note: completionNote.trim() || null,
           skip_reason: null,
           // Set the visit's timing; ended_at clears the "On site" indicator immediately
-          started_at: startedAtISO ?? old.visit.started_at,
+          started_at: startedAtISO,
           ended_at: endedAt,
         },
       }
@@ -263,71 +269,65 @@ export function VisitLogger({
         </SheetHeader>
 
         <div className="px-4 space-y-5 pb-4">
-          {/* Start time — prefilled when the job was started; otherwise optional/manual */}
+          {/* Start time — required; prefilled when the job was started, otherwise
+              defaults to now so the crew can confirm/adjust it. */}
           <div className="space-y-1.5">
-            {startedAt ? (
-              <>
-                <label className="text-sm font-semibold text-foreground" htmlFor="start-time">
-                  Start time
-                </label>
-                <input
-                  id="start-time"
-                  type="datetime-local"
-                  value={startTime}
-                  max={toDatetimeLocalValue(new Date().toISOString())}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  className="h-11 w-full rounded-lg border border-[--border] bg-card px-3 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-[--ring]"
-                />
-              </>
-            ) : (
-              <>
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={manualStart}
-                    onChange={(e) => setManualStart(e.target.checked)}
-                    className="h-4 w-4 accent-[--primary]"
-                  />
-                  <span className="text-sm font-semibold text-foreground">
-                    Forgot to start? Set start time
-                  </span>
-                </label>
-                {manualStart && (
-                  <input
-                    type="datetime-local"
-                    value={startTime}
-                    max={toDatetimeLocalValue(new Date().toISOString())}
-                    onChange={(e) => setStartTime(e.target.value)}
-                    className="h-11 w-full rounded-lg border border-[--border] bg-card px-3 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-[--ring]"
-                  />
-                )}
-              </>
+            <label className="text-sm font-semibold text-foreground" htmlFor="start-time">
+              Start time <span className="text-destructive">*</span>
+            </label>
+            <input
+              id="start-time"
+              type="datetime-local"
+              value={startTime}
+              max={toDatetimeLocalValue(new Date().toISOString())}
+              onChange={(e) => {
+                setStartTime(e.target.value)
+                if (e.target.value) setStartTimeError(false)
+              }}
+              className="h-11 w-full rounded-lg border border-[--border] bg-card px-3 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-[--ring]"
+            />
+            {startTimeError && (
+              <p className="text-xs text-destructive">Start time is required.</p>
             )}
           </div>
 
-          {/* End time — completion timestamp, prefilled to now */}
+          {/* End time — completion timestamp, prefilled to now; required */}
           <div className="space-y-1.5">
             <label className="text-sm font-semibold text-foreground" htmlFor="end-time">
-              End time
+              End time <span className="text-destructive">*</span>
             </label>
             <input
               id="end-time"
               type="datetime-local"
               value={endTime}
               max={toDatetimeLocalValue(new Date().toISOString())}
-              onChange={(e) => setEndTime(e.target.value)}
+              onChange={(e) => {
+                setEndTime(e.target.value)
+                if (e.target.value) setEndTimeError(false)
+              }}
               className="h-11 w-full rounded-lg border border-[--border] bg-card px-3 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-[--ring]"
             />
+            {endTimeError && (
+              <p className="text-xs text-destructive">End time is required.</p>
+            )}
           </div>
 
-          {/* Who was on site — full roster, assigned crew pre-selected */}
+          {/* Who was on site — full roster, assigned crew pre-selected; required */}
           <div className="space-y-1.5">
-            <label className="text-sm font-semibold text-foreground">Who was on site?</label>
+            <label className="text-sm font-semibold text-foreground">
+              Who was on site? <span className="text-destructive">*</span>
+            </label>
             <CrewMultiSelect
               options={crewOptions}
               value={presentIds}
-              onChange={setPresentIds}
+              onChange={(ids) => {
+                setPresentIds(ids)
+                if (ids.length > 0) setPresentIdsError(false)
+              }}
             />
+            {presentIdsError && (
+              <p className="text-xs text-destructive">Select at least one crew member.</p>
+            )}
           </div>
 
           {/* Service types */}
@@ -422,13 +422,22 @@ export function VisitLogger({
           </div>
         </div>
 
-        <SheetFooter className="px-4 pt-2 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] border-t border-[--border] bg-background">
+        <SheetFooter className="flex-row gap-2 px-4 pt-2 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] border-t border-[--border] bg-background">
           <Button
-            className="w-full h-12 text-base font-semibold"
+            type="button"
+            variant="outline"
+            className="flex-1 h-12 text-base font-semibold"
+            onClick={() => handleOpenChange(false)}
+            disabled={submitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            className="flex-1 h-12 text-base font-semibold"
             onClick={handleSubmit}
             disabled={submitting || uploadingPhoto}
           >
-            {submitting ? 'Saving…' : 'Complete Stop'}
+            {submitting ? 'Saving…' : 'Submit'}
           </Button>
         </SheetFooter>
       </SheetContent>
