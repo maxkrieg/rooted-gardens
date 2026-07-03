@@ -10,6 +10,8 @@ interface CompletionSummaryProps {
   visit: StopDetail['visit']
   completedBy: StopDetail['completedBy']
   assignedCrew: StopDetail['assignedCrew']
+  photos: StopDetail['photos']
+  photoUrls: Array<string | null | undefined>
   canEdit?: boolean
   onEdit: () => void
   onEditSkip: () => void
@@ -35,6 +37,8 @@ export function CompletionSummary({
   visit,
   completedBy,
   assignedCrew,
+  photos,
+  photoUrls,
   canEdit = true,
   onEdit,
   onEditSkip,
@@ -145,6 +149,31 @@ export function CompletionSummary({
               <div className="rounded-lg bg-muted px-3 py-2.5 flex gap-2.5">
                 <span className="text-muted-foreground/50 font-display text-lg leading-none select-none mt-0.5">&ldquo;</span>
                 <p className="text-sm text-foreground leading-relaxed">{visit.completion_note}</p>
+              </div>
+            )}
+
+            {/* Photos — taken during completion */}
+            {photos.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                  Photos
+                </p>
+                <div className="flex gap-2 flex-wrap">
+                  {photos.map((photo, i) => {
+                    const url = photoUrls[i]
+                    return url ? (
+                      <a key={photo.id} href={url} target="_blank" rel="noopener noreferrer">
+                        <img
+                          src={url}
+                          alt={photo.caption ?? `Visit photo ${i + 1}`}
+                          className="h-20 w-20 rounded-xl object-cover border border-[--border]"
+                        />
+                      </a>
+                    ) : (
+                      <div key={photo.id} className="h-20 w-20 rounded-xl bg-muted animate-pulse" />
+                    )
+                  })}
+                </div>
               </div>
             )}
 

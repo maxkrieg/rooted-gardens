@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Play, Flag, SkipForward, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -74,6 +75,7 @@ export default function StopDetailPage() {
 
   const { visit, account } = stop
   const isActive = visit.status !== 'completed' && visit.status !== 'skipped'
+  const canManage = employee?.role === 'owner' || employee?.role === 'lead'
 
   async function handleStart() {
     if (!employee?.id || inProgress) return
@@ -101,9 +103,18 @@ export default function StopDetailPage() {
           </Button>
           <span className="text-sm font-medium text-muted-foreground">Stop Detail</span>
         </div>
-        <span className="text-sm font-semibold text-foreground truncate max-w-[160px] text-right">
-          {account.name}
-        </span>
+        {canManage ? (
+          <Link
+            href={`/management/accounts/${account.id}`}
+            className="text-sm font-semibold text-[--primary] truncate max-w-[160px] text-right hover:underline"
+          >
+            {account.name}
+          </Link>
+        ) : (
+          <span className="text-sm font-semibold text-foreground truncate max-w-[160px] text-right">
+            {account.name}
+          </span>
+        )}
       </div>
 
       {/* Scrollable body — bottom padding clears the sticky action bar + bottom nav */}
@@ -189,6 +200,7 @@ export default function StopDetailPage() {
         startedAt={visitStartedAt}
         initialServiceTypes={visit.service_types ?? undefined}
         initialCompletionNote={visit.completion_note ?? undefined}
+        initialPhotos={stop.photos.filter((p) => p.type === 'visit')}
         initialPresentIds={
           (stop.completedBy?.length ?? 0) > 0
             ? stop.completedBy.map((c) => c.employee_id)

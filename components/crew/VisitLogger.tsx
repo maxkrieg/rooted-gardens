@@ -18,6 +18,7 @@ import { enqueueMutation, flushMutationQueue } from '@/lib/crew/mutation-queue'
 import { useTodayTimeEntry } from '@/hooks/crew/useTodayTimeEntry'
 import { useActiveEmployees } from '@/hooks/crew/useActiveEmployees'
 import { createClient } from '@/lib/supabase/client'
+import { MAX_PHOTO_BYTES, ALLOWED_PHOTO_TYPES } from '@/lib/utils/photos'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
 
 // datetime-local input expects "YYYY-MM-DDTHH:mm" in local time
@@ -27,12 +28,14 @@ function toDatetimeLocalValue(iso: string): string {
   return local.toISOString().slice(0, 16)
 }
 
-const MAX_PHOTO_BYTES = 20 * 1024 * 1024
-const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
-
 interface CapturedPhoto {
-  localUrl: string
-  storagePath: string // empty string while upload is in-flight
+  // Set only for a photo that was already uploaded in a prior completion (from
+  // initialPhotos) — it's already persisted, so it's shown read-only and never
+  // re-enqueued on submit.
+  id?: string
+  localUrl?: string // object URL for a photo captured this session
+  remoteUrl?: string // signed URL for a previously uploaded photo
+  storagePath: string // empty string while a fresh capture's upload is in-flight
 }
 
 interface VisitLoggerProps {
@@ -47,6 +50,7 @@ interface VisitLoggerProps {
   initialServiceTypes?: string[]
   initialCompletionNote?: string
   initialPresentIds?: string[]
+  initialPhotos?: Array<{ id: string; storage_path: string; caption?: string | null }>
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
@@ -61,6 +65,7 @@ export function VisitLogger({
   initialServiceTypes,
   initialCompletionNote,
   initialPresentIds,
+  initialPhotos,
   open,
   onOpenChange,
   onSuccess,
@@ -99,16 +104,31 @@ export function VisitLogger({
       setStartTimeError(false)
       setEndTimeError(false)
       setPresentIdsError(false)
+
+      // Seed previously uploaded photos (editing an existing completion) with
+      // fresh signed URLs — they aren't re-enqueued on submit since they're
+      // already persisted.
+      if (initialPhotos && initialPhotos.length > 0) {
+        const supabase = createClient()
+        Promise.all(
+          initialPhotos.map(async (p) => {
+            const { data } = await supabase.storage.from('photos').createSignedUrl(p.storage_path, 3600)
+            return { id: p.id, storagePath: p.storage_path, remoteUrl: data?.signedUrl }
+          })
+        ).then(setPhotos)
+      } else {
+        setPhotos([])
+      }
     }
-  }, [open, assignedCrew, startedAt, initialServiceTypes, initialCompletionNote, initialPresentIds])
+  }, [open, assignedCrew, startedAt, initialServiceTypes, initialCompletionNote, initialPresentIds, initialPhotos])
 
   const crewOptions = activeEmployees.map((e) => ({ id: e.id, name: e.name, role: e.role }))
 
   function removePhoto(index: number) {
     setPhotos((prev) => {
       const next = [...prev]
-      URL.revokeObjectURL(next[index].localUrl)
-      next.splice(index, 1)
+      const [removed] = next.splice(index, 1)
+      if (removed.localUrl) URL.revokeObjectURL(removed.localUrl)
       return next
     })
   }
@@ -125,7 +145,9 @@ export function VisitLogger({
     setEndTimeError(false)
     setPresentIdsError(false)
     setPhotos((prev) => {
-      prev.forEach((p) => URL.revokeObjectURL(p.localUrl))
+      prev.forEach((p) => {
+        if (p.localUrl) URL.revokeObjectURL(p.localUrl)
+      })
       return []
     })
     setPhotoError(null)
@@ -216,8 +238,9 @@ export function VisitLogger({
       endedAt,
     })
 
-    // Enqueue metadata for each successfully uploaded photo
-    for (const photo of photos.filter((p) => p.storagePath)) {
+    // Enqueue metadata for each newly captured photo — previously uploaded
+    // photos (with an id, from initialPhotos) are already persisted.
+    for (const photo of photos.filter((p) => !p.id && p.storagePath)) {
       await enqueueMutation('photo', {
         visitId,
         propertyId,
@@ -396,16 +419,16 @@ export function VisitLogger({
             {photos.length > 0 && (
               <div className="flex gap-2 flex-wrap">
                 {photos.map((photo, i) => (
-                  <div key={photo.localUrl} className="relative">
+                  <div key={photo.id ?? photo.localUrl ?? i} className="relative">
                     <img
-                      src={photo.localUrl}
+                      src={photo.localUrl ?? photo.remoteUrl}
                       alt={`Photo ${i + 1}`}
                       className={[
                         'h-16 w-16 rounded-xl object-cover border border-[--border]',
                         !photo.storagePath ? 'opacity-50' : '',
                       ].join(' ')}
                     />
-                    {photo.storagePath && (
+                    {!photo.id && photo.storagePath && (
                       <button
                         type="button"
                         onClick={() => removePhoto(i)}

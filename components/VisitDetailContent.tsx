@@ -6,7 +6,7 @@ import { format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
 import {
   MapPin,
-  Map,
+  Map as MapIcon,
   User,
   ChevronDown,
   KeyRound,
@@ -32,6 +32,7 @@ import { PropertyVisitHistory } from '@/components/PropertyVisitHistory'
 import { CompletionSummary } from '@/components/crew/CompletionSummary'
 import { CrewAssignSheet } from '@/components/crew/CrewAssignSheet'
 import { CrewInstructionSheet } from '@/components/CrewInstructionSheet'
+import { VisitPlanPhotos } from '@/components/crew/VisitPlanPhotos'
 import { useActiveVehicles } from '@/hooks/crew/useActiveVehicles'
 import { useUpdateVisitVehicle } from '@/hooks/crew/useUpdateVisitVehicle'
 import { useSetVisitInvoiced } from '@/hooks/crew/useSetVisitInvoiced'
@@ -129,6 +130,15 @@ export function VisitDetailContent({
     staleTime: 50 * 60 * 1000, // 50 min — well under the 1-hr signed URL expiry
   })
 
+  // Signed URLs come back positional (aligned to photoStoragePaths), but the two
+  // photo sections below each render a filtered subset — resolve by path so a
+  // filtered subset stays correctly aligned with its URLs.
+  const urlByPath = new Map<string, string | null | undefined>(
+    photoStoragePaths.map((path, i) => [path, signedPhotoUrls?.[i]])
+  )
+  const completionPhotos = photos.filter((p) => p.type === 'visit')
+  const planPhotos = photos.filter((p) => p.type === 'plan')
+
   function handleOfflineOrGenericError(err: unknown, genericMessage: string) {
     if (err instanceof Error && err.message === 'offline') {
       toast.error('This needs a connection.')
@@ -171,7 +181,7 @@ export function VisitDetailContent({
             rel="noopener noreferrer"
             className="ml-7 inline-flex items-center gap-1.5 text-sm font-medium text-[--primary] hover:underline"
           >
-            <Map className="h-3.5 w-3.5 shrink-0" />
+            <MapIcon className="h-3.5 w-3.5 shrink-0" />
             Open in Maps →
           </a>
         </div>
@@ -221,6 +231,8 @@ export function VisitDetailContent({
           visit={visit}
           completedBy={completedBy}
           assignedCrew={assignedCrew}
+          photos={completionPhotos}
+          photoUrls={completionPhotos.map((p) => urlByPath.get(p.storage_path))}
           canEdit={canEditCompletion}
           onEdit={onOpenCompletion}
           onEditSkip={onOpenSkip}
@@ -395,6 +407,16 @@ export function VisitDetailContent({
                 )}
               </div>
             </div>
+
+            {/* Reference photos — owner/lead-managed, for crew to consult before/during the visit */}
+            <VisitPlanPhotos
+              visitId={data.visitId}
+              propertyId={property.id}
+              photos={planPhotos}
+              urlByPath={urlByPath}
+              canManage={canManage}
+              isFinalVisit={isFinalVisit}
+            />
           </div>
         )}
       </div>
@@ -467,29 +489,6 @@ export function VisitDetailContent({
       )}
 
       <PropertyVisitHistory propertyId={property.id} beforeWeekStart={visit.week_start} />
-
-      {/* Photos */}
-      {photos.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide px-1">Photos</p>
-          <div className="flex gap-2 flex-wrap">
-            {photos.map((photo, i) => {
-              const url = signedPhotoUrls?.[i]
-              return url ? (
-                <a key={photo.id} href={url} target="_blank" rel="noopener noreferrer">
-                  <img
-                    src={url}
-                    alt={photo.caption ?? `Visit photo ${i + 1}`}
-                    className="h-20 w-20 rounded-xl object-cover border border-[--border]"
-                  />
-                </a>
-              ) : (
-                <div key={photo.id} className="h-20 w-20 rounded-xl bg-muted animate-pulse" />
-              )
-            })}
-          </div>
-        </div>
-      )}
 
       <CrewAssignSheet
         visitId={data.visitId}

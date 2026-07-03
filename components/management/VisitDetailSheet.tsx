@@ -183,6 +183,7 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart, role }: V
         startedAt={data.visit.started_at}
         initialServiceTypes={data.visit.service_types ?? undefined}
         initialCompletionNote={data.visit.completion_note ?? undefined}
+        initialPhotos={data.photos.filter((p) => p.type === 'visit')}
         initialPresentIds={completedBy.length > 0 ? completedBy.map((c) => c.employee_id) : undefined}
         open={completionOpen}
         onOpenChange={setCompletionOpen}
