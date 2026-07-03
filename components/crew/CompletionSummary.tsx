@@ -19,6 +19,10 @@ function formatTime(iso: string) {
   return format(parseISO(iso), 'h:mm a')
 }
 
+function formatDate(iso: string) {
+  return format(parseISO(iso), 'MMM d')
+}
+
 function formatDuration(startIso: string, endIso: string) {
   const mins = differenceInMinutes(parseISO(endIso), parseISO(startIso))
   if (mins < 60) return `${mins}m`
@@ -80,6 +84,14 @@ export function CompletionSummary({
             {/* Time row */}
             {(visit.started_at || visit.ended_at) && (
               <div className="flex items-start gap-6">
+                <div className="space-y-0.5">
+                  <p className="font-display text-base font-semibold text-foreground tabular-nums">
+                    {formatDate(visit.ended_at ?? visit.week_start)}
+                  </p>
+                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                    Completed
+                  </p>
+                </div>
                 {visit.started_at && (
                   <div className="space-y-0.5">
                     <p className="font-display text-base font-semibold text-foreground tabular-nums">

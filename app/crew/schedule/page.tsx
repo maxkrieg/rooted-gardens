@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { addWeeks, format } from 'date-fns'
+import { addDays, addWeeks, format } from 'date-fns'
 import { ChevronLeft, ChevronRight, CalendarRange, SlidersHorizontal, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScheduleStopRow } from '@/components/crew/ScheduleStopRow'
@@ -94,8 +94,8 @@ export default function CrewSchedulePage() {
             >
               <ChevronLeft className="h-5 w-5" />
             </Button>
-            <span className="text-sm font-medium text-muted-foreground tabular-nums min-w-[64px] text-center">
-              {format(week, 'MMM d')}
+            <span className="text-sm font-medium text-muted-foreground tabular-nums min-w-[112px] text-center">
+              {format(week, 'MMM d')} – {format(addDays(week, 6), 'MMM d')}
             </span>
             <Button
               variant="ghost"

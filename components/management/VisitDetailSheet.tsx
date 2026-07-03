@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
 import { Map } from 'lucide-react'
 import {
@@ -144,7 +145,13 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart, role }: V
               Open in Maps
             </a>
             <SheetDescription>
-              {row.account.name} · Week of {format(parseISO(weekStart), 'MMM d')}
+              <Link
+                href={`/management/accounts/${row.account.id}`}
+                className="font-medium text-[--primary] hover:underline"
+              >
+                {row.account.name}
+              </Link>{' '}
+              · Week of {format(parseISO(weekStart), 'MMM d')}
             </SheetDescription>
           </SheetHeader>
 
