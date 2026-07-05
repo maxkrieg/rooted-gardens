@@ -62,7 +62,7 @@ export function PropertySheet({ accountId, property }: PropertySheetProps) {
             <SheetDescription>
               {isEdit
                 ? 'Update the address and standing notes for this property.'
-                : 'Add a property to this account. A default zone will be created automatically for per-visit accounts.'}
+                : 'Add a property to this account.'}
             </SheetDescription>
           </SheetHeader>
           <div className="flex-1 overflow-y-auto px-6 py-5">

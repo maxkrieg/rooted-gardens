@@ -11,6 +11,29 @@ See `CLAUDE.md` for full context, tech stack, schema, and conventions.
 > 3.6, and 3.11 was intentionally dropped. The task descriptions below are left as-is —
 > they're a historical record of what was built at the time — but `service_zones` no
 > longer exists. See `CLAUDE.md` for the current schema.
+>
+> **Post-launch schema change (2026-06-29):** `visit_sessions` — the per-employee job
+> start/stop table referenced throughout Phase 3 (3.11) and Phase 4 (4.1, 4.10, 4.11) —
+> was collapsed into `visits` in migration `20260629120000_collapse_visit_sessions.sql`.
+> Start/stop timing now lives directly on `visits.started_at` / `visits.ended_at`;
+> `visits.actual_date` was dropped (completion date is derived from `ended_at`, falling
+> back to `week_start`). "In progress" is `started_at IS NOT NULL AND ended_at IS NULL` —
+> a derived state, never a `visits.status` value. See `lib/utils/visits.ts`
+> (`isVisitInProgress`). Task descriptions below are left as historical record.
+>
+> **Post-launch schema change (2026-06-30):** `'invoiced'` was removed as a `visits.status`
+> value in migration `20260630140000_drop_invoiced_status.sql`. Billing state is now the
+> derived flag `invoiced_at IS NOT NULL` — the same convention as the in-progress state
+> above. `visits.status` is only ever `'scheduled' | 'completed' | 'skipped'`. Phases 3
+> and 4 below describe the old `status='invoiced'` model as historical record; **Phase 5
+> (Billing) has been corrected in place**, since it's still unbuilt.
+>
+> **Post-launch additions (2026-07-02 / 2026-07-03):** `photos.type` gained a `'plan'`
+> value — owner/lead-managed reference photos on the Visit Plan, distinct from crew's
+> `'visit'` completion photos — in `20260702150000_photos_add_plan_type.sql`.
+> `property_route_groups` gained a uniqueness constraint — a property belongs to at most
+> one route group at a time — in `20260703120000_property_route_groups_unique_property.sql`.
+> Neither changes any task below; noted here for completeness.
 
 Each task is written to be handed directly to Claude Code as a prompt. Phases are ordered
 as a sensible default build sequence, but the authoritative dependency graph is the
@@ -605,12 +628,20 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 
 > Goal: The accountant's workflow. Invoice queue for completed visits,
 > one-click push to QuickBooks. Accountant works on laptop, desktop-first.
+>
+> **Scaffolding already exists — replace in place, don't create new files:**
+> `app/management/billing/page.tsx`, `components/management/InvoiceQueue.tsx`,
+> `lib/quickbooks/client.ts`, and `lib/quickbooks/sync.ts` are all literal stubs
+> (`return null` / `export {}`); `app/api/quickbooks/connect/route.ts` and
+> `app/api/quickbooks/callback/route.ts` return `501`. The "Billing" nav link already
+> exists in `components/management/ManagementNav.tsx`.
 
 - [ ] **5.1 — Invoice queue page**
   *Depends on: 4.4, 2.4*
-  Create `app/management/billing/page.tsx`. Show all visits with
-  `status = 'completed'` (not yet invoiced), grouped by account.
-  For `per_visit` accounts: each visit is one invoice line with the account's
+  Create `app/management/billing/page.tsx`. Show all visits that are
+  `status = 'completed' AND invoiced_at IS NULL` (reuse the existing
+  `visits_uninvoiced_idx` partial index — no new query logic needed), grouped by
+  account. For `per_visit` accounts: each visit is one invoice line with the account's
   `price_per_visit`. For `contract` accounts: show completed visits as a
   summary (not individual lines) with the periodic contract rate.
   Include a date range filter (default: current month). Accountant can
@@ -639,15 +670,20 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   Add a "Push to QuickBooks" button on the billing invoice queue. For selected
   visits: (1) ensure account has a QBO customer ID (auto-create if not),
   (2) create a QBO Invoice with one line item per visit for `per_visit` accounts
-  or one line per contract period for `contract` accounts, (3) update visit
-  `status` to `invoiced`, set `invoiced_at` and `qbo_invoice_id`.
+  or one line per contract period for `contract` accounts, (3) set `invoiced_at`
+  (`now()`) and `qbo_invoice_id` — **`status` stays `'completed'`; `'invoiced'` is not a
+  `visits.status` value** (billing is the derived flag `invoiced_at IS NOT NULL`, same
+  convention as the in-progress state). `hooks/crew/useSetVisitInvoiced.ts` already
+  implements exactly this write, currently wired to a manual owner checkbox in
+  `components/VisitDetailContent.tsx` as a placeholder — extend/reuse that mutation and
+  trigger it automatically after a successful push rather than writing a new one.
   Show a progress indicator during push. Show success/failure per account.
-  Wrap in a transaction: if QBO push fails, do not update visit status.
+  Wrap in a transaction: if QBO push fails, do not set `invoiced_at`.
 
 - [ ] **5.5 — Invoiced visits view**
   *Depends on: 5.4*
-  Add an "Invoiced" tab to the billing page showing visits with
-  `status = 'invoiced'`, grouped by month. Show QBO invoice ID as a link
+  Add an "Invoiced" tab to the billing page showing visits where
+  `invoiced_at IS NOT NULL`, grouped by month. Show QBO invoice ID as a link
   (link to `https://app.qbo.intuit.com/app/invoice?txnId={id}`).
   Show total invoiced per month. Allow filtering by account.
   This is the accountant's audit trail — equivalent to the red text in the
@@ -655,7 +691,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 
 - [ ] **5.6 — Invoice amount snapshot**
   *Depends on: 5.4*
-  When a visit is marked invoiced, snapshot the price into `visits.invoice_amount`.
+  When `invoiced_at` is set, snapshot the price into `visits.invoice_amount`.
   This preserves the amount even if the account's price changes later.
   Display the invoiced amount (not current price) in the invoiced history view.
   Add a simple revenue summary to the billing page: MTD invoiced, YTD invoiced,
@@ -666,12 +702,12 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 **Automated:** `npm run build` · `tsc --noEmit` · `lint` pass.
 
 **Functional:**
-- Invoice queue lists completed-not-invoiced visits grouped by account; `per_visit` = one line each, `contract` = periodic summary; date filter + running total (5.1).
-- Invoiced tab lists `invoiced` visits by month with QBO links; shows the `invoice_amount` snapshot (not live price); MTD/YTD revenue summary (5.5 / 5.6).
+- Invoice queue lists visits where `status = 'completed' AND invoiced_at IS NULL`, grouped by account; `per_visit` = one line each, `contract` = periodic summary; date filter + running total (5.1).
+- Invoiced tab lists visits where `invoiced_at IS NOT NULL`, by month, with QBO links; shows the `invoice_amount` snapshot (not live price); MTD/YTD revenue summary (5.5 / 5.6).
 
 **Human-gated (needs Intuit sandbox creds — `live-untested` otherwise):**
 - "Connect QuickBooks" OAuth round-trip stores tokens in `integrations` (5.2); `syncCustomer` creates/links a QBO customer (5.3).
-- "Push to QuickBooks" creates a sandbox invoice and flips status to `invoiced` only on success (transactional) (5.4).
+- "Push to QuickBooks" creates a sandbox invoice and sets `invoiced_at` + `qbo_invoice_id` only on success (transactional); `status` remains `'completed'` (5.4).
 
 ---
 
@@ -679,6 +715,12 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 
 > Goal: Track trucks and mowers. The owner assigns them to routes. Flag maintenance.
 > Largely self-contained — only needs Phase 1; can run in parallel with Phases 3–5.
+>
+> **Scaffolding already exists — replace in place:** `app/management/fleet/page.tsx` is a
+> literal stub (`return null`); the "Fleet" nav link already exists in
+> `components/management/ManagementNav.tsx`. The `vehicles` table and some vehicle UI
+> (assignment dropdown in `components/VisitDetailContent.tsx`, `useActiveVehicles`) already
+> exist and are reusable — only the maintenance-log sub-feature (6.3) and this page are unbuilt.
 
 - [ ] **6.1 — Fleet management page**
   *Depends on: 1.6, 1.2*
@@ -718,6 +760,10 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 ## Phase 7 — Team & Timesheets
 
 > Goal: Employee profiles and basic hour tracking for payroll.
+>
+> **Scaffolding already exists — replace in place:** `app/management/team/page.tsx` is a
+> literal stub (`return null`); the "Team" nav link already exists in
+> `components/management/ManagementNav.tsx`.
 
 - [ ] **7.1 — Team management page**
   *Depends on: 1.6, 1.4*

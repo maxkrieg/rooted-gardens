@@ -77,7 +77,7 @@ export type VehicleStatus = (typeof VEHICLE_STATUSES)[number]
 export const EQUIPMENT_TYPES = ['mower', 'trimmer', 'blower', 'edger', 'other'] as const
 export type EquipmentType = (typeof EQUIPMENT_TYPES)[number]
 
-export const PHOTO_TYPES = ['visit', 'how_to', 'customer_request', 'before', 'after'] as const
+export const PHOTO_TYPES = ['visit', 'how_to', 'customer_request', 'before', 'after', 'plan'] as const
 export type PhotoType = (typeof PHOTO_TYPES)[number]
 
 // ─── Joined / composite types ─────────────────────────────────────────────────
