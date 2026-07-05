@@ -136,6 +136,11 @@ export function PropertyAssignmentSheet({
                           <p className="text-xs text-muted-foreground truncate">
                             {property.address}
                           </p>
+                          {property.currentRouteGroup && property.currentRouteGroup.id !== routeGroupId && (
+                            <p className="text-[11px] text-muted-foreground/80 truncate">
+                              Currently in {property.currentRouteGroup.name}
+                            </p>
+                          )}
                         </div>
                         <Switch
                           checked={isAssignedHere}
@@ -164,9 +169,16 @@ export function PropertyAssignmentSheet({
                               key={property.id}
                               className="flex items-center justify-between gap-3 pl-8 pr-6 py-3"
                             >
-                              <p className="text-sm text-foreground truncate min-w-0">
-                                {property.address}
-                              </p>
+                              <div className="min-w-0">
+                                <p className="text-sm text-foreground truncate">
+                                  {property.address}
+                                </p>
+                                {property.currentRouteGroup && property.currentRouteGroup.id !== routeGroupId && (
+                                  <p className="text-[11px] text-muted-foreground/80 truncate">
+                                    Currently in {property.currentRouteGroup.name}
+                                  </p>
+                                )}
+                              </div>
                               <Switch
                                 checked={isAssignedHere}
                                 disabled={pending}
