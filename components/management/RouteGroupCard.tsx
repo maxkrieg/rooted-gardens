@@ -6,7 +6,6 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { RouteGroupSheet } from '@/components/management/RouteGroupSheet'
-import { PropertyAssignmentSheet } from '@/components/management/PropertyAssignmentSheet'
 import { deleteRouteGroup, moveRouteGroup } from '@/app/management/route-groups/actions'
 import type { RouteGroup, PropertyWithAccount } from '@/types/app'
 
@@ -88,7 +87,7 @@ export function RouteGroupCard({
             {/* Separator */}
             <span className="w-px h-4 bg-border mx-0.5" aria-hidden />
 
-            <RouteGroupSheet routeGroup={routeGroup} />
+            <RouteGroupSheet routeGroup={routeGroup} allProperties={allProperties} />
 
             {confirmDelete ? (
               <div className="flex items-center gap-1">
@@ -128,9 +127,9 @@ export function RouteGroupCard({
       <CardContent className="px-4 pb-4">
         {/* Assigned properties list */}
         {assignedProperties.length === 0 ? (
-          <p className="text-sm text-muted-foreground italic mb-3">No properties assigned yet.</p>
+          <p className="text-sm text-muted-foreground italic">No properties assigned yet.</p>
         ) : (
-          <ul className="space-y-1 mb-3">
+          <ul className="space-y-1">
             {assignedProperties.map((property) => (
               <li key={property.id} className="flex items-start gap-2 text-sm">
                 <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
@@ -142,13 +141,6 @@ export function RouteGroupCard({
             ))}
           </ul>
         )}
-
-        {/* Manage properties trigger */}
-        <PropertyAssignmentSheet
-          routeGroupId={routeGroup.id}
-          routeGroupName={routeGroup.name}
-          allProperties={allProperties}
-        />
       </CardContent>
     </Card>
   )

@@ -11,13 +11,21 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet'
 import { RouteGroupForm } from '@/components/management/RouteGroupForm'
-import type { RouteGroup } from '@/types/app'
+import { PropertyAssignmentFields } from '@/components/management/PropertyAssignmentFields'
+import type { RouteGroup, PropertyWithAccount } from '@/types/app'
 
 interface RouteGroupSheetProps {
   routeGroup?: RouteGroup
+  allProperties?: PropertyWithAccount[]
 }
 
-export function RouteGroupSheet({ routeGroup }: RouteGroupSheetProps) {
+/**
+ * Create/edit sheet for a route group. Editing (pencil trigger) combines both
+ * the name form and property assignment in one drawer — creating a new group
+ * only shows the name form, since there's no route group id yet to assign
+ * properties against.
+ */
+export function RouteGroupSheet({ routeGroup, allProperties = [] }: RouteGroupSheetProps) {
   const [open, setOpen] = useState(false)
   const isEdit = Boolean(routeGroup)
 
@@ -51,13 +59,30 @@ export function RouteGroupSheet({ routeGroup }: RouteGroupSheetProps) {
             </SheetTitle>
             <SheetDescription>
               {isEdit
-                ? 'Update the name and sort order for this route group.'
+                ? 'Update the name and assigned properties for this route group.'
                 : 'Create a new geographic cluster for organizing daily routes.'}
             </SheetDescription>
           </SheetHeader>
-          <div className="flex-1 overflow-y-auto px-6 py-5">
-            <RouteGroupForm routeGroup={routeGroup} onSuccess={() => setOpen(false)} />
+
+          <div className="px-6 py-5 shrink-0">
+            <RouteGroupForm
+              routeGroup={routeGroup}
+              onSuccess={() => {
+                // Creating closes the sheet (nothing else to do yet — no id to
+                // assign properties against). Editing stays open so the
+                // property list below remains usable in the same session.
+                if (!isEdit) setOpen(false)
+              }}
+            />
           </div>
+
+          {isEdit && routeGroup && (
+            <PropertyAssignmentFields
+              routeGroupId={routeGroup.id}
+              routeGroupName={routeGroup.name}
+              allProperties={allProperties}
+            />
+          )}
         </SheetContent>
       </Sheet>
     </>
