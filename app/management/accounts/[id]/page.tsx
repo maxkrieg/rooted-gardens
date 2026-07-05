@@ -212,7 +212,7 @@ export default async function AccountDetailPage({ params }: Props) {
                     </span>
                     <Link
                       href="/management/route-groups"
-                      className="ml-auto inline-flex items-center gap-1 text-xs text-[--primary] hover:underline shrink-0"
+                      className="inline-flex items-center gap-1 text-xs text-[--primary] hover:underline shrink-0"
                     >
                       Manage
                       <ArrowRight className="h-3 w-3" />
