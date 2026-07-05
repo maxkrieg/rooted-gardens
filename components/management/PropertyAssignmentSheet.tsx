@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
+import Link from 'next/link'
 import { Map as MapIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -156,12 +157,18 @@ export function PropertyAssignmentSheet({
                         className="flex items-center justify-between gap-3 px-6 py-3.5"
                       >
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">
+                          <Link
+                            href={`/management/accounts/${property.account_id}`}
+                            className="text-sm font-medium text-[--primary] hover:underline truncate block"
+                          >
                             {group.accountName}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate">
+                          </Link>
+                          <Link
+                            href={`/management/accounts/${property.account_id}`}
+                            className="text-xs text-muted-foreground hover:underline truncate block"
+                          >
                             {property.address}
-                          </p>
+                          </Link>
                           {property.currentRouteGroup && property.currentRouteGroup.id !== routeGroupId && (
                             <p className="text-[11px] text-muted-foreground/80 truncate">
                               Currently in {property.currentRouteGroup.name}
@@ -196,9 +203,12 @@ export function PropertyAssignmentSheet({
                               className="flex items-center justify-between gap-3 pl-8 pr-6 py-3"
                             >
                               <div className="min-w-0">
-                                <p className="text-sm text-foreground truncate">
+                                <Link
+                                  href={`/management/accounts/${property.account_id}`}
+                                  className="text-sm text-[--primary] hover:underline truncate block"
+                                >
                                   {property.address}
-                                </p>
+                                </Link>
                                 {property.currentRouteGroup && property.currentRouteGroup.id !== routeGroupId && (
                                   <p className="text-[11px] text-muted-foreground/80 truncate">
                                     Currently in {property.currentRouteGroup.name}
