@@ -5,6 +5,7 @@ import { Map as MapIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import {
   Sheet,
   SheetContent,
@@ -43,6 +44,7 @@ export function PropertyAssignmentSheet({
   const [open, setOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   const [reassignTarget, setReassignTarget] = useState<PropertyWithAccount | null>(null)
+  const [unassignedOnly, setUnassignedOnly] = useState(false)
 
   const accountGroups = useMemo<AccountGroup[]>(() => {
     const map = new Map<string, AccountGroup>()
@@ -60,6 +62,19 @@ export function PropertyAssignmentSheet({
     }
     return [...map.values()].sort((a, b) => a.accountName.localeCompare(b.accountName))
   }, [allProperties])
+
+  // "Unassigned" = not part of any route group (currentRouteGroup null) — the
+  // set of properties still needing a first assignment, as distinct from ones
+  // already elsewhere (which stay visible unfiltered so they can be moved).
+  const visibleAccountGroups = useMemo<AccountGroup[]>(() => {
+    if (!unassignedOnly) return accountGroups
+    return accountGroups
+      .map((group) => ({
+        ...group,
+        properties: group.properties.filter((p) => !p.currentRouteGroup),
+      }))
+      .filter((group) => group.properties.length > 0)
+  }, [accountGroups, unassignedOnly])
 
   function doToggle(propertyId: string, isAssignedHere: boolean) {
     startTransition(async () => {
@@ -110,16 +125,29 @@ export function PropertyAssignmentSheet({
             <SheetDescription>
               Toggle properties in and out of <strong>{routeGroupName}</strong>.
             </SheetDescription>
+            <div className="flex items-center gap-2 pt-1">
+              <Switch
+                id="unassigned-only"
+                checked={unassignedOnly}
+                onCheckedChange={setUnassignedOnly}
+                className="shrink-0"
+              />
+              <Label htmlFor="unassigned-only" className="text-sm text-muted-foreground font-normal">
+                Unassigned only
+              </Label>
+            </div>
           </SheetHeader>
 
           <div className="flex-1 overflow-y-auto">
-            {accountGroups.length === 0 ? (
-              <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
-                No properties exist yet.
+            {visibleAccountGroups.length === 0 ? (
+              <div className="flex items-center justify-center py-16 text-sm text-muted-foreground text-center px-6">
+                {accountGroups.length === 0
+                  ? 'No properties exist yet.'
+                  : 'No unassigned properties.'}
               </div>
             ) : (
               <ul className="divide-y divide-border">
-                {accountGroups.map((group) => {
+                {visibleAccountGroups.map((group) => {
                   if (group.properties.length === 1) {
                     const property = group.properties[0]
                     const isAssignedHere = property.currentRouteGroup?.id === routeGroupId
