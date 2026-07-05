@@ -9,7 +9,7 @@ import { createVisit } from '@/app/management/schedule/actions'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
 import { useVisitTimings } from '@/components/management/SessionsProvider'
-import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
+import { isVisitInProgress, isVisitMissed, formatElapsed } from '@/lib/utils/visits'
 import { groupRowsByAccount } from '@/lib/utils/schedule'
 import { formatAccountPrice } from '@/lib/utils/accounts'
 import { Button } from '@/components/ui/button'
@@ -216,7 +216,10 @@ export function ScheduleListMobile({ weeks, employees, vehicles, canEdit, role }
                               )}
 
                               {row.visit ? (
-                                <VisitStatusBadge status={row.visit.status} />
+                                <VisitStatusBadge
+                                  status={row.visit.status}
+                                  missed={isVisitMissed(row.visit)}
+                                />
                               ) : (
                                 <span className="text-xs text-muted-foreground/50">
                                   {isCreating ? '…' : '+ Schedule'}

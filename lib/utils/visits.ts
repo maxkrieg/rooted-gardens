@@ -1,4 +1,5 @@
 import { differenceInMinutes, parseISO } from 'date-fns'
+import { getWeekStart } from '@/lib/utils/schedule'
 
 /** The on-site timing fields now live directly on the visit row. */
 export type VisitTiming = {
@@ -12,6 +13,21 @@ export type VisitTiming = {
  */
 export function isVisitInProgress(v: VisitTiming): boolean {
   return !!v.started_at && !v.ended_at
+}
+
+export type VisitWeekStatus = {
+  status: string
+  week_start: string
+}
+
+/**
+ * A visit is "missed" when it's still scheduled after its entire week has
+ * passed — distinct from `isVisitInProgress`, which takes precedence when both
+ * are technically true (an open on-site session from a past week is shown as
+ * "On site", not "Missed" — the live state is more actionable/urgent).
+ */
+export function isVisitMissed(v: VisitWeekStatus): boolean {
+  return v.status === 'scheduled' && parseISO(v.week_start) < getWeekStart(new Date())
 }
 
 export function formatElapsed(startedAt: string): string {

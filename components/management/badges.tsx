@@ -75,11 +75,11 @@ const VISIT_STATUS_META: Record<VisitStatus, { label: string; className: string 
   skipped:   { label: 'Skipped',   className: 'status-skipped' },
 }
 
-export function VisitStatusBadge({ status }: { status: string }) {
-  const meta = VISIT_STATUS_META[status as VisitStatus] ?? {
-    label: status,
-    className: 'status-scheduled',
-  }
+export function VisitStatusBadge({ status, missed = false }: { status: string; missed?: boolean }) {
+  const meta =
+    status === 'scheduled' && missed
+      ? { label: 'Missed', className: 'status-missed' }
+      : VISIT_STATUS_META[status as VisitStatus] ?? { label: status, className: 'status-scheduled' }
   return (
     <Badge variant="outline" className={`border-transparent uppercase tracking-wide text-[10px] font-semibold ${meta.className}`}>
       {meta.label}

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { addDays, endOfDay, format, min as minDate, parseISO, startOfDay } from 'date-fns'
 import { Camera, X } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
@@ -46,6 +47,8 @@ interface VisitLoggerProps {
   // The visit's start time, if the job was started. When set, the Start time field
   // is shown prefilled and editable; otherwise the crew can opt into a manual start.
   startedAt?: string | null
+  // The visit's scheduled week (always a Monday) — bounds Start/End to that week.
+  weekStart: string
   // Pre-fill props for editing an existing completion
   initialServiceTypes?: string[]
   initialCompletionNote?: string
@@ -62,6 +65,7 @@ export function VisitLogger({
   propertyId,
   assignedCrew,
   startedAt,
+  weekStart,
   initialServiceTypes,
   initialCompletionNote,
   initialPresentIds,
@@ -76,6 +80,12 @@ export function VisitLogger({
   const isClockedIn = todayEntries.length > 0 && todayEntries[0].clock_out === null
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // The visit's scheduled week bounds Start/End — Monday 00:00 through the earlier
+  // of Sunday 23:59 or "now" (can't log a future completion either).
+  const weekStartDate = startOfDay(parseISO(weekStart))
+  const weekEndDate = endOfDay(addDays(weekStartDate, 6))
+  const latestAllowed = minDate([new Date(), weekEndDate])
+
   const [serviceTypes, setServiceTypes] = useState<string[]>([])
   const [completionNote, setCompletionNote] = useState('')
   const [serviceTypeError, setServiceTypeError] = useState(false)
@@ -84,25 +94,42 @@ export function VisitLogger({
   const [photos, setPhotos] = useState<CapturedPhoto[]>([])
   const [photoError, setPhotoError] = useState<string | null>(null)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
-  // Start time — required. Prefilled from the visit's started_at, or defaults to now
-  // if the crew forgot to tap Start; either way they must confirm/set a value.
+  // Start time — required, and must fall within the visit's scheduled week. Prefilled
+  // from the visit's started_at, or defaults to the latest allowed time if the crew
+  // forgot to tap Start; either way they must confirm/set a value.
   const [startTime, setStartTime] = useState('')
-  const [startTimeError, setStartTimeError] = useState(false)
-  // End time — the completion timestamp (= visits.ended_at), prefilled to now; required.
+  const [startTimeError, setStartTimeError] = useState<string | null>(null)
+  // End time — the completion timestamp (= visits.ended_at), prefilled to the latest
+  // allowed time; required, and must fall within the visit's scheduled week.
   const [endTime, setEndTime] = useState('')
-  const [endTimeError, setEndTimeError] = useState(false)
+  const [endTimeError, setEndTimeError] = useState<string | null>(null)
   const [presentIdsError, setPresentIdsError] = useState(false)
+
+  function validateInWeek(value: string): string | null {
+    if (!value) return 'This field is required.'
+    const dt = new Date(value)
+    if (dt < weekStartDate || dt > weekEndDate) {
+      return `Must fall within the scheduled week (${format(weekStartDate, 'MMM d')}–${format(weekEndDate, 'MMM d')}).`
+    }
+    return null
+  }
 
   // Seed state every time the sheet opens, using pre-fill values when editing
   useEffect(() => {
     if (open) {
+      // Recomputed locally (rather than closing over the render-scoped `latestAllowed`
+      // above) so this effect's dependency list only needs `weekStart`, not a value
+      // that's freshly recreated every render.
+      const openWeekEnd = endOfDay(addDays(startOfDay(parseISO(weekStart)), 6))
+      const openLatestAllowed = minDate([new Date(), openWeekEnd])
+
       setPresentIds(initialPresentIds ?? assignedCrew.map((c) => c.employee_id))
       setServiceTypes(initialServiceTypes ?? [])
       setCompletionNote(initialCompletionNote ?? '')
-      setEndTime(toDatetimeLocalValue(new Date().toISOString()))
-      setStartTime(toDatetimeLocalValue(startedAt ?? new Date().toISOString()))
-      setStartTimeError(false)
-      setEndTimeError(false)
+      setEndTime(toDatetimeLocalValue(openLatestAllowed.toISOString()))
+      setStartTime(toDatetimeLocalValue(startedAt ?? openLatestAllowed.toISOString()))
+      setStartTimeError(null)
+      setEndTimeError(null)
       setPresentIdsError(false)
 
       // Seed previously uploaded photos (editing an existing completion) with
@@ -120,7 +147,7 @@ export function VisitLogger({
         setPhotos([])
       }
     }
-  }, [open, assignedCrew, startedAt, initialServiceTypes, initialCompletionNote, initialPresentIds, initialPhotos])
+  }, [open, assignedCrew, startedAt, weekStart, initialServiceTypes, initialCompletionNote, initialPresentIds, initialPhotos])
 
   const crewOptions = activeEmployees.map((e) => ({ id: e.id, name: e.name, role: e.role }))
 
@@ -140,9 +167,9 @@ export function VisitLogger({
     setSubmitting(false)
     setPresentIds(assignedCrew.map((c) => c.employee_id))
     setStartTime('')
-    setStartTimeError(false)
+    setStartTimeError(null)
     setEndTime('')
-    setEndTimeError(false)
+    setEndTimeError(null)
     setPresentIdsError(false)
     setPhotos((prev) => {
       prev.forEach((p) => {
@@ -204,12 +231,14 @@ export function VisitLogger({
   }
 
   async function handleSubmit() {
-    if (!startTime) {
-      setStartTimeError(true)
+    const startErr = validateInWeek(startTime)
+    if (startErr) {
+      setStartTimeError(startErr)
       return
     }
-    if (!endTime) {
-      setEndTimeError(true)
+    const endErr = validateInWeek(endTime)
+    if (endErr) {
+      setEndTimeError(endErr)
       return
     }
     if (presentIds.length === 0) {
@@ -293,7 +322,8 @@ export function VisitLogger({
 
         <div className="px-4 space-y-5 pb-4">
           {/* Start time — required; prefilled when the job was started, otherwise
-              defaults to now so the crew can confirm/adjust it. */}
+              defaults to the latest allowed time so the crew can confirm/adjust it.
+              Bounded to the visit's scheduled week (Mon–Sun, capped at now). */}
           <div className="space-y-1.5">
             <label className="text-sm font-semibold text-foreground" htmlFor="start-time">
               Start time <span className="text-destructive">*</span>
@@ -302,19 +332,21 @@ export function VisitLogger({
               id="start-time"
               type="datetime-local"
               value={startTime}
-              max={toDatetimeLocalValue(new Date().toISOString())}
+              min={toDatetimeLocalValue(weekStartDate.toISOString())}
+              max={toDatetimeLocalValue(latestAllowed.toISOString())}
               onChange={(e) => {
                 setStartTime(e.target.value)
-                if (e.target.value) setStartTimeError(false)
+                if (e.target.value) setStartTimeError(null)
               }}
               className="h-11 w-full rounded-lg border border-[--border] bg-card px-3 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-[--ring]"
             />
             {startTimeError && (
-              <p className="text-xs text-destructive">Start time is required.</p>
+              <p className="text-xs text-destructive">{startTimeError}</p>
             )}
           </div>
 
-          {/* End time — completion timestamp, prefilled to now; required */}
+          {/* End time — completion timestamp, prefilled to the latest allowed time;
+              required, bounded to the visit's scheduled week. */}
           <div className="space-y-1.5">
             <label className="text-sm font-semibold text-foreground" htmlFor="end-time">
               End time <span className="text-destructive">*</span>
@@ -323,15 +355,16 @@ export function VisitLogger({
               id="end-time"
               type="datetime-local"
               value={endTime}
-              max={toDatetimeLocalValue(new Date().toISOString())}
+              min={toDatetimeLocalValue(weekStartDate.toISOString())}
+              max={toDatetimeLocalValue(latestAllowed.toISOString())}
               onChange={(e) => {
                 setEndTime(e.target.value)
-                if (e.target.value) setEndTimeError(false)
+                if (e.target.value) setEndTimeError(null)
               }}
               className="h-11 w-full rounded-lg border border-[--border] bg-card px-3 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-[--ring]"
             />
             {endTimeError && (
-              <p className="text-xs text-destructive">End time is required.</p>
+              <p className="text-xs text-destructive">{endTimeError}</p>
             )}
           </div>
 

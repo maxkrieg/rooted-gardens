@@ -198,6 +198,7 @@ export default function StopDetailPage() {
         propertyId={stop.property.id}
         assignedCrew={stop.assignedCrew ?? []}
         startedAt={visitStartedAt}
+        weekStart={visit.week_start}
         initialServiceTypes={visit.service_types ?? undefined}
         initialCompletionNote={visit.completion_note ?? undefined}
         initialPhotos={stop.photos.filter((p) => p.type === 'visit')}

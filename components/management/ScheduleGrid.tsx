@@ -10,7 +10,7 @@ import { createVisit } from '@/app/management/schedule/actions'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
 import { useVisitTimings } from '@/components/management/SessionsProvider'
-import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
+import { isVisitInProgress, isVisitMissed, formatElapsed } from '@/lib/utils/visits'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { FilePen } from 'lucide-react'
@@ -212,11 +212,13 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role }: Sche
                         const inProgress = visit
                           ? isVisitInProgress({ started_at: effectiveStartedAt, ended_at: effectiveEndedAt })
                           : false
+                        const missed = visit ? isVisitMissed(visit) && !inProgress : false
                         return (
                           <td key={week.weekStart} className="px-2 py-2 align-top">
                             <ScheduleCell
                               visit={visit}
                               inProgress={inProgress}
+                              missed={missed}
                               startedAt={effectiveStartedAt}
                               isCreating={creatingKey === cellKey}
                               onClick={() => handleCellClick(row, week.weekStart, visit)}
@@ -261,6 +263,7 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role }: Sche
 function ScheduleCell({
   visit,
   inProgress,
+  missed,
   startedAt,
   isCreating,
   onClick,
@@ -268,6 +271,7 @@ function ScheduleCell({
 }: {
   visit: VisitWithCrew | null
   inProgress: boolean
+  missed: boolean
   startedAt: string | null
   isCreating: boolean
   onClick: () => void
@@ -324,7 +328,7 @@ function ScheduleCell({
       className={cn(
         base,
         'relative',
-        `status-${visit.status}`,
+        missed ? 'status-missed' : `status-${visit.status}`,
         'cursor-pointer hover:brightness-95',
       )}
     >
@@ -369,7 +373,7 @@ function ScheduleCell({
           <div className="flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />
             <span className="text-[11px] font-semibold uppercase tracking-wider leading-tight">
-              {visit.status}
+              {missed ? 'Missed' : visit.status}
             </span>
           </div>
           {visit.status === 'completed' && visit.ended_at && (

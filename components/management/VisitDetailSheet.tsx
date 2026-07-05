@@ -181,6 +181,7 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart, role }: V
         propertyId={data.property.id}
         assignedCrew={assignedCrew}
         startedAt={data.visit.started_at}
+        weekStart={data.visit.week_start}
         initialServiceTypes={data.visit.service_types ?? undefined}
         initialCompletionNote={data.visit.completion_note ?? undefined}
         initialPhotos={data.photos.filter((p) => p.type === 'visit')}

@@ -134,6 +134,10 @@
     background-color: #e4ecf2;
     color: #3f6e97;
   }
+  .status-missed {
+    background-color: #f5e1d8;
+    color: #b0492f;
+  }
 
   /* Account status badge colors */
   .acct-active {
