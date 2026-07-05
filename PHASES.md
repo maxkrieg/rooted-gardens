@@ -636,7 +636,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 > `app/api/quickbooks/callback/route.ts` return `501`. The "Billing" nav link already
 > exists in `components/management/ManagementNav.tsx`.
 
-- [ ] **5.1 — Invoice queue page**
+- [x] **5.1 — Invoice queue page**
   *Depends on: 4.4, 2.4*
   Create `app/management/billing/page.tsx`. Show all visits that are
   `status = 'completed' AND invoiced_at IS NULL` (reuse the existing
@@ -646,6 +646,14 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   summary (not individual lines) with the periodic contract rate.
   Include a date range filter (default: current month). Accountant can
   check/uncheck individual visits before pushing. Show running total.
+  **Added beyond the original scope**: a "Mark N visits as invoiced" bulk action
+  (`markVisitsInvoiced` in `app/management/billing/actions.ts`) that sets `invoiced_at`
+  directly on the selected visits — a stopgap so the accountant gets real use out of
+  this page before the QuickBooks push (5.4) exists, which is gated on OAuth setup
+  (5.2/5.3) and Intuit's production review. Month nav via `?month=yyyy-MM`
+  (`components/management/BillingMonthNav.tsx`, mirrors `ScheduleNav.tsx`'s pattern);
+  grouping via `lib/utils/billing.ts` (`groupVisitsByAccount`, mirrors
+  `lib/utils/schedule.ts`'s `groupRowsByAccount`).
 
 - [ ] **5.2 — QuickBooks OAuth setup**
   *Depends on: 1.2, 0.2*
