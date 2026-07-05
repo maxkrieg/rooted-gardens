@@ -5,7 +5,6 @@ import { Map as MapIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
 import {
   Sheet,
   SheetContent,
@@ -125,16 +124,15 @@ export function PropertyAssignmentSheet({
             <SheetDescription>
               Toggle properties in and out of <strong>{routeGroupName}</strong>.
             </SheetDescription>
-            <div className="flex items-center gap-2 pt-1">
-              <Switch
-                id="unassigned-only"
-                checked={unassignedOnly}
-                onCheckedChange={setUnassignedOnly}
-                className="shrink-0"
-              />
-              <Label htmlFor="unassigned-only" className="text-sm text-muted-foreground font-normal">
+            <div className="pt-1">
+              <Button
+                variant={unassignedOnly ? 'default' : 'outline'}
+                size="sm"
+                className="h-9 text-xs"
+                onClick={() => setUnassignedOnly((v) => !v)}
+              >
                 Unassigned only
-              </Label>
+              </Button>
             </div>
           </SheetHeader>
 
