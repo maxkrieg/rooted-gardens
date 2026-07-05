@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { cookies } from 'next/headers'
 import {
   ArrowLeft,
+  ArrowRight,
   CheckCircle2,
   Link2,
   Link2Off,
@@ -33,19 +34,8 @@ export default async function AccountDetailPage({ params }: Props) {
   const { id } = await params
   const supabase = await createClient()
 
-  // ── 1-2. Account + properties, recent visits ──────────────────────────────
-  const [accountResult, visitsResult] = await Promise.all([
-    supabase.from('accounts').select('*, properties(*)').eq('id', id).single(),
-    // Full property + visit_crew(employee) join — needed to open VisitDetailSheet
-    // directly from a row, same shape it already gets from the schedule grid.
-    supabase
-      .from('visits')
-      .select('*, property:properties(*), visit_crew(*, employee:employees(*))')
-      .eq('account_id', id)
-      .eq('status', 'completed')
-      .order('week_start', { ascending: false })
-      .limit(10),
-  ])
+  // ── 1. Account + properties ────────────────────────────────────────────────
+  const accountResult = await supabase.from('accounts').select('*, properties(*)').eq('id', id).single()
 
   if (accountResult.error || !accountResult.data) {
     notFound()
@@ -56,7 +46,33 @@ export default async function AccountDetailPage({ params }: Props) {
     properties: [...accountResult.data.properties].sort((a, b) => a.address.localeCompare(b.address)),
   } as AccountWithDetails
 
+  const propertyIds = account.properties.map((p) => p.id)
+
+  // ── 2. Recent visits, and each property's current route group ─────────────
+  const [visitsResult, routeGroupAssignments] = await Promise.all([
+    // Full property + visit_crew(employee) join — needed to open VisitDetailSheet
+    // directly from a row, same shape it already gets from the schedule grid.
+    supabase
+      .from('visits')
+      .select('*, property:properties(*), visit_crew(*, employee:employees(*))')
+      .eq('account_id', id)
+      .eq('status', 'completed')
+      .order('week_start', { ascending: false })
+      .limit(10),
+    propertyIds.length > 0
+      ? supabase
+          .from('property_route_groups')
+          .select('property_id, route_groups(id, name)')
+          .in('property_id', propertyIds)
+      : Promise.resolve({ data: [] as { property_id: string; route_groups: { id: string; name: string } | null }[] }),
+  ])
+
   const visits = (visitsResult.data ?? []) as RecentVisit[]
+
+  const routeGroupByPropertyId = new Map<string, { id: string; name: string }>()
+  for (const row of routeGroupAssignments.data ?? []) {
+    if (row.route_groups) routeGroupByPropertyId.set(row.property_id, row.route_groups)
+  }
 
   // role mirrors app/management/schedule/page.tsx's derivation from the rg-role cookie.
   const cookieStore = await cookies()
@@ -186,6 +202,21 @@ export default async function AccountDetailPage({ params }: Props) {
                       </div>
                     </div>
                     <PropertySheet accountId={account.id} property={property} />
+                  </div>
+
+                  {/* Route group */}
+                  <div className="flex items-center gap-2 text-sm mb-3">
+                    <span className="text-muted-foreground">Route group: </span>
+                    <span className="font-medium text-foreground">
+                      {routeGroupByPropertyId.get(property.id)?.name ?? 'Unassigned'}
+                    </span>
+                    <Link
+                      href="/management/route-groups"
+                      className="ml-auto inline-flex items-center gap-1 text-xs text-[--primary] hover:underline shrink-0"
+                    >
+                      Manage
+                      <ArrowRight className="h-3 w-3" />
+                    </Link>
                   </div>
 
                   {/* Notes */}
