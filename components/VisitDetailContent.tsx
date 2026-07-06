@@ -234,7 +234,6 @@ export function VisitDetailContent({
         <CompletionSummary
           visit={visit}
           completedBy={completedBy}
-          assignedCrew={assignedCrew}
           photos={completionPhotos}
           photoUrls={completionPhotos.map((p) => urlByPath.get(p.storage_path))}
           canEdit={canEditCompletion}

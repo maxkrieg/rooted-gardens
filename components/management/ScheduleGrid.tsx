@@ -313,11 +313,17 @@ function ScheduleCell({
 
   const hasInstruction = Boolean(visit.crew_instruction)
 
+  // Once a visit is completed, show who actually did the work rather than who was
+  // planned — falls back to assigned crew if no completion crew was recorded.
   const assignedCrew = visit.visit_crew
     .filter((vc) => vc.relation === 'assigned' && vc.employee)
     .map((vc) => vc.employee!)
-  const displayedCrew = assignedCrew.slice(0, 2)
-  const overflow = assignedCrew.length - 2
+  const completedCrew = visit.visit_crew
+    .filter((vc) => vc.relation === 'completed' && vc.employee)
+    .map((vc) => vc.employee!)
+  const displayCrew = visit.status === 'completed' && completedCrew.length > 0 ? completedCrew : assignedCrew
+  const displayedCrew = displayCrew.slice(0, 2)
+  const overflow = displayCrew.length - 2
 
   return (
     <div
@@ -381,7 +387,7 @@ function ScheduleCell({
               {format(parseISO(visit.ended_at), 'MMM d')}
             </span>
           )}
-          {assignedCrew.length > 0 && (
+          {displayCrew.length > 0 && (
             <div className="flex flex-wrap gap-0.5 mt-0.5">
               {displayedCrew.map((emp) => (
                 <span

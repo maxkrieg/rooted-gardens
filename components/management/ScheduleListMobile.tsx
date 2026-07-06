@@ -147,13 +147,23 @@ export function ScheduleListMobile({ weeks, employees, vehicles, canEdit, role }
                     const inProgress = row.visit
                       ? isVisitInProgress({ started_at: effectiveStartedAt, ended_at: effectiveEndedAt })
                       : false
+                    // Once a visit is completed, show who actually did the work rather
+                    // than who was planned — falls back to assigned crew if no
+                    // completion crew was recorded.
                     const assigned = row.visit
                       ? row.visit.visit_crew
                           .filter((vc) => vc.relation === 'assigned' && vc.employee)
                           .map((vc) => vc.employee!)
                       : []
-                    const displayedCrew = assigned.slice(0, 2)
-                    const overflow = assigned.length - 2
+                    const completed = row.visit
+                      ? row.visit.visit_crew
+                          .filter((vc) => vc.relation === 'completed' && vc.employee)
+                          .map((vc) => vc.employee!)
+                      : []
+                    const displayCrew =
+                      row.visit?.status === 'completed' && completed.length > 0 ? completed : assigned
+                    const displayedCrew = displayCrew.slice(0, 2)
+                    const overflow = displayCrew.length - 2
 
                     return (
                       <button

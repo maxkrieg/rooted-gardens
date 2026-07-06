@@ -9,7 +9,6 @@ import type { StopDetail } from '@/hooks/crew/useStopDetail'
 interface CompletionSummaryProps {
   visit: StopDetail['visit']
   completedBy: StopDetail['completedBy']
-  assignedCrew: StopDetail['assignedCrew']
   photos: StopDetail['photos']
   photoUrls: Array<string | null | undefined>
   canEdit?: boolean
@@ -36,7 +35,6 @@ function formatDuration(startIso: string, endIso: string) {
 export function CompletionSummary({
   visit,
   completedBy,
-  assignedCrew,
   photos,
   photoUrls,
   canEdit = true,
@@ -45,13 +43,6 @@ export function CompletionSummary({
 }: CompletionSummaryProps) {
   const isSkipped = visit.status === 'skipped'
   const isCompleted = visit.status === 'completed'
-
-  // Show who was on site only if it differs from who was assigned
-  const assignedIds = new Set(assignedCrew.map((c) => c.employee_id))
-  const crewDiffers =
-    completedBy.length > 0 &&
-    (completedBy.length !== assignedCrew.length ||
-      completedBy.some((c) => !assignedIds.has(c.employee_id)))
 
   const headerBg = isSkipped ? 'bg-[#FBF0D6]' : 'bg-[#E3F1E7]'
   const accentColor = isSkipped ? 'var(--ochre, #D9A441)' : 'var(--primary, #4A7C59)'
@@ -177,8 +168,8 @@ export function CompletionSummary({
               </div>
             )}
 
-            {/* Completed by — only shown when it differs from assigned crew */}
-            {crewDiffers && (
+            {/* Who completed the visit — always shown, regardless of who was assigned */}
+            {completedBy.length > 0 && (
               <div className="space-y-1">
                 <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
                   On site
