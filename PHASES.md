@@ -63,11 +63,15 @@ in-progress view 3.11 consumes the crew start/stop producer 4.10; build it again
   schedule notifications). Carrier approval takes ~1–2 weeks and gates ALL SMS delivery, so
   begin immediately. A verified toll-free number is the fallback path.
 
-- [~] **0.2 — Intuit developer app for QuickBooks** (blocks 5.2–5.4) <!-- blocked: needs human — Intuit Developer account + QBO_CLIENT_ID/SECRET, production review required -->
+- [x] **0.2 — Intuit developer app for QuickBooks**
   *Depends on: — (start here)*
   Create an Intuit Developer account and app to obtain `QBO_CLIENT_ID` / `QBO_CLIENT_SECRET`
   and configure the OAuth redirect URI. Production keys require Intuit app review — develop
   against sandbox now, request production review before Phase 5 ships.
+  **Sandbox credentials are live**: real `QBO_CLIENT_ID`/`QBO_CLIENT_SECRET` are in
+  `.env.local`, unblocking 5.2–5.4. Production app review (required before the real
+  production QuickBooks company can be connected, as opposed to the sandbox company)
+  is still outstanding — do before Phase 5 ships to real users.
 
 - [~] **0.3 — Provision cloud accounts** (blocks Phase 1) <!-- blocked: needs human — Supabase project URL/keys, Vercel project, Twilio Messaging Service -->
   *Depends on: — (start here)*
@@ -79,7 +83,7 @@ in-progress view 3.11 consumes the crew start/stop producer 4.10; build it again
 
 External / human items (they stay `[~]` until a person finishes them). Confirm each is *started*:
 - Twilio account exists and the A2P 10DLC brand + campaign are **submitted** to The Campaign Registry (0.1).
-- Intuit Developer app created; sandbox `QBO_CLIENT_ID` / `QBO_CLIENT_SECRET` + redirect URI in `.env.local` (0.2).
+- ~~Intuit Developer app created; sandbox `QBO_CLIENT_ID` / `QBO_CLIENT_SECRET` + redirect URI in `.env.local`~~ — **done**: sandbox connect flow verified live end-to-end (0.2).
 - Supabase + Vercel projects provisioned, keys in `.env.local`; Twilio Messaging Service created (0.3).
 - Note: local dev needs none of these (local Supabase handles the database) — they gate production / live integrations only.
 
@@ -677,9 +681,11 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   defense-in-depth second gate. `types/quickbooks.d.ts` holds minimal ambient
   types for `intuit-oauth`/`node-quickbooks` (neither ships official types),
   verified against the installed packages' JS source rather than assumed.
-  Code-complete but live-untested — task 0.2 (Intuit developer account) is
-  still blocked on human signup + production review, so only placeholder QBO
-  env vars exist; the auth/role/CSRF redirect paths were verified via `curl`.
+  **Live-verified (2026-07-07)**: real sandbox `QBO_CLIENT_ID`/`QBO_CLIENT_SECRET`
+  now exist (0.2 unblocked) — ran the full connect flow end-to-end and confirmed
+  a genuine `integrations` row (real `realm_id`, `token_expires_at` ~1hr out,
+  matching Intuit's actual access-token lifetime), queried directly via the
+  service-role key to rule out placeholder/stale data.
 
 - [x] **5.3 — QuickBooks customer sync**
   *Depends on: 5.2*
@@ -700,9 +706,13 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   QBO's `GivenName`/`FamilyName`/`CompanyName`). The write touches only the
   `qbo_customer_id` column via the normal RLS client — `accounts`' owner/lead
   UPDATE policy and the accountant column-guard trigger already permit exactly
-  this. Code-complete but live-untested beyond the "not connected" path (task
-  0.2 still blocked) — the actual create/verify/610-recreate round-trips need
-  real QBO sandbox credentials.
+  this. **Live-verified (2026-07-07)**: linked a real account ("Maple Ridge
+  HOA") via the UI, then confirmed against the QuickBooks sandbox API directly
+  (`GET /v3/company/{realmId}/customer/{id}`) — the returned `DisplayName`,
+  `PrimaryEmailAddr`, and `PrimaryPhone` matched the account exactly, proving
+  the full `createCustomer` round-trip works, not just the DB write. The
+  610-not-found/recreate path is still unexercised (would need a customer
+  manually deleted on the QBO side to trigger).
 
 - [ ] **5.4 — Push invoices to QuickBooks**
   *Depends on: 5.1, 5.3*
