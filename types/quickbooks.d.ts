@@ -36,6 +36,39 @@ declare module 'intuit-oauth' {
 }
 
 declare module 'node-quickbooks' {
+  interface QboAddr {
+    Address?: string
+  }
+  interface QboPhone {
+    FreeFormNumber?: string
+  }
+  interface QboCustomer {
+    Id: string
+    SyncToken: string
+    DisplayName: string
+    CompanyName?: string
+    PrimaryEmailAddr?: QboAddr
+    PrimaryPhone?: QboPhone
+  }
+  interface QboCreateCustomerInput {
+    DisplayName: string
+    PrimaryEmailAddr?: QboAddr
+    PrimaryPhone?: QboPhone
+  }
+  /** QBO's "Fault" error shape — surfaces two ways depending on whether the
+   *  library's HTTP layer caught a non-2xx (axios-wrapped, `.response.data.Fault`)
+   *  or received a 200 with a Fault body anyway (raw `.Fault`). */
+  interface QboFaultError {
+    Message?: string
+    code?: string
+  }
+  interface QboFaultBody {
+    Fault?: { Error?: QboFaultError[]; type?: string }
+  }
+  interface QboApiError extends QboFaultBody {
+    response?: { data?: QboFaultBody }
+  }
+
   class QuickBooks {
     constructor(
       consumerKey: string,
@@ -49,6 +82,14 @@ declare module 'node-quickbooks' {
       oauthVersion: '2.0',
       refreshToken: string,
     )
+    createCustomer(
+      customer: QboCreateCustomerInput,
+      callback: (err: QboApiError | null, result: QboCustomer) => void,
+    ): void
+    getCustomer(
+      id: string,
+      callback: (err: QboApiError | null, result: QboCustomer) => void,
+    ): void
   }
 
   export = QuickBooks

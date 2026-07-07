@@ -681,13 +681,28 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   still blocked on human signup + production review, so only placeholder QBO
   env vars exist; the auth/role/CSRF redirect paths were verified via `curl`.
 
-- [ ] **5.3 — QuickBooks customer sync**
+- [x] **5.3 — QuickBooks customer sync**
   *Depends on: 5.2*
   Create `lib/quickbooks/sync.ts` with a `syncCustomer(accountId)` function.
   If `accounts.qbo_customer_id` is null, create a new QBO customer using
   `account.name` and contact details, then store the returned QBO ID.
   If it exists, fetch and verify the customer still exists in QBO.
   Show QBO link status on the account detail page with a "Link / Refresh" button.
+  **Implementation notes**: `node-quickbooks` is callback-style (confirmed by
+  reading its source), so `lib/quickbooks/client.ts` gained a shared
+  `qboPromise` adapter (reused by 5.4's invoice push later) rather than each
+  call site hand-rolling its own. QBO's "customer not found" comes back as an
+  HTTP 400 with a `Fault` body (code `'610'`) in one of two shapes depending on
+  the library's error path — `syncCustomer` detects both and transparently
+  recreates the customer if the stored `qbo_customer_id` is stale, surfacing a
+  distinct "reconnected" toast rather than a plain success. `contact_name` is
+  deliberately not sent to QBO (single free-text field, no reliable mapping to
+  QBO's `GivenName`/`FamilyName`/`CompanyName`). The write touches only the
+  `qbo_customer_id` column via the normal RLS client — `accounts`' owner/lead
+  UPDATE policy and the accountant column-guard trigger already permit exactly
+  this. Code-complete but live-untested beyond the "not connected" path (task
+  0.2 still blocked) — the actual create/verify/610-recreate round-trips need
+  real QBO sandbox credentials.
 
 - [ ] **5.4 — Push invoices to QuickBooks**
   *Depends on: 5.1, 5.3*

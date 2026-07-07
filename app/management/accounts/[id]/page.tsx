@@ -4,9 +4,6 @@ import { cookies } from 'next/headers'
 import {
   ArrowLeft,
   ArrowRight,
-  CheckCircle2,
-  Link2,
-  Link2Off,
   Mail,
   Phone,
 } from 'lucide-react'
@@ -17,6 +14,7 @@ import {
 } from '@/components/management/badges'
 import { EditAccountSheet } from '@/components/management/EditAccountSheet'
 import { PropertySheet } from '@/components/management/PropertySheet'
+import { QboLinkStatus } from '@/components/management/QboLinkStatus'
 import { FrequencyBadge } from '@/components/management/badges'
 import { RecentVisitsList } from '@/components/management/RecentVisitsList'
 import { createClient } from '@/lib/supabase/server'
@@ -151,25 +149,7 @@ export default async function AccountDetailPage({ params }: Props) {
           )}
 
           {/* QBO link status */}
-          <div className="flex items-center gap-2 border-t border-border pt-3">
-            {account.qbo_customer_id ? (
-              <>
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-[#2f6e45]" />
-                <span className="text-sm text-[#2f6e45] font-medium">
-                  Linked to QuickBooks
-                </span>
-                <span className="text-sm text-muted-foreground font-mono ml-1">
-                  · {account.qbo_customer_id}
-                </span>
-                <Link2 className="h-3.5 w-3.5 text-muted-foreground ml-auto shrink-0" />
-              </>
-            ) : (
-              <>
-                <Link2Off className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Not linked to QuickBooks</span>
-              </>
-            )}
-          </div>
+          <QboLinkStatus accountId={account.id} qboCustomerId={account.qbo_customer_id} />
         </CardContent>
       </Card>
 

@@ -8,7 +8,8 @@
       "Bash(supabase status *)",
       "WebFetch(domain:docs.claude.com)",
       "Bash(npx shadcn@latest *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "WebSearch"
     ]
   }
 }

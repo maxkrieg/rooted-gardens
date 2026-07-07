@@ -161,3 +161,20 @@ export async function getQuickBooksClient(): Promise<QuickBooks> {
     refreshToken,
   )
 }
+
+/**
+ * Wraps a node-quickbooks callback-style method as a Promise — node-quickbooks
+ * predates promises entirely (every method takes a final `(err, result) => void`
+ * callback). Shared adapter reused by lib/quickbooks/sync.ts and, later,
+ * invoice push (5.4), instead of each call site hand-rolling its own.
+ */
+export function qboPromise<T>(
+  fn: (callback: (err: unknown, result: T) => void) => void,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    fn((err, result) => {
+      if (err) reject(err)
+      else resolve(result)
+    })
+  })
+}

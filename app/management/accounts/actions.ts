@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { accountFormSchema, type AccountFormValues } from '@/lib/validators/account'
+import { syncCustomer, type SyncCustomerResult } from '@/lib/quickbooks/sync'
 
 /** Shared helper — builds the DB insert/update payload from validated form values. */
 function buildPayload(data: AccountFormValues) {
@@ -80,4 +81,17 @@ export async function updateAccount(
   revalidatePath('/management/accounts')
   revalidatePath(`/management/accounts/${id}`)
   return {}
+}
+
+/**
+ * Server Action wrapper for lib/quickbooks/sync.ts's syncCustomer — link (or
+ * refresh/verify) the account's QuickBooks customer. Revalidates the account
+ * detail page so the fresh qbo_customer_id renders after the sync.
+ */
+export async function syncAccountWithQuickBooks(accountId: string): Promise<SyncCustomerResult> {
+  const result = await syncCustomer(accountId)
+  if (!result.error) {
+    revalidatePath(`/management/accounts/${accountId}`)
+  }
+  return result
 }
