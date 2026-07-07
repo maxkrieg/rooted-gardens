@@ -5,6 +5,7 @@
 
 import { Badge } from '@/components/ui/badge'
 import type { AccountStatus, BillingType, Frequency, VisitStatus } from '@/types/app'
+import type { QboConnectionStatus } from '@/lib/quickbooks/client'
 
 // ─── Account status ──────────────────────────────────────────────────────────
 
@@ -80,6 +81,23 @@ export function VisitStatusBadge({ status, missed = false }: { status: string; m
     status === 'scheduled' && missed
       ? { label: 'Missed', className: 'status-missed' }
       : VISIT_STATUS_META[status as VisitStatus] ?? { label: status, className: 'status-scheduled' }
+  return (
+    <Badge variant="outline" className={`border-transparent uppercase tracking-wide text-[10px] font-semibold ${meta.className}`}>
+      {meta.label}
+    </Badge>
+  )
+}
+
+// ─── QuickBooks connection status ─────────────────────────────────────────────
+
+const QBO_STATUS_META: Record<QboConnectionStatus, { label: string; className: string }> = {
+  connected:    { label: 'Connected',     className: 'status-completed' },
+  disconnected: { label: 'Disconnected',  className: 'status-scheduled' },
+  expired:      { label: 'Token Expired', className: 'status-skipped' },
+}
+
+export function QboStatusBadge({ status }: { status: QboConnectionStatus }) {
+  const meta = QBO_STATUS_META[status]
   return (
     <Badge variant="outline" className={`border-transparent uppercase tracking-wide text-[10px] font-semibold ${meta.className}`}>
       {meta.label}

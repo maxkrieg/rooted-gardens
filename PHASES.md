@@ -655,7 +655,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   grouping via `lib/utils/billing.ts` (`groupVisitsByAccount`, mirrors
   `lib/utils/schedule.ts`'s `groupRowsByAccount`).
 
-- [ ] **5.2 — QuickBooks OAuth setup**
+- [x] **5.2 — QuickBooks OAuth setup**
   *Depends on: 1.2, 0.2*
   Create `app/api/quickbooks/connect/route.ts` that initiates the OAuth 2.0
   flow using `intuit-oauth`. Create `app/api/quickbooks/callback/route.ts`
@@ -664,6 +664,22 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   authenticated QBO client, automatically refreshing the token if expired.
   Add a "Connect QuickBooks" button on the billing page that shows connection
   status (connected / disconnected / token expired).
+  **Implementation notes**: `proxy.ts` does not protect `/api/quickbooks/*` at
+  all (its matcher only covers `/management/*` and `/crew/*`), so both route
+  handlers do their own complete auth + owner-role check (`supabase.rpc('get_my_role')`)
+  rather than relying on any upstream gating — RLS-backed, not just the UI-hint
+  `rg-role` cookie the rest of the app reads. CSRF via a random `state` stored
+  in a short-lived httpOnly cookie, verified on callback. Added
+  `lib/supabase/service.ts` (`createServiceClient`) since `integrations` RLS is
+  owner-only but 5.3/5.4 are accountant-facing — the token read/refresh path in
+  `getQuickBooksClient` needs to work under any calling role; the OAuth
+  callback's actual token write still goes through the normal RLS client as a
+  defense-in-depth second gate. `types/quickbooks.d.ts` holds minimal ambient
+  types for `intuit-oauth`/`node-quickbooks` (neither ships official types),
+  verified against the installed packages' JS source rather than assumed.
+  Code-complete but live-untested — task 0.2 (Intuit developer account) is
+  still blocked on human signup + production review, so only placeholder QBO
+  env vars exist; the auth/role/CSRF redirect paths were verified via `curl`.
 
 - [ ] **5.3 — QuickBooks customer sync**
   *Depends on: 5.2*
