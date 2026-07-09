@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
 import {
   MapPin,
@@ -18,7 +17,6 @@ import {
   FilePen,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import {
   Select,
@@ -35,7 +33,6 @@ import { CrewInstructionSheet } from '@/components/CrewInstructionSheet'
 import { VisitPlanPhotos } from '@/components/crew/VisitPlanPhotos'
 import { useActiveVehicles } from '@/hooks/crew/useActiveVehicles'
 import { useUpdateVisitVehicle } from '@/hooks/crew/useUpdateVisitVehicle'
-import { useSetVisitInvoiced } from '@/hooks/crew/useSetVisitInvoiced'
 import { useRevertVisitToScheduled } from '@/hooks/crew/useRevertVisitToScheduled'
 import { isVisitInProgress, isVisitMissed, formatElapsed } from '@/lib/utils/visits'
 import { cn } from '@/lib/utils'
@@ -102,7 +99,6 @@ export function VisitDetailContent({
 
   const { data: vehicles = [] } = useActiveVehicles()
   const updateVehicle = useUpdateVisitVehicle(data.visitId)
-  const setInvoiced = useSetVisitInvoiced(data.visitId)
   const revert = useRevertVisitToScheduled(data.visitId)
 
   const assignedVehicle = vehicles.find((v) => v.id === visit.vehicle_id)
@@ -240,34 +236,6 @@ export function VisitDetailContent({
           onEdit={onOpenCompletion}
           onEditSkip={onOpenSkip}
         />
-      )}
-
-      {/* Invoiced — owner/lead only, completed visits only. Derived flag on
-          invoiced_at, never a status value — same convention as in-progress. */}
-      {canManage && visit.status === 'completed' && (
-        <label
-          className={cn(
-            'flex items-center gap-3 rounded-lg border border-border px-3 py-2.5',
-            setInvoiced.isPending && 'opacity-60',
-            'cursor-pointer',
-          )}
-        >
-          <Checkbox
-            checked={!!visit.invoiced_at}
-            disabled={setInvoiced.isPending}
-            onCheckedChange={(c) =>
-              setInvoiced.mutate(!!c, {
-                onError: (err) => handleOfflineOrGenericError(err, 'Could not update invoiced status. Try again.'),
-              })
-            }
-          />
-          <span className="text-sm font-medium text-foreground flex-1 select-none">Invoiced</span>
-          {visit.invoiced_at && (
-            <span className="text-xs text-muted-foreground tabular-nums">
-              {format(parseISO(visit.invoiced_at), 'MMM d')}
-            </span>
-          )}
-        </label>
       )}
 
       {/* Plan — crew instruction, assigned crew, vehicle: what was arranged for this

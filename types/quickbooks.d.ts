@@ -86,6 +86,28 @@ declare module 'node-quickbooks' {
   interface QboApiError extends QboFaultBody {
     response?: { data?: QboFaultBody }
   }
+  interface QboLine {
+    DetailType: 'SalesItemLineDetail'
+    Amount: number
+    Description?: string
+    SalesItemLineDetail: { ItemRef: { value: string } }
+  }
+  interface QboCreateInvoiceInput {
+    CustomerRef: { value: string }
+    Line: QboLine[]
+  }
+  interface QboInvoice {
+    Id: string
+    SyncToken: string
+    DocNumber?: string
+  }
+  interface QboItem {
+    Id: string
+    Name: string
+  }
+  interface QboItemQueryResponse {
+    QueryResponse: { Item?: QboItem[] }
+  }
 
   class QuickBooks {
     constructor(
@@ -111,6 +133,14 @@ declare module 'node-quickbooks' {
     updateCustomer(
       customer: QboUpdateCustomerInput,
       callback: (err: QboApiError | null, result: QboCustomer) => void,
+    ): void
+    createInvoice(
+      invoice: QboCreateInvoiceInput,
+      callback: (err: QboApiError | null, result: QboInvoice) => void,
+    ): void
+    findItems(
+      criteria: Record<string, string>,
+      callback: (err: QboApiError | null, result: QboItemQueryResponse) => void,
     ): void
   }
 

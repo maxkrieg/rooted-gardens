@@ -41,7 +41,7 @@ export default async function BillingPage({ searchParams }: Props) {
         </div>
       </div>
 
-      <InvoiceQueue visits={visits} month={resolvedMonth} />
+      <InvoiceQueue visits={visits} month={resolvedMonth} qboConnected={qboStatus !== 'disconnected'} />
     </div>
   )
 }

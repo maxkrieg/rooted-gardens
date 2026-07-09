@@ -14,7 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { BillingTypeBadge } from '@/components/management/badges'
-import { markVisitsInvoiced } from '@/app/management/billing/actions'
+import { pushInvoicesToQuickBooks } from '@/app/management/billing/actions'
 import { groupVisitsByAccount, type AccountInvoiceGroup } from '@/lib/utils/billing'
 import { formatAccountPrice } from '@/lib/utils/accounts'
 import type { VisitWithLocation } from '@/types/app'
@@ -22,6 +22,7 @@ import type { VisitWithLocation } from '@/types/app'
 interface InvoiceQueueProps {
   visits: VisitWithLocation[]
   month: string
+  qboConnected: boolean
 }
 
 function groupAmount(group: AccountInvoiceGroup, selectedIds: Set<string>): number {
@@ -42,12 +43,10 @@ function groupAmount(group: AccountInvoiceGroup, selectedIds: Set<string>): numb
  * The billing invoice queue — completed, not-yet-invoiced visits grouped by
  * account. per_visit accounts get one row per visit; contract accounts collapse
  * to a single summary row (flat periodic rate regardless of visit count),
- * matching the schedule grid's account-grouping convention. "Mark as invoiced"
- * is a stopgap manual bulk action standing in for the real QuickBooks push
- * (task 5.4, blocked on OAuth setup) — same invoiced_at field the single-visit
- * toggle in VisitDetailContent already uses.
+ * matching the schedule grid's account-grouping convention. "Push to
+ * QuickBooks" creates a real QBO invoice per account (task 5.4).
  */
-export function InvoiceQueue({ visits, month }: InvoiceQueueProps) {
+export function InvoiceQueue({ visits, month, qboConnected }: InvoiceQueueProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(visits.map((v) => v.id)))
   const [pending, startTransition] = useTransition()
 
@@ -93,14 +92,18 @@ export function InvoiceQueue({ visits, month }: InvoiceQueueProps) {
     })
   }
 
-  function handleMarkInvoiced() {
+  function handlePush() {
     const ids = [...selectedIds]
     startTransition(async () => {
-      const res = await markVisitsInvoiced(ids)
-      if (res.error) {
-        toast.error('Could not mark visits invoiced', { description: res.error })
-      } else {
-        toast.success(`Marked ${ids.length} visit${ids.length === 1 ? '' : 's'} as invoiced`)
+      const results = await pushInvoicesToQuickBooks(ids)
+      for (const r of results) {
+        if (r.success) {
+          toast.success(`${r.accountName}: invoice pushed`, {
+            description: `QuickBooks invoice ${r.qboInvoiceId}`,
+          })
+        } else {
+          toast.error(`${r.accountName}: push failed`, { description: r.error })
+        }
       }
     })
   }
@@ -124,11 +127,16 @@ export function InvoiceQueue({ visits, month }: InvoiceQueueProps) {
             across {selectedAccountCount} {selectedAccountCount === 1 ? 'account' : 'accounts'}
           </p>
         </div>
-        <Button onClick={handleMarkInvoiced} disabled={pending || selectedIds.size === 0}>
-          {pending
-            ? 'Marking…'
-            : `Mark ${selectedIds.size} visit${selectedIds.size === 1 ? '' : 's'} as invoiced`}
-        </Button>
+        <div className="flex flex-col items-end gap-1">
+          <Button onClick={handlePush} disabled={pending || selectedIds.size === 0 || !qboConnected}>
+            {pending
+              ? 'Pushing…'
+              : `Push ${selectedIds.size} visit${selectedIds.size === 1 ? '' : 's'} to QuickBooks`}
+          </Button>
+          {!qboConnected && (
+            <p className="text-xs text-muted-foreground">Connect QuickBooks above first</p>
+          )}
+        </div>
       </div>
 
       <div className="rounded-xl border border-border bg-card shadow-warm overflow-hidden">

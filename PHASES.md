@@ -714,7 +714,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   610-not-found/recreate path is still unexercised (would need a customer
   manually deleted on the QBO side to trigger).
 
-- [ ] **5.4 — Push invoices to QuickBooks**
+- [x] **5.4 — Push invoices to QuickBooks**
   *Depends on: 5.1, 5.3*
   Add a "Push to QuickBooks" button on the billing invoice queue. For selected
   visits: (1) ensure account has a QBO customer ID (auto-create if not),
@@ -722,12 +722,31 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   or one line per contract period for `contract` accounts, (3) set `invoiced_at`
   (`now()`) and `qbo_invoice_id` — **`status` stays `'completed'`; `'invoiced'` is not a
   `visits.status` value** (billing is the derived flag `invoiced_at IS NOT NULL`, same
-  convention as the in-progress state). `hooks/crew/useSetVisitInvoiced.ts` already
-  implements exactly this write, currently wired to a manual owner checkbox in
-  `components/VisitDetailContent.tsx` as a placeholder — extend/reuse that mutation and
-  trigger it automatically after a successful push rather than writing a new one.
+  convention as the in-progress state).
   Show a progress indicator during push. Show success/failure per account.
   Wrap in a transaction: if QBO push fails, do not set `invoiced_at`.
+  **Implementation notes**: every QBO invoice line must reference a Product/Service
+  "Item" — rather than the accountants' existing pattern of one Item per customer
+  (a workaround for defaulting prices when typing invoices manually), this push uses
+  **one single shared Item** ("Services", QuickBooks' own built-in default — configurable
+  via `QBO_SERVICE_ITEM_NAME`) for every line, every account, since the app always sets
+  each line's exact dollar amount explicitly and never needs a default price. Looked up
+  by name (`lib/quickbooks/invoice.ts`'s `getServiceItemId`); fails with a clear error if
+  missing rather than auto-creating it (auto-creating would also require picking/creating
+  an Income account — an accounting decision left to the accountant). `per_visit` accounts
+  get one line per visit; `contract` accounts collapse to one flat-rate summary line
+  regardless of visit count. Push is per-account, not all-or-nothing across a batch — one
+  account's `visits` update is atomic, and one account failing never blocks another's in
+  the same push. Replaced the 5.1 "Mark N visits as invoiced" stopgap button entirely
+  (superseded, not kept alongside), and removed the manual "Invoiced" checkbox from
+  `components/VisitDetailContent.tsx` along with its now-fully-unused
+  `hooks/crew/useSetVisitInvoiced.ts` — invoicing now happens exclusively from the Billing
+  page. **Live-verified (2026-07-08)** against the connected sandbox: pushed a contract
+  account (Birchwood Commons, 1 visit → one $1,200 line, `contract_rate`) and a brand-new
+  per_visit account (Krieg House, 2 visits → two $101.08 lines, one per visit) — confirmed
+  via the QuickBooks sandbox API directly that both invoices' `CustomerRef`/`Line`
+  amounts/`ItemRef` (same shared "Services" item, id `1`, for both) matched exactly, and
+  that QBO auto-populated `BillAddr` from the 5.3 billing-address work with zero extra code.
 
 - [ ] **5.5 — Invoiced visits view**
   *Depends on: 5.4*
