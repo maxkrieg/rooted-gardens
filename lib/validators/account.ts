@@ -24,6 +24,13 @@ export const accountFormSchema = z
         message: 'Invalid email address',
       }),
     phone: z.string().trim().optional(),
+    // Structured billing/mailing address — for QuickBooks invoices, separate from
+    // properties.address (the serviced location). Each part is independently optional.
+    billing_address_line1: z.string().trim().optional(),
+    billing_address_line2: z.string().trim().optional(),
+    billing_city: z.string().trim().optional(),
+    billing_state: z.string().trim().optional(),
+    billing_zip: z.string().trim().optional(),
     billing_type: z.enum(BILLING_TYPES),
     // Numbers only — the form converts '' → undefined on input change
     price_per_visit: z.number().positive('Must be a positive amount').optional(),

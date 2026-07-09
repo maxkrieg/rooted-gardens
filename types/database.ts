@@ -41,7 +41,12 @@ export type Database = {
     Tables: {
       accounts: {
         Row: {
+          billing_address_line1: string | null
+          billing_address_line2: string | null
+          billing_city: string | null
+          billing_state: string | null
           billing_type: string
+          billing_zip: string | null
           contact_name: string | null
           contract_period: string | null
           contract_rate: number | null
@@ -57,7 +62,12 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          billing_address_line1?: string | null
+          billing_address_line2?: string | null
+          billing_city?: string | null
+          billing_state?: string | null
           billing_type: string
+          billing_zip?: string | null
           contact_name?: string | null
           contract_period?: string | null
           contract_rate?: number | null
@@ -73,7 +83,12 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          billing_address_line1?: string | null
+          billing_address_line2?: string | null
+          billing_city?: string | null
+          billing_state?: string | null
           billing_type?: string
+          billing_zip?: string | null
           contact_name?: string | null
           contract_period?: string | null
           contract_rate?: number | null

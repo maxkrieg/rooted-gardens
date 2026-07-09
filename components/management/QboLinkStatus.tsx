@@ -11,9 +11,10 @@ interface QboLinkStatusProps {
   qboCustomerId: string | null
 }
 
-/** QuickBooks link status + "Link / Refresh" trigger for the account detail
- *  page. Create-vs-verify is decided server-side (syncCustomer) based on
- *  whether qbo_customer_id is already set. */
+/** QuickBooks link status + "Link / Sync" trigger for the account detail
+ *  page. Create-vs-update is decided server-side (syncCustomer) based on
+ *  whether qbo_customer_id is already set — once linked, every click pushes
+ *  the account's current name/email/phone/billing address to QBO. */
 export function QboLinkStatus({ accountId, qboCustomerId }: QboLinkStatusProps) {
   const [pending, startTransition] = useTransition()
 
@@ -22,10 +23,12 @@ export function QboLinkStatus({ accountId, qboCustomerId }: QboLinkStatusProps) 
       const res = await syncAccountWithQuickBooks(accountId)
       if (res.error) {
         toast.error('QuickBooks sync failed', { description: res.error })
-      } else if (res.recreated) {
+      } else if (res.action === 'recreated') {
         toast.warning('Reconnected to QuickBooks', {
           description: 'The previous link was invalid — a new QuickBooks customer was created.',
         })
+      } else if (res.action === 'updated') {
+        toast.success('QuickBooks customer updated')
       } else {
         toast.success('Linked to QuickBooks')
       }
@@ -53,7 +56,7 @@ export function QboLinkStatus({ accountId, qboCustomerId }: QboLinkStatusProps) 
         disabled={pending}
         onClick={handleSync}
       >
-        {pending ? (qboCustomerId ? 'Refreshing…' : 'Linking…') : qboCustomerId ? 'Refresh' : 'Link to QuickBooks'}
+        {pending ? (qboCustomerId ? 'Syncing…' : 'Linking…') : qboCustomerId ? 'Sync' : 'Link to QuickBooks'}
       </Button>
       {qboCustomerId && <Link2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
     </div>

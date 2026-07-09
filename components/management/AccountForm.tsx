@@ -45,6 +45,11 @@ export function AccountForm({ onSuccess, account }: AccountFormProps) {
           contact_name: account.contact_name ?? '',
           email: account.email ?? '',
           phone: account.phone ?? '',
+          billing_address_line1: account.billing_address_line1 ?? '',
+          billing_address_line2: account.billing_address_line2 ?? '',
+          billing_city: account.billing_city ?? '',
+          billing_state: account.billing_state ?? '',
+          billing_zip: account.billing_zip ?? '',
           billing_type: account.billing_type as AccountFormValues['billing_type'],
           price_per_visit: account.price_per_visit ?? undefined,
           contract_rate: account.contract_rate ?? undefined,
@@ -58,6 +63,11 @@ export function AccountForm({ onSuccess, account }: AccountFormProps) {
           contact_name: '',
           email: '',
           phone: '',
+          billing_address_line1: '',
+          billing_address_line2: '',
+          billing_city: '',
+          billing_state: '',
+          billing_zip: '',
           billing_type: 'per_visit' as const,
           price_per_visit: undefined,
           contract_rate: undefined,
@@ -161,6 +171,88 @@ export function AccountForm({ onSuccess, account }: AccountFormProps) {
               </FormItem>
             )}
           />
+        </div>
+
+        {/* Billing address */}
+        <div className="border-t border-border pt-5 space-y-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Billing address
+          </p>
+
+          <FormField
+            control={form.control}
+            name="billing_address_line1"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Street address</FormLabel>
+                <FormControl>
+                  <Input placeholder="123 Main St" className="h-11 text-base" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="billing_address_line2"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  Apt, suite, etc.{' '}
+                  <span className="text-muted-foreground font-normal">(optional)</span>
+                </FormLabel>
+                <FormControl>
+                  <Input placeholder="Suite 100" className="h-11 text-base" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <div className="grid grid-cols-3 gap-4">
+            <FormField
+              control={form.control}
+              name="billing_city"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>City</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Norwich" className="h-11 text-base" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="billing_state"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>State</FormLabel>
+                  <FormControl>
+                    <Input placeholder="VT" className="h-11 text-base" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="billing_zip"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Zip</FormLabel>
+                  <FormControl>
+                    <Input placeholder="05055" className="h-11 text-base" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
         </div>
 
         {/* Billing type */}

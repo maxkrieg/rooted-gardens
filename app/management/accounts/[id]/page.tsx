@@ -135,6 +135,23 @@ export default async function AccountDetailPage({ params }: Props) {
             </div>
           )}
 
+          {/* Billing address */}
+          {(account.billing_address_line1 || account.billing_city) && (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Billing address:</span>
+              <div className="text-foreground mt-0.5">
+                {account.billing_address_line1 && <div>{account.billing_address_line1}</div>}
+                {account.billing_address_line2 && <div>{account.billing_address_line2}</div>}
+                {(account.billing_city || account.billing_state || account.billing_zip) && (
+                  <div>
+                    {[account.billing_city, account.billing_state].filter(Boolean).join(', ')}
+                    {account.billing_zip ? ` ${account.billing_zip}` : ''}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Price / rate */}
           <div className="text-sm">
             <span className="text-muted-foreground">Rate: </span>

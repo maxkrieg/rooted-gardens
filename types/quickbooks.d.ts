@@ -42,6 +42,13 @@ declare module 'node-quickbooks' {
   interface QboPhone {
     FreeFormNumber?: string
   }
+  interface QboBillAddr {
+    Line1?: string
+    Line2?: string
+    City?: string
+    CountrySubDivisionCode?: string // QBO's field name for US state
+    PostalCode?: string
+  }
   interface QboCustomer {
     Id: string
     SyncToken: string
@@ -49,11 +56,22 @@ declare module 'node-quickbooks' {
     CompanyName?: string
     PrimaryEmailAddr?: QboAddr
     PrimaryPhone?: QboPhone
+    BillAddr?: QboBillAddr
   }
   interface QboCreateCustomerInput {
     DisplayName: string
     PrimaryEmailAddr?: QboAddr
     PrimaryPhone?: QboPhone
+    BillAddr?: QboBillAddr
+  }
+  interface QboUpdateCustomerInput {
+    Id: string
+    SyncToken: string
+    DisplayName: string
+    PrimaryEmailAddr?: QboAddr
+    PrimaryPhone?: QboPhone
+    BillAddr?: QboBillAddr
+    sparse?: boolean
   }
   /** QBO's "Fault" error shape — surfaces two ways depending on whether the
    *  library's HTTP layer caught a non-2xx (axios-wrapped, `.response.data.Fault`)
@@ -88,6 +106,10 @@ declare module 'node-quickbooks' {
     ): void
     getCustomer(
       id: string,
+      callback: (err: QboApiError | null, result: QboCustomer) => void,
+    ): void
+    updateCustomer(
+      customer: QboUpdateCustomerInput,
       callback: (err: QboApiError | null, result: QboCustomer) => void,
     ): void
   }
