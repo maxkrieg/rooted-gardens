@@ -22,3 +22,42 @@ export function groupVisitsByAccount(visits: VisitWithLocation[]): AccountInvoic
   }
   return [...map.values()].sort((a, b) => a.account.name.localeCompare(b.account.name))
 }
+
+export type InvoiceGroup = {
+  account: Account
+  qboInvoiceId: string
+  invoicedAt: string
+  visits: VisitWithLocation[]
+  totalAmount: number
+}
+
+/**
+ * Clusters invoiced visits by the actual QBO invoice they belong to (not by
+ * account alone — an account can be pushed more than once in a month, and the
+ * audit trail needs to keep those as distinct invoices). `totalAmount` is a
+ * plain sum of `invoice_amount` across the group: correct for every billing
+ * type with no special-casing, since the contract snapshot convention (see
+ * pushInvoicesToQuickBooks) already puts the full contract_rate on exactly one
+ * visit per invoice and 0 on the rest.
+ */
+export function groupVisitsByInvoice(visits: VisitWithLocation[]): InvoiceGroup[] {
+  const map = new Map<string, InvoiceGroup>()
+  for (const visit of visits) {
+    if (!visit.qbo_invoice_id || !visit.invoiced_at) continue
+    const amount = Number(visit.invoice_amount ?? 0)
+    const existing = map.get(visit.qbo_invoice_id)
+    if (existing) {
+      existing.visits.push(visit)
+      existing.totalAmount += amount
+    } else {
+      map.set(visit.qbo_invoice_id, {
+        account: visit.account,
+        qboInvoiceId: visit.qbo_invoice_id,
+        invoicedAt: visit.invoiced_at,
+        visits: [visit],
+        totalAmount: amount,
+      })
+    }
+  }
+  return [...map.values()].sort((a, b) => (a.invoicedAt < b.invoicedAt ? 1 : -1))
+}

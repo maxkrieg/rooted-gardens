@@ -1,14 +1,17 @@
 import { cookies } from 'next/headers'
+import Link from 'next/link'
 import { format } from 'date-fns'
+import { cn } from '@/lib/utils'
 import { parseRoleCookie } from '@/lib/utils/role-cookie'
 import { getQboConnectionStatus } from '@/lib/quickbooks/client'
 import { BillingMonthNav } from '@/components/management/BillingMonthNav'
 import { QuickBooksConnect } from '@/components/management/QuickBooksConnect'
 import { InvoiceQueue } from '@/components/management/InvoiceQueue'
-import { getUninvoicedVisits } from './actions'
+import { InvoicedHistory } from '@/components/management/InvoicedHistory'
+import { getUninvoicedVisits, getInvoicedVisits, getRevenueSummary } from './actions'
 
 interface Props {
-  searchParams: Promise<{ month?: string; qbo?: string; reason?: string }>
+  searchParams: Promise<{ month?: string; qbo?: string; reason?: string; view?: string }>
 }
 
 /**
@@ -16,16 +19,17 @@ interface Props {
  * one management area that stays table/grid-dense rather than mobile-first).
  */
 export default async function BillingPage({ searchParams }: Props) {
-  const { month, qbo, reason } = await searchParams
+  const { month, qbo, reason, view } = await searchParams
   const resolvedMonth = month ?? format(new Date(), 'yyyy-MM')
+  const resolvedView = view === 'invoiced' ? 'invoiced' : 'queue'
 
   const cookieStore = await cookies()
   const role = parseRoleCookie(cookieStore.get('rg-role')?.value)?.role ?? 'accountant'
 
-  const [visits, qboStatus] = await Promise.all([
-    getUninvoicedVisits(resolvedMonth),
-    getQboConnectionStatus(),
-  ])
+  const qboStatus = await getQboConnectionStatus()
+  const [visits, revenue] = resolvedView === 'invoiced'
+    ? await Promise.all([getInvoicedVisits(resolvedMonth), getRevenueSummary()])
+    : await Promise.all([getUninvoicedVisits(resolvedMonth), Promise.resolve(null)])
 
   return (
     <div className="p-4 lg:p-6 space-y-6">
@@ -41,7 +45,36 @@ export default async function BillingPage({ searchParams }: Props) {
         </div>
       </div>
 
-      <InvoiceQueue visits={visits} month={resolvedMonth} qboConnected={qboStatus !== 'disconnected'} />
+      <div className="flex items-center gap-1.5 border-b border-border">
+        <Link
+          href={`/management/billing?month=${resolvedMonth}`}
+          className={cn(
+            'px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+            resolvedView === 'queue'
+              ? 'border-primary text-foreground'
+              : 'border-transparent text-muted-foreground hover:text-foreground',
+          )}
+        >
+          Queue
+        </Link>
+        <Link
+          href={`/management/billing?view=invoiced&month=${resolvedMonth}`}
+          className={cn(
+            'px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+            resolvedView === 'invoiced'
+              ? 'border-primary text-foreground'
+              : 'border-transparent text-muted-foreground hover:text-foreground',
+          )}
+        >
+          Invoiced
+        </Link>
+      </div>
+
+      {resolvedView === 'invoiced' && revenue ? (
+        <InvoicedHistory visits={visits} month={resolvedMonth} revenue={revenue} />
+      ) : (
+        <InvoiceQueue visits={visits} month={resolvedMonth} qboConnected={qboStatus !== 'disconnected'} />
+      )}
     </div>
   )
 }

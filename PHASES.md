@@ -748,7 +748,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   amounts/`ItemRef` (same shared "Services" item, id `1`, for both) matched exactly, and
   that QBO auto-populated `BillAddr` from the 5.3 billing-address work with zero extra code.
 
-- [ ] **5.5 — Invoiced visits view**
+- [x] **5.5 — Invoiced visits view**
   *Depends on: 5.4*
   Add an "Invoiced" tab to the billing page showing visits where
   `invoiced_at IS NOT NULL`, grouped by month. Show QBO invoice ID as a link
@@ -756,14 +756,42 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   Show total invoiced per month. Allow filtering by account.
   This is the accountant's audit trail — equivalent to the red text in the
   old spreadsheet.
+  **Implementation notes**: built together with 5.6 (see below) since a
+  trustworthy audit trail needs the price snapshot from day one. Added a
+  `?view=queue|invoiced` param to `app/management/billing/page.tsx` (plain
+  server-rendered `Link` toggle, no client component needed) alongside the
+  existing `?month=`. `getInvoicedVisits(month)` in
+  `app/management/billing/actions.ts` mirrors `getUninvoicedVisits`, filtering
+  `invoiced_at` instead of `ended_at`. New `groupVisitsByInvoice` in
+  `lib/utils/billing.ts` groups by `qbo_invoice_id` (not by account, unlike the
+  queue's `groupVisitsByAccount`) — an account can be pushed more than once in
+  a month, and the audit trail keeps those as visibly distinct invoices.
+  `components/management/InvoicedHistory.tsx` (new, read-only sibling of
+  `InvoiceQueue.tsx`) renders the grouped table with a client-side account
+  filter (same `useState` + shadcn `Select` convention as `AccountsTable.tsx`)
+  and links each invoice out to QBO.
 
-- [ ] **5.6 — Invoice amount snapshot**
+- [x] **5.6 — Invoice amount snapshot**
   *Depends on: 5.4*
   When `invoiced_at` is set, snapshot the price into `visits.invoice_amount`.
   This preserves the amount even if the account's price changes later.
   Display the invoiced amount (not current price) in the invoiced history view.
   Add a simple revenue summary to the billing page: MTD invoiced, YTD invoiced,
   broken down by billing type (per-visit vs contract).
+  **Implementation notes**: `pushInvoicesToQuickBooks` now branches by billing
+  type when setting `invoice_amount`. `per_visit` is straightforward — each
+  visit gets its own `price_per_visit`. `contract` is the non-obvious case: a
+  contract invoice is one flat rate for a whole batch of visits, so storing
+  the full `contract_rate` on every visit in the batch would make any
+  `SUM(invoice_amount)` overcount by the visit count. Instead the batch's
+  first visit gets `invoice_amount = contract_rate` and the rest get `0` —
+  this keeps a plain `SUM(invoice_amount)` correct everywhere (the invoiced
+  view, the revenue summary) with zero billing-type special-casing downstream.
+  `getRevenueSummary()` (`app/management/billing/actions.ts`) pulls the
+  current calendar year in one query and reduces MTD/YTD totals (each split
+  per-visit vs. contract) in JS. Full writeup of the invoicing model —
+  billing types, the shared-QBO-Item strategy from 5.4, the snapshot
+  convention — now lives in `docs/INVOICING.md`.
 
 ### ✅ Verifying Phase 5 — Billing & QuickBooks
 
