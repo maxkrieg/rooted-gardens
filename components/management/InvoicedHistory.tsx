@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { format, parseISO } from 'date-fns'
 import { ExternalLink } from 'lucide-react'
 import {
@@ -19,14 +20,16 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { BillingTypeBadge } from '@/components/management/badges'
+import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { groupVisitsByInvoice } from '@/lib/utils/billing'
 import type { RevenueSummary } from '@/app/management/billing/actions'
-import type { VisitWithLocation } from '@/types/app'
+import type { EmployeeRole, VisitWithLocation } from '@/types/app'
 
 interface InvoicedHistoryProps {
   visits: VisitWithLocation[]
   month: string
   revenue: RevenueSummary
+  role: EmployeeRole | undefined
 }
 
 function qboInvoiceUrl(qboInvoiceId: string): string {
@@ -59,8 +62,20 @@ function RevenueCard({
  * once in a month). Amounts are the invoice_amount snapshot (task 5.6), never
  * a live account price, so the trail stays correct even after a price change.
  */
-export function InvoicedHistory({ visits, month, revenue }: InvoicedHistoryProps) {
+export function InvoicedHistory({ visits, month, revenue, role }: InvoicedHistoryProps) {
+  const router = useRouter()
   const [accountFilter, setAccountFilter] = useState<string>('all')
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [sheetVisit, setSheetVisit] = useState<VisitWithLocation | null>(null)
+
+  function handleVisitClick(visit: VisitWithLocation) {
+    setSheetVisit(visit)
+    setSheetOpen(true)
+  }
+
+  function handleAccountClick(accountId: string) {
+    router.push(`/management/accounts/${accountId}`)
+  }
 
   const accountOptions = useMemo(() => {
     const map = new Map<string, string>()
@@ -119,6 +134,7 @@ export function InvoicedHistory({ visits, month, revenue }: InvoicedHistoryProps
                     href={qboInvoiceUrl(group.qboInvoiceId)}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
                     className="inline-flex items-center gap-1 text-primary hover:underline"
                   >
                     {group.qboInvoiceId}
@@ -128,7 +144,11 @@ export function InvoicedHistory({ visits, month, revenue }: InvoicedHistoryProps
 
                 if (group.account.billing_type === 'contract') {
                   return [
-                    <TableRow key={group.qboInvoiceId}>
+                    <TableRow
+                      key={group.qboInvoiceId}
+                      onClick={() => handleAccountClick(group.account.id)}
+                      className="cursor-pointer hover:bg-accent/50 transition-colors"
+                    >
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-foreground">{group.account.name}</span>
@@ -148,19 +168,32 @@ export function InvoicedHistory({ visits, month, revenue }: InvoicedHistoryProps
                 }
 
                 return [
-                  <TableRow key={`${group.qboInvoiceId}-header`} className="bg-muted/30 hover:bg-muted/30">
-                    <TableCell colSpan={4}>
+                  <TableRow
+                    key={`${group.qboInvoiceId}-header`}
+                    onClick={() => handleAccountClick(group.account.id)}
+                    className="bg-muted/30 hover:bg-accent/40 transition-colors cursor-pointer"
+                  >
+                    <TableCell>
                       <div className="flex items-center gap-2">
                         <span className="font-display text-sm text-foreground">{group.account.name}</span>
                         <BillingTypeBadge billingType={group.account.billing_type} />
                       </div>
                     </TableCell>
+                    <TableCell className="text-muted-foreground tabular-nums">{invoicedDate}</TableCell>
+                    <TableCell>{link}</TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">
+                      ${group.totalAmount.toFixed(2)}
+                    </TableCell>
                   </TableRow>,
                   ...group.visits.map((visit) => (
-                    <TableRow key={visit.id}>
+                    <TableRow
+                      key={visit.id}
+                      onClick={() => handleVisitClick(visit)}
+                      className="cursor-pointer hover:bg-accent/50 transition-colors"
+                    >
                       <TableCell className="pl-8 text-foreground">{visit.property.address}</TableCell>
-                      <TableCell className="text-muted-foreground tabular-nums">{invoicedDate}</TableCell>
-                      <TableCell>{link}</TableCell>
+                      <TableCell />
+                      <TableCell />
                       <TableCell className="text-right tabular-nums">
                         ${Number(visit.invoice_amount ?? 0).toFixed(2)}
                       </TableCell>
@@ -171,6 +204,20 @@ export function InvoicedHistory({ visits, month, revenue }: InvoicedHistoryProps
             </TableBody>
           </Table>
         </div>
+      )}
+
+      {sheetVisit && (
+        <VisitDetailSheet
+          open={sheetOpen}
+          onOpenChange={setSheetOpen}
+          row={{
+            property: sheetVisit.property,
+            account: sheetVisit.account,
+            visit: { ...sheetVisit, visit_crew: [] },
+          }}
+          weekStart={sheetVisit.week_start}
+          role={role}
+        />
       )}
     </div>
   )

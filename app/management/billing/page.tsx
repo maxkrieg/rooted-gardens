@@ -9,6 +9,7 @@ import { QuickBooksConnect } from '@/components/management/QuickBooksConnect'
 import { InvoiceQueue } from '@/components/management/InvoiceQueue'
 import { InvoicedHistory } from '@/components/management/InvoicedHistory'
 import { getUninvoicedVisits, getInvoicedVisits, getRevenueSummary } from './actions'
+import type { EmployeeRole } from '@/types/app'
 
 interface Props {
   searchParams: Promise<{ month?: string; qbo?: string; reason?: string; view?: string }>
@@ -71,7 +72,7 @@ export default async function BillingPage({ searchParams }: Props) {
       </div>
 
       {resolvedView === 'invoiced' && revenue ? (
-        <InvoicedHistory visits={visits} month={resolvedMonth} revenue={revenue} />
+        <InvoicedHistory visits={visits} month={resolvedMonth} revenue={revenue} role={role as EmployeeRole} />
       ) : (
         <InvoiceQueue visits={visits} month={resolvedMonth} qboConnected={qboStatus !== 'disconnected'} />
       )}
