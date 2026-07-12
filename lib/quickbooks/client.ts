@@ -89,33 +89,89 @@ export async function upsertIntegrationTokens(
   return {}
 }
 
+interface IntegrationRow {
+  access_token: string
+  refresh_token: string
+  realm_id: string
+  token_expires_at: string | null
+}
+
 /**
- * Read-only connection status for the billing page's status badge — visible
- * to every role, so this goes through the service client (integrations RLS is
- * owner-only) but selects only `token_expires_at`, never the tokens
- * themselves. Deliberately simple: no speculative refresh just to report
- * status — that's what getQuickBooksClient is for when 5.3/5.4 actually use it.
+ * Returns fresh tokens for `row`, refreshing against Intuit first if the
+ * stored access token is expired or expiring within `REFRESH_BUFFER_MS`.
+ * Persists a successful refresh via `upsertIntegrationTokens`. Shared by
+ * `getQuickBooksClient` (needs a usable client) and `getQboConnectionStatus`
+ * (needs to know whether the *refresh token* — not just the short-lived
+ * access token — still works). Throws if Intuit rejects the refresh (e.g. the
+ * refresh token itself was revoked or expired) — that's the one case that
+ * actually requires the user to reconnect.
+ */
+async function ensureFreshTokens(
+  supabase: SupabaseClient<Database>,
+  row: IntegrationRow,
+): Promise<StoredTokens> {
+  const expiresAt = row.token_expires_at ? new Date(row.token_expires_at).getTime() : 0
+  if (expiresAt - Date.now() >= REFRESH_BUFFER_MS) {
+    return { ...row, token_expires_at: row.token_expires_at! }
+  }
+
+  const oauthClient = createQboOAuthClient()
+  const authResponse = await oauthClient.refreshUsingToken(row.refresh_token)
+  const json = authResponse.getJson()
+  const tokens: StoredTokens = {
+    access_token: json.access_token,
+    refresh_token: json.refresh_token,
+    realm_id: row.realm_id,
+    token_expires_at: new Date(Date.now() + json.expires_in * 1000).toISOString(),
+  }
+
+  await upsertIntegrationTokens(supabase, tokens)
+  return tokens
+}
+
+/**
+ * Connection status for the billing page's status badge — visible to every
+ * role, so this goes through the service client (integrations RLS is
+ * owner-only). Actually attempts a refresh when the stored access token looks
+ * expired, rather than just reading the stale `token_expires_at` column: a
+ * QBO access token expires every ~hour regardless of activity, so a purely
+ * passive read would show "Expired" (with a "Connect QuickBooks" button)
+ * after any hour of inactivity even though the long-lived refresh token is
+ * still perfectly valid and the next real action would refresh it silently
+ * anyway. Reporting that as "Expired" — the same label/button shown for a
+ * truly broken connection — was confusing. Only a failed refresh (the
+ * *refresh* token itself no longer works) is reported as 'expired' now.
  */
 export async function getQboConnectionStatus(): Promise<QboConnectionStatus> {
   const supabase = createServiceClient()
-  const { data } = await supabase
+  const { data: row } = await supabase
     .from('integrations')
-    .select('token_expires_at')
+    .select('access_token, refresh_token, realm_id, token_expires_at')
     .eq('service', 'quickbooks')
     .maybeSingle()
 
-  if (!data) return 'disconnected'
-  if (!data.token_expires_at) return 'expired'
-  return new Date(data.token_expires_at).getTime() > Date.now() ? 'connected' : 'expired'
+  if (!row?.access_token || !row.refresh_token || !row.realm_id) return 'disconnected'
+
+  try {
+    await ensureFreshTokens(supabase, {
+      access_token: row.access_token,
+      refresh_token: row.refresh_token,
+      realm_id: row.realm_id,
+      token_expires_at: row.token_expires_at,
+    })
+    return 'connected'
+  } catch (err) {
+    console.error('[getQboConnectionStatus] refresh failed', err)
+    return 'expired'
+  }
 }
 
 /**
  * Returns an authenticated node-quickbooks client, refreshing the token first
- * if it's expired or expiring within the next 5 minutes. Not called by task
- * 5.2 itself — exported for 5.3 (customer sync) / 5.4 (invoice push) to
- * consume. Uses the service client throughout so it works under any calling
- * role (an accountant-triggered sync must still be able to read the tokens,
- * which the owner-only integrations RLS would otherwise block).
+ * if it's expired or expiring within the next 5 minutes. Uses the service
+ * client throughout so it works under any calling role (an
+ * accountant-triggered sync must still be able to read the tokens, which the
+ * owner-only integrations RLS would otherwise block).
  */
 export async function getQuickBooksClient(): Promise<QuickBooks> {
   const supabase = createServiceClient()
@@ -129,36 +185,24 @@ export async function getQuickBooksClient(): Promise<QuickBooks> {
     throw new Error('QuickBooks is not connected')
   }
 
-  let accessToken = row.access_token
-  let refreshToken = row.refresh_token
-  const expiresAt = row.token_expires_at ? new Date(row.token_expires_at).getTime() : 0
-
-  if (expiresAt - Date.now() < REFRESH_BUFFER_MS) {
-    const oauthClient = createQboOAuthClient()
-    const authResponse = await oauthClient.refreshUsingToken(refreshToken)
-    const json = authResponse.getJson()
-    accessToken = json.access_token
-    refreshToken = json.refresh_token
-
-    await upsertIntegrationTokens(supabase, {
-      access_token: accessToken,
-      refresh_token: refreshToken,
-      realm_id: row.realm_id,
-      token_expires_at: new Date(Date.now() + json.expires_in * 1000).toISOString(),
-    })
-  }
+  const tokens = await ensureFreshTokens(supabase, {
+    access_token: row.access_token,
+    refresh_token: row.refresh_token,
+    realm_id: row.realm_id,
+    token_expires_at: row.token_expires_at,
+  })
 
   return new QuickBooks(
     process.env.QBO_CLIENT_ID!,
     process.env.QBO_CLIENT_SECRET!,
-    accessToken,
+    tokens.access_token,
     false,
-    row.realm_id,
+    tokens.realm_id,
     qboEnvironment() !== 'production',
     false,
     null,
     '2.0',
-    refreshToken,
+    tokens.refresh_token,
   )
 }
 
