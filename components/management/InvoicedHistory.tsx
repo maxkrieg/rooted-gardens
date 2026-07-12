@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, parseISO } from 'date-fns'
-import { ExternalLink } from 'lucide-react'
+import { ChevronDown, ExternalLink } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -69,6 +69,7 @@ export function InvoicedHistory({ visits, month, revenue, role }: InvoicedHistor
   const [accountFilter, setAccountFilter] = useState<string>('all')
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sheetVisit, setSheetVisit] = useState<VisitWithLocation | null>(null)
+  const [expandedInvoiceIds, setExpandedInvoiceIds] = useState<Set<string>>(() => new Set())
 
   function handleVisitClick(visit: VisitWithLocation) {
     setSheetVisit(visit)
@@ -77,6 +78,15 @@ export function InvoicedHistory({ visits, month, revenue, role }: InvoicedHistor
 
   function handleAccountClick(accountId: string) {
     router.push(`/management/accounts/${accountId}`)
+  }
+
+  function toggleInvoiceExpanded(qboInvoiceId: string) {
+    setExpandedInvoiceIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(qboInvoiceId)) next.delete(qboInvoiceId)
+      else next.add(qboInvoiceId)
+      return next
+    })
   }
 
   const accountOptions = useMemo(() => {
@@ -169,16 +179,38 @@ export function InvoicedHistory({ visits, month, revenue, role }: InvoicedHistor
                   ]
                 }
 
-                return [
+                const isExpanded = expandedInvoiceIds.has(group.qboInvoiceId)
+
+                const headerRow = (
                   <TableRow
                     key={`${group.qboInvoiceId}-header`}
                     onClick={() => handleAccountClick(group.account.id)}
                     className="bg-muted/30 hover:bg-accent/40 transition-colors cursor-pointer"
                   >
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className="font-display text-sm text-foreground">{group.account.name}</span>
-                        <BillingTypeBadge billingType={group.account.billing_type} />
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-display text-sm text-foreground">{group.account.name}</span>
+                          <BillingTypeBadge billingType={group.account.billing_type} />
+                          <span className="text-xs text-muted-foreground tabular-nums">
+                            {group.visits.length} visit{group.visits.length === 1 ? '' : 's'}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleInvoiceExpanded(group.qboInvoiceId)
+                          }}
+                          aria-label={isExpanded ? 'Collapse visits' : 'Expand visits'}
+                          aria-expanded={isExpanded}
+                          className="shrink-0 rounded p-1 hover:bg-accent/60 transition-colors"
+                        >
+                          <ChevronDown
+                            className="h-4 w-4 text-muted-foreground transition-transform duration-200"
+                            style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                          />
+                        </button>
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground tabular-nums">{invoicedDate}</TableCell>
@@ -186,17 +218,31 @@ export function InvoicedHistory({ visits, month, revenue, role }: InvoicedHistor
                     <TableCell className="text-right tabular-nums font-medium">
                       ${group.totalAmount.toFixed(2)}
                     </TableCell>
-                  </TableRow>,
+                  </TableRow>
+                )
+
+                if (!isExpanded) return [headerRow]
+
+                return [
+                  headerRow,
                   ...group.visits.map((visit) => (
                     <TableRow
                       key={visit.id}
                       onClick={() => handleVisitClick(visit)}
-                      className="cursor-pointer hover:bg-accent/50 transition-colors"
+                      className="cursor-pointer hover:bg-accent/40 transition-colors bg-muted/10"
                     >
-                      <TableCell className="pl-8 text-foreground">{visit.property.address}</TableCell>
-                      <TableCell />
-                      <TableCell />
-                      <TableCell className="text-right tabular-nums">
+                      <TableCell className="pl-8 py-1.5 text-sm text-foreground">
+                        {visit.property.address}
+                        {visit.ended_at && (
+                          <span className="text-xs text-muted-foreground">
+                            {' '}
+                            — {format(parseISO(visit.ended_at), 'MMM d')}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-1.5" />
+                      <TableCell className="py-1.5" />
+                      <TableCell className="py-1.5 text-right text-sm tabular-nums">
                         ${Number(visit.invoice_amount ?? 0).toFixed(2)}
                       </TableCell>
                     </TableRow>
