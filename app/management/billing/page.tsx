@@ -30,7 +30,7 @@ export default async function BillingPage({ searchParams }: Props) {
   const qboStatus = await getQboConnectionStatus()
   const [visits, revenue] = resolvedView === 'invoiced'
     ? await Promise.all([getInvoicedVisits(resolvedMonth), getRevenueSummary()])
-    : await Promise.all([getUninvoicedVisits(resolvedMonth), Promise.resolve(null)])
+    : await Promise.all([getUninvoicedVisits(), Promise.resolve(null)])
 
   return (
     <div className="p-4 lg:p-6 space-y-6">
@@ -42,13 +42,13 @@ export default async function BillingPage({ searchParams }: Props) {
             canManage={role === 'owner'}
             feedback={qbo ? { qbo, reason } : undefined}
           />
-          <BillingMonthNav month={resolvedMonth} />
+          {resolvedView === 'invoiced' && <BillingMonthNav month={resolvedMonth} view={resolvedView} />}
         </div>
       </div>
 
       <div className="flex items-center gap-1.5 border-b border-border">
         <Link
-          href={`/management/billing?month=${resolvedMonth}`}
+          href="/management/billing?view=queue"
           className={cn(
             'px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
             resolvedView === 'queue'
@@ -74,7 +74,7 @@ export default async function BillingPage({ searchParams }: Props) {
       {resolvedView === 'invoiced' && revenue ? (
         <InvoicedHistory visits={visits} month={resolvedMonth} revenue={revenue} role={role as EmployeeRole} />
       ) : (
-        <InvoiceQueue visits={visits} month={resolvedMonth} qboConnected={qboStatus !== 'disconnected'} />
+        <InvoiceQueue visits={visits} qboConnected={qboStatus !== 'disconnected'} />
       )}
     </div>
   )

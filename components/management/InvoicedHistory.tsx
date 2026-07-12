@@ -41,14 +41,16 @@ function RevenueCard({
   data,
 }: {
   label: string
-  data: { total: number; perVisit: number; contract: number }
+  data: { total: number; perVisit: number; contract: number; label: string }
 }) {
   return (
     <div className="rounded-xl border border-border bg-card px-5 py-3.5 shadow-warm">
       <p className="font-display text-lg font-semibold text-foreground tabular-nums">
         ${data.total.toFixed(2)}
       </p>
-      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-xs text-muted-foreground">
+        {label} <span className="text-muted-foreground/70">({data.label})</span>
+      </p>
       <p className="text-xs text-muted-foreground mt-1 tabular-nums">
         Per-visit ${data.perVisit.toFixed(2)} · Contract ${data.contract.toFixed(2)}
       </p>

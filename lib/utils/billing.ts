@@ -1,26 +1,47 @@
+import { format, parseISO } from 'date-fns'
 import type { Account, VisitWithLocation } from '@/types/app'
 
-export type AccountInvoiceGroup = {
+export type AccountMonthGroup = {
   account: Account
+  monthKey: string // 'yyyy-MM', from the visit's completion date
+  monthLabel: string // 'May 2026'
   visits: VisitWithLocation[]
 }
 
+function completionMonthKey(visit: VisitWithLocation): string {
+  return format(parseISO(visit.ended_at ?? visit.week_start), 'yyyy-MM')
+}
+
 /**
- * Clusters uninvoiced visits by account, alphabetically — the billing page groups
- * per_visit accounts as individual lines and contract accounts as one summary line
- * per group (see components/management/InvoiceQueue.tsx).
+ * Clusters uninvoiced visits by (account, completion month) — the owner invoices
+ * monthly, so a push must never combine two different months' visits into one
+ * invoice (that would under-bill a contract account, whose flat rate is per
+ * period, not per push). Sorted oldest-month-first, then by account name, so
+ * the Queue can render one flat list and drop a divider whenever `monthKey`
+ * changes between consecutive groups, with no separate nested structure.
  */
-export function groupVisitsByAccount(visits: VisitWithLocation[]): AccountInvoiceGroup[] {
-  const map = new Map<string, AccountInvoiceGroup>()
+export function groupVisitsByAccountMonth(visits: VisitWithLocation[]): AccountMonthGroup[] {
+  const map = new Map<string, AccountMonthGroup>()
   for (const visit of visits) {
-    const existing = map.get(visit.account.id)
+    const monthKey = completionMonthKey(visit)
+    const key = `${visit.account.id}::${monthKey}`
+    const existing = map.get(key)
     if (existing) {
       existing.visits.push(visit)
     } else {
-      map.set(visit.account.id, { account: visit.account, visits: [visit] })
+      map.set(key, {
+        account: visit.account,
+        monthKey,
+        monthLabel: format(parseISO(`${monthKey}-01`), 'MMMM yyyy'),
+        visits: [visit],
+      })
     }
   }
-  return [...map.values()].sort((a, b) => a.account.name.localeCompare(b.account.name))
+  return [...map.values()].sort((a, b) =>
+    a.monthKey !== b.monthKey
+      ? a.monthKey.localeCompare(b.monthKey)
+      : a.account.name.localeCompare(b.account.name),
+  )
 }
 
 export type InvoiceGroup = {
