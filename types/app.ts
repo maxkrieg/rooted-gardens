@@ -13,6 +13,7 @@ export type VisitCrew = Tables<'visit_crew'>
 export type TimeEntry = Tables<'time_entries'>
 export type Photo = Tables<'photos'>
 export type Integration = Tables<'integrations'>
+export type ContractInvoice = Tables<'contract_invoices'>
 
 // A property enriched with its account name and current route group — used by
 // the route-groups management page and its Assign Properties sheet.
@@ -111,6 +112,12 @@ export type VisitCrewWithEmployee = VisitCrew & {
 /** Visit with its property and account. */
 export type VisitWithLocation = Visit & {
   property: Property
+  account: Account
+}
+
+/** A contract invoice joined to its account — the authoritative record of an
+ *  ad-hoc contract invoice (flat rate, not visit-driven). See docs/INVOICING.md. */
+export type ContractInvoiceWithAccount = ContractInvoice & {
   account: Account
 }
 

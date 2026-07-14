@@ -105,6 +105,53 @@ export type Database = {
         }
         Relationships: []
       }
+      contract_invoices: {
+        Row: {
+          account_id: string
+          amount: number
+          created_at: string
+          id: string
+          invoiced_at: string
+          period_end: string
+          period_label: string
+          period_start: string
+          qbo_invoice_id: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          amount: number
+          created_at?: string
+          id?: string
+          invoiced_at?: string
+          period_end: string
+          period_label: string
+          period_start: string
+          qbo_invoice_id: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          amount?: number
+          created_at?: string
+          id?: string
+          invoiced_at?: string
+          period_end?: string
+          period_label?: string
+          period_start?: string
+          qbo_invoice_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_invoices_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           active: boolean

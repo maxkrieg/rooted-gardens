@@ -34,6 +34,19 @@ See `CLAUDE.md` for full context, tech stack, schema, and conventions.
 > `property_route_groups` gained a uniqueness constraint — a property belongs to at most
 > one route group at a time — in `20260703120000_property_route_groups_unique_property.sql`.
 > Neither changes any task below; noted here for completeness.
+>
+> **Post-launch addition (2026-07-13):** new table `contract_invoices`
+> (`20260713150000_contract_invoices.sql`) backs **ad-hoc contract invoicing** — `contract`
+> accounts bill a flat rate per period regardless of visit activity (including zero
+> visits), so a visit-completion-driven queue was the wrong trigger for them. Contract
+> accounts were removed from the Billing Queue tab entirely and are now invoiced from a new
+> "Contracts" tab (`components/management/ContractInvoicing.tsx`,
+> `createContractInvoice`/`getContractAccountsOverview` in
+> `app/management/billing/actions.ts`); `contract_invoices` is the authoritative revenue
+> record (not `visits.invoice_amount`, which can't hold an amount for a zero-visit period).
+> The Invoiced tab and MTD/YTD revenue summary (Phase 5 below) were updated to merge this
+> in. Full writeup in `docs/INVOICING.md`. Not a numbered task below since it's a
+> follow-up correction discovered after 5.4 shipped, not part of the original plan.
 
 Each task is written to be handed directly to Claude Code as a prompt. Phases are ordered
 as a sensible default build sequence, but the authoritative dependency graph is the

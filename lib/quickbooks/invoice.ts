@@ -62,11 +62,18 @@ interface InvoiceLine {
  * rather than being silently skipped — the caller (actions.ts) already
  * filters these out before calling this function, so this is a defensive
  * backstop, not the primary skip point.
+ *
+ * `options.amountOverride` lets a caller bill a contract account something
+ * other than its stored `contract_rate` — used by the Contracts tab's ad-hoc
+ * invoicing (createContractInvoice) so an owner can invoice a one-off amount
+ * without changing the account's standing rate. Only meaningful for
+ * `contract`; ignored for `per_visit`/`as_needed`.
  */
 export async function pushAccountInvoice(
   qbo: QuickBooks,
   account: BillableAccount,
   visits: VisitWithLocation[],
+  options?: { amountOverride?: number },
 ): Promise<AccountInvoiceResult> {
   if (!account.qbo_customer_id) {
     return { error: 'Account is not linked to a QuickBooks customer' }
@@ -91,13 +98,14 @@ export async function pushAccountInvoice(
       SalesItemLineDetail: { ItemRef: { value: itemId } },
     }))
   } else if (account.billing_type === 'contract') {
-    if (account.contract_rate == null) {
+    const amount = options?.amountOverride ?? account.contract_rate
+    if (amount == null) {
       return { error: 'No contract rate set for this account' }
     }
     lines = [
       {
         DetailType: 'SalesItemLineDetail',
-        Amount: Number(account.contract_rate),
+        Amount: Number(amount),
         Description: `${account.contract_period ?? 'Period'} service — ${visits.length} visit${visits.length === 1 ? '' : 's'}`,
         SalesItemLineDetail: { ItemRef: { value: itemId } },
       },

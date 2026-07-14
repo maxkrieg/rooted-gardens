@@ -21,16 +21,21 @@ import {
 } from '@/components/ui/table'
 import { BillingTypeBadge } from '@/components/management/badges'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
-import { groupVisitsByInvoice } from '@/lib/utils/billing'
+import { groupVisitsByInvoice, type InvoiceGroup } from '@/lib/utils/billing'
 import type { RevenueSummary } from '@/app/management/billing/actions'
-import type { EmployeeRole, VisitWithLocation } from '@/types/app'
+import type { ContractInvoiceWithAccount, EmployeeRole, VisitWithLocation } from '@/types/app'
 
 interface InvoicedHistoryProps {
   visits: VisitWithLocation[]
+  contractInvoices: ContractInvoiceWithAccount[]
   month: string
   revenue: RevenueSummary
   role: EmployeeRole | undefined
 }
+
+type DisplayEntry =
+  | { type: 'visitGroup'; invoicedAt: string; group: InvoiceGroup }
+  | { type: 'contractInvoice'; invoicedAt: string; invoice: ContractInvoiceWithAccount }
 
 function qboInvoiceUrl(qboInvoiceId: string): string {
   return `https://app.qbo.intuit.com/app/invoice?txnId=${qboInvoiceId}`
@@ -64,7 +69,7 @@ function RevenueCard({
  * once in a month). Amounts are the invoice_amount snapshot (task 5.6), never
  * a live account price, so the trail stays correct even after a price change.
  */
-export function InvoicedHistory({ visits, month, revenue, role }: InvoicedHistoryProps) {
+export function InvoicedHistory({ visits, contractInvoices, month, revenue, role }: InvoicedHistoryProps) {
   const router = useRouter()
   const [accountFilter, setAccountFilter] = useState<string>('all')
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -92,13 +97,42 @@ export function InvoicedHistory({ visits, month, revenue, role }: InvoicedHistor
   const accountOptions = useMemo(() => {
     const map = new Map<string, string>()
     for (const v of visits) map.set(v.account.id, v.account.name)
+    for (const inv of contractInvoices) map.set(inv.account.id, inv.account.name)
     return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]))
-  }, [visits])
+  }, [visits, contractInvoices])
 
+  // Contract invoices render exclusively from the contract_invoices table
+  // (Step 4 — ad-hoc contract invoicing), so visit-derived groups exclude
+  // contract accounts entirely here — otherwise a contract invoice's tagged
+  // visits would also form a group via groupVisitsByInvoice, duplicating the row.
   const groups = useMemo(() => {
-    const all = groupVisitsByInvoice(visits)
+    const all = groupVisitsByInvoice(visits).filter((g) => g.account.billing_type !== 'contract')
     return accountFilter === 'all' ? all : all.filter((g) => g.account.id === accountFilter)
   }, [visits, accountFilter])
+
+  const filteredContractInvoices = useMemo(
+    () =>
+      accountFilter === 'all'
+        ? contractInvoices
+        : contractInvoices.filter((inv) => inv.account.id === accountFilter),
+    [contractInvoices, accountFilter],
+  )
+
+  const combined = useMemo<DisplayEntry[]>(() => {
+    const visitEntries: DisplayEntry[] = groups.map((group) => ({
+      type: 'visitGroup',
+      invoicedAt: group.invoicedAt,
+      group,
+    }))
+    const contractEntries: DisplayEntry[] = filteredContractInvoices.map((invoice) => ({
+      type: 'contractInvoice',
+      invoicedAt: invoice.invoiced_at,
+      invoice,
+    }))
+    return [...visitEntries, ...contractEntries].sort((a, b) =>
+      a.invoicedAt < b.invoicedAt ? 1 : -1,
+    )
+  }, [groups, filteredContractInvoices])
 
   return (
     <div className="space-y-4">
@@ -123,7 +157,7 @@ export function InvoicedHistory({ visits, month, revenue, role }: InvoicedHistor
         </Select>
       </div>
 
-      {groups.length === 0 ? (
+      {combined.length === 0 ? (
         <div className="flex items-center justify-center py-16 text-sm text-muted-foreground rounded-xl border border-border bg-card">
           No invoiced visits for {format(parseISO(`${month}-01`), 'MMMM yyyy')}.
         </div>
@@ -139,7 +173,44 @@ export function InvoicedHistory({ visits, month, revenue, role }: InvoicedHistor
               </TableRow>
             </TableHeader>
             <TableBody>
-              {groups.flatMap((group) => {
+              {combined.flatMap((entry) => {
+                if (entry.type === 'contractInvoice') {
+                  const invoice = entry.invoice
+                  const invoicedDate = format(parseISO(invoice.invoiced_at), 'MMM d')
+                  return [
+                    <TableRow
+                      key={invoice.id}
+                      onClick={() => handleAccountClick(invoice.account.id)}
+                      className="cursor-pointer hover:bg-accent/50 transition-colors"
+                    >
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-foreground">{invoice.account.name}</span>
+                          <BillingTypeBadge billingType={invoice.account.billing_type} />
+                          <span className="text-xs text-muted-foreground">{invoice.period_label}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground tabular-nums">{invoicedDate}</TableCell>
+                      <TableCell>
+                        <a
+                          href={qboInvoiceUrl(invoice.qbo_invoice_id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1 text-primary hover:underline"
+                        >
+                          {invoice.qbo_invoice_id}
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums font-medium">
+                        ${Number(invoice.amount).toFixed(2)}
+                      </TableCell>
+                    </TableRow>,
+                  ]
+                }
+
+                const { group } = entry
                 const invoicedDate = format(parseISO(group.invoicedAt), 'MMM d')
                 const link = (
                   <a
@@ -153,31 +224,6 @@ export function InvoicedHistory({ visits, month, revenue, role }: InvoicedHistor
                     <ExternalLink className="h-3 w-3" />
                   </a>
                 )
-
-                if (group.account.billing_type === 'contract') {
-                  return [
-                    <TableRow
-                      key={group.qboInvoiceId}
-                      onClick={() => handleAccountClick(group.account.id)}
-                      className="cursor-pointer hover:bg-accent/50 transition-colors"
-                    >
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-foreground">{group.account.name}</span>
-                          <BillingTypeBadge billingType={group.account.billing_type} />
-                          <span className="text-xs text-muted-foreground tabular-nums">
-                            {group.visits.length} visit{group.visits.length === 1 ? '' : 's'}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground tabular-nums">{invoicedDate}</TableCell>
-                      <TableCell>{link}</TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">
-                        ${group.totalAmount.toFixed(2)}
-                      </TableCell>
-                    </TableRow>,
-                  ]
-                }
 
                 const isExpanded = expandedInvoiceIds.has(group.qboInvoiceId)
 
