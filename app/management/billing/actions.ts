@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { startOfMonth, endOfMonth, startOfYear, format } from 'date-fns'
+import { startOfMonth, startOfYear, format } from 'date-fns'
 import { createClient } from '@/lib/supabase/server'
 import { getQuickBooksClient } from '@/lib/quickbooks/client'
 import { syncCustomer } from '@/lib/quickbooks/sync'
@@ -215,22 +215,28 @@ export async function pushInvoicesToQuickBooks(visitIds: string[]): Promise<Push
   return results
 }
 
+export interface DateRange {
+  start: Date
+  end: Date
+}
+
 /**
- * Invoiced visits for a given month (`yyyy-MM`) — the mirror image of
+ * Invoiced visits within a date range — the mirror image of
  * getUninvoicedVisits, filtered on `invoiced_at` instead of `ended_at`. Backs
- * the Billing page's "Invoiced" audit-trail view (task 5.5).
+ * the Billing page's "History" audit-trail view (task 5.5). The range comes
+ * from the tab's date-range filter (lib/utils/billing.ts's resolveDateRange) —
+ * "this month" by default, but the owner can pick a different preset or a
+ * custom range.
  */
-export async function getInvoicedVisits(month: string): Promise<VisitWithLocation[]> {
+export async function getInvoicedVisits({ start, end }: DateRange): Promise<VisitWithLocation[]> {
   const supabase = await createClient()
-  const monthStart = startOfMonth(new Date(`${month}-01T00:00:00`))
-  const monthEnd = endOfMonth(monthStart)
 
   const { data, error } = await supabase
     .from('visits')
     .select('*, property:properties(*), account:accounts(*)')
     .not('invoiced_at', 'is', null)
-    .gte('invoiced_at', monthStart.toISOString())
-    .lte('invoiced_at', monthEnd.toISOString())
+    .gte('invoiced_at', start.toISOString())
+    .lte('invoiced_at', end.toISOString())
     .order('invoiced_at', { ascending: false })
 
   if (error) {
@@ -365,22 +371,23 @@ export async function getContractAccountsOverview(): Promise<ContractAccountOver
   }))
 }
 
-/** Contract invoices for a given month (`yyyy-MM`), joined to account — the
- *  Invoiced tab's contract rows (merged with per_visit InvoiceGroups there). */
-export async function getContractInvoicesForMonth(month: string): Promise<ContractInvoiceWithAccount[]> {
+/** Contract invoices within a date range, joined to account — the History
+ *  tab's contract rows (merged with per_visit InvoiceGroups there). */
+export async function getContractInvoicesForRange({
+  start,
+  end,
+}: DateRange): Promise<ContractInvoiceWithAccount[]> {
   const supabase = await createClient()
-  const monthStart = startOfMonth(new Date(`${month}-01T00:00:00`))
-  const monthEnd = endOfMonth(monthStart)
 
   const { data, error } = await supabase
     .from('contract_invoices')
     .select('*, account:accounts(*)')
-    .gte('invoiced_at', monthStart.toISOString())
-    .lte('invoiced_at', monthEnd.toISOString())
+    .gte('invoiced_at', start.toISOString())
+    .lte('invoiced_at', end.toISOString())
     .order('invoiced_at', { ascending: false })
 
   if (error) {
-    console.error('[getContractInvoicesForMonth]', error)
+    console.error('[getContractInvoicesForRange]', error)
     return []
   }
 

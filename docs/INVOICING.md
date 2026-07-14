@@ -108,10 +108,12 @@ require changing the account's rate — then clicks **Create Invoice**.
    `contract_invoices`. Duplicating it onto a visit too would risk double-counting revenue
    if anything ever summed `visits.invoice_amount` directly.
 
-## The invoiced view (audit trail)
+## The History tab (audit trail)
 
-The Billing page's "Invoiced" tab merges two sources into one chronological list, sorted by
-invoiced date:
+The Billing page's "History" tab (formerly "Invoiced") merges two sources into one
+chronological list, sorted by invoiced date, filtered by a date-range picker
+(`lib/utils/billing.ts`'s `resolveDateRange` — presets: this month, last month, last 7
+days, this year, or a custom range) and a searchable account combobox:
 
 - **`per_visit` invoices** — visits where `invoiced_at IS NOT NULL`, grouped by **QBO
   invoice** (`qbo_invoice_id`), not by account — an account can be pushed more than once in
@@ -123,6 +125,9 @@ invoiced date:
   expand, since a contract invoice isn't visit-driven.
 
 Both link out to `https://app.qbo.intuit.com/app/invoice?txnId={qbo_invoice_id}`.
+
+The date-range filter only scopes this list — it's independent of the revenue summary
+below, which is always MTD/YTD regardless of what range is selected.
 
 A "This month" / "This year" revenue summary sits above the list, split into per-visit vs.
 contract totals. The contract bucket sums **both** `contract_invoices.amount` (every

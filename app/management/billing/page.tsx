@@ -1,25 +1,31 @@
 import { cookies } from 'next/headers'
 import Link from 'next/link'
-import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { parseRoleCookie } from '@/lib/utils/role-cookie'
 import { getQboConnectionStatus } from '@/lib/quickbooks/client'
-import { BillingMonthNav } from '@/components/management/BillingMonthNav'
 import { QuickBooksConnect } from '@/components/management/QuickBooksConnect'
 import { InvoiceQueue } from '@/components/management/InvoiceQueue'
 import { InvoicedHistory } from '@/components/management/InvoicedHistory'
 import { ContractInvoicing } from '@/components/management/ContractInvoicing'
+import { resolveDateRange, type ResolvedDateRange } from '@/lib/utils/billing'
 import {
   getUninvoicedVisits,
   getInvoicedVisits,
   getRevenueSummary,
   getContractAccountsOverview,
-  getContractInvoicesForMonth,
+  getContractInvoicesForRange,
 } from './actions'
 import type { EmployeeRole } from '@/types/app'
 
 interface Props {
-  searchParams: Promise<{ month?: string; qbo?: string; reason?: string; view?: string }>
+  searchParams: Promise<{
+    range?: string
+    start?: string
+    end?: string
+    qbo?: string
+    reason?: string
+    view?: string
+  }>
 }
 
 type BillingView = 'queue' | 'invoiced' | 'contracts'
@@ -35,9 +41,9 @@ function resolveView(view: string | undefined): BillingView {
  * one management area that stays table/grid-dense rather than mobile-first).
  */
 export default async function BillingPage({ searchParams }: Props) {
-  const { month, qbo, reason, view } = await searchParams
-  const resolvedMonth = month ?? format(new Date(), 'yyyy-MM')
+  const { range, start, end, qbo, reason, view } = await searchParams
   const resolvedView = resolveView(view)
+  const resolvedRange = resolveDateRange({ range, start, end })
 
   const cookieStore = await cookies()
   const role = parseRoleCookie(cookieStore.get('rg-role')?.value)?.role ?? 'accountant'
@@ -54,7 +60,6 @@ export default async function BillingPage({ searchParams }: Props) {
             canManage={role === 'owner'}
             feedback={qbo ? { qbo, reason } : undefined}
           />
-          {resolvedView === 'invoiced' && <BillingMonthNav month={resolvedMonth} view={resolvedView} />}
         </div>
       </div>
 
@@ -71,7 +76,7 @@ export default async function BillingPage({ searchParams }: Props) {
           Queue
         </Link>
         <Link
-          href={`/management/billing?view=invoiced&month=${resolvedMonth}`}
+          href="/management/billing?view=invoiced"
           className={cn(
             'px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
             resolvedView === 'invoiced'
@@ -79,7 +84,7 @@ export default async function BillingPage({ searchParams }: Props) {
               : 'border-transparent text-muted-foreground hover:text-foreground',
           )}
         >
-          Invoiced
+          History
         </Link>
         <Link
           href="/management/billing?view=contracts"
@@ -95,7 +100,7 @@ export default async function BillingPage({ searchParams }: Props) {
       </div>
 
       {resolvedView === 'invoiced' ? (
-        <InvoicedTab month={resolvedMonth} role={role as EmployeeRole} />
+        <InvoicedTab range={resolvedRange} role={role as EmployeeRole} />
       ) : resolvedView === 'contracts' ? (
         <ContractsTab qboConnected={qboStatus !== 'disconnected'} />
       ) : (
@@ -110,17 +115,20 @@ async function QueueTab({ qboConnected }: { qboConnected: boolean }) {
   return <InvoiceQueue visits={visits} qboConnected={qboConnected} />
 }
 
-async function InvoicedTab({ month, role }: { month: string; role: EmployeeRole }) {
+async function InvoicedTab({ range, role }: { range: ResolvedDateRange; role: EmployeeRole }) {
   const [visits, revenue, contractInvoices] = await Promise.all([
-    getInvoicedVisits(month),
+    getInvoicedVisits(range),
     getRevenueSummary(),
-    getContractInvoicesForMonth(month),
+    getContractInvoicesForRange(range),
   ])
   return (
     <InvoicedHistory
       visits={visits}
       contractInvoices={contractInvoices}
-      month={month}
+      rangeLabel={range.label}
+      rangePreset={range.preset}
+      customStart={range.customStart}
+      customEnd={range.customEnd}
       revenue={revenue}
       role={role}
     />

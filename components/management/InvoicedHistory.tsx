@@ -3,14 +3,17 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, parseISO } from 'date-fns'
-import { ChevronDown, ExternalLink } from 'lucide-react'
+import { Check, ChevronDown, ChevronsUpDown, ExternalLink } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
 import {
   Table,
   TableBody,
@@ -21,14 +24,19 @@ import {
 } from '@/components/ui/table'
 import { BillingTypeBadge } from '@/components/management/badges'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
-import { groupVisitsByInvoice, type InvoiceGroup } from '@/lib/utils/billing'
+import { HistoryDateRangeFilter } from '@/components/management/HistoryDateRangeFilter'
+import { groupVisitsByInvoice, type DateRangePreset, type InvoiceGroup } from '@/lib/utils/billing'
+import { cn } from '@/lib/utils'
 import type { RevenueSummary } from '@/app/management/billing/actions'
 import type { ContractInvoiceWithAccount, EmployeeRole, VisitWithLocation } from '@/types/app'
 
 interface InvoicedHistoryProps {
   visits: VisitWithLocation[]
   contractInvoices: ContractInvoiceWithAccount[]
-  month: string
+  rangeLabel: string
+  rangePreset: DateRangePreset
+  customStart?: string
+  customEnd?: string
   revenue: RevenueSummary
   role: EmployeeRole | undefined
 }
@@ -69,9 +77,19 @@ function RevenueCard({
  * once in a month). Amounts are the invoice_amount snapshot (task 5.6), never
  * a live account price, so the trail stays correct even after a price change.
  */
-export function InvoicedHistory({ visits, contractInvoices, month, revenue, role }: InvoicedHistoryProps) {
+export function InvoicedHistory({
+  visits,
+  contractInvoices,
+  rangeLabel,
+  rangePreset,
+  customStart,
+  customEnd,
+  revenue,
+  role,
+}: InvoicedHistoryProps) {
   const router = useRouter()
   const [accountFilter, setAccountFilter] = useState<string>('all')
+  const [accountPopoverOpen, setAccountPopoverOpen] = useState(false)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sheetVisit, setSheetVisit] = useState<VisitWithLocation | null>(null)
   const [expandedInvoiceIds, setExpandedInvoiceIds] = useState<Set<string>>(() => new Set())
@@ -141,25 +159,68 @@ export function InvoicedHistory({ visits, contractInvoices, month, revenue, role
         <RevenueCard label="Invoiced this year" data={revenue.ytd} />
       </div>
 
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <Select value={accountFilter} onValueChange={setAccountFilter}>
-          <SelectTrigger className="h-10 w-full sm:w-56">
-            <SelectValue placeholder="Account" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All accounts</SelectItem>
-            {accountOptions.map(([id, name]) => (
-              <SelectItem key={id} value={id}>
-                {name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex items-center gap-3 flex-wrap">
+        <HistoryDateRangeFilter preset={rangePreset} customStart={customStart} customEnd={customEnd} />
+
+        <Popover open={accountPopoverOpen} onOpenChange={setAccountPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={accountPopoverOpen}
+              className="h-10 w-full sm:w-56 justify-between font-normal"
+            >
+              <span className="truncate">
+                {accountFilter === 'all'
+                  ? 'All accounts'
+                  : (accountOptions.find(([id]) => id === accountFilter)?.[1] ?? 'All accounts')}
+              </span>
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-0">
+            <Command>
+              <CommandInput placeholder="Search accounts…" />
+              <CommandList>
+                <CommandEmpty>No account found.</CommandEmpty>
+                <CommandGroup>
+                  <CommandItem
+                    value="all accounts"
+                    onSelect={() => {
+                      setAccountFilter('all')
+                      setAccountPopoverOpen(false)
+                    }}
+                  >
+                    <Check
+                      className={cn('mr-2 h-4 w-4', accountFilter === 'all' ? 'opacity-100' : 'opacity-0')}
+                    />
+                    All accounts
+                  </CommandItem>
+                  {accountOptions.map(([id, name]) => (
+                    <CommandItem
+                      key={id}
+                      value={name}
+                      onSelect={() => {
+                        setAccountFilter(id)
+                        setAccountPopoverOpen(false)
+                      }}
+                    >
+                      <Check
+                        className={cn('mr-2 h-4 w-4', accountFilter === id ? 'opacity-100' : 'opacity-0')}
+                      />
+                      {name}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
       </div>
 
       {combined.length === 0 ? (
         <div className="flex items-center justify-center py-16 text-sm text-muted-foreground rounded-xl border border-border bg-card">
-          No invoiced visits for {format(parseISO(`${month}-01`), 'MMMM yyyy')}.
+          No invoiced visits for {rangeLabel}.
         </div>
       ) : (
         <div className="rounded-xl border border-border bg-card shadow-warm overflow-hidden">
