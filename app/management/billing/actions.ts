@@ -512,3 +512,49 @@ export async function refreshInvoiceStatuses(
   revalidatePath('/management/billing')
   return { processed, errors }
 }
+
+/** How recently an invoice must have been synced for the background poll to skip
+ *  it — the throttle that keeps the History tab's auto-refresh from hammering the
+ *  QBO API. The manual "Refresh now" button deliberately ignores this (force-now). */
+const POLL_STALENESS_MS = 45_000
+
+/**
+ * Background auto-refresh for the History tab: syncs QBO status for the visible
+ * invoices, but ONLY those that are (a) not already `paid` (terminal — won't
+ * change) and (b) not synced within the last POLL_STALENESS_MS. That staleness
+ * gate is what makes it safe to call on a short interval / on every tab refocus /
+ * from multiple open tabs — QBO gets hit at most about once per invoice per
+ * window, no matter how often the client polls. Silent (no toasts); returns how
+ * many it actually synced so the client can skip a re-render when nothing changed.
+ */
+export async function pollInvoiceStatuses(invoiceIds: string[]): Promise<{ synced: number }> {
+  if (invoiceIds.length === 0) return { synced: 0 }
+
+  const supabase = await createClient()
+  const staleBefore = new Date(Date.now() - POLL_STALENESS_MS).toISOString()
+
+  const { data, error } = await supabase
+    .from('invoices')
+    .select('id, qbo_invoice_id, sent_at, paid_at')
+    .in('id', invoiceIds)
+    .neq('status', 'paid')
+    .or(`last_synced_at.is.null,last_synced_at.lt.${staleBefore}`)
+
+  if (error || !data || data.length === 0) return { synced: 0 }
+
+  let qbo
+  try {
+    qbo = await getQuickBooksClient()
+  } catch {
+    return { synced: 0 } // QBO not connected — stay silent, cron/manual will catch up
+  }
+
+  let synced = 0
+  for (const row of data) {
+    const res = await syncInvoiceStatus(supabase, qbo, row)
+    if (!res.error) synced++
+  }
+
+  if (synced > 0) revalidatePath('/management/billing')
+  return { synced }
+}

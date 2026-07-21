@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, parseISO } from 'date-fns'
 import { Check, ChevronDown, ChevronsUpDown, ExternalLink, RefreshCw } from 'lucide-react'
@@ -26,7 +26,7 @@ import {
 import { BillingTypeBadge, InvoiceStatusBadge } from '@/components/management/badges'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { HistoryDateRangeFilter } from '@/components/management/HistoryDateRangeFilter'
-import { refreshInvoiceStatuses } from '@/app/management/billing/actions'
+import { pollInvoiceStatuses, refreshInvoiceStatuses } from '@/app/management/billing/actions'
 import type { DateRangePreset } from '@/lib/utils/billing'
 import { cn } from '@/lib/utils'
 import type { RevenueSummary } from '@/app/management/billing/actions'
@@ -49,6 +49,11 @@ interface InvoicedHistoryProps {
 }
 
 type SheetRow = { property: Property; account: Account; visit: Visit }
+
+// How often the tab auto-refreshes invoice status while visible. The server
+// action is staleness-gated (see pollInvoiceStatuses), so this only bounds how
+// quickly a stale invoice gets picked up — not how hard QBO is hit.
+const POLL_INTERVAL_MS = 60_000
 
 function qboInvoiceUrl(qboInvoiceId: string): string {
   return `https://app.qbo.intuit.com/app/invoice?txnId=${qboInvoiceId}`
@@ -147,6 +152,58 @@ export function InvoicedHistory({
       router.refresh()
     })
   }
+
+  // Background auto-refresh while the tab is visible: polls QBO status for the
+  // visible, non-terminal (not paid) invoices on an interval and the moment the
+  // tab regains focus. The server action is staleness-gated, so a short interval,
+  // frequent refocus, or multiple open tabs can't hammer the QBO API. Silent —
+  // the "Refresh now" button is the explicit, force-now path. Ids live in a ref
+  // so the effect subscribes once (on mount) rather than re-subscribing whenever
+  // the data changes.
+  const pollableIds = useMemo(
+    () => filtered.filter((inv) => inv.status !== 'paid').map((inv) => inv.id),
+    [filtered],
+  )
+  const pollableIdsRef = useRef(pollableIds)
+  useEffect(() => {
+    pollableIdsRef.current = pollableIds
+  }, [pollableIds])
+  const pollInFlight = useRef(false)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function poll() {
+      if (pollInFlight.current || document.hidden) return
+      const ids = pollableIdsRef.current
+      if (ids.length === 0) return
+      pollInFlight.current = true
+      try {
+        const { synced } = await pollInvoiceStatuses(ids)
+        // Only re-render when something actually changed — the staleness gate
+        // makes most polls no-ops, so this avoids needless refresh churn.
+        if (!cancelled && synced > 0) router.refresh()
+      } catch {
+        // Transient/network — the next tick retries.
+      } finally {
+        pollInFlight.current = false
+      }
+    }
+
+    const interval = setInterval(poll, POLL_INTERVAL_MS)
+    const kickoff = setTimeout(poll, 3_000) // one soon after landing
+    function onVisibility() {
+      if (!document.hidden) poll() // catch changes made while the tab was hidden
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+      clearTimeout(kickoff)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [router])
 
   return (
     <div className="space-y-4">
