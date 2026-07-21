@@ -126,99 +126,71 @@ INSERT INTO equipment (id, name, type, status, last_serviced, notes) VALUES
   ('00000000-0000-0000-0007-000000000004', 'Blower A',  'blower',  'available',   '2026-05-20', NULL);
 
 -- =====================
--- INVOICES (4) — the canonical record of every QBO invoice pushed. Referenced
--- by visits.invoice_id below. Statuses vary to exercise the lifecycle badges
--- (draft/sent/paid) in the Billing → History tab. All per_visit here (contract
--- accounts carry period_label/period_start/period_end instead).
--- =====================
-INSERT INTO invoices (id, qbo_invoice_id, account_id, billing_type, amount,
-                      status, qbo_balance, qbo_due_date, qbo_email_status,
-                      sent_at, paid_at, last_synced_at, created_at) VALUES
-  ('00000000-0000-0000-000b-000000000001','INV-001','00000000-0000-0000-0001-000000000001',
-   'per_visit',125.00,'paid',0,'2026-06-13','EmailSent',
-   '2026-05-30 10:05:00+00','2026-06-10 14:00:00+00','2026-06-10 14:05:00+00','2026-05-30 10:00:00+00'),
-  ('00000000-0000-0000-000b-000000000002','INV-002','00000000-0000-0000-0001-000000000003',
-   'per_visit',95.00,'sent',95.00,'2026-06-13','EmailSent',
-   '2026-05-31 09:00:00+00',NULL,'2026-06-01 08:00:00+00','2026-05-30 10:00:00+00'),
-  ('00000000-0000-0000-000b-000000000003','INV-003','00000000-0000-0000-0001-000000000001',
-   'per_visit',125.00,'sent',125.00,'2026-06-20','EmailSent',
-   '2026-06-05 09:05:00+00',NULL,'2026-06-06 08:00:00+00','2026-06-05 09:00:00+00'),
-  ('00000000-0000-0000-000b-000000000004','INV-004','00000000-0000-0000-0001-000000000003',
-   'per_visit',95.00,'draft',NULL,NULL,NULL,
-   NULL,NULL,NULL,'2026-06-05 09:00:00+00');
-
--- =====================
 -- VISITS (19) — one row per (property × week)
 -- Weeks: 2026-05-25 (W1), 2026-06-01 (W2), 2026-06-08 (W3 current)
 -- All week_start dates are Mondays. Monthly/biweekly properties only
 -- get a visit on the weeks their cadence is due.
 -- =====================
 
--- W1: 2026-05-25 — all 8 properties (every cadence lands here), all completed/invoiced
+-- W1: 2026-05-25 — all 8 properties (every cadence lands here), all completed
 INSERT INTO visits (id, account_id, property_id, week_start, vehicle_id,
-                    status, ended_at, service_types, completion_note,
-                    invoice_id) VALUES
+                    status, ended_at, service_types, completion_note) VALUES
   ('00000000-0000-0000-0008-000000000001',
    '00000000-0000-0000-0001-000000000001','00000000-0000-0000-0002-000000000001',
    '2026-05-25','00000000-0000-0000-0006-000000000001',
-   'completed','2026-05-27',ARRAY['mow','trim'],NULL,
-   '00000000-0000-0000-000b-000000000001'),
+   'completed','2026-05-27',ARRAY['mow','trim'],NULL),
   ('00000000-0000-0000-0008-000000000002',
    '00000000-0000-0000-0001-000000000002','00000000-0000-0000-0002-000000000002',
    '2026-05-25','00000000-0000-0000-0006-000000000002',
-   'completed','2026-05-27',ARRAY['mow','trim','edge'],NULL,NULL),
+   'completed','2026-05-27',ARRAY['mow','trim','edge'],NULL),
   ('00000000-0000-0000-0008-000000000003',
    '00000000-0000-0000-0001-000000000002','00000000-0000-0000-0002-000000000003',
    '2026-05-25','00000000-0000-0000-0006-000000000002',
-   'completed','2026-05-28',ARRAY['mow'],NULL,NULL),
+   'completed','2026-05-28',ARRAY['mow'],NULL),
   ('00000000-0000-0000-0008-000000000004',
    '00000000-0000-0000-0001-000000000003','00000000-0000-0000-0002-000000000004',
    '2026-05-25','00000000-0000-0000-0006-000000000001',
-   'completed','2026-05-28',ARRAY['mow','trim','edge'],NULL,
-   '00000000-0000-0000-000b-000000000002'),
+   'completed','2026-05-28',ARRAY['mow','trim','edge'],NULL),
   ('00000000-0000-0000-0008-000000000005',
    '00000000-0000-0000-0001-000000000004','00000000-0000-0000-0002-000000000005',
    '2026-05-25','00000000-0000-0000-0006-000000000001',
-   'completed','2026-05-28',ARRAY['mow','trim','edge','cleanup'],NULL,NULL),
+   'completed','2026-05-28',ARRAY['mow','trim','edge','cleanup'],NULL),
   ('00000000-0000-0000-0008-000000000006',
    '00000000-0000-0000-0001-000000000004','00000000-0000-0000-0002-000000000006',
    '2026-05-25','00000000-0000-0000-0006-000000000001',
-   'completed','2026-05-28',ARRAY['mow'],NULL,NULL),
+   'completed','2026-05-28',ARRAY['mow'],NULL),
   ('00000000-0000-0000-0008-000000000007',
    '00000000-0000-0000-0001-000000000005','00000000-0000-0000-0002-000000000007',
    '2026-05-25','00000000-0000-0000-0006-000000000002',
-   'completed','2026-05-29',ARRAY['mow','trim'],NULL,NULL),
+   'completed','2026-05-29',ARRAY['mow','trim'],NULL),
   ('00000000-0000-0000-0008-000000000008',
    '00000000-0000-0000-0001-000000000005','00000000-0000-0000-0002-000000000008',
    '2026-05-25','00000000-0000-0000-0006-000000000002',
-   'completed','2026-05-29',ARRAY['trim','edge','cleanup'],NULL,NULL);
+   'completed','2026-05-29',ARRAY['trim','edge','cleanup'],NULL);
 
 -- W2: 2026-06-01 — weekly properties only
 INSERT INTO visits (id, account_id, property_id, week_start, vehicle_id,
-                    status, ended_at, service_types,
-                    invoice_id) VALUES
+                    status, ended_at, service_types) VALUES
   ('00000000-0000-0000-0008-000000000009',
    '00000000-0000-0000-0001-000000000001','00000000-0000-0000-0002-000000000001',
    '2026-06-01','00000000-0000-0000-0006-000000000001',
-   'completed','2026-06-02',ARRAY['mow','trim'],
-   '00000000-0000-0000-000b-000000000003'),
+   'completed','2026-06-02',ARRAY['mow','trim']),
   ('00000000-0000-0000-0008-000000000010',
    '00000000-0000-0000-0001-000000000002','00000000-0000-0000-0002-000000000002',
    '2026-06-01','00000000-0000-0000-0006-000000000002',
-   'completed','2026-06-02',ARRAY['mow','trim'],NULL),
+   'completed','2026-06-02',ARRAY['mow','trim']),
   ('00000000-0000-0000-0008-000000000011',
    '00000000-0000-0000-0001-000000000003','00000000-0000-0000-0002-000000000004',
    '2026-06-01','00000000-0000-0000-0006-000000000001',
-   'completed','2026-06-03',ARRAY['mow','trim'],
-   '00000000-0000-0000-000b-000000000004'),
+   'completed','2026-06-03',ARRAY['mow','trim']),
   ('00000000-0000-0000-0008-000000000012',
    '00000000-0000-0000-0001-000000000004','00000000-0000-0000-0002-000000000005',
    '2026-06-01','00000000-0000-0000-0006-000000000001',
-   'completed','2026-06-02',ARRAY['mow','trim'],NULL),
+   'completed','2026-06-02',ARRAY['mow','trim']),
   ('00000000-0000-0000-0008-000000000013',
    '00000000-0000-0000-0001-000000000005','00000000-0000-0000-0002-000000000007',
    '2026-06-01','00000000-0000-0000-0006-000000000002',
-   'completed','2026-06-04',ARRAY['mow','trim'],NULL);
+   'completed','2026-06-04',ARRAY['mow','trim']);
 
 -- W3: 2026-06-08 — weekly properties + Old Stone Garden (biweekly, due this week), mixed statuses
 INSERT INTO visits (id, account_id, property_id, week_start, vehicle_id,
