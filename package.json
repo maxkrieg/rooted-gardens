@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ext .ts,.tsx",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "sync:invoices": "node scripts/sync-invoice-status.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",

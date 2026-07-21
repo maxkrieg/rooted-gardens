@@ -83,6 +83,34 @@ export function deriveInvoiceStatus(
  *  time the invoice reaches that state). */
 type SyncableInvoice = Pick<Invoice, 'id' | 'qbo_invoice_id' | 'sent_at' | 'paid_at'>
 
+interface QboFaultError {
+  Message?: string
+  Detail?: string
+  code?: string
+}
+interface QboErrorShape {
+  response?: { status?: number; data?: { Fault?: { Error?: QboFaultError[] } } }
+  Fault?: { Error?: QboFaultError[] }
+}
+
+/**
+ * Concise one-line summary of a node-quickbooks / axios error. Critically, this
+ * avoids `console.error(err)` on the raw AxiosError, which dumps hundreds of
+ * lines AND embeds the QBO access token (the `Authorization: Bearer ...` header)
+ * into the logs on every failure.
+ */
+function describeQboError(err: unknown): string {
+  const e = err as QboErrorShape
+  const status = e?.response?.status
+  const fault = e?.response?.data?.Fault ?? e?.Fault
+  const first = fault?.Error?.[0]
+  const msg = first?.Detail ?? first?.Message ?? first?.code
+  if (status && msg) return `HTTP ${status}: ${msg}`
+  if (status) return `HTTP ${status}`
+  if (err instanceof Error) return err.message
+  return 'unknown error'
+}
+
 /**
  * Fetches one invoice from QBO, derives its status, and writes the snapshot back.
  * Never throws — returns `{ error }` on either the QBO call or the DB write
@@ -98,7 +126,17 @@ export async function syncInvoiceStatus(
   try {
     detail = await qboPromise<QboInvoiceDetail>((cb) => qbo.getInvoice(row.qbo_invoice_id, cb))
   } catch (err) {
-    console.error('[syncInvoiceStatus] getInvoice', row.qbo_invoice_id, err)
+    console.error(
+      `[syncInvoiceStatus] getInvoice ${row.qbo_invoice_id} — ${describeQboError(err)}`,
+    )
+    // Back off: stamp last_synced_at even on failure so a permanently-bad id
+    // (e.g. a placeholder qbo_invoice_id that doesn't resolve in QBO) or a
+    // transient blip isn't retried on every poll/cron tick. The next cycle still
+    // picks it up (cron by oldest-synced; poll after the staleness window).
+    await supabase
+      .from('invoices')
+      .update({ last_synced_at: new Date().toISOString() })
+      .eq('id', row.id)
     return { error: 'Could not read invoice from QuickBooks' }
   }
 
