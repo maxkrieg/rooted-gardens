@@ -72,7 +72,7 @@ export function ContractInvoicing({ accounts, qboConnected }: ContractInvoicingP
             </p>
             <p className="text-xs text-muted-foreground mt-1">
               {lastInvoice
-                ? `Last: ${lastInvoice.period_label} · $${Number(lastInvoice.amount).toFixed(2)} · ${format(parseISO(lastInvoice.invoiced_at), 'MMM d')}`
+                ? `Last: ${lastInvoice.period_label} · $${Number(lastInvoice.amount).toFixed(2)} · ${format(parseISO(lastInvoice.created_at), 'MMM d')}`
                 : 'Never invoiced'}
             </p>
           </div>

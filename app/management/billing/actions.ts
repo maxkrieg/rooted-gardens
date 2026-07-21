@@ -6,16 +6,17 @@ import { createClient } from '@/lib/supabase/server'
 import { getQuickBooksClient } from '@/lib/quickbooks/client'
 import { syncCustomer } from '@/lib/quickbooks/sync'
 import { pushAccountInvoice } from '@/lib/quickbooks/invoice'
+import { syncInvoiceStatus } from '@/lib/quickbooks/invoiceStatus'
 import { groupVisitsByAccountMonth } from '@/lib/utils/billing'
-import type { Account, ContractInvoiceWithAccount, VisitWithLocation } from '@/types/app'
+import type { Account, Invoice, InvoiceWithVisits, VisitWithLocation } from '@/types/app'
 
 /**
  * All completed, not-yet-invoiced visits, joined to property + account —
  * every uninvoiced visit regardless of month, so nothing sitting in an old
  * month goes unnoticed (the Queue groups these by month for display; see
- * groupVisitsByAccountMonth). Filters on `status`/`invoiced_at` only, hitting
- * the existing `visits_uninvoiced_idx` partial index
- * (`WHERE status='completed' AND invoiced_at IS NULL`). Ordered oldest-first
+ * groupVisitsByAccountMonth). Filters on `status`/`invoice_id` only, hitting
+ * the `visits_uninvoiced_idx` partial index
+ * (`WHERE status='completed' AND invoice_id IS NULL`). Ordered oldest-first
  * — the oldest unbilled work is the most overdue/actionable.
  *
  * Excludes `contract` accounts — they're billed a flat rate per period
@@ -30,7 +31,7 @@ export async function getUninvoicedVisits(): Promise<VisitWithLocation[]> {
     .from('visits')
     .select('*, property:properties(*), account:accounts(*)')
     .eq('status', 'completed')
-    .is('invoiced_at', null)
+    .is('invoice_id', null)
     .order('ended_at', { ascending: true })
 
   if (error) {
@@ -55,18 +56,22 @@ export interface PushResult {
 /**
  * Pushes the selected visits to QuickBooks as real invoices, grouped by
  * (account, completion month) — one QBO Invoice per account per month (one
- * line per visit for per_visit accounts, one flat-rate summary line for
- * contract accounts). The owner invoices monthly, so a push must never
- * combine two different months' visits into one invoice — grouping by month
- * as well as account is what guarantees that, regardless of what the
- * accountant happens to select in one batch. Re-fetches and re-groups the
- * visits server-side rather than trusting client-supplied grouping, since
- * this is a money-moving operation.
+ * line per visit for per_visit accounts). The owner invoices monthly, so a
+ * push must never combine two different months' visits into one invoice —
+ * grouping by month as well as account is what guarantees that, regardless of
+ * what the accountant selects in one batch. Re-fetches and re-groups the visits
+ * server-side rather than trusting client-supplied grouping, since this is a
+ * money-moving operation.
  *
- * Per group, not all-or-nothing across the batch: each group's own visits
- * update is a single atomic statement, and one group failing (missing rate,
- * QBO rejecting the invoice, etc.) never blocks or rolls back another
- * group's push in the same batch.
+ * On success each group inserts one row into the canonical `invoices` table
+ * (the record the History tab and status-sync read), then tags its visits with
+ * that `invoice_id`. The invoices insert comes first because the visit tag now
+ * points at it — so a failed insert fails the whole group (the invoice exists in
+ * QBO but can't be recorded locally; same actionable error as before, just now
+ * the primary failure path).
+ *
+ * Per group, not all-or-nothing across the batch: one group failing never
+ * blocks or rolls back another group's push in the same batch.
  */
 export async function pushInvoicesToQuickBooks(visitIds: string[]): Promise<PushResult[]> {
   if (visitIds.length === 0) return []
@@ -147,60 +152,56 @@ export async function pushInvoicesToQuickBooks(visitIds: string[]): Promise<Push
       continue
     }
 
-    // Snapshot invoice_amount (task 5.6): per_visit gets each visit's own
-    // price; contract's flat rate can't be split per visit, so the batch's
-    // first visit gets the full contract_rate and the rest get 0 — this keeps
-    // any downstream SUM(invoice_amount) correct for both billing types with
-    // no special-casing (see lib/utils/billing.ts's groupVisitsByInvoice).
-    const now = new Date().toISOString()
-    let invoiceUpdateFailed = false
+    const recordFailed = (): PushResult => ({
+      accountId: group.account.id,
+      accountName: group.account.name,
+      monthLabel: group.monthLabel,
+      success: false,
+      error: `Invoice ${invoiceRes.qboInvoiceId} created in QuickBooks but could not be recorded locally — record it manually`,
+    })
 
-    if (group.account.billing_type === 'contract') {
-      const [first, ...rest] = group.visits
-      const { error: firstErr } = await supabase
-        .from('visits')
-        .update({
-          invoiced_at: now,
-          qbo_invoice_id: invoiceRes.qboInvoiceId,
-          invoice_amount: group.account.contract_rate,
-        })
-        .eq('id', first.id)
-      if (firstErr) invoiceUpdateFailed = true
+    // Insert the canonical invoices row first (the visit tag points at it).
+    // Contract accounts don't reach the Queue, so this is effectively per_visit;
+    // the contract branch below is a defensive backstop for a legacy contract
+    // visit that somehow lands here.
+    const isContract = group.account.billing_type === 'contract'
+    const total = isContract
+      ? Number(group.account.contract_rate)
+      : Number(group.account.price_per_visit) * group.visits.length
 
-      if (!firstErr && rest.length > 0) {
-        const { error: restErr } = await supabase
-          .from('visits')
-          .update({ invoiced_at: now, qbo_invoice_id: invoiceRes.qboInvoiceId, invoice_amount: 0 })
-          .in(
-            'id',
-            rest.map((v) => v.id),
-          )
-        if (restErr) invoiceUpdateFailed = true
-      }
-    } else {
-      const { error } = await supabase
-        .from('visits')
-        .update({
-          invoiced_at: now,
-          qbo_invoice_id: invoiceRes.qboInvoiceId,
-          invoice_amount: group.account.price_per_visit,
-        })
-        .in(
-          'id',
-          group.visits.map((v) => v.id),
-        )
-      if (error) invoiceUpdateFailed = true
+    const { data: invoiceRow, error: insertError } = await supabase
+      .from('invoices')
+      .insert({
+        qbo_invoice_id: invoiceRes.qboInvoiceId,
+        account_id: group.account.id,
+        billing_type: group.account.billing_type,
+        amount: total,
+      })
+      .select('id')
+      .single()
+
+    if (insertError || !invoiceRow) {
+      console.error('[pushInvoicesToQuickBooks] invoices insert', insertError)
+      results.push(recordFailed())
+      continue
     }
+
+    // Tag the visits with the invoice they were billed on. The per-line dollar
+    // amount isn't stored on the visit — the History tab derives it as
+    // invoices.amount / visit count (every per_visit line is billed at the same
+    // price, so that's exact and stays a point-in-time snapshot).
+    const { error: updErr } = await supabase
+      .from('visits')
+      .update({ invoice_id: invoiceRow.id })
+      .in(
+        'id',
+        group.visits.map((v) => v.id),
+      )
+    const invoiceUpdateFailed = Boolean(updErr)
 
     results.push(
       invoiceUpdateFailed
-        ? {
-            accountId: group.account.id,
-            accountName: group.account.name,
-            monthLabel: group.monthLabel,
-            success: false,
-            error: `Invoice ${invoiceRes.qboInvoiceId} created in QuickBooks but could not be recorded locally — record it manually`,
-          }
+        ? recordFailed()
         : {
             accountId: group.account.id,
             accountName: group.account.name,
@@ -221,30 +222,32 @@ export interface DateRange {
 }
 
 /**
- * Invoiced visits within a date range — the mirror image of
- * getUninvoicedVisits, filtered on `invoiced_at` instead of `ended_at`. Backs
- * the Billing page's "History" audit-trail view (task 5.5). The range comes
- * from the tab's date-range filter (lib/utils/billing.ts's resolveDateRange) —
- * "this month" by default, but the owner can pick a different preset or a
- * custom range.
+ * Every invoice created in a date range, joined to its account and the visits it
+ * billed — the invoices-primary source for the Billing "History" tab. Range
+ * filters on `invoices.created_at` (a real top-level column — the "invoiced"
+ * moment), and one nested embed brings the account + per-visit detail rows along
+ * in a single query. For contract invoices the embedded visits are just the
+ * cosmetically-tagged ones and aren't rendered.
  */
-export async function getInvoicedVisits({ start, end }: DateRange): Promise<VisitWithLocation[]> {
+export async function getInvoicesForRange({
+  start,
+  end,
+}: DateRange): Promise<InvoiceWithVisits[]> {
   const supabase = await createClient()
 
   const { data, error } = await supabase
-    .from('visits')
-    .select('*, property:properties(*), account:accounts(*)')
-    .not('invoiced_at', 'is', null)
-    .gte('invoiced_at', start.toISOString())
-    .lte('invoiced_at', end.toISOString())
-    .order('invoiced_at', { ascending: false })
+    .from('invoices')
+    .select('*, account:accounts(*), visits:visits(*, property:properties(*))')
+    .gte('created_at', start.toISOString())
+    .lte('created_at', end.toISOString())
+    .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('[getInvoicedVisits]', error)
+    console.error('[getInvoicesForRange]', error)
     return []
   }
 
-  return (data ?? []) as unknown as VisitWithLocation[]
+  return (data ?? []) as unknown as InvoiceWithVisits[]
 }
 
 export interface RevenueSummary {
@@ -253,16 +256,11 @@ export interface RevenueSummary {
 }
 
 /**
- * MTD/YTD invoiced revenue, split by billing type (task 5.6). Pulls the whole
- * calendar year in one query (small volume at this company's scale) and
- * reduces both windows in JS rather than round-tripping twice.
- *
- * Contract revenue is summed from two sources with no double-counting risk:
- * `contract_invoices` (the authoritative record for every contract invoice
- * created via the Contracts tab, going forward) plus any `visits.invoice_amount`
- * tagged before that feature existed (historical contract pushes from the old
- * Queue-driven flow). New contract visits are always tagged `invoice_amount = 0`
- * (see createContractInvoice), so they never contribute here.
+ * MTD/YTD invoiced revenue, split by billing type. Reads the canonical
+ * `invoices` table directly — `amount` is always the single total per invoice,
+ * so there's no double-counting to guard against (unlike the old split between
+ * visits.invoice_amount and contract_invoices). Pulls the whole calendar year in
+ * one query (small volume at this company's scale) and reduces both windows in JS.
  */
 export async function getRevenueSummary(): Promise<RevenueSummary> {
   const supabase = await createClient()
@@ -273,55 +271,31 @@ export async function getRevenueSummary(): Promise<RevenueSummary> {
   const yearLabel = format(now, 'yyyy')
   const empty = { total: 0, perVisit: 0, contract: 0 }
 
-  const [visitsRes, contractInvoicesRes] = await Promise.all([
-    supabase
-      .from('visits')
-      .select('invoice_amount, invoiced_at, account:accounts(billing_type)')
-      .not('invoiced_at', 'is', null)
-      .gte('invoiced_at', yearStart.toISOString()),
-    supabase
-      .from('contract_invoices')
-      .select('amount, invoiced_at')
-      .gte('invoiced_at', yearStart.toISOString()),
-  ])
+  const { data, error } = await supabase
+    .from('invoices')
+    .select('billing_type, amount, created_at')
+    .gte('created_at', yearStart.toISOString())
 
-  if (visitsRes.error || !visitsRes.data) {
-    console.error('[getRevenueSummary] visits', visitsRes.error)
+  if (error || !data) {
+    console.error('[getRevenueSummary]', error)
     return { mtd: { ...empty, label: monthLabel }, ytd: { ...empty, label: yearLabel } }
-  }
-  if (contractInvoicesRes.error) {
-    console.error('[getRevenueSummary] contract_invoices', contractInvoicesRes.error)
   }
 
   const mtd = { ...empty }
   const ytd = { ...empty }
 
-  for (const row of visitsRes.data as unknown as {
-    invoice_amount: number | null
-    invoiced_at: string
-    account: { billing_type: string } | null
-  }[]) {
-    const amount = Number(row.invoice_amount ?? 0)
-    const isContract = row.account?.billing_type === 'contract'
+  for (const row of data as { billing_type: string; amount: number | null; created_at: string }[]) {
+    const amount = Number(row.amount ?? 0)
+    const isContract = row.billing_type === 'contract'
 
     ytd.total += amount
     if (isContract) ytd.contract += amount
     else ytd.perVisit += amount
 
-    if (new Date(row.invoiced_at) >= monthStart) {
+    if (new Date(row.created_at) >= monthStart) {
       mtd.total += amount
       if (isContract) mtd.contract += amount
       else mtd.perVisit += amount
-    }
-  }
-
-  for (const row of contractInvoicesRes.data ?? []) {
-    const amount = Number(row.amount)
-    ytd.total += amount
-    ytd.contract += amount
-    if (new Date(row.invoiced_at) >= monthStart) {
-      mtd.total += amount
-      mtd.contract += amount
     }
   }
 
@@ -336,7 +310,7 @@ export async function getRevenueSummary(): Promise<RevenueSummary> {
  */
 export interface ContractAccountOverview {
   account: Account
-  lastInvoice: ContractInvoiceWithAccount | null
+  lastInvoice: Invoice | null
 }
 
 export async function getContractAccountsOverview(): Promise<ContractAccountOverview[]> {
@@ -355,43 +329,21 @@ export async function getContractAccountsOverview(): Promise<ContractAccountOver
   }
 
   const { data: invoices, error: invoicesError } = await supabase
-    .from('contract_invoices')
-    .select('*, account:accounts(*)')
-    .order('invoiced_at', { ascending: false })
+    .from('invoices')
+    .select('*')
+    .eq('billing_type', 'contract')
+    .order('created_at', { ascending: false })
 
   if (invoicesError) {
     console.error('[getContractAccountsOverview] invoices', invoicesError)
   }
 
-  const typedInvoices = (invoices ?? []) as unknown as ContractInvoiceWithAccount[]
+  const typedInvoices = (invoices ?? []) as unknown as Invoice[]
 
   return accounts.map((account) => ({
     account,
     lastInvoice: typedInvoices.find((inv) => inv.account_id === account.id) ?? null,
   }))
-}
-
-/** Contract invoices within a date range, joined to account — the History
- *  tab's contract rows (merged with per_visit InvoiceGroups there). */
-export async function getContractInvoicesForRange({
-  start,
-  end,
-}: DateRange): Promise<ContractInvoiceWithAccount[]> {
-  const supabase = await createClient()
-
-  const { data, error } = await supabase
-    .from('contract_invoices')
-    .select('*, account:accounts(*)')
-    .gte('invoiced_at', start.toISOString())
-    .lte('invoiced_at', end.toISOString())
-    .order('invoiced_at', { ascending: false })
-
-  if (error) {
-    console.error('[getContractInvoicesForRange]', error)
-    return []
-  }
-
-  return (data ?? []) as unknown as ContractInvoiceWithAccount[]
 }
 
 export interface CreateContractInvoiceInput {
@@ -411,16 +363,14 @@ export interface CreateContractInvoiceResult {
 /**
  * Creates an ad-hoc invoice for a contract account, independent of visit
  * activity — a period with zero completed visits still owes the flat rate.
- * Bills `input.amount`, not `account.contract_rate` — the dialog prefills
- * with the account's standing rate, but the owner can override it to bill a
- * one-off amount without changing the account's rate. Reuses
- * pushAccountInvoice's `amountOverride` option; it already builds a single
- * flat-rate line for `billing_type === 'contract'` using visits only for the
- * line description, so it works correctly with an empty visits array.
+ * Bills `input.amount`, not `account.contract_rate` — the dialog prefills with
+ * the account's standing rate, but the owner can override it to bill a one-off
+ * amount without changing the account's rate. Reuses pushAccountInvoice's
+ * `amountOverride` option.
  *
- * `contract_invoices` is the authoritative revenue record (not the visits
- * tagged below) — see getRevenueSummary's doc comment for why that avoids
- * double-counting.
+ * Inserts one row into the canonical `invoices` table (with the period_* fields),
+ * then tags any completed visits in the period with that `invoice_id` (the amount
+ * lives on the invoice row — a contract invoice isn't visit-driven).
  */
 export async function createContractInvoice(
   input: CreateContractInvoiceInput,
@@ -474,40 +424,91 @@ export async function createContractInvoice(
     return { success: false, error: invoiceRes.error ?? 'Could not create QuickBooks invoice' }
   }
 
-  const now = new Date().toISOString()
+  const { data: invoiceRow, error: insertError } = await supabase
+    .from('invoices')
+    .insert({
+      qbo_invoice_id: invoiceRes.qboInvoiceId,
+      account_id: account.id,
+      billing_type: 'contract',
+      amount: input.amount,
+      period_label: input.periodLabel,
+      period_start: input.periodStart,
+      period_end: input.periodEnd,
+    })
+    .select('id')
+    .single()
 
-  const { error: insertError } = await supabase.from('contract_invoices').insert({
-    account_id: account.id,
-    period_label: input.periodLabel,
-    period_start: input.periodStart,
-    period_end: input.periodEnd,
-    amount: input.amount,
-    qbo_invoice_id: invoiceRes.qboInvoiceId,
-    invoiced_at: now,
-  })
-
-  if (visits.length > 0) {
-    // Tag for audit-trail/UI consistency only — invoice_amount is 0 since the
-    // real amount lives on the contract_invoices row just inserted above.
-    await supabase
-      .from('visits')
-      .update({ invoiced_at: now, qbo_invoice_id: invoiceRes.qboInvoiceId, invoice_amount: 0 })
-      .in(
-        'id',
-        visits.map((v) => v.id),
-      )
-      .is('invoiced_at', null)
-  }
-
-  revalidatePath('/management/billing')
-
-  if (insertError) {
+  if (insertError || !invoiceRow) {
     console.error('[createContractInvoice] insert', insertError)
+    revalidatePath('/management/billing')
     return {
       success: false,
       error: `Invoice ${invoiceRes.qboInvoiceId} created in QuickBooks but could not be recorded locally — record it manually`,
     }
   }
 
+  if (visits.length > 0) {
+    // Tag for audit-trail/UI consistency only — the real amount lives on the
+    // invoices row just inserted above (a contract invoice isn't visit-driven).
+    await supabase
+      .from('visits')
+      .update({ invoice_id: invoiceRow.id })
+      .in(
+        'id',
+        visits.map((v) => v.id),
+      )
+      .is('invoice_id', null)
+  }
+
+  revalidatePath('/management/billing')
   return { success: true, qboInvoiceId: invoiceRes.qboInvoiceId }
+}
+
+export interface RefreshInvoiceStatusesResult {
+  processed: number
+  errors: number
+}
+
+/**
+ * Manual "Refresh now" — pulls current QBO status for a specific set of invoices
+ * on demand (the History tab's currently-visible rows), so the accountant can
+ * confirm an invoice went out right after sending it from inside QuickBooks,
+ * without waiting for the daily cron. Runs under the authenticated user's RLS
+ * client (permitted by the invoices_update policy) and reuses the same
+ * per-invoice sync logic as the cron.
+ */
+export async function refreshInvoiceStatuses(
+  invoiceIds: string[],
+): Promise<RefreshInvoiceStatusesResult> {
+  if (invoiceIds.length === 0) return { processed: 0, errors: 0 }
+
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('invoices')
+    .select('id, qbo_invoice_id, sent_at, paid_at')
+    .in('id', invoiceIds)
+
+  if (error || !data) {
+    console.error('[refreshInvoiceStatuses] select', error)
+    return { processed: 0, errors: 0 }
+  }
+
+  let qbo
+  try {
+    qbo = await getQuickBooksClient()
+  } catch {
+    return { processed: 0, errors: data.length }
+  }
+
+  let processed = 0
+  let errors = 0
+  for (const row of data) {
+    const res = await syncInvoiceStatus(supabase, qbo, row)
+    if (res.error) errors++
+    else processed++
+  }
+
+  revalidatePath('/management/billing')
+  return { processed, errors }
 }

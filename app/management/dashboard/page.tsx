@@ -41,7 +41,7 @@ export default async function DashboardPage() {
   const completedCount = visits.filter((v) => v.status === 'completed').length
   const skippedCount = visits.filter((v) => v.status === 'skipped').length
   const uninvoicedCount = visits.filter(
-    (v) => v.status === 'completed' && !v.invoiced_at,
+    (v) => v.status === 'completed' && !v.invoice_id,
   ).length
 
   // Crew-instruction visits floated to the top

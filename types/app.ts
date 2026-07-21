@@ -13,7 +13,7 @@ export type VisitCrew = Tables<'visit_crew'>
 export type TimeEntry = Tables<'time_entries'>
 export type Photo = Tables<'photos'>
 export type Integration = Tables<'integrations'>
-export type ContractInvoice = Tables<'contract_invoices'>
+export type Invoice = Tables<'invoices'>
 
 // A property enriched with its account name and current route group — used by
 // the route-groups management page and its Assign Properties sheet.
@@ -47,6 +47,9 @@ export type Frequency = (typeof PROPERTY_FREQUENCIES)[number]
 
 export const VISIT_STATUSES = ['scheduled', 'completed', 'skipped'] as const
 export type VisitStatus = (typeof VISIT_STATUSES)[number]
+
+export const INVOICE_STATUSES = ['draft', 'sent', 'paid', 'overdue'] as const
+export type InvoiceStatus = (typeof INVOICE_STATUSES)[number]
 
 export const SERVICE_TYPES = [
   'mow',
@@ -115,10 +118,12 @@ export type VisitWithLocation = Visit & {
   account: Account
 }
 
-/** A contract invoice joined to its account — the authoritative record of an
- *  ad-hoc contract invoice (flat rate, not visit-driven). See docs/INVOICING.md. */
-export type ContractInvoiceWithAccount = ContractInvoice & {
+/** An invoice joined to its account and the visits it billed (empty for a
+ *  contract invoice with no visits in the period). Backs the Billing → History
+ *  tab, which renders one row per invoice with its status. See docs/INVOICING.md. */
+export type InvoiceWithVisits = Invoice & {
   account: Account
+  visits: (Visit & { property: Property })[]
 }
 
 /** Visit with crew assignment/completion rows and the associated employees. */

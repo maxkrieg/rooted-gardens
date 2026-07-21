@@ -101,6 +101,18 @@ declare module 'node-quickbooks' {
     SyncToken: string
     DocNumber?: string
   }
+  /** The subset of a full QBO Invoice entity we read back to derive lifecycle
+   *  status. `EmailStatus` only reflects invoices sent through QBO's own send
+   *  flow; `Balance` reaching 0 means paid; `DueDate` is a bare 'yyyy-MM-dd'
+   *  calendar date (no timezone). */
+  interface QboInvoiceDetail {
+    Id: string
+    SyncToken: string
+    Balance: number
+    TotalAmt: number
+    DueDate?: string
+    EmailStatus?: 'NotSet' | 'NeedToSend' | 'EmailSent'
+  }
   interface QboItem {
     Id: string
     Name: string
@@ -137,6 +149,10 @@ declare module 'node-quickbooks' {
     createInvoice(
       invoice: QboCreateInvoiceInput,
       callback: (err: QboApiError | null, result: QboInvoice) => void,
+    ): void
+    getInvoice(
+      id: string,
+      callback: (err: QboApiError | null, result: QboInvoiceDetail) => void,
     ): void
     findItems(
       criteria: Record<string, string>,

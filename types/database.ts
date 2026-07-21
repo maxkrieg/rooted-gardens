@@ -105,53 +105,6 @@ export type Database = {
         }
         Relationships: []
       }
-      contract_invoices: {
-        Row: {
-          account_id: string
-          amount: number
-          created_at: string
-          id: string
-          invoiced_at: string
-          period_end: string
-          period_label: string
-          period_start: string
-          qbo_invoice_id: string
-          updated_at: string
-        }
-        Insert: {
-          account_id: string
-          amount: number
-          created_at?: string
-          id?: string
-          invoiced_at?: string
-          period_end: string
-          period_label: string
-          period_start: string
-          qbo_invoice_id: string
-          updated_at?: string
-        }
-        Update: {
-          account_id?: string
-          amount?: number
-          created_at?: string
-          id?: string
-          invoiced_at?: string
-          period_end?: string
-          period_label?: string
-          period_start?: string
-          qbo_invoice_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "contract_invoices_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       employees: {
         Row: {
           active: boolean
@@ -262,6 +215,74 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      invoices: {
+        Row: {
+          account_id: string
+          amount: number
+          billing_type: string
+          created_at: string
+          id: string
+          last_synced_at: string | null
+          paid_at: string | null
+          period_end: string | null
+          period_label: string | null
+          period_start: string | null
+          qbo_balance: number | null
+          qbo_due_date: string | null
+          qbo_email_status: string | null
+          qbo_invoice_id: string
+          sent_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          amount: number
+          billing_type: string
+          created_at?: string
+          id?: string
+          last_synced_at?: string | null
+          paid_at?: string | null
+          period_end?: string | null
+          period_label?: string | null
+          period_start?: string | null
+          qbo_balance?: number | null
+          qbo_due_date?: string | null
+          qbo_email_status?: string | null
+          qbo_invoice_id: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          amount?: number
+          billing_type?: string
+          created_at?: string
+          id?: string
+          last_synced_at?: string | null
+          paid_at?: string | null
+          period_end?: string | null
+          period_label?: string | null
+          period_start?: string | null
+          qbo_balance?: number | null
+          qbo_due_date?: string | null
+          qbo_email_status?: string | null
+          qbo_invoice_id?: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       photos: {
         Row: {
@@ -569,10 +590,8 @@ export type Database = {
           crew_instruction: string | null
           ended_at: string | null
           id: string
-          invoice_amount: number | null
-          invoiced_at: string | null
+          invoice_id: string | null
           property_id: string
-          qbo_invoice_id: string | null
           service_types: string[] | null
           skip_reason: string | null
           started_at: string | null
@@ -588,10 +607,8 @@ export type Database = {
           crew_instruction?: string | null
           ended_at?: string | null
           id?: string
-          invoice_amount?: number | null
-          invoiced_at?: string | null
+          invoice_id?: string | null
           property_id: string
-          qbo_invoice_id?: string | null
           service_types?: string[] | null
           skip_reason?: string | null
           started_at?: string | null
@@ -607,10 +624,8 @@ export type Database = {
           crew_instruction?: string | null
           ended_at?: string | null
           id?: string
-          invoice_amount?: number | null
-          invoiced_at?: string | null
+          invoice_id?: string | null
           property_id?: string
-          qbo_invoice_id?: string | null
           service_types?: string[] | null
           skip_reason?: string | null
           started_at?: string | null
@@ -625,6 +640,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visits_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
             referencedColumns: ["id"]
           },
           {

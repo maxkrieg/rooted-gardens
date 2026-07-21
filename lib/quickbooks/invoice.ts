@@ -94,7 +94,9 @@ export async function pushAccountInvoice(
     lines = visits.map((v) => ({
       DetailType: 'SalesItemLineDetail',
       Amount: Number(account.price_per_visit),
-      Description: `${v.property.address} — ${format(parseISO(v.ended_at ?? v.week_start), 'MMM d')}`,
+      Description: `${v.property.address} — ${format(parseISO(v.ended_at ?? v.week_start), 'MMM d')}${
+        v.service_types?.length ? ` — ${v.service_types.join(', ')}` : ''
+      }`,
       SalesItemLineDetail: { ItemRef: { value: itemId } },
     }))
   } else if (account.billing_type === 'contract') {

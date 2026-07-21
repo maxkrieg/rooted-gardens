@@ -10,10 +10,9 @@ import { ContractInvoicing } from '@/components/management/ContractInvoicing'
 import { resolveDateRange, type ResolvedDateRange } from '@/lib/utils/billing'
 import {
   getUninvoicedVisits,
-  getInvoicedVisits,
+  getInvoicesForRange,
   getRevenueSummary,
   getContractAccountsOverview,
-  getContractInvoicesForRange,
 } from './actions'
 import type { EmployeeRole } from '@/types/app'
 
@@ -116,15 +115,13 @@ async function QueueTab({ qboConnected }: { qboConnected: boolean }) {
 }
 
 async function InvoicedTab({ range, role }: { range: ResolvedDateRange; role: EmployeeRole }) {
-  const [visits, revenue, contractInvoices] = await Promise.all([
-    getInvoicedVisits(range),
+  const [invoices, revenue] = await Promise.all([
+    getInvoicesForRange(range),
     getRevenueSummary(),
-    getContractInvoicesForRange(range),
   ])
   return (
     <InvoicedHistory
-      visits={visits}
-      contractInvoices={contractInvoices}
+      invoices={invoices}
       rangeLabel={range.label}
       rangePreset={range.preset}
       customStart={range.customStart}

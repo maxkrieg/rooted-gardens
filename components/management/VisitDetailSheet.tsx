@@ -63,7 +63,6 @@ function normalizeRow(row: VisitDetailRow): StopDetail | undefined {
       completion_note: v.completion_note,
       skip_reason: v.skip_reason,
       vehicle_id: v.vehicle_id,
-      invoiced_at: v.invoiced_at,
     },
     property: {
       id: row.property.id,

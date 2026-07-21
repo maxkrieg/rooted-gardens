@@ -16,7 +16,6 @@ export type StopDetail = {
     completion_note: string | null
     skip_reason: string | null
     vehicle_id: string | null
-    invoiced_at: string | null
   }
   property: {
     id: string
@@ -61,7 +60,7 @@ export function useStopDetail(visitId: string | undefined, options?: { initialDa
         .from('visits')
         .select(`
           id, status, crew_instruction, week_start, started_at, ended_at,
-          service_types, completion_note, skip_reason, vehicle_id, invoiced_at,
+          service_types, completion_note, skip_reason, vehicle_id,
           property:properties!inner(
             id, address, frequency, crew_notes, access_notes, parking_notes
           ),
@@ -101,7 +100,6 @@ export function useStopDetail(visitId: string | undefined, options?: { initialDa
           completion_note: data.completion_note,
           skip_reason: data.skip_reason,
           vehicle_id: data.vehicle_id,
-          invoiced_at: data.invoiced_at,
         },
         property,
         account,

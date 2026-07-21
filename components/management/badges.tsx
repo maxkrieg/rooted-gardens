@@ -4,7 +4,7 @@
  */
 
 import { Badge } from '@/components/ui/badge'
-import type { AccountStatus, BillingType, Frequency, VisitStatus } from '@/types/app'
+import type { AccountStatus, BillingType, Frequency, InvoiceStatus, VisitStatus } from '@/types/app'
 import type { QboConnectionStatus } from '@/lib/quickbooks/client'
 
 // ─── Account status ──────────────────────────────────────────────────────────
@@ -81,6 +81,30 @@ export function VisitStatusBadge({ status, missed = false }: { status: string; m
     status === 'scheduled' && missed
       ? { label: 'Missed', className: 'status-missed' }
       : VISIT_STATUS_META[status as VisitStatus] ?? { label: status, className: 'status-scheduled' }
+  return (
+    <Badge variant="outline" className={`border-transparent uppercase tracking-wide text-[10px] font-semibold ${meta.className}`}>
+      {meta.label}
+    </Badge>
+  )
+}
+
+// ─── Invoice lifecycle status ─────────────────────────────────────────────────
+
+// Real QBO invoice status, synced back from QuickBooks (draft → sent → paid,
+// with overdue branching off sent). Reuses existing status-* classes: sent maps
+// to the denim "invoiced/billed" hue, overdue to the brick destructive hue.
+const INVOICE_STATUS_META: Record<InvoiceStatus, { label: string; className: string }> = {
+  draft:   { label: 'Draft',   className: 'status-scheduled' },
+  sent:    { label: 'Sent',    className: 'status-invoiced' },
+  paid:    { label: 'Paid',    className: 'status-completed' },
+  overdue: { label: 'Overdue', className: 'status-missed' },
+}
+
+export function InvoiceStatusBadge({ status }: { status: string }) {
+  const meta = INVOICE_STATUS_META[status as InvoiceStatus] ?? {
+    label: status,
+    className: 'status-scheduled',
+  }
   return (
     <Badge variant="outline" className={`border-transparent uppercase tracking-wide text-[10px] font-semibold ${meta.className}`}>
       {meta.label}

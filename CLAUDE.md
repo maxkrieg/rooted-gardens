@@ -62,8 +62,12 @@ web app. Parent company is **Tigertown Farm LLC**.
 - **QuickBooks Online API** — invoice sync
   - Package: `node-quickbooks` + `intuit-oauth`
   - Auth: OAuth 2.0 (tokens stored in `integrations` table, encrypted)
-  - Scope: one-way push from this app → QBO (never pull)
-  - Endpoints used: `createInvoice`, `createCustomer`, `getCustomer`
+  - Scope: one-way push (app → QBO) for everything EXCEPT one narrow read-path — a
+    polling sync + manual "Refresh now" reads back an invoice's *lifecycle status only*
+    (draft/sent/paid/overdue) via `getInvoice`, to answer "has QBO actually sent this to
+    the customer yet". Never customer data, payment details, or edits made in QBO, and
+    nothing read back feeds into invoice creation or pricing.
+  - Endpoints used: `createInvoice`, `createCustomer`, `getCustomer`, `getInvoice` (status read)
 - **Twilio** — outbound SMS for crew schedule-change notifications. This is the only
   notification channel besides in-app realtime — **no email anywhere in the app**.
   - Sent from a Supabase Edge Function (`send-sms`), never inline
@@ -316,11 +320,12 @@ visits (
   skip_reason text,                     -- if status = 'skipped'
   
   -- Billing
-  -- Derived invoiced flag: invoiced_at IS NOT NULL. Same convention as in-progress
-  -- (started_at/ended_at) above — NOT a value of status. (migration 20260630140000)
-  invoiced_at timestamptz,
-  qbo_invoice_id text,
-  invoice_amount numeric(8,2),          -- snapshot of price at time of invoicing
+  -- Derived invoiced flag: invoice_id IS NOT NULL. Same convention as in-progress
+  -- (started_at/ended_at) above — NOT a value of status. (migration 20260714120000
+  -- collapsed the old invoiced_at + qbo_invoice_id columns into this FK.)
+  invoice_id uuid FK → invoices,        -- the QBO invoice this visit was billed on
+  -- (no per-line amount is stored — the invoice total lives on invoices.amount;
+  --  the History tab derives a per_visit line as invoices.amount / visit count.)
   
   created_at, updated_at
 )
@@ -392,6 +397,38 @@ integrations (
   token_expires_at timestamptz,
   created_at, updated_at
 )
+
+-- The canonical record of every QBO invoice this app has created — ONE row per
+-- QBO invoice, for every billing type. Replaced the old per-billing-type split
+-- (per_visit lived only as visits.qbo_invoice_id; contract lived in a separate
+-- contract_invoices table) in migration 20260714120000. visits.invoice_id FKs
+-- here; visits.invoice_amount is the per-line snapshot, this table's `amount` is
+-- the invoice total. `created_at` is the "invoiced/pushed to QBO" moment.
+invoices (
+  id uuid PK,
+  qbo_invoice_id text NOT NULL UNIQUE,  -- the QBO Invoice.Id
+  account_id uuid FK → accounts,
+  billing_type text NOT NULL            -- denormalized snapshot: 'per_visit' | 'contract' | 'as_needed'
+    CHECK (billing_type IN ('per_visit', 'contract', 'as_needed')),
+  amount numeric(8,2) NOT NULL,         -- invoice total
+  period_label text,                    -- contract only (period being billed)
+  period_start date,                    -- contract only
+  period_end date,                      -- contract only
+  -- Real QBO lifecycle, synced BACK from QBO (the one narrow read exception to
+  -- the otherwise one-way push — see External Integrations). NOT a visits.status.
+  status text NOT NULL DEFAULT 'draft'
+    CHECK (status IN ('draft', 'sent', 'paid', 'overdue')),
+  qbo_balance numeric(8,2),             -- QBO Balance snapshot
+  qbo_due_date date,                    -- QBO DueDate snapshot
+  qbo_email_status text,                -- raw QBO EmailStatus, debugging only
+  sent_at timestamptz,                  -- set once, first time status → sent/overdue
+  paid_at timestamptz,                  -- set once, first time status → paid
+  last_synced_at timestamptz,           -- null = never synced; drives sync ordering
+  created_at, updated_at
+)
+-- RLS: select for owner/lead/accountant; insert for owner/lead; update for
+-- owner/lead/accountant (the manual "Refresh now" status sync). The cron sync
+-- (app/api/cron/sync-invoice-status) writes via the service client, bypassing RLS.
 ```
 
 ---
@@ -448,11 +485,14 @@ A `visit` is a (property × week) record — enforced by a UNIQUE index on
 - May have a `crew_instruction` — a one-time note for this specific visit (distinct from property standing notes)
 - Crew completes it in the field: sets `ended_at`, `service_types[]`, `completion_note`
 - Completion date is derived from `ended_at` (fallback: `week_start`); display with `parseISO`
-- `status` is `scheduled | completed | skipped` — never `invoiced`. Billing is a
-  *derived* flag (`invoiced_at IS NOT NULL`), the same convention as the in-progress
-  state below. The owner/accountant marks a completed visit invoiced after pushing to
-  QBO (today: a manual toggle in `VisitDetailSheet`, standing in for the real QBO push
-  which is still unbuilt — see Phase 5 in PHASES.md).
+- `status` is `scheduled | completed | skipped` — never `invoiced`. Whether a visit has
+  been billed is a *derived* flag (`invoice_id IS NOT NULL`), the same convention as the
+  in-progress state below. Pushing to QBO (from the Billing Queue / Contracts tab) creates
+  an `invoices` row and sets the visit's `invoice_id`. The *real* QBO lifecycle — whether
+  QBO has actually sent it, been paid, or gone overdue — lives on `invoices.status`
+  (`draft | sent | paid | overdue`), synced back from QBO (see External Integrations). To
+  the owners, "invoiced" means QBO *sent* it (`invoices.status = 'sent'`), not merely that
+  it was pushed.
 
 ### Job Start/Stop & In-Progress State
 Start/stop timing lives directly on the visit row: `visits.started_at` and `visits.ended_at`.
@@ -697,6 +737,10 @@ QBO_CLIENT_ID=
 QBO_CLIENT_SECRET=
 QBO_REDIRECT_URI=
 QBO_ENVIRONMENT=sandbox         # 'sandbox' | 'production'
+QBO_SERVICE_ITEM_NAME=Services  # shared Product/Service every invoice line bills against
+
+# Cron (invoice-status sync — app/api/cron/sync-invoice-status)
+CRON_SECRET=                    # Vercel Cron sends this as `Authorization: Bearer <secret>`
 
 # Twilio (SMS notifications — no email is used anywhere in the app)
 TWILIO_ACCOUNT_SID=
@@ -717,7 +761,11 @@ NEXT_PUBLIC_APP_URL=            # https://yourapp.vercel.app
   `(public)` route group and the `leads` table (Phase 9).
 - Do NOT build a native mobile app — PWA is sufficient
 - Do NOT use Prisma or Drizzle — use Supabase client directly with generated types
-- Do NOT pull data FROM QuickBooks — sync is one-way (app → QBO only)
+- Do NOT pull data FROM QuickBooks — sync is one-way (app → QBO), with ONE narrow,
+  intentional exception: reading an invoice's lifecycle **status** back (draft/sent/paid/
+  overdue) via a daily cron + manual "Refresh now". That's status only — never customer/
+  payment data, never edits made in QBO, and never anything that feeds back into invoice
+  creation or pricing.
 - Do NOT store Supabase service role key anywhere client-accessible
 - Do NOT use `any` types — generate proper types from Supabase schema
 - Do NOT build pricing tiers or pricing calculation logic — prices are stored flat per account
