@@ -1,11 +1,28 @@
 'use client'
 
-import { useMemo, useState, useTransition, type ReactNode } from 'react'
-import { format, parseISO } from 'date-fns'
-import { ChevronDown } from 'lucide-react'
+import { useMemo, useState, useTransition } from 'react'
+import { format, parseISO, startOfMonth, endOfMonth } from 'date-fns'
+import { Check, ChevronsUpDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -14,10 +31,20 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { AccountInvoiceDrawer } from '@/components/management/AccountInvoiceDrawer'
+import { SortableTableHead, type SortDir } from '@/components/management/SortableTableHead'
 import { BillingTypeBadge } from '@/components/management/badges'
 import { pushInvoicesToQuickBooks } from '@/app/management/billing/actions'
-import { groupVisitsByAccountMonth, type AccountMonthGroup } from '@/lib/utils/billing'
+import {
+  groupVisitsByAccount,
+  resolveDateRange,
+  DATE_RANGE_PRESETS,
+  DATE_RANGE_PRESET_LABELS,
+  type AccountGroup,
+  type DateRangePreset,
+} from '@/lib/utils/billing'
 import { formatAccountPrice } from '@/lib/utils/accounts'
+import { cn } from '@/lib/utils'
 import type { VisitWithLocation } from '@/types/app'
 
 interface InvoiceQueueProps {
@@ -25,125 +52,146 @@ interface InvoiceQueueProps {
   qboConnected: boolean
 }
 
-function groupAmount(group: AccountMonthGroup, selectedIds: Set<string>): number {
-  if (group.account.billing_type === 'contract') {
-    const allSelected = group.visits.length > 0 && group.visits.every((v) => selectedIds.has(v.id))
-    return allSelected && group.account.contract_rate != null ? Number(group.account.contract_rate) : 0
-  }
-  return group.visits.reduce((sum, v) => {
-    if (!selectedIds.has(v.id)) return sum
-    if (group.account.billing_type === 'per_visit' && group.account.price_per_visit != null) {
-      return sum + Number(group.account.price_per_visit)
-    }
-    return sum // as_needed accounts have no stored rate — listed, but contribute $0
-  }, 0)
+/** The dollars an account's uninvoiced (shown) visits will bill: per_visit rate
+ *  × visit count. The queue is per_visit-only, so this is the whole story. */
+function accountTotal(group: AccountGroup): number {
+  const price = group.account.price_per_visit != null ? Number(group.account.price_per_visit) : 0
+  return price * group.visits.length
 }
 
+// The Queue's own date filter adds an "All time" default on top of the History
+// tab's presets — the Queue's job is to surface *every* unbilled visit so nothing
+// old is missed, so it must not hide old work by default the way History does.
+type QueueDatePreset = 'all' | DateRangePreset
+type SortKey = 'account' | 'visits' | 'total'
+
 /**
- * The billing invoice queue — every completed, not-yet-invoiced visit
- * regardless of month, grouped by (account, completion month) so nothing in
- * an old month goes unnoticed, and so a push always maps to exactly one QBO
- * invoice per group (the owner invoices monthly — combining two months into
- * one push would under-bill a contract account). per_visit accounts get one
- * row per visit; contract accounts collapse to a single summary row (flat
- * periodic rate regardless of visit count). A divider row marks each new
- * month, oldest first.
+ * The billing invoice queue — one row per (per_visit) account with uninvoiced,
+ * completed visits. Checking an account row and pushing bills *all* of that
+ * account's shown uninvoiced visits onto a single QBO invoice ("bazooka");
+ * clicking a row opens a drawer to hand-pick which visits go on the invoice
+ * instead. Sortable columns + the same Date/Account filters as the Invoices tab
+ * (applied in-memory here — the queue already holds every uninvoiced visit).
  */
 export function InvoiceQueue({ visits, qboConnected }: InvoiceQueueProps) {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
-  const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(() => new Set())
+  const [selectedAccountIds, setSelectedAccountIds] = useState<Set<string>>(() => new Set())
+  const [datePreset, setDatePreset] = useState<QueueDatePreset>('all')
+  const [customStart, setCustomStart] = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-dd'))
+  const [customEnd, setCustomEnd] = useState(() => format(endOfMonth(new Date()), 'yyyy-MM-dd'))
+  const [accountFilter, setAccountFilter] = useState<string>('all')
+  const [accountPopoverOpen, setAccountPopoverOpen] = useState(false)
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'account', dir: 'asc' })
+  const [drawerAccountId, setDrawerAccountId] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
   // Reset selection whenever the visit set changes (e.g. after a push
-  // revalidates the page with fewer rows) — nothing is pre-selected, so a
-  // stale id from a now-invoiced visit never lingers in the set. Adjusted
-  // during render (React's recommended pattern for resetting state from a
-  // prop change) rather than in an effect, which would cause an extra render pass.
+  // revalidates the page) — nothing is pre-selected, so a stale id from a
+  // now-invoiced account never lingers. Render-phase reset (React's recommended
+  // pattern) rather than an effect, to avoid an extra render pass.
   const [prevVisits, setPrevVisits] = useState(visits)
   if (visits !== prevVisits) {
     setPrevVisits(visits)
-    setSelectedIds(new Set())
+    setSelectedAccountIds(new Set())
   }
 
-  const groups = useMemo(() => groupVisitsByAccountMonth(visits), [visits])
+  // The account dropdown always lists every account in the queue, regardless of
+  // the active date filter.
+  const accountOptions = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const v of visits) map.set(v.account.id, v.account.name)
+    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]))
+  }, [visits])
 
-  // All visit ids for a given month, across every account in that month —
-  // backs the month divider's "select all" checkbox.
-  const visitIdsByMonth = useMemo(() => {
-    const map = new Map<string, string[]>()
-    for (const group of groups) {
-      const ids = map.get(group.monthKey) ?? []
-      ids.push(...group.visits.map((v) => v.id))
-      map.set(group.monthKey, ids)
+  const dateRange = useMemo(
+    () =>
+      datePreset === 'all'
+        ? null
+        : resolveDateRange({ range: datePreset, start: customStart, end: customEnd }),
+    [datePreset, customStart, customEnd],
+  )
+
+  const filteredVisits = useMemo(() => {
+    let list = visits
+    if (dateRange) {
+      list = list.filter((v) => {
+        const d = parseISO(v.ended_at ?? v.week_start)
+        return d >= dateRange.start && d <= dateRange.end
+      })
     }
-    return map
-  }, [groups])
+    if (accountFilter !== 'all') list = list.filter((v) => v.account.id === accountFilter)
+    return list
+  }, [visits, dateRange, accountFilter])
+
+  const groups = useMemo(() => {
+    const grouped = groupVisitsByAccount(filteredVisits)
+    const { key, dir } = sort
+    const factor = dir === 'asc' ? 1 : -1
+    return [...grouped].sort((a, b) => {
+      let cmp = 0
+      if (key === 'account') cmp = a.account.name.localeCompare(b.account.name)
+      else if (key === 'visits') cmp = a.visits.length - b.visits.length
+      else cmp = accountTotal(a) - accountTotal(b)
+      return cmp * factor
+    })
+  }, [filteredVisits, sort])
 
   const total = useMemo(
-    () => groups.reduce((sum, group) => sum + groupAmount(group, selectedIds), 0),
-    [groups, selectedIds],
+    () =>
+      groups.reduce(
+        (sum, g) => (selectedAccountIds.has(g.account.id) ? sum + accountTotal(g) : sum),
+        0,
+      ),
+    [groups, selectedAccountIds],
   )
-  // Each group is exactly one future QBO invoice (one per account per month).
-  const selectedInvoiceCount = useMemo(
-    () => groups.filter((group) => group.visits.some((v) => selectedIds.has(v.id))).length,
-    [groups, selectedIds],
+  const selectedCount = useMemo(
+    () => groups.filter((g) => selectedAccountIds.has(g.account.id)).length,
+    [groups, selectedAccountIds],
   )
+  const allVisibleSelected =
+    groups.length > 0 && groups.every((g) => selectedAccountIds.has(g.account.id))
 
-  function toggleVisit(visitId: string) {
-    setSelectedIds((prev) => {
+  const drawerGroup = drawerAccountId
+    ? groups.find((g) => g.account.id === drawerAccountId) ?? null
+    : null
+
+  function toggleAccount(accountId: string) {
+    setSelectedAccountIds((prev) => {
       const next = new Set(prev)
-      if (next.has(visitId)) next.delete(visitId)
-      else next.add(visitId)
+      if (next.has(accountId)) next.delete(accountId)
+      else next.add(accountId)
       return next
     })
   }
 
-  function toggleGroup(group: AccountMonthGroup) {
-    const allSelected = group.visits.every((v) => selectedIds.has(v.id))
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      for (const v of group.visits) {
-        if (allSelected) next.delete(v.id)
-        else next.add(v.id)
-      }
-      return next
+  function toggleAll() {
+    setSelectedAccountIds((prev) => {
+      if (groups.every((g) => prev.has(g.account.id))) return new Set()
+      return new Set(groups.map((g) => g.account.id))
     })
   }
 
-  function toggleMonth(monthKey: string) {
-    const ids = visitIdsByMonth.get(monthKey) ?? []
-    const allSelected = ids.every((id) => selectedIds.has(id))
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      for (const id of ids) {
-        if (allSelected) next.delete(id)
-        else next.add(id)
-      }
-      return next
-    })
-  }
-
-  function toggleMonthExpanded(monthKey: string) {
-    setCollapsedMonths((prev) => {
-      const next = new Set(prev)
-      if (next.has(monthKey)) next.delete(monthKey)
-      else next.add(monthKey)
-      return next
-    })
+  function toggleSort(key: SortKey) {
+    setSort((prev) =>
+      prev.key === key ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' },
+    )
   }
 
   function handlePush() {
-    const ids = [...selectedIds]
+    // Bazooka: every shown uninvoiced visit for each selected account → one
+    // invoice per account (grouping is account-only server-side).
+    const ids = groups
+      .filter((g) => selectedAccountIds.has(g.account.id))
+      .flatMap((g) => g.visits.map((v) => v.id))
+    if (ids.length === 0) return
     startTransition(async () => {
       const results = await pushInvoicesToQuickBooks(ids)
       for (const r of results) {
-        const label = r.monthLabel ? `${r.accountName} — ${r.monthLabel}` : r.accountName
         if (r.success) {
-          toast.success(`${label}: invoice pushed`, {
+          toast.success(`${r.accountName}: invoice pushed`, {
             description: `QuickBooks invoice ${r.qboInvoiceId}`,
           })
         } else {
-          toast.error(`${label}: push failed`, { description: r.error })
+          toast.error(`${r.accountName}: push failed`, { description: r.error })
         }
       }
     })
@@ -159,20 +207,113 @@ export function InvoiceQueue({ visits, qboConnected }: InvoiceQueueProps) {
 
   return (
     <div className="space-y-4">
+      {/* Filters */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select value={datePreset} onValueChange={(v) => setDatePreset(v as QueueDatePreset)}>
+            <SelectTrigger className="h-10 w-full sm:w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All time</SelectItem>
+              {DATE_RANGE_PRESETS.map((p) => (
+                <SelectItem key={p} value={p}>
+                  {DATE_RANGE_PRESET_LABELS[p]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {datePreset === 'custom' && (
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                className="h-10 w-[150px]"
+                value={customStart}
+                onChange={(e) => setCustomStart(e.target.value)}
+              />
+              <span className="text-sm text-muted-foreground">to</span>
+              <Input
+                type="date"
+                className="h-10 w-[150px]"
+                value={customEnd}
+                onChange={(e) => setCustomEnd(e.target.value)}
+              />
+            </div>
+          )}
+        </div>
+
+        <Popover open={accountPopoverOpen} onOpenChange={setAccountPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={accountPopoverOpen}
+              className="h-10 w-full sm:w-56 justify-between font-normal"
+            >
+              <span className="truncate">
+                {accountFilter === 'all'
+                  ? 'All accounts'
+                  : (accountOptions.find(([id]) => id === accountFilter)?.[1] ?? 'All accounts')}
+              </span>
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-0">
+            <Command>
+              <CommandInput placeholder="Search accounts…" />
+              <CommandList>
+                <CommandEmpty>No account found.</CommandEmpty>
+                <CommandGroup>
+                  <CommandItem
+                    value="all accounts"
+                    onSelect={() => {
+                      setAccountFilter('all')
+                      setAccountPopoverOpen(false)
+                    }}
+                  >
+                    <Check
+                      className={cn('mr-2 h-4 w-4', accountFilter === 'all' ? 'opacity-100' : 'opacity-0')}
+                    />
+                    All accounts
+                  </CommandItem>
+                  {accountOptions.map(([id, name]) => (
+                    <CommandItem
+                      key={id}
+                      value={name}
+                      onSelect={() => {
+                        setAccountFilter(id)
+                        setAccountPopoverOpen(false)
+                      }}
+                    >
+                      <Check
+                        className={cn('mr-2 h-4 w-4', accountFilter === id ? 'opacity-100' : 'opacity-0')}
+                      />
+                      {name}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+      </div>
+
+      {/* Summary bar + push */}
       <div className="flex items-center justify-between rounded-xl border border-border bg-card px-5 py-3.5 shadow-warm">
         <div>
           <p className="font-display text-lg font-semibold text-foreground tabular-nums">
             ${total.toFixed(2)} selected
           </p>
           <p className="text-xs text-muted-foreground">
-            across {selectedInvoiceCount} {selectedInvoiceCount === 1 ? 'invoice' : 'invoices'}
+            across {selectedCount} {selectedCount === 1 ? 'invoice' : 'invoices'}
           </p>
         </div>
         <div className="flex flex-col items-end gap-1">
-          <Button onClick={handlePush} disabled={pending || selectedIds.size === 0 || !qboConnected}>
+          <Button onClick={handlePush} disabled={pending || selectedCount === 0 || !qboConnected}>
             {pending
               ? 'Pushing…'
-              : `Push ${selectedIds.size} visit${selectedIds.size === 1 ? '' : 's'} to QuickBooks`}
+              : `Push ${selectedCount} account${selectedCount === 1 ? '' : 's'} to QuickBooks`}
           </Button>
           {!qboConnected && (
             <p className="text-xs text-muted-foreground">Connect QuickBooks above first</p>
@@ -180,126 +321,97 @@ export function InvoiceQueue({ visits, qboConnected }: InvoiceQueueProps) {
         </div>
       </div>
 
+      {/* Table */}
       <div className="rounded-xl border border-border bg-card shadow-warm overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-10" />
-              <TableHead>Account / Property</TableHead>
-              <TableHead>Completed</TableHead>
-              <TableHead className="text-right">Price</TableHead>
+              <TableHead className="w-10">
+                <Checkbox
+                  checked={allVisibleSelected}
+                  onCheckedChange={toggleAll}
+                  aria-label="Select all accounts"
+                  disabled={groups.length === 0}
+                />
+              </TableHead>
+              <SortableTableHead
+                label="Account"
+                sortKey="account"
+                currentKey={sort.key}
+                dir={sort.dir}
+                onSort={toggleSort}
+              />
+              <SortableTableHead
+                label="Uninvoiced visits"
+                sortKey="visits"
+                currentKey={sort.key}
+                dir={sort.dir}
+                onSort={toggleSort}
+              />
+              <SortableTableHead
+                label="Total Uninvoiced"
+                sortKey="total"
+                currentKey={sort.key}
+                dir={sort.dir}
+                onSort={toggleSort}
+                align="right"
+              />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {groups.flatMap((group, index) => {
-              const rows: ReactNode[] = []
-              const prevGroup = groups[index - 1]
-              const isExpanded = !collapsedMonths.has(group.monthKey)
-
-              if (!prevGroup || prevGroup.monthKey !== group.monthKey) {
-                const monthIds = visitIdsByMonth.get(group.monthKey) ?? []
-                const monthAllSelected = monthIds.length > 0 && monthIds.every((id) => selectedIds.has(id))
-                rows.push(
-                  <TableRow
-                    key={`month-${group.monthKey}`}
-                    onClick={() => toggleMonthExpanded(group.monthKey)}
-                    className="cursor-pointer hover:bg-secondary border-t-4 border-border"
-                  >
-                    <TableCell className="bg-secondary py-3" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        checked={monthAllSelected}
-                        onCheckedChange={() => toggleMonth(group.monthKey)}
-                        aria-label={`Select all visits in ${group.monthLabel}`}
-                      />
-                    </TableCell>
-                    <TableCell colSpan={3} className="bg-secondary py-3">
-                      <div className="flex items-center justify-between">
-                        <span className="font-display text-base font-semibold text-foreground uppercase tracking-wide">
-                          {group.monthLabel}
-                          <span className="ml-2 font-sans text-sm font-normal normal-case tracking-normal text-muted-foreground">
-                            ({monthIds.length} visit{monthIds.length === 1 ? '' : 's'})
-                          </span>
-                        </span>
-                        <ChevronDown
-                          className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
-                          style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
-                        />
-                      </div>
-                    </TableCell>
-                  </TableRow>,
-                )
-              }
-
-              if (!isExpanded) return rows
-
-              if (group.account.billing_type === 'contract') {
-                const allSelected = group.visits.every((v) => selectedIds.has(v.id))
-                rows.push(
-                  <TableRow key={`${group.account.id}-${group.monthKey}`}>
-                    <TableCell>
-                      <Checkbox
-                        checked={allSelected}
-                        onCheckedChange={() => toggleGroup(group)}
-                        aria-label={`Select ${group.account.name}`}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-foreground">{group.account.name}</span>
-                        <BillingTypeBadge billingType={group.account.billing_type} />
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground tabular-nums">
-                      {group.visits.length} visit{group.visits.length === 1 ? '' : 's'}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums font-medium">
-                      {formatAccountPrice(group.account)}
-                    </TableCell>
-                  </TableRow>,
-                )
-                return rows
-              }
-
-              rows.push(
-                <TableRow key={`${group.account.id}-${group.monthKey}-header`} className="bg-muted/30 hover:bg-muted/30">
-                  <TableCell colSpan={4}>
+            {groups.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="py-12 text-center text-sm text-muted-foreground">
+                  No accounts match these filters.
+                </TableCell>
+              </TableRow>
+            ) : (
+              groups.map((group) => (
+                <TableRow
+                  key={group.account.id}
+                  onClick={() => setDrawerAccountId(group.account.id)}
+                  className="cursor-pointer hover:bg-accent/40 transition-colors"
+                >
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={selectedAccountIds.has(group.account.id)}
+                      onCheckedChange={() => toggleAccount(group.account.id)}
+                      aria-label={`Select ${group.account.name}`}
+                    />
+                  </TableCell>
+                  <TableCell>
                     <div className="flex items-center gap-2">
-                      <span className="font-display text-sm text-foreground">{group.account.name}</span>
+                      <span className="font-medium text-foreground">{group.account.name}</span>
                       <BillingTypeBadge billingType={group.account.billing_type} />
                       <span className="text-xs text-muted-foreground tabular-nums">
                         {formatAccountPrice(group.account)}
                       </span>
                     </div>
                   </TableCell>
-                </TableRow>,
-              )
-              for (const visit of group.visits) {
-                rows.push(
-                  <TableRow key={visit.id}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedIds.has(visit.id)}
-                        onCheckedChange={() => toggleVisit(visit.id)}
-                        aria-label={`Select ${visit.property.address}`}
-                      />
-                    </TableCell>
-                    <TableCell className="pl-8 text-foreground">{visit.property.address}</TableCell>
-                    <TableCell className="text-muted-foreground tabular-nums">
-                      {visit.ended_at ? format(parseISO(visit.ended_at), 'MMM d') : '—'}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {group.account.billing_type === 'per_visit'
-                        ? formatAccountPrice(group.account)
-                        : '—'}
-                    </TableCell>
-                  </TableRow>,
-                )
-              }
-              return rows
-            })}
+                  <TableCell className="text-muted-foreground tabular-nums">
+                    {group.visits.length}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums font-medium">
+                    ${accountTotal(group).toFixed(2)}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
+
+      {drawerGroup && (
+        <AccountInvoiceDrawer
+          open={drawerAccountId !== null}
+          onOpenChange={(open) => {
+            if (!open) setDrawerAccountId(null)
+          }}
+          account={drawerGroup.account}
+          visits={drawerGroup.visits}
+          qboConnected={qboConnected}
+        />
+      )}
     </div>
   )
 }

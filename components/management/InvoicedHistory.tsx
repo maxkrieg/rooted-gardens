@@ -16,6 +16,13 @@ import {
   CommandList,
 } from '@/components/ui/command'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Table,
   TableBody,
   TableCell,
@@ -24,6 +31,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { BillingTypeBadge, InvoiceStatusBadge } from '@/components/management/badges'
+import { SortableTableHead } from '@/components/management/SortableTableHead'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { HistoryDateRangeFilter } from '@/components/management/HistoryDateRangeFilter'
 import { pollInvoiceStatuses, refreshInvoiceStatuses } from '@/app/management/billing/actions'
@@ -54,6 +62,18 @@ type SheetRow = { property: Property; account: Account; visit: Visit }
 // action is staleness-gated (see pollInvoiceStatuses), so this only bounds how
 // quickly a stale invoice gets picked up — not how hard QBO is hit.
 const POLL_INTERVAL_MS = 60_000
+
+const INVOICE_STATUSES = ['draft', 'sent', 'paid', 'overdue'] as const
+const STATUS_LABELS: Record<(typeof INVOICE_STATUSES)[number], string> = {
+  draft: 'Draft',
+  sent: 'Sent',
+  paid: 'Paid',
+  overdue: 'Overdue',
+}
+// Lifecycle order for sorting the Status column (not alphabetical).
+const STATUS_RANK: Record<string, number> = { draft: 0, sent: 1, overdue: 2, paid: 3 }
+
+type InvoiceSortKey = 'account' | 'date' | 'status' | 'amount'
 
 function RevenueCard({
   label,
@@ -97,7 +117,12 @@ export function InvoicedHistory({
 }: InvoicedHistoryProps) {
   const router = useRouter()
   const [accountFilter, setAccountFilter] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
   const [accountPopoverOpen, setAccountPopoverOpen] = useState(false)
+  const [sort, setSort] = useState<{ key: InvoiceSortKey; dir: 'asc' | 'desc' }>({
+    key: 'date',
+    dir: 'desc',
+  })
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sheetRow, setSheetRow] = useState<SheetRow | null>(null)
   const [expandedInvoiceIds, setExpandedInvoiceIds] = useState<Set<string>>(() => new Set())
@@ -127,13 +152,33 @@ export function InvoicedHistory({
     return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]))
   }, [invoices])
 
-  const filtered = useMemo(
-    () =>
-      accountFilter === 'all'
-        ? invoices
-        : invoices.filter((inv) => inv.account.id === accountFilter),
-    [invoices, accountFilter],
-  )
+  const filtered = useMemo(() => {
+    let list = invoices
+    if (accountFilter !== 'all') list = list.filter((inv) => inv.account.id === accountFilter)
+    if (statusFilter !== 'all') list = list.filter((inv) => inv.status === statusFilter)
+    return list
+  }, [invoices, accountFilter, statusFilter])
+
+  // Display order — filtered rows sorted by the active column. Kept separate from
+  // `filtered` (which backs the refresh/poll id sets, where order is irrelevant).
+  const sorted = useMemo(() => {
+    const { key, dir } = sort
+    const factor = dir === 'asc' ? 1 : -1
+    return [...filtered].sort((a, b) => {
+      let cmp = 0
+      if (key === 'account') cmp = a.account.name.localeCompare(b.account.name)
+      else if (key === 'date') cmp = a.created_at.localeCompare(b.created_at)
+      else if (key === 'status') cmp = (STATUS_RANK[a.status] ?? 0) - (STATUS_RANK[b.status] ?? 0)
+      else cmp = Number(a.amount) - Number(b.amount)
+      return cmp * factor
+    })
+  }, [filtered, sort])
+
+  function toggleSort(key: InvoiceSortKey) {
+    setSort((prev) =>
+      prev.key === key ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' },
+    )
+  }
 
   function handleRefresh() {
     const ids = filtered.map((inv) => inv.id)
@@ -266,6 +311,20 @@ export function InvoicedHistory({
           </PopoverContent>
         </Popover>
 
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="h-10 w-full sm:w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            {INVOICE_STATUSES.map((s) => (
+              <SelectItem key={s} value={s}>
+                {STATUS_LABELS[s]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         <Button
           variant="outline"
           className="h-10 gap-1.5"
@@ -277,7 +336,7 @@ export function InvoicedHistory({
         </Button>
       </div>
 
-      {filtered.length === 0 ? (
+      {sorted.length === 0 ? (
         <div className="flex items-center justify-center py-16 text-sm text-muted-foreground rounded-xl border border-border bg-card">
           No invoices for {rangeLabel}.
         </div>
@@ -286,15 +345,40 @@ export function InvoicedHistory({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Account / Property</TableHead>
-                <TableHead>Invoiced</TableHead>
+                <SortableTableHead
+                  label="Account"
+                  sortKey="account"
+                  currentKey={sort.key}
+                  dir={sort.dir}
+                  onSort={toggleSort}
+                />
+                <SortableTableHead
+                  label="Invoice Date"
+                  sortKey="date"
+                  currentKey={sort.key}
+                  dir={sort.dir}
+                  onSort={toggleSort}
+                />
                 <TableHead>QBO Invoice</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
+                <SortableTableHead
+                  label="Status"
+                  sortKey="status"
+                  currentKey={sort.key}
+                  dir={sort.dir}
+                  onSort={toggleSort}
+                />
+                <SortableTableHead
+                  label="Amount"
+                  sortKey="amount"
+                  currentKey={sort.key}
+                  dir={sort.dir}
+                  onSort={toggleSort}
+                  align="right"
+                />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.flatMap((invoice) => {
+              {sorted.flatMap((invoice) => {
                 const invoicedDate = format(parseISO(invoice.created_at), 'MMM d')
                 const isContract = invoice.billing_type === 'contract'
                 const expandable = !isContract && invoice.visits.length > 0

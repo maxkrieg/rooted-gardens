@@ -15,47 +15,29 @@ export function qboInvoiceUrl(qboInvoiceId: string): string {
   return `https://app.qbo.intuit.com/app/invoice?txnId=${qboInvoiceId}`
 }
 
-export type AccountMonthGroup = {
+export type AccountGroup = {
   account: Account
-  monthKey: string // 'yyyy-MM', from the visit's completion date
-  monthLabel: string // 'May 2026'
   visits: VisitWithLocation[]
 }
 
-function completionMonthKey(visit: VisitWithLocation): string {
-  return format(parseISO(visit.ended_at ?? visit.week_start), 'yyyy-MM')
-}
-
 /**
- * Clusters uninvoiced visits by (account, completion month) — the owner invoices
- * monthly, so a push must never combine two different months' visits into one
- * invoice (that would under-bill a contract account, whose flat rate is per
- * period, not per push). Sorted oldest-month-first, then by account name, so
- * the Queue can render one flat list and drop a divider whenever `monthKey`
- * changes between consecutive groups, with no separate nested structure.
+ * Clusters uninvoiced visits by account only (not by month) — one group per
+ * account, which maps to exactly one QBO invoice per account when pushed. The
+ * owner now decides which visits land on which invoice (via the account-row
+ * "bazooka" push or the per-account selective drawer), so the queue no longer
+ * force-splits a push by calendar month. Sorted by account name.
  */
-export function groupVisitsByAccountMonth(visits: VisitWithLocation[]): AccountMonthGroup[] {
-  const map = new Map<string, AccountMonthGroup>()
+export function groupVisitsByAccount(visits: VisitWithLocation[]): AccountGroup[] {
+  const map = new Map<string, AccountGroup>()
   for (const visit of visits) {
-    const monthKey = completionMonthKey(visit)
-    const key = `${visit.account.id}::${monthKey}`
-    const existing = map.get(key)
+    const existing = map.get(visit.account.id)
     if (existing) {
       existing.visits.push(visit)
     } else {
-      map.set(key, {
-        account: visit.account,
-        monthKey,
-        monthLabel: format(parseISO(`${monthKey}-01`), 'MMMM yyyy'),
-        visits: [visit],
-      })
+      map.set(visit.account.id, { account: visit.account, visits: [visit] })
     }
   }
-  return [...map.values()].sort((a, b) =>
-    a.monthKey !== b.monthKey
-      ? a.monthKey.localeCompare(b.monthKey)
-      : a.account.name.localeCompare(b.account.name),
-  )
+  return [...map.values()].sort((a, b) => a.account.name.localeCompare(b.account.name))
 }
 
 export const DATE_RANGE_PRESETS = [

@@ -7,22 +7,22 @@ import { getQuickBooksClient } from '@/lib/quickbooks/client'
 import { syncCustomer } from '@/lib/quickbooks/sync'
 import { pushAccountInvoice } from '@/lib/quickbooks/invoice'
 import { syncInvoiceStatus } from '@/lib/quickbooks/invoiceStatus'
-import { groupVisitsByAccountMonth } from '@/lib/utils/billing'
+import { groupVisitsByAccount } from '@/lib/utils/billing'
 import type { Account, Invoice, InvoiceWithVisits, VisitWithLocation } from '@/types/app'
 
 /**
  * All completed, not-yet-invoiced visits, joined to property + account —
  * every uninvoiced visit regardless of month, so nothing sitting in an old
- * month goes unnoticed (the Queue groups these by month for display; see
- * groupVisitsByAccountMonth). Filters on `status`/`invoice_id` only, hitting
+ * month goes unnoticed (the Queue groups these by account; see
+ * groupVisitsByAccount). Filters on `status`/`invoice_id` only, hitting
  * the `visits_uninvoiced_idx` partial index
  * (`WHERE status='completed' AND invoice_id IS NULL`). Ordered oldest-first
  * — the oldest unbilled work is the most overdue/actionable.
  *
- * Excludes `contract` accounts — they're billed a flat rate per period
- * regardless of visit count/activity, so a visit-completion-driven queue is
- * the wrong trigger for them (see docs/INVOICING.md). Contract invoicing
- * happens from the Contracts tab (`createContractInvoice`) instead.
+ * Restricted to `per_visit` accounts. `contract` accounts are billed a flat
+ * rate per period regardless of visit count (Contracts tab / createContractInvoice),
+ * and `as_needed` accounts have no stored rate to auto-price a queue push against
+ * — both are the wrong fit for a visit-completion-driven queue (see docs/INVOICING.md).
  */
 export async function getUninvoicedVisits(): Promise<VisitWithLocation[]> {
   const supabase = await createClient()
@@ -40,14 +40,13 @@ export async function getUninvoicedVisits(): Promise<VisitWithLocation[]> {
   }
 
   return ((data ?? []) as unknown as VisitWithLocation[]).filter(
-    (v) => v.account.billing_type !== 'contract',
+    (v) => v.account.billing_type === 'per_visit',
   )
 }
 
 export interface PushResult {
   accountId: string
   accountName: string
-  monthLabel: string
   success: boolean
   qboInvoiceId?: string
   error?: string
@@ -55,13 +54,14 @@ export interface PushResult {
 
 /**
  * Pushes the selected visits to QuickBooks as real invoices, grouped by
- * (account, completion month) — one QBO Invoice per account per month (one
- * line per visit for per_visit accounts). The owner invoices monthly, so a
- * push must never combine two different months' visits into one invoice —
- * grouping by month as well as account is what guarantees that, regardless of
- * what the accountant selects in one batch. Re-fetches and re-groups the visits
- * server-side rather than trusting client-supplied grouping, since this is a
- * money-moving operation.
+ * account — one QBO Invoice per account (one line per visit for per_visit
+ * accounts), combining every selected visit for that account regardless of
+ * which month it was completed in. The owner now decides exactly which visits
+ * go on which invoice (the account-row "bazooka" push sends all of an account's
+ * uninvoiced visits; the per-account drawer sends a hand-picked subset), so the
+ * push deliberately no longer force-splits by calendar month. Re-fetches and
+ * re-groups the visits server-side rather than trusting client-supplied grouping,
+ * since this is a money-moving operation.
  *
  * On success each group inserts one row into the canonical `invoices` table
  * (the record the History tab and status-sync read), then tags its visits with
@@ -88,14 +88,13 @@ export async function pushInvoicesToQuickBooks(visitIds: string[]): Promise<Push
       {
         accountId: '',
         accountName: 'Selected visits',
-        monthLabel: '',
         success: false,
         error: 'Could not load selected visits',
       },
     ]
   }
 
-  const groups = groupVisitsByAccountMonth(data as unknown as VisitWithLocation[])
+  const groups = groupVisitsByAccount(data as unknown as VisitWithLocation[])
 
   let qbo
   try {
@@ -104,7 +103,6 @@ export async function pushInvoicesToQuickBooks(visitIds: string[]): Promise<Push
     return groups.map((g) => ({
       accountId: g.account.id,
       accountName: g.account.name,
-      monthLabel: g.monthLabel,
       success: false,
       error: 'Connect QuickBooks from the Billing page first',
     }))
@@ -117,7 +115,6 @@ export async function pushInvoicesToQuickBooks(visitIds: string[]): Promise<Push
       results.push({
         accountId: group.account.id,
         accountName: group.account.name,
-        monthLabel: group.monthLabel,
         success: false,
         error: 'as_needed accounts have no set rate — invoice manually',
       })
@@ -129,7 +126,6 @@ export async function pushInvoicesToQuickBooks(visitIds: string[]): Promise<Push
       results.push({
         accountId: group.account.id,
         accountName: group.account.name,
-        monthLabel: group.monthLabel,
         success: false,
         error: syncRes.error ?? 'Could not link QuickBooks customer',
       })
@@ -145,7 +141,6 @@ export async function pushInvoicesToQuickBooks(visitIds: string[]): Promise<Push
       results.push({
         accountId: group.account.id,
         accountName: group.account.name,
-        monthLabel: group.monthLabel,
         success: false,
         error: invoiceRes.error ?? 'Could not create QuickBooks invoice',
       })
@@ -155,7 +150,6 @@ export async function pushInvoicesToQuickBooks(visitIds: string[]): Promise<Push
     const recordFailed = (): PushResult => ({
       accountId: group.account.id,
       accountName: group.account.name,
-      monthLabel: group.monthLabel,
       success: false,
       error: `Invoice ${invoiceRes.qboInvoiceId} created in QuickBooks but could not be recorded locally — record it manually`,
     })
@@ -205,7 +199,6 @@ export async function pushInvoicesToQuickBooks(visitIds: string[]): Promise<Push
         : {
             accountId: group.account.id,
             accountName: group.account.name,
-            monthLabel: group.monthLabel,
             success: true,
             qboInvoiceId: invoiceRes.qboInvoiceId,
           },
