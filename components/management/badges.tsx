@@ -3,6 +3,7 @@
  * Colours are defined as CSS classes in globals.css (@layer base).
  */
 
+import { Receipt } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import type { AccountStatus, BillingType, Frequency, InvoiceStatus, VisitStatus } from '@/types/app'
 import type { QboConnectionStatus } from '@/lib/quickbooks/client'
@@ -100,13 +101,18 @@ const INVOICE_STATUS_META: Record<InvoiceStatus, { label: string; className: str
   overdue: { label: 'Overdue', className: 'status-missed' },
 }
 
-export function InvoiceStatusBadge({ status }: { status: string }) {
+// `withIcon` prepends a small receipt glyph so the badge reads as an *invoice*
+// status wherever it sits next to a visit-status badge (schedule cells, the visit
+// drawer, account recent-visits). The Billing → Invoices tab omits it — the
+// context there is already unambiguous.
+export function InvoiceStatusBadge({ status, withIcon = false }: { status: string; withIcon?: boolean }) {
   const meta = INVOICE_STATUS_META[status as InvoiceStatus] ?? {
     label: status,
     className: 'status-scheduled',
   }
   return (
     <Badge variant="outline" className={`border-transparent uppercase tracking-wide text-[10px] font-semibold ${meta.className}`}>
+      {withIcon && <Receipt className="w-2.5 h-2.5 mr-1 shrink-0" aria-hidden />}
       {meta.label}
     </Badge>
   )

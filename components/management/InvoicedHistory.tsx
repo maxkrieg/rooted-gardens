@@ -27,7 +27,7 @@ import { BillingTypeBadge, InvoiceStatusBadge } from '@/components/management/ba
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { HistoryDateRangeFilter } from '@/components/management/HistoryDateRangeFilter'
 import { pollInvoiceStatuses, refreshInvoiceStatuses } from '@/app/management/billing/actions'
-import type { DateRangePreset } from '@/lib/utils/billing'
+import { qboInvoiceUrl, type DateRangePreset } from '@/lib/utils/billing'
 import { cn } from '@/lib/utils'
 import type { RevenueSummary } from '@/app/management/billing/actions'
 import type {
@@ -54,10 +54,6 @@ type SheetRow = { property: Property; account: Account; visit: Visit }
 // action is staleness-gated (see pollInvoiceStatuses), so this only bounds how
 // quickly a stale invoice gets picked up — not how hard QBO is hit.
 const POLL_INTERVAL_MS = 60_000
-
-function qboInvoiceUrl(qboInvoiceId: string): string {
-  return `https://app.qbo.intuit.com/app/invoice?txnId=${qboInvoiceId}`
-}
 
 function RevenueCard({
   label,

@@ -13,7 +13,7 @@ import { isVisitInProgress, isVisitMissed, formatElapsed } from '@/lib/utils/vis
 import { groupRowsByAccount } from '@/lib/utils/schedule'
 import { formatAccountPrice } from '@/lib/utils/accounts'
 import { Button } from '@/components/ui/button'
-import { VisitStatusBadge, FrequencyBadge, BillingTypeBadge } from '@/components/management/badges'
+import { VisitStatusBadge, FrequencyBadge, BillingTypeBadge, InvoiceStatusBadge } from '@/components/management/badges'
 import type {
   Employee,
   EmployeeRole,
@@ -226,10 +226,15 @@ export function ScheduleListMobile({ weeks, employees, vehicles, canEdit, role }
                               )}
 
                               {row.visit ? (
-                                <VisitStatusBadge
-                                  status={row.visit.status}
-                                  missed={isVisitMissed(row.visit)}
-                                />
+                                <div className="flex flex-col items-end gap-1">
+                                  <VisitStatusBadge
+                                    status={row.visit.status}
+                                    missed={isVisitMissed(row.visit)}
+                                  />
+                                  {row.visit.status === 'completed' && row.visit.invoice && (
+                                    <InvoiceStatusBadge status={row.visit.invoice.status} withIcon />
+                                  )}
+                                </div>
                               ) : (
                                 <span className="text-xs text-muted-foreground/50">
                                   {isCreating ? '…' : '+ Schedule'}

@@ -64,6 +64,9 @@ function normalizeRow(row: VisitDetailRow): StopDetail | undefined {
       skip_reason: v.skip_reason,
       vehicle_id: v.vehicle_id,
     },
+    // Populated from the schedule/account embed when present, so the invoice
+    // badge shows immediately; useStopDetail's refetch backfills it otherwise.
+    invoice: v.invoice ?? null,
     property: {
       id: row.property.id,
       address: row.property.address,
@@ -161,6 +164,7 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart, role }: V
               onOpenCompletion={() => setCompletionOpen(true)}
               onOpenSkip={() => setSkipOpen(true)}
               showAddress={false}
+              showInvoice
             />
           </div>
 

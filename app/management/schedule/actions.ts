@@ -21,7 +21,7 @@ export async function getScheduleForWeek(weekStart: string): Promise<ScheduleWee
     `),
     supabase
       .from('visits')
-      .select(`*, visit_crew(*, employee:employees(*))`)
+      .select(`*, visit_crew(*, employee:employees(*)), invoice:invoices(status, qbo_invoice_id)`)
       .eq('week_start', weekStart),
   ])
 

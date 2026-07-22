@@ -10,6 +10,11 @@ import {
 } from 'date-fns'
 import type { Account, VisitWithLocation } from '@/types/app'
 
+/** Deep link to an invoice in QuickBooks Online by its QBO invoice id. */
+export function qboInvoiceUrl(qboInvoiceId: string): string {
+  return `https://app.qbo.intuit.com/app/invoice?txnId=${qboInvoiceId}`
+}
+
 export type AccountMonthGroup = {
   account: Account
   monthKey: string // 'yyyy-MM', from the visit's completion date

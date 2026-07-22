@@ -52,7 +52,7 @@ export default async function AccountDetailPage({ params }: Props) {
     // directly from a row, same shape it already gets from the schedule grid.
     supabase
       .from('visits')
-      .select('*, property:properties(*), visit_crew(*, employee:employees(*))')
+      .select('*, property:properties(*), visit_crew(*, employee:employees(*)), invoice:invoices(status, qbo_invoice_id)')
       .eq('account_id', id)
       .eq('status', 'completed')
       .order('week_start', { ascending: false })

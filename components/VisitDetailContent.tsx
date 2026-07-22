@@ -15,6 +15,7 @@ import {
   Users,
   Pencil,
   FilePen,
+  ExternalLink,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -25,7 +26,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { FrequencyBadge, VisitStatusBadge } from '@/components/management/badges'
+import { FrequencyBadge, VisitStatusBadge, InvoiceStatusBadge } from '@/components/management/badges'
+import { qboInvoiceUrl } from '@/lib/utils/billing'
 import { PropertyVisitHistory } from '@/components/PropertyVisitHistory'
 import { CompletionSummary } from '@/components/crew/CompletionSummary'
 import { CrewAssignSheet } from '@/components/crew/CrewAssignSheet'
@@ -50,6 +52,11 @@ interface VisitDetailContentProps {
   /** False when the container already shows the address in its own header (the
    *  management Sheet) — avoids showing it twice. Defaults to true (crew page). */
   showAddress?: boolean
+  /** Show the invoice status + QBO link section. Set true only by the management
+   *  VisitDetailSheet; the crew stop page leaves it off, so invoice info never
+   *  surfaces on the crew route (even for an owner/lead viewing it there). Still
+   *  gated on owner/lead + a completed, invoiced visit inside. Defaults to false. */
+  showInvoice?: boolean
 }
 
 /**
@@ -68,6 +75,7 @@ export function VisitDetailContent({
   onOpenCompletion,
   onOpenSkip,
   showAddress = true,
+  showInvoice = false,
 }: VisitDetailContentProps) {
   const { visit, property, account } = data
   // Defensive: a stale persisted cache entry (or a momentarily malformed embed)
@@ -236,6 +244,31 @@ export function VisitDetailContent({
           onEdit={onOpenCompletion}
           onEditSkip={onOpenSkip}
         />
+      )}
+
+      {/* Invoice — the billing outcome that follows completion. Management-only
+          (showInvoice) and owner/lead-only (canManage); shown once the visit is on
+          an invoice. Links out to the invoice in QuickBooks. */}
+      {showInvoice && canManage && visit.status === 'completed' && data.invoice && (
+        <div className="rounded-2xl border border-[--border] bg-card px-4 py-3 shadow-[0_1px_2px_rgba(43,42,36,.04),_0_6px_16px_-4px_rgba(43,42,36,.08)]">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Invoice
+            </span>
+            <InvoiceStatusBadge status={data.invoice.status} withIcon />
+          </div>
+          {data.invoice.qbo_invoice_id && (
+            <a
+              href={qboInvoiceUrl(data.invoice.qbo_invoice_id)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 inline-flex items-center gap-1 text-sm text-[--primary] hover:underline"
+            >
+              QuickBooks invoice {data.invoice.qbo_invoice_id}
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          )}
+        </div>
       )}
 
       {/* Plan — crew instruction, assigned crew, vehicle: what was arranged for this

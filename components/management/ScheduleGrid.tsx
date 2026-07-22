@@ -14,7 +14,7 @@ import { isVisitInProgress, isVisitMissed, formatElapsed } from '@/lib/utils/vis
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { FilePen } from 'lucide-react'
-import { FrequencyBadge, BillingTypeBadge } from '@/components/management/badges'
+import { FrequencyBadge, BillingTypeBadge, InvoiceStatusBadge } from '@/components/management/badges'
 import type {
   Employee,
   EmployeeRole,
@@ -385,6 +385,11 @@ function ScheduleCell({
           {visit.status === 'completed' && visit.ended_at && (
             <span className="text-[11px] opacity-80 tabular-nums">
               {format(parseISO(visit.ended_at), 'MMM d')}
+            </span>
+          )}
+          {visit.status === 'completed' && visit.invoice && (
+            <span className="mt-0.5">
+              <InvoiceStatusBadge status={visit.invoice.status} withIcon />
             </span>
           )}
           {displayCrew.length > 0 && (

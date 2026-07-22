@@ -5,7 +5,7 @@ import { format, parseISO } from 'date-fns'
 import { Building2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { VisitStatusBadge } from '@/components/management/badges'
+import { VisitStatusBadge, InvoiceStatusBadge } from '@/components/management/badges'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { cn } from '@/lib/utils'
 import type { Account, EmployeeRole, RecentVisit, VisitWithCrew } from '@/types/app'
@@ -88,8 +88,9 @@ export function RecentVisitsList({ visits, account, role }: RecentVisitsListProp
                       </div>
                     )}
                   </div>
-                  <div className="shrink-0 pt-0.5">
+                  <div className="shrink-0 pt-0.5 flex flex-col items-end gap-1">
                     <VisitStatusBadge status={visit.status} />
+                    {visit.invoice && <InvoiceStatusBadge status={visit.invoice.status} withIcon />}
                   </div>
                 </button>
               </li>

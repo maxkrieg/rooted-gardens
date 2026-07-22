@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
+import type { VisitInvoiceInfo } from '@/types/app'
 
 export type StopDetail = {
   visitId: string
@@ -17,6 +18,10 @@ export type StopDetail = {
     skip_reason: string | null
     vehicle_id: string | null
   }
+  // The invoice this visit was billed on, if any (null when uninvoiced, or under
+  // RLS for roles that can't read invoices — e.g. crew). Only surfaced in the
+  // management drawer for owner/lead.
+  invoice: VisitInvoiceInfo | null
   property: {
     id: string
     address: string
@@ -61,6 +66,7 @@ export function useStopDetail(visitId: string | undefined, options?: { initialDa
         .select(`
           id, status, crew_instruction, week_start, started_at, ended_at,
           service_types, completion_note, skip_reason, vehicle_id,
+          invoice:invoices(status, qbo_invoice_id),
           property:properties!inner(
             id, address, frequency, crew_notes, access_notes, parking_notes
           ),
@@ -101,6 +107,7 @@ export function useStopDetail(visitId: string | undefined, options?: { initialDa
           skip_reason: data.skip_reason,
           vehicle_id: data.vehicle_id,
         },
+        invoice: (data.invoice as unknown as VisitInvoiceInfo | null) ?? null,
         property,
         account,
         assignedCrew,

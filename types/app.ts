@@ -126,9 +126,17 @@ export type InvoiceWithVisits = Invoice & {
   visits: (Visit & { property: Property })[]
 }
 
-/** Visit with crew assignment/completion rows and the associated employees. */
+/** The bit of an invoice a visit-centric view needs to show a status badge +
+ *  QBO link — embedded via the visits.invoice_id FK (`invoice:invoices(...)`). */
+export type VisitInvoiceInfo = Pick<Invoice, 'status' | 'qbo_invoice_id'>
+
+/** Visit with crew assignment/completion rows and the associated employees.
+ *  `invoice` is optional: only queries that embed it (schedule grid, account
+ *  recent-visits) populate it; it's null for uninvoiced visits or under RLS for
+ *  roles that can't read invoices. */
 export type VisitWithCrew = Visit & {
   visit_crew: VisitCrewWithEmployee[]
+  invoice?: VisitInvoiceInfo | null
 }
 
 /** Full visit: property, account, crew, and vehicle. */
