@@ -27,10 +27,10 @@ interface Props {
   }>
 }
 
-type BillingView = 'queue' | 'invoiced' | 'contracts'
+type BillingView = 'queue' | 'invoices' | 'contracts'
 
 function resolveView(view: string | undefined): BillingView {
-  if (view === 'invoiced') return 'invoiced'
+  if (view === 'invoices') return 'invoices'
   if (view === 'contracts') return 'contracts'
   return 'queue'
 }
@@ -75,15 +75,15 @@ export default async function BillingPage({ searchParams }: Props) {
           Queue
         </Link>
         <Link
-          href="/management/billing?view=invoiced"
+          href="/management/billing?view=invoices"
           className={cn(
             'px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
-            resolvedView === 'invoiced'
+            resolvedView === 'invoices'
               ? 'border-primary text-foreground'
               : 'border-transparent text-muted-foreground hover:text-foreground',
           )}
         >
-          History
+          Invoices
         </Link>
         <Link
           href="/management/billing?view=contracts"
@@ -98,7 +98,7 @@ export default async function BillingPage({ searchParams }: Props) {
         </Link>
       </div>
 
-      {resolvedView === 'invoiced' ? (
+      {resolvedView === 'invoices' ? (
         <InvoicedTab range={resolvedRange} role={role as EmployeeRole} />
       ) : resolvedView === 'contracts' ? (
         <ContractsTab qboConnected={qboStatus !== 'disconnected'} />

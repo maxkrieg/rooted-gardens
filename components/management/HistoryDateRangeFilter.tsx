@@ -36,7 +36,7 @@ export function HistoryDateRangeFilter({ preset, customStart, customEnd }: Histo
   const [draftEnd, setDraftEnd] = useState(customEnd ?? format(endOfMonth(now), 'yyyy-MM-dd'))
 
   function navigate(nextPreset: DateRangePreset, start?: string, end?: string) {
-    const params = new URLSearchParams({ view: 'invoiced', range: nextPreset })
+    const params = new URLSearchParams({ view: 'invoices', range: nextPreset })
     if (nextPreset === 'custom') {
       params.set('start', start ?? draftStart)
       params.set('end', end ?? draftEnd)
