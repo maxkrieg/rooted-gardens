@@ -73,7 +73,7 @@ const STATUS_LABELS: Record<(typeof INVOICE_STATUSES)[number], string> = {
 // Lifecycle order for sorting the Status column (not alphabetical).
 const STATUS_RANK: Record<string, number> = { draft: 0, sent: 1, overdue: 2, paid: 3 }
 
-type InvoiceSortKey = 'account' | 'date' | 'status' | 'amount'
+type InvoiceSortKey = 'account' | 'date' | 'dueDate' | 'status' | 'amount'
 
 function RevenueCard({
   label,
@@ -165,6 +165,14 @@ export function InvoicedHistory({
     const { key, dir } = sort
     const factor = dir === 'asc' ? 1 : -1
     return [...filtered].sort((a, b) => {
+      // Invoices with no due date (e.g. drafts) always sort to the bottom,
+      // regardless of direction — so the factor is applied before this returns.
+      if (key === 'dueDate') {
+        if (!a.qbo_due_date && !b.qbo_due_date) return 0
+        if (!a.qbo_due_date) return 1
+        if (!b.qbo_due_date) return -1
+        return a.qbo_due_date.localeCompare(b.qbo_due_date) * factor
+      }
       let cmp = 0
       if (key === 'account') cmp = a.account.name.localeCompare(b.account.name)
       else if (key === 'date') cmp = a.created_at.localeCompare(b.created_at)
@@ -359,6 +367,13 @@ export function InvoicedHistory({
                   dir={sort.dir}
                   onSort={toggleSort}
                 />
+                <SortableTableHead
+                  label="Due Date"
+                  sortKey="dueDate"
+                  currentKey={sort.key}
+                  dir={sort.dir}
+                  onSort={toggleSort}
+                />
                 <TableHead>QBO Invoice</TableHead>
                 <SortableTableHead
                   label="Status"
@@ -433,6 +448,16 @@ export function InvoicedHistory({
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground tabular-nums">{invoicedDate}</TableCell>
+                    <TableCell
+                      className={cn(
+                        'tabular-nums',
+                        invoice.status === 'overdue'
+                          ? 'text-destructive font-medium'
+                          : 'text-muted-foreground',
+                      )}
+                    >
+                      {invoice.qbo_due_date ? format(parseISO(invoice.qbo_due_date), 'MMM d') : '—'}
+                    </TableCell>
                     <TableCell>{link}</TableCell>
                     <TableCell>
                       <InvoiceStatusBadge status={invoice.status} />
@@ -464,6 +489,7 @@ export function InvoicedHistory({
                           </span>
                         )}
                       </TableCell>
+                      <TableCell className="py-1.5" />
                       <TableCell className="py-1.5" />
                       <TableCell className="py-1.5" />
                       <TableCell className="py-1.5" />
