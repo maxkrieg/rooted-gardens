@@ -831,7 +831,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 > (assignment dropdown in `components/VisitDetailContent.tsx`, `useActiveVehicles`) already
 > exist and are reusable — only the maintenance-log sub-feature (6.3) and this page are unbuilt.
 
-- [ ] **6.1 — Fleet management page**
+- [x] **6.1 — Fleet management page**
   *Depends on: 1.6, 1.2*
   Create `app/management/fleet/page.tsx` with two sections: Vehicles and
   Equipment. Each shows a card grid (not a table). Vehicle card: name, plate,
@@ -847,7 +847,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   If a vehicle or mower has `status = 'maintenance'`, show a warning icon
   and exclude it from assignment dropdowns.
 
-- [ ] **6.3 — Maintenance logging**
+- [x] **6.3 — Maintenance logging**
   *Depends on: 6.1*
   On vehicle and equipment detail cards, add a "Log Maintenance" button.
   Opens a form: date, description of work, next service due date, cost (optional).
