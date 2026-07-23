@@ -1,10 +1,11 @@
 'use client'
 
 import { useTransition } from 'react'
-import { CheckCircle2, Link2, Link2Off } from 'lucide-react'
+import { CheckCircle2, ExternalLink, Link2Off } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { syncAccountWithQuickBooks } from '@/app/management/accounts/actions'
+import { qboCustomerUrl } from '@/lib/utils/billing'
 
 interface QboLinkStatusProps {
   accountId: string
@@ -42,6 +43,15 @@ export function QboLinkStatus({ accountId, qboCustomerId }: QboLinkStatusProps) 
           <CheckCircle2 className="h-4 w-4 shrink-0 text-[#2f6e45]" />
           <span className="text-sm text-[#2f6e45] font-medium">Linked to QuickBooks</span>
           <span className="text-sm text-muted-foreground font-mono ml-1">· {qboCustomerId}</span>
+          <a
+            href={qboCustomerUrl(qboCustomerId)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-sm text-primary hover:underline ml-2 shrink-0"
+          >
+            View in QuickBooks
+            <ExternalLink className="h-3.5 w-3.5" />
+          </a>
         </>
       ) : (
         <>
@@ -58,7 +68,6 @@ export function QboLinkStatus({ accountId, qboCustomerId }: QboLinkStatusProps) 
       >
         {pending ? (qboCustomerId ? 'Syncing…' : 'Linking…') : qboCustomerId ? 'Sync' : 'Link to QuickBooks'}
       </Button>
-      {qboCustomerId && <Link2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
     </div>
   )
 }

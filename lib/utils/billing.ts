@@ -15,6 +15,11 @@ export function qboInvoiceUrl(qboInvoiceId: string): string {
   return `https://app.qbo.intuit.com/app/invoice?txnId=${qboInvoiceId}`
 }
 
+/** Deep link to a customer in QuickBooks Online by its QBO customer id. */
+export function qboCustomerUrl(qboCustomerId: string): string {
+  return `https://app.qbo.intuit.com/app/customerdetail?nameId=${qboCustomerId}`
+}
+
 export type AccountGroup = {
   account: Account
   visits: VisitWithLocation[]
