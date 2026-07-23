@@ -126,6 +126,16 @@ INSERT INTO equipment (id, name, type, status, last_serviced, notes) VALUES
   ('00000000-0000-0000-0007-000000000004', 'Blower A',  'blower',  'available',   '2026-05-20', NULL);
 
 -- =====================
+-- MAINTENANCE LOGS (4) — mix of overdue / due-soon / future next_service_due
+-- so the Fleet cards' service badges have data (task 6.3).
+-- =====================
+INSERT INTO maintenance_logs (id, vehicle_id, equipment_id, service_date, description, next_service_due, cost) VALUES
+  ('00000000-0000-0000-0008-000000000001', '00000000-0000-0000-0006-000000000001', NULL, '2026-06-01', 'Oil change and tire rotation', '2026-07-01', 89.00),   -- overdue
+  ('00000000-0000-0000-0008-000000000002', '00000000-0000-0000-0006-000000000003', NULL, '2026-07-10', 'Replaced brake pads',           '2026-10-10', 340.00),  -- future (no badge)
+  ('00000000-0000-0000-0008-000000000003', NULL, '00000000-0000-0000-0007-000000000002', '2026-07-15', 'Blade sharpening',              '2026-08-01', 25.00),   -- due soon
+  ('00000000-0000-0000-0008-000000000004', NULL, '00000000-0000-0000-0007-000000000003', '2026-03-10', 'Line replacement',              NULL,         18.00);   -- no next-due
+
+-- =====================
 -- VISITS (19) — one row per (property × week)
 -- Weeks: 2026-05-25 (W1), 2026-06-01 (W2), 2026-06-08 (W3 current)
 -- All week_start dates are Mondays. Monthly/biweekly properties only

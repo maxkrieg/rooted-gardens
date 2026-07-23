@@ -284,6 +284,57 @@ export type Database = {
           },
         ]
       }
+      maintenance_logs: {
+        Row: {
+          cost: number | null
+          created_at: string
+          description: string
+          equipment_id: string | null
+          id: string
+          next_service_due: string | null
+          service_date: string
+          updated_at: string
+          vehicle_id: string | null
+        }
+        Insert: {
+          cost?: number | null
+          created_at?: string
+          description: string
+          equipment_id?: string | null
+          id?: string
+          next_service_due?: string | null
+          service_date: string
+          updated_at?: string
+          vehicle_id?: string | null
+        }
+        Update: {
+          cost?: number | null
+          created_at?: string
+          description?: string
+          equipment_id?: string | null
+          id?: string
+          next_service_due?: string | null
+          service_date?: string
+          updated_at?: string
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_logs_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_logs_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       photos: {
         Row: {
           caption: string | null

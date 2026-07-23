@@ -3,9 +3,19 @@
  * Colours are defined as CSS classes in globals.css (@layer base).
  */
 
-import { Receipt } from 'lucide-react'
+import { AlertTriangle, Receipt } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import type { AccountStatus, BillingType, Frequency, InvoiceStatus, VisitStatus } from '@/types/app'
+import type {
+  AccountStatus,
+  BillingType,
+  EquipmentStatus,
+  Frequency,
+  InvoiceStatus,
+  VehicleStatus,
+  VisitStatus,
+} from '@/types/app'
+import type { ServiceDueState } from '@/lib/utils/fleet'
+import { serviceDueState } from '@/lib/utils/fleet'
 import type { QboConnectionStatus } from '@/lib/quickbooks/client'
 
 // ─── Account status ──────────────────────────────────────────────────────────
@@ -113,6 +123,64 @@ export function InvoiceStatusBadge({ status, withIcon = false }: { status: strin
   return (
     <Badge variant="outline" className={`border-transparent uppercase tracking-wide text-[10px] font-semibold ${meta.className}`}>
       {withIcon && <Receipt className="w-2.5 h-2.5 mr-1 shrink-0" aria-hidden />}
+      {meta.label}
+    </Badge>
+  )
+}
+
+// ─── Fleet: vehicle & equipment status ───────────────────────────────────────
+
+// Vehicles and equipment share the same status vocabulary. Reuses the existing
+// status-* colour classes (like InvoiceStatusBadge) — no new CSS: available =
+// green, in_use = denim, maintenance = amber, retired = neutral gray.
+const FLEET_STATUS_META: Record<VehicleStatus, { label: string; className: string }> = {
+  available:   { label: 'Available',   className: 'status-completed' },
+  in_use:      { label: 'In Use',      className: 'status-invoiced' },
+  maintenance: { label: 'Maintenance', className: 'status-skipped' },
+  retired:     { label: 'Retired',     className: 'status-scheduled' },
+}
+
+export function VehicleStatusBadge({ status }: { status: string }) {
+  const meta = FLEET_STATUS_META[status as VehicleStatus] ?? {
+    label: status,
+    className: 'status-scheduled',
+  }
+  return (
+    <Badge variant="outline" className={`border-transparent uppercase tracking-wide text-[10px] font-semibold ${meta.className}`}>
+      {meta.label}
+    </Badge>
+  )
+}
+
+export function EquipmentStatusBadge({ status }: { status: string }) {
+  const meta = FLEET_STATUS_META[status as EquipmentStatus] ?? {
+    label: status,
+    className: 'status-scheduled',
+  }
+  return (
+    <Badge variant="outline" className={`border-transparent uppercase tracking-wide text-[10px] font-semibold ${meta.className}`}>
+      {meta.label}
+    </Badge>
+  )
+}
+
+// ─── Fleet: service-due indicator ─────────────────────────────────────────────
+
+// Derived from a maintenance log's next_service_due (see lib/utils/fleet.ts):
+// overdue → brick, due-soon → amber, otherwise nothing. Pass either a raw due
+// date or a pre-computed state.
+const SERVICE_DUE_META: Record<ServiceDueState, { label: string; className: string }> = {
+  overdue:  { label: 'Overdue',  className: 'status-missed' },
+  due_soon: { label: 'Due Soon', className: 'status-skipped' },
+}
+
+export function ServiceDueBadge({ dueDate }: { dueDate: string | null | undefined }) {
+  const state = serviceDueState(dueDate)
+  if (!state) return null
+  const meta = SERVICE_DUE_META[state]
+  return (
+    <Badge variant="outline" className={`border-transparent uppercase tracking-wide text-[10px] font-semibold ${meta.className}`}>
+      <AlertTriangle className="w-2.5 h-2.5 mr-1 shrink-0" aria-hidden />
       {meta.label}
     </Badge>
   )

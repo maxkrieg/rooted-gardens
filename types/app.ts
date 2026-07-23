@@ -14,6 +14,7 @@ export type TimeEntry = Tables<'time_entries'>
 export type Photo = Tables<'photos'>
 export type Integration = Tables<'integrations'>
 export type Invoice = Tables<'invoices'>
+export type MaintenanceLog = Tables<'maintenance_logs'>
 
 // A property enriched with its account name and current route group — used by
 // the route-groups management page and its Assign Properties sheet.
@@ -78,8 +79,17 @@ export type CrewRelation = (typeof CREW_RELATIONS)[number]
 export const VEHICLE_STATUSES = ['available', 'in_use', 'maintenance', 'retired'] as const
 export type VehicleStatus = (typeof VEHICLE_STATUSES)[number]
 
+// vehicles.type is free text at the DB level (no CHECK) — this tuple is a UI
+// convenience for the form dropdown, not an enforced constraint.
+export const VEHICLE_TYPES = ['truck', 'trailer', 'other'] as const
+export type VehicleType = (typeof VEHICLE_TYPES)[number]
+
 export const EQUIPMENT_TYPES = ['mower', 'trimmer', 'blower', 'edger', 'other'] as const
 export type EquipmentType = (typeof EQUIPMENT_TYPES)[number]
+
+// Equipment shares the vehicle status vocabulary (available/in_use/maintenance/retired).
+export const EQUIPMENT_STATUSES = ['available', 'in_use', 'maintenance', 'retired'] as const
+export type EquipmentStatus = (typeof EQUIPMENT_STATUSES)[number]
 
 export const PHOTO_TYPES = ['visit', 'how_to', 'customer_request', 'before', 'after', 'plan'] as const
 export type PhotoType = (typeof PHOTO_TYPES)[number]
