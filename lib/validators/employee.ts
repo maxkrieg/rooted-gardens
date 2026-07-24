@@ -28,3 +28,17 @@ export const employeeFormSchema = z.object({
 })
 
 export type EmployeeFormValues = z.infer<typeof employeeFormSchema>
+
+/**
+ * Crew self-service profile edit (crew /profile). Deliberately tiny — crew may
+ * only change their own phone and SMS opt-in. Email is read-only here (login-email
+ * changes are owner-managed) and role/side/active/hourly_rate are never editable
+ * by the employee. `smsOptIn` is opt-*in*; the DB column is opt-*out* (stored
+ * inverted by the action).
+ */
+export const crewProfileSchema = z.object({
+  phone: z.string().trim().optional(),
+  smsOptIn: z.boolean(),
+})
+
+export type CrewProfileValues = z.infer<typeof crewProfileSchema>

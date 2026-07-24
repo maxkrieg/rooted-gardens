@@ -72,6 +72,37 @@ export async function updateEmployee(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid form data' }
 
   const supabase = await createClient()
+
+  // employees.email and the Supabase Auth login email (auth.users.email) are
+  // independent — magic-link login only uses the auth email. For an already-
+  // invited employee (user_id set), keep them in sync: an owner is an admin, so
+  // push the change to auth immediately via updateUserById (no confirmation).
+  const { data: existing, error: fetchErr } = await supabase
+    .from('employees')
+    .select('user_id, email')
+    .eq('id', id)
+    .single()
+  if (fetchErr || !existing) return { error: 'Employee not found' }
+
+  const newEmail = parsed.data.email?.trim() || null
+  if (existing.user_id && newEmail !== existing.email) {
+    if (!newEmail) {
+      return { error: 'An employee with app access must keep an email address.' }
+    }
+    const service = createServiceClient()
+    const { error: authErr } = await service.auth.admin.updateUserById(existing.user_id, {
+      email: newEmail,
+    })
+    if (authErr) {
+      console.error('[updateEmployee] auth email sync', authErr)
+      return {
+        error: /already|exists|registered/i.test(authErr.message)
+          ? 'That email is already used by another user.'
+          : `Could not update login email: ${authErr.message}`,
+      }
+    }
+  }
+
   const { error } = await supabase.from('employees').update(employeePayload(parsed.data)).eq('id', id)
   if (error) {
     console.error('[updateEmployee]', error)

@@ -161,7 +161,11 @@ export function EmployeeForm({ onSuccess, employee }: EmployeeFormProps) {
                     {...field}
                   />
                 </FormControl>
-                <FormDescription>Required to invite them to the app.</FormDescription>
+                <FormDescription>
+                  {isEdit && employee?.user_id
+                    ? 'Changing this also updates their app login email.'
+                    : 'Required to invite them to the app.'}
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
