@@ -47,6 +47,17 @@ See `CLAUDE.md` for full context, tech stack, schema, and conventions.
 > The Invoiced tab and MTD/YTD revenue summary (Phase 5 below) were updated to merge this
 > in. Full writeup in `docs/INVOICING.md`. Not a numbered task below since it's a
 > follow-up correction discovered after 5.4 shipped, not part of the original plan.
+>
+> **Post-launch removal (2026-07-23):** payroll **time tracking** was eliminated entirely
+> (migration `20260723000000_drop_time_entries.sql` drops the `time_entries` table). The
+> owners don't track employee clock-in/clock-out or run timesheets in this app — all they
+> need is *who was at which visit* (`visit_crew`) and *per-visit on-site time*
+> (`visits.started_at` / `visits.ended_at`), both of which are unaffected. This removed the
+> built crew clock-in/out feature (task 4.7) and cut the two unbuilt management timesheet
+> tasks (7.2 Timesheet grid, 7.3 Hours export); **Phase 7 is now just the Team page (7.1)**.
+> `employees.hourly_rate` is retained for pay-rate reference (it is not part of time
+> tracking). The affected task descriptions below are left as historical record but marked
+> `[removed]`.
 
 Each task is written to be handed directly to Claude Code as a prompt. Phases are ordered
 as a sensible default build sequence, but the authoritative dependency graph is the
@@ -548,7 +559,10 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   (grayed out, strikethrough) but keep them visible so crew has a record
   of what they passed on.
 
-- [x] **4.7 — Clock in / clock out (crew mobile)**
+- [removed] **4.7 — Clock in / clock out (crew mobile)** — _built, then torn out 2026-07-23
+  when payroll time tracking was eliminated (see top-of-file note). The `time_entries` table,
+  the crew Profile clock card, and the `clock_in`/`clock_out` offline-queue mutations are all
+  gone; the Profile tab is now identity + Sign Out only. Original description kept as history:_
   *Depends on: 4.1, 1.2*
   Add clock in/out to the crew Profile tab (`app/crew/profile/page.tsx`).
   Show current clock state (in or out) with elapsed time if clocked in.
@@ -635,7 +649,6 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 - App is installable ("Add to Home Screen"); manifest + service worker present.
 - Today list shows assigned stops in route order; stop detail shows notes / maps / zones; history lists the last 30 completed (4.2 / 4.3 / 4.8).
 - Completion writes `visit_crew` (`relation='completed'`) + status; photos upload to Storage + a `photos` row; skip works (4.4 / 4.5 / 4.6).
-- Clock in/out writes/updates `time_entries`; a completion-without-clock-in shows the reminder (4.7).
 - Editing a visit in management pushes a realtime toast to the crew view (4.9); Start/Stop writes `visit_sessions` and the 3.11 overlay updates live, and the in-progress "On site" pulse shows on **both** the today list and the crew schedule list (4.10).
 - The Schedule tab shows the full week grouped by route group; prev/next + "This week" nav works; search / crew / route-group filters narrow the list; rows open the same stop detail; crew self-reassignment writes `visit_crew` `assigned` rows (4.11).
 
@@ -866,9 +879,10 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 
 ---
 
-## Phase 7 — Team & Timesheets
+## Phase 7 — Team
 
-> Goal: Employee profiles and basic hour tracking for payroll.
+> Goal: Employee profiles. (Timesheets / payroll hour tracking were cut — see the
+> 2026-07-23 post-launch removal note at the top of this file. Only 7.1 remains.)
 >
 > **Scaffolding already exists — replace in place:** `app/management/team/page.tsx` is a
 > literal stub (`return null`); the "Team" nav link already exists in
@@ -890,28 +904,28 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   based on whether `employees.user_id` is set. Capture SMS consent here (used
   by 8.2) — a per-employee opt-in toggle backed by `sms_opt_out`.
 
-- [ ] **7.2 — Timesheet management (management view)**
+- [removed] **7.2 — Timesheet management (management view)** — _cut 2026-07-23; payroll time
+  tracking removed (see top-of-file note). Never built. Original description kept as history:_
   *Depends on: 7.1, 4.7*
   Create a timesheet view under the team page. Show this week's time entries
   in a grid: employees as rows, days as columns, hours as cells. Allow owners
   to manually add/edit entries. Show daily and weekly totals. Add an "Approve
   Week" action that marks all entries for that week as `approved = true`.
 
-- [ ] **7.3 — Hours export**
+- [removed] **7.3 — Hours export** — _cut 2026-07-23; payroll time tracking removed. Never
+  built. Original description kept as history:_
   *Depends on: 7.2*
   Add an "Export Timesheet" button that downloads a CSV of approved time entries
   for a selected date range. Columns: Employee Name, Date, Clock In, Clock Out,
   Break, Total Hours, Approved. This is what goes to payroll. Format dates/times
   in EST. Use a Server Action that streams the CSV response.
 
-### ✅ Verifying Phase 7 — Team & Timesheets
+### ✅ Verifying Phase 7 — Team
 
 **Automated:** `npm run build` · `tsc --noEmit` · `lint` pass.
 
 **Functional:**
 - Team page lists employees with role / side / active + "has app access" badges (7.1); "Invite to App" sends a magic link; the SMS-consent toggle persists to `sms_opt_out`.
-- Timesheet grid shows the week's `time_entries` (employees × days) with daily/weekly totals; manual add/edit works; "Approve Week" sets `approved = true` (7.2).
-- "Export Timesheet" downloads a CSV of approved entries for a date range, with times in EST (7.3).
 
 ---
 

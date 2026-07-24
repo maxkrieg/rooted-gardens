@@ -3,7 +3,7 @@ import { openDB, type IDBPDatabase } from 'idb'
 const DB_NAME = 'rooted-crew'
 const DB_VERSION = 1
 
-export type MutationType = 'completion' | 'photo' | 'job_start' | 'job_stop' | 'skip' | 'clock_in' | 'clock_out'
+export type MutationType = 'completion' | 'photo' | 'job_start' | 'job_stop' | 'skip'
 
 export interface QueuedMutation {
   id: string

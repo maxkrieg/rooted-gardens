@@ -7,7 +7,6 @@ import { Clock, User, CalendarRange } from 'lucide-react'
 import { OfflineBanner } from '@/components/crew/OfflineBanner'
 import { flushMutationQueue } from '@/lib/crew/mutation-queue'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
-import { useTodayTimeEntry } from '@/hooks/crew/useTodayTimeEntry'
 import { useCrewRealtimeSync } from '@/hooks/crew/useCrewRealtimeSync'
 
 const navItems = [
@@ -19,8 +18,6 @@ const navItems = [
 export default function CrewLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { data: employee } = useCurrentEmployee()
-  const { data: todayEntries = [] } = useTodayTimeEntry(employee?.id)
-  const isClockedIn = todayEntries.length > 0 && todayEntries[0].clock_out === null
 
   // Flush any mutations that were queued during a prior offline session
   useEffect(() => {
@@ -57,25 +54,11 @@ export default function CrewLayout({ children }: { children: React.ReactNode }) 
                       : 'text-muted-foreground hover:text-foreground',
                   ].join(' ')}
                 >
-                  <div className="relative">
-                    <Icon
-                      size={22}
-                      strokeWidth={isActive ? 2.25 : 1.75}
-                      aria-hidden
-                    />
-                    {href === '/crew/profile' && isClockedIn && (
-                      <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
-                        <span
-                          className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
-                          style={{ backgroundColor: 'var(--clay)' }}
-                        />
-                        <span
-                          className="relative inline-flex rounded-full h-2 w-2"
-                          style={{ backgroundColor: 'var(--clay)' }}
-                        />
-                      </span>
-                    )}
-                  </div>
+                  <Icon
+                    size={22}
+                    strokeWidth={isActive ? 2.25 : 1.75}
+                    aria-hidden
+                  />
                   <span className="leading-none">{label}</span>
                 </Link>
               </li>

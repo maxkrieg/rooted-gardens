@@ -41,25 +41,12 @@ export interface SkipPayload {
   endedAt?: string
 }
 
-export interface ClockInPayload {
-  employeeId: string
-  date: string     // 'yyyy-MM-dd'
-  clockIn: string  // ISO timestamptz, device-captured
-}
-
-export interface ClockOutPayload {
-  timeEntryId: string
-  clockOut: string // ISO timestamptz, device-captured
-}
-
 type MutationPayload =
   | { type: 'completion'; payload: CompletionPayload }
   | { type: 'job_start'; payload: JobStartPayload }
   | { type: 'job_stop'; payload: JobStopPayload }
   | { type: 'photo'; payload: PhotoPayload }
   | { type: 'skip'; payload: SkipPayload }
-  | { type: 'clock_in'; payload: ClockInPayload }
-  | { type: 'clock_out'; payload: ClockOutPayload }
 
 export async function enqueueMutation(
   type: MutationType,
@@ -200,24 +187,6 @@ export async function flushMutationQueue(): Promise<void> {
             }).throwOnError()
           }
           break
-        case 'clock_in': {
-          const p = mutation.payload as ClockInPayload
-          await supabase.from('time_entries').insert({
-            employee_id: p.employeeId,
-            date: p.date,
-            clock_in: p.clockIn,
-          }).throwOnError()
-          break
-        }
-        case 'clock_out': {
-          const p = mutation.payload as ClockOutPayload
-          await supabase
-            .from('time_entries')
-            .update({ clock_out: p.clockOut })
-            .eq('id', p.timeEntryId)
-            .throwOnError()
-          break
-        }
         default:
           console.warn('[mutation-queue] unknown mutation type:', (mutation as QueuedMutation).type)
       }

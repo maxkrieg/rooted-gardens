@@ -16,7 +16,6 @@ import {
 import { ServiceTypeSelector } from '@/components/crew/ServiceTypeSelector'
 import { CrewMultiSelect } from '@/components/crew/CrewMultiSelect'
 import { enqueueMutation, flushMutationQueue } from '@/lib/crew/mutation-queue'
-import { useTodayTimeEntry } from '@/hooks/crew/useTodayTimeEntry'
 import { useActiveEmployees } from '@/hooks/crew/useActiveEmployees'
 import { createClient } from '@/lib/supabase/client'
 import { MAX_PHOTO_BYTES, ALLOWED_PHOTO_TYPES } from '@/lib/utils/photos'
@@ -75,9 +74,7 @@ export function VisitLogger({
   onSuccess,
 }: VisitLoggerProps) {
   const queryClient = useQueryClient()
-  const { data: todayEntries = [] } = useTodayTimeEntry(employeeId)
   const { data: activeEmployees = [] } = useActiveEmployees()
-  const isClockedIn = todayEntries.length > 0 && todayEntries[0].clock_out === null
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // The visit's scheduled week bounds Start/End — Monday 00:00 through the earlier

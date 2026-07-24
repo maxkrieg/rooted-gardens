@@ -10,7 +10,6 @@ export type Vehicle = Tables<'vehicles'>
 export type Equipment = Tables<'equipment'>
 export type Visit = Tables<'visits'>
 export type VisitCrew = Tables<'visit_crew'>
-export type TimeEntry = Tables<'time_entries'>
 export type Photo = Tables<'photos'>
 export type Integration = Tables<'integrations'>
 export type Invoice = Tables<'invoices'>

@@ -353,22 +353,11 @@ visit_crew (
 --   CREATE INDEX visits_in_progress_idx ON visits (id)
 --     WHERE started_at IS NOT NULL AND ended_at IS NULL;
 
--- Time tracking — payroll shift clock (one shift per employee per day, approved for
--- payroll). Distinct from visits.started_at/ended_at (per-job on-site time); this is
--- the daily clock-in/out. They are not auto-derived from each other.
-time_entries (
-  id uuid PK,
-  employee_id uuid FK → employees,
-  visit_id uuid FK → visits,            -- nullable (some time not tied to a visit)
-  date date NOT NULL,
-  clock_in timestamptz,
-  clock_out timestamptz,
-  break_minutes integer DEFAULT 0,
-  approved boolean DEFAULT false,
-  approved_by uuid FK → employees,
-  notes text,
-  created_at, updated_at
-)
+-- NOTE: payroll time tracking (the `time_entries` clock-in/clock-out table) was removed
+-- (migration 20260723000000_drop_time_entries). The owners don't track employee
+-- clock-in/clock-out or run timesheets in this app. Attendance ("who was at which
+-- visit") is tracked by visit_crew; per-visit on-site time by visits.started_at /
+-- visits.ended_at. employees.hourly_rate is retained for pay-rate reference only.
 ```
 
 ### Media & Integrations
@@ -540,7 +529,7 @@ shadcn/ui consumes the variables. This block is the single source of truth for l
   warm, organic). Weights 400–600.
 - Body / UI / labels → **Hanken Grotesk** (humanist sans, highly legible in the field; friendly,
   not overused). Weights 400/500/600/700. This is the default `font-sans`.
-- Numeric data (schedule, billing, timesheets) → Hanken Grotesk with `tabular-nums`.
+- Numeric data (schedule, billing) → Hanken Grotesk with `tabular-nums`.
 - Never use Inter / Roboto / Arial / system fonts.
 
 **Color tokens** (light = the default; hex, mapped to shadcn variables):
@@ -628,7 +617,7 @@ Dark theme ("soil at dusk", for dawn/dusk field use): `--background #1C1A15`, `-
 - Billing (`/management/billing/*`) is the exception — the accountant is laptop-first,
   so it can assume a wide screen and stay table/grid-dense.
 - Colors & type: per the **Design System** above; lean on the warm neutrals for dense data and
-  use `tabular-nums` for numeric columns (schedule, billing, timesheets).
+  use `tabular-nums` for numeric columns (schedule, billing).
 
 ### Shared Components
 - Use shadcn/ui primitives as the base (Button, Card, Dialog, etc.)

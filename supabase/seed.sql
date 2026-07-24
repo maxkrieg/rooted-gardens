@@ -3,7 +3,7 @@
 -- Run via: supabase db reset
 -- UUID segments: 0001=accounts, 0002=properties,
 --   0004=route_groups, 0005=employees, 0006=vehicles, 0007=equipment,
---   0008=visits, 000a=time_entries
+--   0008=visits
 -- (service_zones eliminated — frequency now lives on properties; one
 -- visit per property per week.)
 -- =============================================================
@@ -348,15 +348,3 @@ UPDATE visits SET started_at = '2026-06-09 09:00:00+00', ended_at = '2026-06-09 
 -- OPEN: Sarah tapped Start on Old Stone Front Lawn (v18) — ended_at IS NULL → in progress
 UPDATE visits SET started_at = '2026-06-13 10:00:00+00', ended_at = NULL
   WHERE id = '00000000-0000-0000-0008-000000000018';
-
--- =====================
--- TIME ENTRIES (2)
--- Payroll shift clock for the week of Jun 9
--- =====================
-INSERT INTO time_entries (id, employee_id, date, clock_in, clock_out, break_minutes, approved) VALUES
-  ('00000000-0000-0000-000a-000000000001',
-   '00000000-0000-0000-0005-000000000002',
-   '2026-06-09','2026-06-09 07:30:00+00','2026-06-09 16:00:00+00',30,false),
-  ('00000000-0000-0000-000a-000000000002',
-   '00000000-0000-0000-0005-000000000003',
-   '2026-06-09','2026-06-09 07:45:00+00','2026-06-09 15:30:00+00',30,false);
