@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import type {
   AccountStatus,
   BillingType,
+  EmployeeRole,
   EquipmentStatus,
   Frequency,
   InvoiceStatus,
@@ -181,6 +182,29 @@ export function ServiceDueBadge({ dueDate }: { dueDate: string | null | undefine
   return (
     <Badge variant="outline" className={`border-transparent uppercase tracking-wide text-[10px] font-semibold ${meta.className}`}>
       <AlertTriangle className="w-2.5 h-2.5 mr-1 shrink-0" aria-hidden />
+      {meta.label}
+    </Badge>
+  )
+}
+
+// ─── Employee role ────────────────────────────────────────────────────────────
+
+// Reuses existing status-* colour classes (no new CSS): owner = green, lead =
+// denim, crew = neutral gray, accountant = amber.
+const EMPLOYEE_ROLE_META: Record<EmployeeRole, { label: string; className: string }> = {
+  owner:      { label: 'Owner',      className: 'status-completed' },
+  lead:       { label: 'Lead',       className: 'status-invoiced' },
+  crew:       { label: 'Crew',       className: 'status-scheduled' },
+  accountant: { label: 'Accountant', className: 'status-skipped' },
+}
+
+export function EmployeeRoleBadge({ role }: { role: string }) {
+  const meta = EMPLOYEE_ROLE_META[role as EmployeeRole] ?? {
+    label: role,
+    className: 'status-scheduled',
+  }
+  return (
+    <Badge variant="outline" className={`border-transparent uppercase tracking-wide text-[10px] font-semibold ${meta.className}`}>
       {meta.label}
     </Badge>
   )

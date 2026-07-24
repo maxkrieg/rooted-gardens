@@ -29,22 +29,25 @@ const NAV_ITEMS = [
   { href: '/management/route-groups', label: 'Routes', icon: Route },
   { href: '/management/billing', label: 'Billing', icon: Receipt },
   { href: '/management/fleet', label: 'Fleet', icon: Truck },
-  { href: '/management/team', label: 'Team', icon: UserCircle },
+  { href: '/management/team', label: 'Team', icon: UserCircle, ownerOnly: true },
 ]
 
 const SIDEBAR_LOGO_CLASSES =
   'flex items-center gap-2 px-4 h-14 border-b border-border shrink-0'
 
+type NavItem = (typeof NAV_ITEMS)[number]
+
 interface NavLinksProps {
   pathname: string
+  items: NavItem[]
   onNavigate?: () => void
 }
 
-function NavLinks({ pathname, onNavigate }: NavLinksProps) {
+function NavLinks({ pathname, items, onNavigate }: NavLinksProps) {
   return (
     <nav className="flex-1 overflow-y-auto py-3 px-2">
       <ul className="space-y-0.5">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+        {items.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(href + '/')
           return (
             <li key={href}>
@@ -99,13 +102,17 @@ function SidebarFooter({ userEmail, onLogout }: SidebarFooterProps) {
 
 interface ManagementNavProps {
   userEmail?: string | null
+  role?: string | null
 }
 
-export function ManagementNav({ userEmail }: ManagementNavProps) {
+export function ManagementNav({ userEmail, role }: ManagementNavProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
+
+  // Owner-only items (e.g. Team, task 7.1) are hidden from other roles.
+  const navItems = NAV_ITEMS.filter((item) => !item.ownerOnly || role === 'owner')
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -147,7 +154,7 @@ export function ManagementNav({ userEmail }: ManagementNavProps) {
             </kbd>
           </button>
         </div>
-        <NavLinks pathname={pathname} />
+        <NavLinks pathname={pathname} items={navItems} />
         <SidebarFooter userEmail={userEmail} onLogout={handleLogout} />
       </aside>
 
@@ -194,7 +201,7 @@ export function ManagementNav({ userEmail }: ManagementNavProps) {
               Rooted Gardens
             </span>
           </div>
-          <NavLinks pathname={pathname} onNavigate={() => setMobileOpen(false)} />
+          <NavLinks pathname={pathname} items={navItems} onNavigate={() => setMobileOpen(false)} />
           <SidebarFooter userEmail={userEmail} onLogout={handleLogout} />
         </SheetContent>
       </Sheet>

@@ -11,9 +11,20 @@ export default async function ManagementLayout({
     data: { user },
   } = await supabase.auth.getUser()
 
+  // Role drives which nav items show (e.g. Team is owner-only, task 7.1).
+  let role: string | null = null
+  if (user) {
+    const { data: employee } = await supabase
+      .from('employees')
+      .select('role')
+      .eq('user_id', user.id)
+      .single()
+    role = employee?.role ?? null
+  }
+
   return (
     <div className="min-h-screen bg-background">
-      <ManagementNav userEmail={user?.email} />
+      <ManagementNav userEmail={user?.email} role={role} />
 
       {/* Main content area:
           - Mobile: offset below the fixed top header (h-14 = pt-14)

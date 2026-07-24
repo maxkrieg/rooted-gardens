@@ -127,6 +127,14 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(url)
     }
 
+    // Team management is owner-only (task 7.1) — leads and accountants are
+    // otherwise valid management users, so gate this sub-route specifically.
+    if (pathname.startsWith('/management/team') && role !== 'owner') {
+      const url = request.nextUrl.clone()
+      url.pathname = ROLE_HOME[role] ?? '/management/dashboard'
+      return NextResponse.redirect(url)
+    }
+
     if (isCrew && !CREW_ROLES.includes(role)) {
       const url = request.nextUrl.clone()
       url.pathname = ROLE_HOME[role] ?? '/management/dashboard'

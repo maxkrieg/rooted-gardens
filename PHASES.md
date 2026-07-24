@@ -852,7 +852,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   name, type badge, status badge, last serviced date (flag red if overdue).
   Add "New Vehicle" and "New Equipment" buttons that open inline forms.
 
-- [ ] **6.2 — Daily fleet assignment**
+- [removed] **6.2 — Daily fleet assignment**
   *Depends on: 6.1, 3.9*
   On the schedule grid (Phase 3), vehicle assignment is per-visit. Add a
   "Fleet Status Today" panel to the dashboard that shows: which vehicles are
@@ -888,7 +888,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 > literal stub (`return null`); the "Team" nav link already exists in
 > `components/management/ManagementNav.tsx`.
 
-- [ ] **7.1 — Team management page**
+- [x] **7.1 — Team management page**
   *Depends on: 1.6, 1.4*
   Create `app/management/team/page.tsx`. Gate the entire page to `owner` role
   only (proxy redirect + RLS) — leads and crew cannot access team management.
@@ -903,6 +903,26 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   to `employees.user_id`. Show "Has app access" vs "No app access" indicator
   based on whether `employees.user_id` is set. Capture SMS consent here (used
   by 8.2) — a per-employee opt-in toggle backed by `sms_opt_out`.
+  **Implementation notes**: built by mirroring the Fleet trio — `TeamView.tsx`
+  (card-grid host + "Add Employee" sheet), `EmployeeCard.tsx` (role badge, side,
+  contact, has-app-access chip, "Invite to App" button, inline SMS toggle, edit
+  sheet), and a create/edit `EmployeeForm.tsx` over `employeeFormSchema`
+  (`lib/validators/employee.ts`) + `app/management/team/actions.ts`. **Owner-only
+  enforced at three layers**: a `/management/team` sub-route gate in `proxy.ts`, a
+  page-level owner re-check (`redirect`), and a new migration tightening
+  `employees` INSERT/UPDATE RLS to `owner` only
+  (`20260724000000_employees_owner_only_writes.sql`, was owner+lead). The Team nav
+  link is hidden from non-owners (`layout.tsx` passes `role` → `ManagementNav`).
+  `inviteEmployee` uses the **service client** (`inviteUserByEmail` is an admin API,
+  and the new auth user has no `employees` row yet so `get_my_role()` is NULL) —
+  every action still calls a `requireOwner()` re-check since the service client
+  bypasses RLS. The SMS toggle is opt-*in* over the opt-*out* `sms_opt_out` column
+  (stored inverted). **Added beyond the literal spec**: an optional `hourly_rate`
+  field, so the retained pay-rate column is actually settable (no time tracking).
+  `EmployeeRoleBadge` added to `components/management/badges.tsx`. **Live-untested**:
+  the "Invite to App" magic-link round-trip needs `NEXT_PUBLIC_APP_URL` set and the
+  `/auth/callback` URL allow-listed in Supabase Auth (human-gated, like the QBO OAuth
+  checks).
 
 - [removed] **7.2 — Timesheet management (management view)** — _cut 2026-07-23; payroll time
   tracking removed (see top-of-file note). Never built. Original description kept as history:_
