@@ -17,7 +17,7 @@ const ROLE_HOME: Record<EmployeeRole, string> = {
   owner: '/management/dashboard',
   lead: '/management/dashboard',
   accountant: '/management/billing',
-  crew: '/crew/today',
+  crew: '/crew/schedule',
 }
 
 export async function proxy(request: NextRequest) {
@@ -123,7 +123,7 @@ export async function proxy(request: NextRequest) {
 
     if (isManagement && !MANAGEMENT_ROLES.includes(role)) {
       const url = request.nextUrl.clone()
-      url.pathname = ROLE_HOME[role] ?? '/crew/today'
+      url.pathname = ROLE_HOME[role] ?? '/crew/schedule'
       return NextResponse.redirect(url)
     }
 
