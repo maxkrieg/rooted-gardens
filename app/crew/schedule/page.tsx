@@ -1,13 +1,12 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { addDays, addWeeks, format } from 'date-fns'
-import { ChevronLeft, ChevronRight, CalendarRange, SlidersHorizontal, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CalendarRange } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScheduleStopRow } from '@/components/crew/ScheduleStopRow'
 import {
-  ScheduleFilterSheet,
-  activeFilterChips,
+  CrewScheduleFilterBar,
   EMPTY_FILTERS,
   type ScheduleFilters,
 } from '@/components/crew/CrewScheduleFilters'
@@ -17,18 +16,12 @@ import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { getWeekStart } from '@/lib/utils/schedule'
 import type { SchedulePropertyRow } from '@/types/app'
 
-function rowMatches(
-  row: SchedulePropertyRow,
-  filters: ScheduleFilters,
-  myId: string | undefined
-): boolean {
+function rowMatches(row: SchedulePropertyRow, filters: ScheduleFilters): boolean {
   if (filters.routeGroup !== 'all' && row.routeGroup.id !== filters.routeGroup) return false
 
   if (filters.crew !== 'all') {
-    const targetId = filters.crew === 'me' ? myId : filters.crew
-    if (!targetId) return false
     const assigned = (row.visit?.visit_crew ?? []).some(
-      (vc) => vc.relation === 'assigned' && vc.employee_id === targetId
+      (vc) => vc.relation === 'assigned' && vc.employee_id === filters.crew
     )
     if (!assigned) return false
   }
@@ -38,19 +31,12 @@ function rowMatches(
     if (row.visit?.status !== filters.status) return false
   }
 
-  const q = filters.search.trim().toLowerCase()
-  if (q) {
-    const hay = `${row.property.address} ${row.account.name}`.toLowerCase()
-    if (!hay.includes(q)) return false
-  }
-
   return true
 }
 
 export default function CrewSchedulePage() {
   const [week, setWeek] = useState(() => getWeekStart(new Date()))
-  const [filters, setFilters] = useState<ScheduleFilters>({ ...EMPTY_FILTERS, crew: 'me' })
-  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [filters, setFilters] = useState<ScheduleFilters>(EMPTY_FILTERS)
 
   const thisWeek = getWeekStart(new Date())
   const isCurrentWeek = week.getTime() === thisWeek.getTime()
@@ -59,27 +45,36 @@ export default function CrewSchedulePage() {
   const { data: employees = [] } = useActiveEmployees()
   const { data: me } = useCurrentEmployee()
 
+  // Default to the current user's own stops ("My stops") once their employee record
+  // loads — done here rather than in the initial state because `me` is fetched async.
+  const didInitCrew = useRef(false)
+  useEffect(() => {
+    if (!didInitCrew.current && me?.id) {
+      didInitCrew.current = true
+      setFilters((f) => ({ ...f, crew: me.id }))
+    }
+  }, [me?.id])
+
   const routeGroups = useMemo(
     () => schedule?.routeGroups.map((g) => g.routeGroup) ?? [],
     [schedule]
   )
-  const chips = activeFilterChips(filters, employees, routeGroups)
 
   const filteredGroups = useMemo(() => {
     if (!schedule) return []
     return schedule.routeGroups
       .map((group) => ({
         routeGroup: group.routeGroup,
-        rows: group.rows.filter((row) => rowMatches(row, filters, me?.id)),
+        rows: group.rows.filter((row) => rowMatches(row, filters)),
       }))
       .filter((group) => group.rows.length > 0)
-  }, [schedule, filters, me?.id])
+  }, [schedule, filters])
 
   const totalVisible = filteredGroups.reduce((sum, g) => sum + g.rows.length, 0)
 
   return (
     <div className="flex flex-col">
-      {/* Header — week nav is the hero; filters live in a sheet */}
+      {/* Header — week nav is the hero; filters sit inline across the top */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-[--border] px-4 py-3 space-y-2.5">
         {/* Row 1: title + week nav */}
         <div className="flex items-center justify-between gap-2">
@@ -109,64 +104,55 @@ export default function CrewSchedulePage() {
           </div>
         </div>
 
-        {/* Row 2: quick toggles + Filters */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5">
+        {/* Row 2: quick toggles */}
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant={filters.status === 'scheduled' ? 'default' : 'outline'}
+            size="sm"
+            className="h-9 text-xs"
+            onClick={() =>
+              setFilters((f) => ({
+                ...f,
+                status: f.status === 'scheduled' ? 'all' : 'scheduled',
+              }))
+            }
+          >
+            Incomplete
+          </Button>
+          <Button
+            variant={me?.id && filters.crew === me.id ? 'default' : 'outline'}
+            size="sm"
+            className="h-9 text-xs"
+            disabled={!me?.id}
+            onClick={() =>
+              setFilters((f) => ({
+                ...f,
+                crew: f.crew === me?.id ? 'all' : (me?.id ?? 'all'),
+              }))
+            }
+          >
+            My stops
+          </Button>
+          {!isCurrentWeek && (
             <Button
-              variant={filters.crew === 'me' ? 'default' : 'outline'}
+              variant="outline"
               size="sm"
               className="h-9 text-xs"
-              onClick={() =>
-                setFilters((f) => ({ ...f, crew: f.crew === 'me' ? 'all' : 'me' }))
-              }
+              onClick={() => setWeek(thisWeek)}
             >
-              My stops
+              This week
             </Button>
-            {!isCurrentWeek && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 text-xs"
-                onClick={() => setWeek(thisWeek)}
-              >
-                This week
-              </Button>
-            )}
-          </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 text-xs gap-1.5"
-            onClick={() => setFiltersOpen(true)}
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-            Filters
-            {chips.length > 0 && (
-              <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[--primary] px-1 text-[10px] font-semibold text-[--primary-foreground] tabular-nums">
-                {chips.length}
-              </span>
-            )}
-          </Button>
+          )}
         </div>
 
-        {/* Active filter chips */}
-        {chips.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {chips.map((chip) => (
-              <button
-                key={chip.key}
-                type="button"
-                onClick={() => setFilters((f) => ({ ...f, ...chip.clear }))}
-                className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground active:bg-accent transition-colors"
-                aria-label={`Remove ${chip.key} filter`}
-              >
-                {chip.label}
-                <X className="h-3 w-3 opacity-60" />
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Row 3: route + crew dropdowns */}
+        <CrewScheduleFilterBar
+          filters={filters}
+          onChange={setFilters}
+          employees={employees}
+          routeGroups={routeGroups}
+          currentEmployeeId={me?.id}
+        />
       </div>
 
       {/* Body */}
@@ -205,15 +191,6 @@ export default function CrewSchedulePage() {
           ))
         )}
       </div>
-
-      <ScheduleFilterSheet
-        open={filtersOpen}
-        onOpenChange={setFiltersOpen}
-        filters={filters}
-        onChange={setFilters}
-        employees={employees}
-        routeGroups={routeGroups}
-      />
     </div>
   )
 }
