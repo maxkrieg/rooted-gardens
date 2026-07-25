@@ -1,4 +1,4 @@
-import { startOfWeek, addWeeks, isBefore } from 'date-fns'
+import { startOfWeek, addWeeks, isBefore, parseISO, format } from 'date-fns'
 import type {
   Account,
   Property,
@@ -10,6 +10,24 @@ import type {
 
 export function getWeekStart(date: Date): Date {
   return startOfWeek(date, { weekStartsOn: 1 })
+}
+
+/**
+ * Parse a `?week=YYYY-MM-DD` query param into the Monday of that week.
+ * Falls back to the current week when the param is missing or unparseable —
+ * shared by the management schedule (server) and crew schedule (client) so a
+ * week link works in both directions.
+ */
+export function parseWeekParam(value: string | null | undefined): Date {
+  if (!value) return getWeekStart(new Date())
+  const parsed = parseISO(value)
+  if (Number.isNaN(parsed.getTime())) return getWeekStart(new Date())
+  return getWeekStart(parsed)
+}
+
+/** Serialize a week start for the `?week=` query param. */
+export function formatWeekParam(date: Date): string {
+  return format(getWeekStart(date), 'yyyy-MM-dd')
 }
 
 export function getWeeksInRange(start: Date, end: Date): Date[] {

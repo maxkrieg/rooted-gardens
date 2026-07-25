@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
-import { format, parseISO } from 'date-fns'
+import Link from 'next/link'
+import { addDays, format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
-import { FilePen } from 'lucide-react'
+import { ChevronRight, FilePen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createVisit } from '@/app/management/schedule/actions'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
@@ -82,9 +83,14 @@ export function ScheduleListMobile({ weeks, employees, vehicles, canEdit, role }
 
   return (
     <>
-      <p className="text-sm text-muted-foreground mb-4">
-        Week of {format(parseISO(week.weekStart), 'MMMM d, yyyy')}
-      </p>
+      <Link
+        href={`/crew/schedule?week=${week.weekStart}`}
+        className="inline-flex items-center gap-1 mb-4 text-sm text-muted-foreground tabular-nums hover:text-foreground hover:underline"
+      >
+        {format(parseISO(week.weekStart), 'MMM d')} –{' '}
+        {format(addDays(parseISO(week.weekStart), 6), 'MMM d')}
+        <ChevronRight className="h-3.5 w-3.5" />
+      </Link>
 
       <div className="space-y-4">
         {week.routeGroups.map(({ routeGroup, rows }) => (

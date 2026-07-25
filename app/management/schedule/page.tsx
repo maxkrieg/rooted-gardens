@@ -1,6 +1,6 @@
-import { format, addWeeks, parseISO } from 'date-fns'
+import { format, addWeeks } from 'date-fns'
 import { cookies } from 'next/headers'
-import { getWeekStart } from '@/lib/utils/schedule'
+import { parseWeekParam } from '@/lib/utils/schedule'
 import { parseRoleCookie } from '@/lib/utils/role-cookie'
 import { createClient } from '@/lib/supabase/server'
 import { getScheduleForWeek } from './actions'
@@ -16,7 +16,7 @@ export default async function SchedulePage({
   searchParams: Promise<{ week?: string }>
 }) {
   const { week } = await searchParams
-  const base = week ? getWeekStart(parseISO(week)) : getWeekStart(new Date())
+  const base = parseWeekParam(week)
   const weekStarts = [0, 1, 2, 3].map((n) => addWeeks(base, n))
 
   const supabase = await createClient()

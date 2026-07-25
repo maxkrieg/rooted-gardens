@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { format, parseISO } from 'date-fns'
+import Link from 'next/link'
+import { addDays, format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { getWeekStart, groupRowsByAccount } from '@/lib/utils/schedule'
@@ -123,22 +124,34 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role }: Sche
                 </th>
                 {weeks.map((week) => {
                   const isCurrent = week.weekStart === currentWeekStart
+                  const start = parseISO(week.weekStart)
                   return (
                     <th
                       key={week.weekStart}
                       className={cn(
-                        'min-w-[140px] px-3 py-3 text-center',
+                        'min-w-[160px] px-3 py-3 text-center',
                         isCurrent ? 'text-primary' : 'text-muted-foreground'
                       )}
                     >
-                      <div className={cn('text-sm', isCurrent ? 'font-bold' : 'font-semibold')}>
-                        {format(parseISO(week.weekStart), 'MMM d')}
-                      </div>
-                      {isCurrent && (
-                        <div className="text-[10px] font-medium text-primary/70 mt-0.5">
-                          This week
-                        </div>
-                      )}
+                      <Link
+                        href={`/crew/schedule?week=${week.weekStart}`}
+                        className="block rounded-md px-1 py-0.5 hover:bg-accent/40 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        title={`Open the crew schedule for ${format(start, 'MMM d')} – ${format(addDays(start, 6), 'MMM d')}`}
+                      >
+                        <span
+                          className={cn(
+                            'block text-sm tabular-nums',
+                            isCurrent ? 'font-bold' : 'font-semibold'
+                          )}
+                        >
+                          {format(start, 'MMM d')} – {format(addDays(start, 6), 'MMM d')}
+                        </span>
+                        {isCurrent && (
+                          <span className="block text-[10px] font-medium text-primary/70 mt-0.5">
+                            This week
+                          </span>
+                        )}
+                      </Link>
                     </th>
                   )
                 })}
