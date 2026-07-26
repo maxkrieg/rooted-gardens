@@ -8,12 +8,15 @@ import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
 import { getWeekStart } from '@/lib/utils/schedule'
+import { scheduleFilterParams, type ScheduleFilterValues } from '@/lib/utils/schedule-filters'
 
 interface ScheduleNavProps {
   windowStart: string // ISO date — first Monday of the 4-week window
+  /** Carried through every navigation so changing week never drops the filters. */
+  filters: ScheduleFilterValues
 }
 
-export function ScheduleNav({ windowStart }: ScheduleNavProps) {
+export function ScheduleNav({ windowStart, filters }: ScheduleNavProps) {
   const router = useRouter()
   const [calendarOpen, setCalendarOpen] = useState(false)
 
@@ -25,15 +28,18 @@ export function ScheduleNav({ windowStart }: ScheduleNavProps) {
     !isBefore(currentWeekStart, windowStartDate) &&
     !isAfter(currentWeekStart, windowEndDate)
 
+  function goToWeek(weekStart: string) {
+    const params = scheduleFilterParams(filters, weekStart)
+    router.push(`/management/schedule?${params.toString()}`)
+  }
+
   function navigate(weeks: number) {
-    const next = format(addWeeks(windowStartDate, weeks), 'yyyy-MM-dd')
-    router.push(`/management/schedule?week=${next}`)
+    goToWeek(format(addWeeks(windowStartDate, weeks), 'yyyy-MM-dd'))
   }
 
   function handleCalendarSelect(date: Date | undefined) {
     if (!date) return
-    const weekStart = format(getWeekStart(date), 'yyyy-MM-dd')
-    router.push(`/management/schedule?week=${weekStart}`)
+    goToWeek(format(getWeekStart(date), 'yyyy-MM-dd'))
     setCalendarOpen(false)
   }
 
@@ -47,7 +53,7 @@ export function ScheduleNav({ windowStart }: ScheduleNavProps) {
           variant="outline"
           size="sm"
           className="h-8 px-3 text-xs"
-          onClick={() => router.push('/management/schedule')}
+          onClick={() => goToWeek(format(currentWeekStart, 'yyyy-MM-dd'))}
         >
           Today
         </Button>

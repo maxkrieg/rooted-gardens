@@ -10,6 +10,7 @@ import { formatAccountPrice } from '@/lib/utils/accounts'
 import { createVisit } from '@/app/management/schedule/actions'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
+import { ScheduleEmptyState } from '@/components/management/ScheduleEmptyState'
 import { useVisitTimings } from '@/components/management/SessionsProvider'
 import { isVisitInProgress, isVisitMissed, formatElapsed } from '@/lib/utils/visits'
 import { Button } from '@/components/ui/button'
@@ -32,9 +33,11 @@ interface ScheduleGridProps {
   vehicles: Vehicle[]
   canEdit: boolean
   role: EmployeeRole | undefined
+  /** True when a filter is narrowing the view — changes the empty state's meaning. */
+  filtered?: boolean
 }
 
-export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role }: ScheduleGridProps) {
+export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filtered }: ScheduleGridProps) {
   const currentWeekStart = useMemo(
     () => format(getWeekStart(new Date()), 'yyyy-MM-dd'),
     []
@@ -98,14 +101,8 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role }: Sche
     }
   }
 
-  if (weeks.length === 0 || weeks[0].routeGroups.length === 0) {
-    return (
-      <div className="rounded-xl border border-border bg-card shadow-warm p-12 text-center">
-        <p className="text-muted-foreground">
-          No route groups configured. Add properties to a route group to see the schedule.
-        </p>
-      </div>
-    )
+  if (weeks.length === 0 || weeks.every((w) => w.routeGroups.length === 0)) {
+    return <ScheduleEmptyState filtered={filtered} />
   }
 
   const structure = weeks[0]

@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { createVisit } from '@/app/management/schedule/actions'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
+import { ScheduleEmptyState } from '@/components/management/ScheduleEmptyState'
 import { useVisitTimings } from '@/components/management/SessionsProvider'
 import { isVisitInProgress, isVisitMissed, formatElapsed } from '@/lib/utils/visits'
 import { groupRowsByAccount } from '@/lib/utils/schedule'
@@ -26,15 +27,27 @@ import type {
 } from '@/types/app'
 
 interface ScheduleListMobileProps {
-  weeks: ScheduleWeek[]
+  /** The single week on screen, already filtered. */
+  week: ScheduleWeek | undefined
+  /** The unfiltered 4-week window — only feeds RouteAssignDialog's week picker. */
+  windowWeeks: ScheduleWeek[]
   employees: Employee[]
   vehicles: Vehicle[]
   canEdit: boolean
   role: EmployeeRole | undefined
+  /** True when a filter is narrowing the view — changes the empty state's meaning. */
+  filtered?: boolean
 }
 
-export function ScheduleListMobile({ weeks, employees, vehicles, canEdit, role }: ScheduleListMobileProps) {
-  const week = weeks[0]
+export function ScheduleListMobile({
+  week,
+  windowWeeks,
+  employees,
+  vehicles,
+  canEdit,
+  role,
+  filtered,
+}: ScheduleListMobileProps) {
   const visitTimings = useVisitTimings()
 
   // Tick elapsed time every 30s
@@ -54,6 +67,7 @@ export function ScheduleListMobile({ weeks, employees, vehicles, canEdit, role }
   const [assignGroup, setAssignGroup] = useState<RouteGroup | null>(null)
 
   function handleRowClick(row: SchedulePropertyRow, visit: VisitWithCrew | null) {
+    if (!week) return
     if (visit) {
       setSheetRow({ ...row, visit })
       setSheetWeek(week.weekStart)
@@ -72,13 +86,7 @@ export function ScheduleListMobile({ weeks, employees, vehicles, canEdit, role }
   }
 
   if (!week || week.routeGroups.length === 0) {
-    return (
-      <div className="rounded-xl border border-border bg-card shadow-warm p-12 text-center">
-        <p className="text-muted-foreground">
-          No route groups configured. Add properties to a route group to see the schedule.
-        </p>
-      </div>
-    )
+    return <ScheduleEmptyState filtered={filtered} />
   }
 
   return (
@@ -274,7 +282,7 @@ export function ScheduleListMobile({ weeks, employees, vehicles, canEdit, role }
           open={assignOpen}
           onOpenChange={setAssignOpen}
           routeGroup={assignGroup}
-          weeks={weeks}
+          weeks={windowWeeks}
           employees={employees}
           vehicles={vehicles}
         />
