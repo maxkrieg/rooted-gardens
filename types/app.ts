@@ -93,6 +93,27 @@ export type EquipmentStatus = (typeof EQUIPMENT_STATUSES)[number]
 export const PHOTO_TYPES = ['visit', 'how_to', 'customer_request', 'before', 'after', 'plan'] as const
 export type PhotoType = (typeof PHOTO_TYPES)[number]
 
+export const PHOTO_TYPE_LABELS: Record<PhotoType, string> = {
+  how_to: 'How-To Guide',
+  customer_request: 'Customer Request',
+  visit: 'Visit',
+  before: 'Before',
+  after: 'After',
+  plan: 'Visit Plan Reference',
+}
+
+/** UI buckets for the property photo gallery. A superset of PHOTO_TYPES — the
+ *  'other' bucket is the default branch so a type added to the DB CHECK ahead of
+ *  the UI still renders somewhere instead of vanishing from the gallery. */
+export const PHOTO_GROUP_KEYS = [
+  'how_to',
+  'customer_request',
+  'visit',
+  'reference',
+  'other',
+] as const
+export type PhotoGroupKey = (typeof PHOTO_GROUP_KEYS)[number]
+
 // ─── Joined / composite types ─────────────────────────────────────────────────
 
 /** Employee record joined to its auth.users identity (user_id is always set). */
@@ -186,6 +207,29 @@ export type ScheduleWeek = {
     routeGroup: RouteGroup
     rows: SchedulePropertyRow[]
   }>
+}
+
+// ─── Photos ───────────────────────────────────────────────────────────────────
+
+/** A photo row with its resolved signed URL. The `photos` bucket is private, so
+ *  every render needs a signed URL; the account Photos tab signs them in a single
+ *  batch server-side and denormalizes the result onto each row. `url` is null when
+ *  signing failed (e.g. the object is missing) — render a placeholder, not a
+ *  broken image. */
+export type PhotoWithUrl = Photo & { url: string | null }
+
+export interface PhotoGroup {
+  key: PhotoGroupKey
+  label: string
+  photos: PhotoWithUrl[]
+}
+
+/** One property's photos, bucketed by group — the unit the gallery renders. */
+export interface PropertyPhotos {
+  propertyId: string
+  address: string
+  groups: PhotoGroup[]
+  total: number
 }
 
 // ─── Search ───────────────────────────────────────────────────────────────────

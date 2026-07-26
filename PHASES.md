@@ -971,7 +971,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 > (The offline foundation and seed data that used to live here moved earlier — to 4.1
 > and 1.9 respectively — because they're foundational, not polish.)
 
-- [ ] **8.1 — Property photo gallery**
+- [x] **8.1 — Property photo gallery**
   *Depends on: 2.4, 4.5*
   On the account detail page, add a "Photos" tab. Show all photos for the
   property grouped by type: How-To Guide photos (permanent crew reference),
@@ -979,6 +979,17 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   can upload how-to photos from desktop (drag-and-drop). Photos display in
   a lightbox. Allow captioning photos. This replaces the informal photo
   sharing the owner currently uses for new employee onboarding.
+  **Built:** a `?view=` tab strip on the account page (same hand-rolled pattern as
+  Billing — no shadcn Tabs), grouped by **property first, then type**, with a 4th
+  "Other" group so `plan`/`before`/`after` photos stay visible. Upload defaults to
+  `how_to`; owners can also recategorize and caption any photo (no RLS migration
+  needed — `photos_update` already allowed exactly this). Image bytes go browser →
+  Storage directly and only the row goes through a Server Action, since 20 MB
+  exceeds both Next's Server Action body limit and the serverless request ceiling.
+  Added a `photos (property_id, created_at DESC)` index.
+  *Follow-up, not built:* surfacing how-to photos to crew in the PWA — 8.1 calls
+  them "permanent crew reference," but that needs its own offline-caching and UI
+  decisions.
 
 - [deferred] **8.2 — SMS delivery infrastructure (Twilio)** — _deferred 2026-07-25; not building now_
   *Depends on: 1.2, 7.1, 0.1*
