@@ -59,6 +59,17 @@ See `CLAUDE.md` for full context, tech stack, schema, and conventions.
 > tracking). The affected task descriptions below are left as historical record but marked
 > `[removed]`.
 
+> **Deferral (2026-07-25):** all **SMS** work is deferred — **8.2** (Twilio delivery
+> infrastructure), **8.3** (schedule-change notifications), and the Phase 0 lead-time item
+> that exists only to unblock them, **0.1** (A2P 10DLC registration). They are marked
+> `[deferred]` and kept in full below; this is a "not now", not a cut like `[removed]`.
+> **Phase 8 ships as 8.1, 8.4, 8.5, 8.6.** Nothing else depends on SMS: crew already get
+> live in-app updates via the 4.9 realtime toast, and owner start/stop alerts were always
+> in-app only (3.11 / 4.10) — the only gap is reaching a crew phone while the PWA is
+> *closed*, which the owners cover by texting manually as they do today. When picking this
+> back up, restart 0.1 **~2 weeks ahead** — carrier approval is the long pole and gates all
+> delivery.
+
 Each task is written to be handed directly to Claude Code as a prompt. Phases are ordered
 as a sensible default build sequence, but the authoritative dependency graph is the
 `Depends on:` line under each task — tasks with disjoint dependencies can be built in
@@ -80,8 +91,11 @@ in-progress view 3.11 consumes the crew start/stop producer 4.10; build it again
 > day one, in parallel with Phase 1. Nothing here blocks *beginning* Phase 1 coding, but
 > several later tasks block on them, so kicking them off late stalls the end of the build.
 
-- [~] **0.1 — A2P 10DLC SMS registration** (blocks 8.2 → 8.3) <!-- blocked: needs human — Twilio account + TCR brand/campaign registration, carrier approval ~1-2 weeks -->
+- [deferred] **0.1 — A2P 10DLC SMS registration** (blocks 8.2 → 8.3) — _deferred 2026-07-25 with 8.2 / 8.3_
   *Depends on: — (start here)*
+  > Deferred by owner decision (2026-07-25). Its only purpose is unblocking SMS (8.2 → 8.3),
+  > which is deferred. Restart registration ~2 weeks *before* picking 8.2 back up — carrier
+  > approval is the long pole and gates all delivery.
   Create the Twilio account and start brand + campaign registration with The Campaign
   Registry (brand = Tigertown Farm LLC, EIN / business details; campaign = operational
   schedule notifications). Carrier approval takes ~1–2 weeks and gates ALL SMS delivery, so
@@ -102,13 +116,15 @@ in-progress view 3.11 consumes the crew start/stop producer 4.10; build it again
   Create the Supabase project (URL + anon + service-role keys), the Vercel project, and the
   Twilio Messaging Service. Populate `.env.local`. This is the one Phase 0 item that actually
   blocks starting Phase 1 (1.2 needs the Supabase project).
+  *(The Twilio Messaging Service part is deferred along with 0.1 / 8.2 — Supabase + Vercel
+  are still required.)*
 
 ### ✅ Verifying Phase 0 — Kickoff
 
 External / human items (they stay `[~]` until a person finishes them). Confirm each is *started*:
-- Twilio account exists and the A2P 10DLC brand + campaign are **submitted** to The Campaign Registry (0.1).
+- ~~Twilio account exists and the A2P 10DLC brand + campaign are **submitted** to The Campaign Registry (0.1).~~ — **deferred** with 8.2 / 8.3.
 - ~~Intuit Developer app created; sandbox `QBO_CLIENT_ID` / `QBO_CLIENT_SECRET` + redirect URI in `.env.local`~~ — **done**: sandbox connect flow verified live end-to-end (0.2).
-- Supabase + Vercel projects provisioned, keys in `.env.local`; Twilio Messaging Service created (0.3).
+- Supabase + Vercel projects provisioned, keys in `.env.local` (0.3). Twilio Messaging Service deferred.
 - Note: local dev needs none of these (local Supabase handles the database) — they gate production / live integrations only.
 
 ---
@@ -964,8 +980,12 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   a lightbox. Allow captioning photos. This replaces the informal photo
   sharing the owner currently uses for new employee onboarding.
 
-- [ ] **8.2 — SMS delivery infrastructure (Twilio)**
+- [deferred] **8.2 — SMS delivery infrastructure (Twilio)** — _deferred 2026-07-25; not building now_
   *Depends on: 1.2, 7.1, 0.1*
+  > Deferred by owner decision (2026-07-25). Kept here in full for when SMS is picked back
+  > up. Nothing else in the build depends on it — crew already get in-app realtime updates
+  > (4.9), so the only gap is reaching a crew phone when the PWA is closed. Do not build
+  > `send-sms`, the Twilio webhook, or delivery logging until this is un-deferred.
   Stand up outbound SMS so the 8.3 notifications can reach crew phones when the PWA is
   closed. This is the only notification channel besides in-app realtime — no email.
   - **Provider:** Twilio. Store `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and
@@ -985,8 +1005,13 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   - **Delivery logging:** persist send attempts + Twilio status callbacks so a missed text
     is debuggable. Keep volume low — SMS is for schedule changes, not per-stop chatter.
 
-- [ ] **8.3 — Notification system for schedule changes**
+- [deferred] **8.3 — Notification system for schedule changes** — _deferred 2026-07-25; not building now_
   *Depends on: 8.2, 4.9, 3.11*
+  > Deferred by owner decision (2026-07-25), together with 8.2 which it depends on. Kept
+  > here in full for later. The owners keep texting crew manually in the meantime. Note the
+  > **in-app** half of this task is already shipped elsewhere and is NOT deferred: the crew
+  > realtime toast (4.9) and the owner start/stop live overlay + toast (3.11 / 4.10) exist.
+  > What's deferred is the SMS half — the DB trigger → `send-sms` fan-out.
   When the owner updates a crew instruction, changes crew assignment, or adds a new stop, send
   an **SMS** to affected crew members via the Twilio infrastructure in 8.2 (DB webhook /
   trigger → `send-sms` Edge Function). Message: "Rooted: your schedule for [day] changed —
@@ -1038,9 +1063,10 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 - Audit: every list view has empty + loading + error states; the app is wrapped in an `ErrorBoundary`; no raw error strings reach users (8.5).
 - Mobile audit: ≥44px tap targets, inputs ≥16px (no zoom-on-focus), no horizontal scroll, installable, natural back-nav (8.6).
 
-**Human-gated (needs Twilio — `live-untested` otherwise):**
-- `send-sms` Edge Function skips opted-out / no-phone employees; the STOP inbound webhook flips `sms_opt_out` (8.2).
-- A schedule change (crew instruction / assignment / new stop) triggers the SMS to affected crew (8.3). In-app realtime owner start/stop alerts are already covered by the Phase 3/4 checks.
+**Deferred — not part of shipping Phase 8 (8.2 / 8.3):**
+- ~~`send-sms` Edge Function skips opted-out / no-phone employees; the STOP inbound webhook flips `sms_opt_out` (8.2).~~
+- ~~A schedule change (crew instruction / assignment / new stop) triggers the SMS to affected crew (8.3).~~
+- In-app realtime owner start/stop alerts are unaffected — already covered by the Phase 3/4 checks.
 
 ---
 
@@ -1055,8 +1081,9 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 > ("Gardening Notes") is **deferred** — link out to the existing site for now.
 >
 > Additive and depends on earlier phases: lead→account conversion reuses the Phase 2
-> account/property forms + `get_my_role()` RLS helper; the new-lead SMS reuses the Twilio
-> `send-sms` Edge Function (8.2); the Leads inbox lives in the management shell (1.6). The
+> account/property forms + `get_my_role()` RLS helper; ~~the new-lead SMS reuses the Twilio
+> `send-sms` Edge Function (8.2)~~ (deferred — 9.7 ships in-app-only); the Leads inbox lives
+> in the management shell (1.6). The
 > public marketing pages themselves only need the design system (1.1).
 
 - [ ] **9.1 — `leads` table + RLS migration**
@@ -1118,8 +1145,11 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   that inserts a `leads` row with `kind='job_application'` and the extras in `details`
   (position, resume path). Reuse the 9.5 spam protection + Server Action pattern.
 
-- [ ] **9.7 — New-lead notification (in-app + SMS)**
-  *Depends on: 9.5, 8.2*
+- [ ] **9.7 — New-lead notification (in-app + ~~SMS~~)**
+  *Depends on: 9.5, ~~8.2~~*
+  > **Build the in-app half only** — the SMS half is blocked by the 8.2 deferral
+  > (2026-07-25). Ship the Realtime toast + unread badge; skip the `send-sms` routing until
+  > 8.2 is un-deferred. 9.7 is *not* deferred as a whole and does not block on Twilio.
   **In-app:** management subscribes to `leads` INSERT (Realtime) → toast + an unread badge on
   the new "Leads" sidebar item. **SMS:** route by `service_interest` to the owner whose
   `employees.side` matches (lawn → Matt, garden → Krystyna; `both` / `other` → both owners) via
@@ -1153,8 +1183,8 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 - Submitting the inquiry form inserts a `leads` row (`kind='service_inquiry'`, `status='new'`)
   and shows the success state; the honeypot / rate-limit reject obvious bots (9.5).
 - The careers form inserts `kind='job_application'` with the resume in Storage + `details` (9.6).
-- A new lead pushes an in-app toast / badge to management and (with Twilio) SMS to the matching
-  owner by `service_interest` (9.7).
+- A new lead pushes an in-app toast / badge to management (9.7). ~~SMS to the matching owner by
+  `service_interest`~~ — deferred with 8.2.
 - The Leads inbox lists / filters leads and advances status; "Convert to Account" creates a
   `prospective` account + property and marks the lead `won` (9.8 / 9.9).
 
@@ -1162,5 +1192,5 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 - The anon / public role can INSERT into `leads` but cannot SELECT; `crew` / `accountant` have
   no `leads` access; `owner` / `lead` can read + update.
 
-**Human-gated (needs Twilio — `live-untested` otherwise):**
-- The new-lead SMS reaches the matching owner via the `send-sms` Edge Function (9.7).
+**Deferred with 8.2 — not part of shipping Phase 9:**
+- ~~The new-lead SMS reaches the matching owner via the `send-sms` Edge Function (9.7).~~

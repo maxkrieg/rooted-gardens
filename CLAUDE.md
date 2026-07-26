@@ -68,12 +68,21 @@ web app. Parent company is **Tigertown Farm LLC**.
     the customer yet". Never customer data, payment details, or edits made in QBO, and
     nothing read back feeds into invoice creation or pricing.
   - Endpoints used: `createInvoice`, `createCustomer`, `getCustomer`, `getInvoice` (status read)
-- **Twilio** — outbound SMS for crew schedule-change notifications. This is the only
-  notification channel besides in-app realtime — **no email anywhere in the app**.
-  - Sent from a Supabase Edge Function (`send-sms`), never inline
-  - Requires US **A2P 10DLC** brand + campaign registration — start early, ~1–2 week
-    carrier approval gates all delivery
-  - STOP/HELP handled via inbound webhook → `employees.sms_opt_out`
+- **Twilio** — ⚠️ **DEFERRED (2026-07-25) — not built, do not build.** Outbound SMS for crew
+  schedule-change notifications (PHASES.md 8.2 / 8.3, plus the 0.1 registration lead-time
+  item) is postponed indefinitely. **There is currently no SMS in this app.** The design
+  below is retained as the intended shape for when it's picked back up — treat it as a
+  plan, not as existing architecture, and don't write code against it.
+  - **What this means today:** in-app realtime is the *only* notification channel
+    (crew: the schedule-change toast; owners: live start/stop indicators). Still **no email
+    anywhere in the app** — that part is permanent, not deferred. Owners cover the
+    app-is-closed gap by texting crew manually, as they did before the app.
+  - `employees.sms_opt_out` and the Team page consent toggle **are built and stay** — they
+    are inert until SMS ships. Leave them alone; don't remove them as dead code.
+  - _When un-deferred:_ sent from a Supabase Edge Function (`send-sms`), never inline;
+    STOP/HELP via inbound webhook → `employees.sms_opt_out`; requires US **A2P 10DLC**
+    brand + campaign registration — restart ~2 weeks ahead, carrier approval gates all
+    delivery.
 
 ### Deployment
 - **Vercel** — Next.js hosting
@@ -123,7 +132,7 @@ rooted-gardens/
 │       │   └── callback/route.ts← OAuth callback
 │       └── webhooks/
 │           ├── supabase/route.ts
-│           └── twilio/route.ts   ← inbound STOP/HELP (SMS opt-out)
+│           └── twilio/route.ts   ← inbound STOP/HELP (SMS opt-out) [DEFERRED — not built]
 ├── components/
 │   ├── ui/                      ← shadcn components (auto-generated, don't edit)
 │   ├── management/              ← desktop-specific components
@@ -199,7 +208,9 @@ leads (
   email text,
   phone text,
   address text,
-  service_interest text         -- 'lawn' | 'garden' | 'both' | 'other' (routes the SMS)
+  service_interest text         -- 'lawn' | 'garden' | 'both' | 'other'
+                                --   (was to route the new-lead SMS — deferred; still used
+                                --    to route the in-app notification + triage)
     CHECK (service_interest IN ('lawn', 'garden', 'both', 'other')),
   message text,
   source text DEFAULT 'website',
@@ -254,7 +265,8 @@ employees (
   user_id uuid FK → auth.users,  -- nullable (not all employees have app access)
   name text NOT NULL,
   phone text,
-  sms_opt_out boolean DEFAULT false,  -- honor STOP; suppress schedule-change texts
+  sms_opt_out boolean DEFAULT false,  -- honor STOP; suppress schedule-change texts.
+                                      -- Inert while SMS is deferred — keep it, don't drop.
   email text,
   role text NOT NULL    -- 'owner' | 'crew' | 'accountant' | 'lead'
     CHECK (role IN ('owner', 'crew', 'accountant', 'lead')),
@@ -682,7 +694,8 @@ visits where `started_at IS NOT NULL AND ended_at IS NULL` on mount, then subscr
 `visits` UPDATE to add/remove entries live. Treat realtime as a best-effort live overlay on
 top of server-rendered data, never the source of truth. Owner start/stop alerts are
 **in-app only** — no email / SMS / push (Phase 8.3). If an owner doesn't have the app open,
-they simply catch up on next open.
+they simply catch up on next open. (Unaffected by the 8.2/8.3 SMS deferral — these alerts
+were always designed as in-app only, and they are built and working.)
 
 > Why this matters: the old `assigned_crew uuid[]` design could not be filtered by
 > Supabase Realtime (its `postgres_changes` filters don't support array containment),
@@ -731,10 +744,12 @@ QBO_SERVICE_ITEM_NAME=Services  # shared Product/Service every invoice line bill
 # Cron (invoice-status sync — app/api/cron/sync-invoice-status)
 CRON_SECRET=                    # Vercel Cron sends this as `Authorization: Bearer <secret>`
 
-# Twilio (SMS notifications — no email is used anywhere in the app)
-TWILIO_ACCOUNT_SID=
-TWILIO_AUTH_TOKEN=
-TWILIO_MESSAGING_SERVICE_SID=   # use a Messaging Service, not a raw number
+# Twilio — DEFERRED 2026-07-25, none of these are set or needed right now.
+# Listed for when SMS (PHASES.md 8.2/8.3) is picked back up. No email is used anywhere,
+# ever — that's permanent, not deferred.
+# TWILIO_ACCOUNT_SID=
+# TWILIO_AUTH_TOKEN=
+# TWILIO_MESSAGING_SERVICE_SID= # use a Messaging Service, not a raw number
 
 # App
 NEXT_PUBLIC_APP_URL=            # https://yourapp.vercel.app
