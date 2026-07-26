@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useQueryClient } from '@tanstack/react-query'
+import { addDays, format, parseISO } from 'date-fns'
 import { ArrowLeft, Play, Flag, SkipForward, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { VisitDetailContent } from '@/components/VisitDetailContent'
@@ -24,7 +25,11 @@ function LoadingSkeleton() {
     <div className="flex flex-col">
       <div className="sticky top-0 z-10 bg-background border-b border-[--border] px-4 py-3 flex items-center gap-3">
         <SkeletonBlock className="h-9 w-9 rounded-full" />
-        <SkeletonBlock className="h-5 w-24" />
+        {/* Mirrors the loaded header's two-line stack so it doesn't jump. */}
+        <div className="flex flex-col gap-1">
+          <SkeletonBlock className="h-3 w-16" />
+          <SkeletonBlock className="h-4 w-24" />
+        </div>
       </div>
       <div className="p-4 space-y-4">
         <SkeletonBlock className="h-16 w-full rounded-2xl" />
@@ -77,6 +82,12 @@ export default function StopDetailPage() {
   const isActive = visit.status !== 'completed' && visit.status !== 'skipped'
   const canManage = employee?.role === 'owner' || employee?.role === 'lead'
 
+  // Which week this visit belongs to — a visit is a (property × week) record, and
+  // crew arrive here from /crew/schedule, which may be parked on any week. Same
+  // "MMM d – MMM d" format as that page's week nav so the two read as one trail.
+  const weekStartDate = parseISO(visit.week_start)
+  const weekRange = `${format(weekStartDate, 'MMM d')} – ${format(addDays(weekStartDate, 6), 'MMM d')}`
+
   async function handleStart() {
     if (!employee?.id || inProgress) return
     const startedAt = new Date().toISOString()
@@ -91,7 +102,7 @@ export default function StopDetailPage() {
     <>
       {/* Sticky header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-[--border] px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 min-w-0">
           <Button
             variant="ghost"
             size="icon"
@@ -101,7 +112,12 @@ export default function StopDetailPage() {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <span className="text-sm font-medium text-muted-foreground">Stop Detail</span>
+          {/* Two lines, but they fit inside the back button's existing 36px row,
+              so the sticky header doesn't get taller — screen space is scarce here. */}
+          <div className="flex flex-col min-w-0 leading-tight">
+            <span className="text-[11px] text-muted-foreground">Stop Detail</span>
+            <span className="text-sm font-medium text-foreground tabular-nums">{weekRange}</span>
+          </div>
         </div>
         {canManage ? (
           <Link
