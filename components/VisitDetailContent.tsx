@@ -29,10 +29,14 @@ import {
 import { FrequencyBadge, VisitStatusBadge, InvoiceStatusBadge } from '@/components/management/badges'
 import { qboInvoiceUrl } from '@/lib/utils/billing'
 import { PropertyVisitHistory } from '@/components/PropertyVisitHistory'
+import { PropertyPhotosSection } from '@/components/PropertyPhotosSection'
+import { PhotoLightbox, type LightboxPhoto } from '@/components/PhotoLightbox'
+import { PhotoCaptionEditor } from '@/components/PhotoCaptionEditor'
 import { CompletionSummary } from '@/components/crew/CompletionSummary'
 import { CrewAssignSheet } from '@/components/crew/CrewAssignSheet'
 import { CrewInstructionSheet } from '@/components/CrewInstructionSheet'
 import { VisitPlanPhotos } from '@/components/crew/VisitPlanPhotos'
+import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { useActiveVehicles } from '@/hooks/crew/useActiveVehicles'
 import { useUpdateVisitVehicle } from '@/hooks/crew/useUpdateVisitVehicle'
 import { useRevertVisitToScheduled } from '@/hooks/crew/useRevertVisitToScheduled'
@@ -57,6 +61,12 @@ interface VisitDetailContentProps {
    *  surfaces on the crew route (even for an owner/lead viewing it there). Still
    *  gated on owner/lead + a completed, invoiced visit inside. Defaults to false. */
   showInvoice?: boolean
+  /** Fires as the photo lightbox opens and closes. A container that is itself a
+   *  modal (the management Sheet) needs this to ignore close requests while a
+   *  photo is open — two stacked Radix overlays both portal to <body>, so
+   *  dismissing the inner one can reach the outer one as an outside click and
+   *  close it too. */
+  onPhotoViewerChange?: (open: boolean) => void
 }
 
 /**
@@ -76,6 +86,7 @@ export function VisitDetailContent({
   onOpenSkip,
   showAddress = true,
   showInvoice = false,
+  onPhotoViewerChange,
 }: VisitDetailContentProps) {
   const { visit, property, account } = data
   // Defensive: a stale persisted cache entry (or a momentarily malformed embed)
@@ -89,9 +100,44 @@ export function VisitDetailContent({
   const [instructionOpen, setInstructionOpen] = useState(false)
   const [planOpen, setPlanOpen] = useState(false)
 
+  // One lightbox for all three photo surfaces below (plan, completion, property
+  // history). Paging stays WITHIN the set that was opened — mixing them into one
+  // strip would make "next" meaningless.
+  const [lightbox, setLightbox] = useState<{ photos: LightboxPhoto[]; index: number } | null>(null)
+
+  function openPhoto(photos: LightboxPhoto[], index: number) {
+    setLightbox({ photos, index })
+    onPhotoViewerChange?.(true)
+  }
+
+  function closePhoto() {
+    setLightbox(null)
+    onPhotoViewerChange?.(false)
+  }
+
+  // The lightbox holds a snapshot of the photo list, so a saved caption is
+  // patched in directly — the query invalidation behind it refreshes the grids,
+  // but wouldn't reach this array.
+  function handleCaptionSaved(photoId: string, caption: string | null) {
+    setLightbox((prev) =>
+      prev
+        ? { ...prev, photos: prev.photos.map((p) => (p.id === photoId ? { ...p, caption } : p)) }
+        : prev,
+    )
+  }
+
   const canManage = role === 'owner' || role === 'lead'
   const canReassign = role === 'owner' || role === 'lead' || role === 'crew'
   const canEditCompletion = role !== 'accountant' && role !== undefined
+
+  const { data: currentEmployee } = useCurrentEmployee()
+
+  /** Mirrors the RLS rules: owner/lead caption any photo, crew only their own. */
+  function canCaption(photo: LightboxPhoto) {
+    if (canManage) return true
+    if (role !== 'crew') return false
+    return !!currentEmployee?.id && photo.uploaded_by === currentEmployee.id
+  }
 
   // A final visit's plan (instruction/crew/vehicle) is historical, not actionable —
   // the Plan card collapses to a glance summary and its inputs lock, same treatment
@@ -101,9 +147,9 @@ export function VisitDetailContent({
   const inProgress = isVisitInProgress({ started_at: visit.started_at, ended_at: visit.ended_at })
   const missed = isVisitMissed(visit) && !inProgress
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(property.address)}`
-  const hasNotesSection = !!(
-    property.access_notes || property.crew_notes || property.parking_notes || account.contact_name
-  )
+  // The Property Notes card used to be gated on having at least one note. It now
+  // always hosts the property Photos section, so it always has something to show
+  // — and it stays collapsed by default, so an empty one costs nothing.
 
   const { data: vehicles = [] } = useActiveVehicles()
   const updateVehicle = useUpdateVisitVehicle(data.visitId)
@@ -143,6 +189,17 @@ export function VisitDetailContent({
   )
   const completionPhotos = photos.filter((p) => p.type === 'visit')
   const planPhotos = photos.filter((p) => p.type === 'plan')
+
+  function toLightboxPhoto(p: StopDetail['photos'][number]): LightboxPhoto {
+    return {
+      id: p.id,
+      type: p.type,
+      created_at: p.created_at,
+      caption: p.caption,
+      uploaded_by: p.uploaded_by,
+      url: urlByPath.get(p.storage_path) ?? null,
+    }
+  }
 
   function handleOfflineOrGenericError(err: unknown, genericMessage: string) {
     if (err instanceof Error && err.message === 'offline') {
@@ -243,6 +300,7 @@ export function VisitDetailContent({
           canEdit={canEditCompletion}
           onEdit={onOpenCompletion}
           onEditSkip={onOpenSkip}
+          onOpenPhoto={(index) => openPhoto(completionPhotos.map(toLightboxPhoto), index)}
         />
       )}
 
@@ -420,14 +478,19 @@ export function VisitDetailContent({
               urlByPath={urlByPath}
               canManage={canManage}
               isFinalVisit={isFinalVisit}
+              onOpenPhoto={(index) => openPhoto(planPhotos.map(toLightboxPhoto), index)}
+              onPhotoAdded={(added) =>
+                // The cache update from the upload hasn't re-rendered us yet, so
+                // append the new photo to the list we already have and open it.
+                openPhoto([...planPhotos.map(toLightboxPhoto), added], planPhotos.length)
+              }
             />
           </div>
         )}
       </div>
 
       {/* Property notes — collapsible */}
-      {hasNotesSection && (
-        <div className="rounded-2xl border border-[--border] bg-card overflow-hidden shadow-[0_1px_2px_rgba(43,42,36,.04),_0_6px_16px_-4px_rgba(43,42,36,.08)]">
+      <div className="rounded-2xl border border-[--border] bg-card overflow-hidden shadow-[0_1px_2px_rgba(43,42,36,.04),_0_6px_16px_-4px_rgba(43,42,36,.08)]">
           <button
             type="button"
             onClick={() => setNotesOpen((prev) => !prev)}
@@ -487,10 +550,17 @@ export function VisitDetailContent({
                   </div>
                 </div>
               )}
+
+              {/* Every other photo at this property — the current visit's own
+                  plan/completion photos have their own sections above. */}
+              <PropertyPhotosSection
+                propertyId={property.id}
+                visitId={data.visitId}
+                onOpenPhoto={openPhoto}
+              />
             </div>
           )}
         </div>
-      )}
 
       <PropertyVisitHistory propertyId={property.id} beforeWeekStart={visit.week_start} />
 
@@ -507,6 +577,28 @@ export function VisitDetailContent({
         open={instructionOpen}
         onOpenChange={setInstructionOpen}
       />
+
+      {lightbox && (
+        <PhotoLightbox
+          photos={lightbox.photos}
+          index={lightbox.index}
+          subtitle={property.address}
+          onIndexChange={(next) => setLightbox({ ...lightbox, index: next })}
+          onClose={closePhoto}
+          footer={
+            lightbox.photos[lightbox.index] &&
+            canCaption(lightbox.photos[lightbox.index]) ? (
+              // Keyed by photo id so the draft resets when paging between photos.
+              <PhotoCaptionEditor
+                key={lightbox.photos[lightbox.index].id}
+                photoId={lightbox.photos[lightbox.index].id}
+                initialCaption={lightbox.photos[lightbox.index].caption}
+                onSaved={handleCaptionSaved}
+              />
+            ) : undefined
+          }
+        />
+      )}
     </div>
   )
 }

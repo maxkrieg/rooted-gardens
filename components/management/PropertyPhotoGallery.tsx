@@ -4,7 +4,8 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Images, MapPin } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { PhotoLightbox } from '@/components/management/PhotoLightbox'
+import { PhotoLightbox } from '@/components/PhotoLightbox'
+import { PhotoEditor } from '@/components/management/PhotoEditor'
 import { PhotoUploadDropzone } from '@/components/management/PhotoUploadDropzone'
 import { photoNeedsTypeBadge, photoTypeLabel } from '@/lib/utils/photos'
 import type { PropertyPhotos } from '@/types/app'
@@ -158,13 +159,22 @@ export function PropertyPhotoGallery({
 
       {active && activeProperty && (
         <PhotoLightbox
-          accountId={accountId}
           photos={activePhotos}
           index={active.index}
-          address={activeProperty.address}
+          subtitle={activeProperty.address}
           onIndexChange={(next) => setActive({ ...active, index: next })}
           onClose={() => setActive(null)}
-          canManage={canManage}
+          footer={
+            canManage && activePhotos[active.index] ? (
+              // Keyed by photo id so the caption draft resets between photos.
+              <PhotoEditor
+                key={activePhotos[active.index].id}
+                accountId={accountId}
+                photo={activePhotos[active.index]}
+                onClose={() => setActive(null)}
+              />
+            ) : undefined
+          }
         />
       )}
     </div>

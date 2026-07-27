@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { useAddVisitPlanPhoto } from '@/hooks/crew/useAddVisitPlanPhoto'
 import { useDeleteVisitPlanPhoto } from '@/hooks/crew/useDeleteVisitPlanPhoto'
 import { MAX_PHOTO_BYTES, ALLOWED_PHOTO_TYPES } from '@/lib/utils/photos'
+import type { LightboxPhoto } from '@/components/PhotoLightbox'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
 
 const MAX_PLAN_PHOTOS = 4
@@ -18,6 +19,11 @@ interface VisitPlanPhotosProps {
   urlByPath: Map<string, string | null | undefined>
   canManage: boolean
   isFinalVisit: boolean
+  /** Opens the shared lightbox at this photo's index within `photos`. */
+  onOpenPhoto: (index: number) => void
+  /** Fired once a new photo is uploaded, so the drawer can open it straight away
+   *  for captioning while the uploader still has it in mind. */
+  onPhotoAdded: (photo: LightboxPhoto) => void
 }
 
 /**
@@ -33,6 +39,8 @@ export function VisitPlanPhotos({
   urlByPath,
   canManage,
   isFinalVisit,
+  onOpenPhoto,
+  onPhotoAdded,
 }: VisitPlanPhotosProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState<string | null>(null)
@@ -61,6 +69,18 @@ export function VisitPlanPhotos({
 
     setError(null)
     addPhoto.mutate(file, {
+      onSuccess: ({ photo, url }) => {
+        // Straight into the lightbox on the photo just added — captioning is the
+        // natural next step and the uploader still knows what they shot.
+        onPhotoAdded({
+          id: photo.id,
+          type: photo.type,
+          created_at: photo.created_at,
+          caption: photo.caption,
+          uploaded_by: photo.uploaded_by,
+          url,
+        })
+      },
       onError: (err) => {
         setError(
           err instanceof Error && err.message === 'offline'
@@ -98,21 +118,31 @@ export function VisitPlanPhotos({
           <p className="text-sm text-muted-foreground italic">No reference photos.</p>
         ) : (
           <div className="flex gap-2 flex-wrap">
-            {photos.map((photo) => {
+            {photos.map((photo, i) => {
               const url = urlByPath.get(photo.storage_path)
               return (
                 <div key={photo.id} className="relative">
-                  {url ? (
-                    <a href={url} target="_blank" rel="noopener noreferrer">
+                  {/* Opens the shared lightbox rather than dumping a raw signed
+                      URL into a new tab — crew are on a phone and need to page
+                      through photos with the caption and date in view. */}
+                  <button
+                    type="button"
+                    onClick={() => onOpenPhoto(i)}
+                    aria-label={photo.caption ?? 'Open reference photo'}
+                    className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {url ? (
                       <img
                         src={url}
                         alt={photo.caption ?? 'Reference photo'}
                         className="h-16 w-16 rounded-xl object-cover border border-[--border]"
                       />
-                    </a>
-                  ) : (
-                    <div className="h-16 w-16 rounded-xl bg-muted animate-pulse" />
-                  )}
+                    ) : (
+                      <span className="flex h-16 w-16 rounded-xl border border-[--border] bg-muted items-center justify-center text-[9px] text-muted-foreground text-center px-1">
+                        Unavailable
+                      </span>
+                    )}
+                  </button>
                   {canEdit && (
                     <button
                       type="button"

@@ -1,5 +1,6 @@
 import { getDB, type MutationType, type QueuedMutation } from './idb'
 import { createClient } from '@/lib/supabase/client'
+import type { PhotoType } from '@/types/app'
 
 // Payload types
 export interface CompletionPayload {
@@ -34,6 +35,14 @@ export interface PhotoPayload {
   caption?: string
 }
 
+/** Caption edit for a photo row that ALREADY exists. A photo captured in the
+ *  completion logger has no row until submit, so its caption rides along on the
+ *  PhotoPayload above instead. */
+export interface PhotoCaptionPayload {
+  photoId: string
+  caption: string | null
+}
+
 export interface SkipPayload {
   visitId: string
   skipReason?: string
@@ -46,6 +55,7 @@ type MutationPayload =
   | { type: 'job_start'; payload: JobStartPayload }
   | { type: 'job_stop'; payload: JobStopPayload }
   | { type: 'photo'; payload: PhotoPayload }
+  | { type: 'photo_caption'; payload: PhotoCaptionPayload }
   | { type: 'skip'; payload: SkipPayload }
 
 export async function enqueueMutation(
@@ -182,11 +192,20 @@ export async function flushMutationQueue(): Promise<void> {
               property_id: p.propertyId,
               storage_path: p.storagePath,
               uploaded_by: p.uploadedBy,
-              type: (p.type ?? 'visit') as 'visit' | 'how_to' | 'customer_request' | 'before' | 'after',
+              type: (p.type ?? 'visit') as PhotoType,
               caption: p.caption ?? null,
             }).throwOnError()
           }
           break
+        case 'photo_caption': {
+          const p = mutation.payload as PhotoCaptionPayload
+          await supabase
+            .from('photos')
+            .update({ caption: p.caption })
+            .eq('id', p.photoId)
+            .throwOnError()
+          break
+        }
         default:
           console.warn('[mutation-queue] unknown mutation type:', (mutation as QueuedMutation).type)
       }

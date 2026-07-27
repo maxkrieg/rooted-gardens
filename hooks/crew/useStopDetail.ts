@@ -50,6 +50,8 @@ export type StopDetail = {
     type: string
     created_at: string
     caption: string | null
+    /** Who took it — crew may caption their own photos, owner/lead any. */
+    uploaded_by: string | null
   }>
 }
 
@@ -72,7 +74,7 @@ export function useStopDetail(visitId: string | undefined, options?: { initialDa
           ),
           account:accounts!inner(id, name, billing_type, contact_name),
           visit_crew(employee_id, relation, employees(id, name)),
-          photos(id, storage_path, type, created_at, caption)
+          photos(id, storage_path, type, created_at, caption, uploaded_by)
         `)
         .eq('id', visitId)
         .single()

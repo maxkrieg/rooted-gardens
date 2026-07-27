@@ -14,6 +14,8 @@ interface CompletionSummaryProps {
   canEdit?: boolean
   onEdit: () => void
   onEditSkip: () => void
+  /** Opens the shared lightbox at this photo's index within `photos`. */
+  onOpenPhoto: (index: number) => void
 }
 
 function formatTime(iso: string) {
@@ -40,6 +42,7 @@ export function CompletionSummary({
   canEdit = true,
   onEdit,
   onEditSkip,
+  onOpenPhoto,
 }: CompletionSummaryProps) {
   const isSkipped = visit.status === 'skipped'
   const isCompleted = visit.status === 'completed'
@@ -152,16 +155,28 @@ export function CompletionSummary({
                 <div className="flex gap-2 flex-wrap">
                   {photos.map((photo, i) => {
                     const url = photoUrls[i]
-                    return url ? (
-                      <a key={photo.id} href={url} target="_blank" rel="noopener noreferrer">
-                        <img
-                          src={url}
-                          alt={photo.caption ?? `Visit photo ${i + 1}`}
-                          className="h-20 w-20 rounded-xl object-cover border border-[--border]"
-                        />
-                      </a>
-                    ) : (
-                      <div key={photo.id} className="h-20 w-20 rounded-xl bg-muted animate-pulse" />
+                    return (
+                      // Opens the shared lightbox instead of a new browser tab —
+                      // keeps crew inside the PWA and lets them page through.
+                      <button
+                        key={photo.id}
+                        type="button"
+                        onClick={() => onOpenPhoto(i)}
+                        aria-label={photo.caption ?? `Open visit photo ${i + 1}`}
+                        className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {url ? (
+                          <img
+                            src={url}
+                            alt={photo.caption ?? `Visit photo ${i + 1}`}
+                            className="h-20 w-20 rounded-xl object-cover border border-[--border]"
+                          />
+                        ) : (
+                          <span className="flex h-20 w-20 rounded-xl border border-[--border] bg-muted items-center justify-center text-[10px] text-muted-foreground text-center px-1">
+                            Unavailable
+                          </span>
+                        )}
+                      </button>
                     )
                   })}
                 </div>

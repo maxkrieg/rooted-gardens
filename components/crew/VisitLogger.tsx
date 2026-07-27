@@ -19,6 +19,7 @@ import { enqueueMutation, flushMutationQueue } from '@/lib/crew/mutation-queue'
 import { useActiveEmployees } from '@/hooks/crew/useActiveEmployees'
 import { createClient } from '@/lib/supabase/client'
 import { MAX_PHOTO_BYTES, ALLOWED_PHOTO_TYPES } from '@/lib/utils/photos'
+import { PhotoLightbox, type LightboxPhoto } from '@/components/PhotoLightbox'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
 
 // datetime-local input expects "YYYY-MM-DDTHH:mm" in local time
@@ -30,12 +31,19 @@ function toDatetimeLocalValue(iso: string): string {
 
 interface CapturedPhoto {
   // Set only for a photo that was already uploaded in a prior completion (from
-  // initialPhotos) — it's already persisted, so it's shown read-only and never
-  // re-enqueued on submit.
+  // initialPhotos) — its row already exists, so it's never re-enqueued as a new
+  // photo on submit (a caption edit is enqueued separately).
   id?: string
   localUrl?: string // object URL for a photo captured this session
   remoteUrl?: string // signed URL for a previously uploaded photo
   storagePath: string // empty string while a fresh capture's upload is in-flight
+  createdAt?: string // only known for already-persisted photos
+  // Captions are held locally and written on submit: a photo captured this
+  // session has no `photos` row yet (the row is inserted from the offline queue
+  // when the form is submitted), so there's nothing to UPDATE against until then.
+  caption?: string | null
+  // What the caption was when the form opened, so submit only enqueues real edits.
+  initialCaption?: string | null
 }
 
 interface VisitLoggerProps {
@@ -52,7 +60,12 @@ interface VisitLoggerProps {
   initialServiceTypes?: string[]
   initialCompletionNote?: string
   initialPresentIds?: string[]
-  initialPhotos?: Array<{ id: string; storage_path: string; caption?: string | null }>
+  initialPhotos?: Array<{
+    id: string
+    storage_path: string
+    caption?: string | null
+    created_at?: string
+  }>
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
@@ -91,6 +104,26 @@ export function VisitLogger({
   const [photos, setPhotos] = useState<CapturedPhoto[]>([])
   const [photoError, setPhotoError] = useState<string | null>(null)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  // Which photo the caption lightbox is showing, by index into `photos`.
+  const [captionIndex, setCaptionIndex] = useState<number | null>(null)
+
+  function setPhotoCaption(index: number, caption: string) {
+    setPhotos((prev) => prev.map((p, i) => (i === index ? { ...p, caption } : p)))
+  }
+
+  function toLightboxPhoto(photo: CapturedPhoto, i: number): LightboxPhoto {
+    return {
+      // A photo captured this session has no row yet, so its object URL stands in
+      // as a stable key for the lightbox.
+      id: photo.id ?? photo.localUrl ?? String(i),
+      type: 'visit',
+      // Only persisted photos know their real timestamp; one taken just now is
+      // accurately "today".
+      created_at: photo.createdAt ?? new Date().toISOString(),
+      caption: photo.caption ?? null,
+      url: photo.localUrl ?? photo.remoteUrl ?? null,
+    }
+  }
   // Start time — required, and must fall within the visit's scheduled week. Prefilled
   // from the visit's started_at, or defaults to the latest allowed time if the crew
   // forgot to tap Start; either way they must confirm/set a value.
@@ -128,6 +161,7 @@ export function VisitLogger({
       setStartTimeError(null)
       setEndTimeError(null)
       setPresentIdsError(false)
+      setCaptionIndex(null)
 
       // Seed previously uploaded photos (editing an existing completion) with
       // fresh signed URLs — they aren't re-enqueued on submit since they're
@@ -137,7 +171,14 @@ export function VisitLogger({
         Promise.all(
           initialPhotos.map(async (p) => {
             const { data } = await supabase.storage.from('photos').createSignedUrl(p.storage_path, 3600)
-            return { id: p.id, storagePath: p.storage_path, remoteUrl: data?.signedUrl }
+            return {
+              id: p.id,
+              storagePath: p.storage_path,
+              remoteUrl: data?.signedUrl,
+              createdAt: p.created_at,
+              caption: p.caption ?? null,
+              initialCaption: p.caption ?? null,
+            }
           })
         ).then(setPhotos)
       } else {
@@ -179,6 +220,13 @@ export function VisitLogger({
   }
 
   function handleOpenChange(next: boolean) {
+    // Dismissing the caption lightbox must never tear down the form underneath
+    // it. Two stacked Radix overlays both portal to <body>, so closing the inner
+    // one can reach this Sheet as an outside-interaction and take the whole form
+    // with it — losing everything typed so far. Every close path (X, Esc,
+    // outside click) funnels through here, so refusing while a photo is open
+    // covers all of them.
+    if (!next && captionIndex !== null) return
     if (!next) resetForm()
     onOpenChange(next)
   }
@@ -206,6 +254,9 @@ export function VisitLogger({
     setPhotoError(null)
     const localUrl = URL.createObjectURL(file)
     const placeholder: CapturedPhoto = { localUrl, storagePath: '' }
+    // The photo is appended, and only one upload runs at a time (the Add Photo
+    // button is disabled while `uploadingPhoto`), so this is its final index.
+    const newIndex = photos.length
     setPhotos((prev) => [...prev, placeholder])
     setUploadingPhoto(true)
 
@@ -225,6 +276,10 @@ export function VisitLogger({
     setPhotos((prev) =>
       prev.map((p) => (p.localUrl === localUrl ? { ...p, storagePath } : p))
     )
+
+    // Straight into the photo so it can be captioned now, while the crew member
+    // still remembers what they were pointing at.
+    setCaptionIndex(newIndex)
   }
 
   async function handleSubmit() {
@@ -273,6 +328,18 @@ export function VisitLogger({
         storagePath: photo.storagePath,
         uploadedBy: employeeId,
         type: 'visit',
+        caption: photo.caption?.trim() || undefined,
+      })
+    }
+
+    // Captions edited on photos that were already persisted need their own
+    // update — they aren't re-inserted above.
+    for (const photo of photos.filter(
+      (p) => p.id && (p.caption ?? '') !== (p.initialCaption ?? ''),
+    )) {
+      await enqueueMutation('photo_caption', {
+        photoId: photo.id!,
+        caption: photo.caption?.trim() || null,
       })
     }
 
@@ -308,6 +375,7 @@ export function VisitLogger({
   }
 
   return (
+    <>
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent
         side="bottom"
@@ -450,14 +518,33 @@ export function VisitLogger({
               <div className="flex gap-2 flex-wrap">
                 {photos.map((photo, i) => (
                   <div key={photo.id ?? photo.localUrl ?? i} className="relative">
-                    <img
-                      src={photo.localUrl ?? photo.remoteUrl}
-                      alt={`Photo ${i + 1}`}
-                      className={[
-                        'h-16 w-16 rounded-xl object-cover border border-[--border]',
-                        !photo.storagePath ? 'opacity-50' : '',
-                      ].join(' ')}
-                    />
+                    {/* Tapping opens the photo big, with a caption field —
+                        captions are most likely to be written right after the
+                        shot, while the crew member still remembers why. */}
+                    <button
+                      type="button"
+                      onClick={() => setCaptionIndex(i)}
+                      disabled={!photo.storagePath}
+                      aria-label={`Open photo ${i + 1} to add a caption`}
+                      className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <img
+                        src={photo.localUrl ?? photo.remoteUrl}
+                        alt={`Photo ${i + 1}`}
+                        className={[
+                          'h-16 w-16 rounded-xl object-cover border border-[--border]',
+                          !photo.storagePath ? 'opacity-50' : '',
+                        ].join(' ')}
+                      />
+                    </button>
+                    {photo.caption && (
+                      <span
+                        className="absolute bottom-0 inset-x-0 bg-foreground/70 text-background text-[9px] px-1 py-px rounded-b-xl truncate pointer-events-none"
+                        aria-hidden
+                      >
+                        {photo.caption}
+                      </span>
+                    )}
                     {!photo.id && photo.storagePath && (
                       <button
                         type="button"
@@ -495,5 +582,58 @@ export function VisitLogger({
         </SheetFooter>
       </SheetContent>
     </Sheet>
+
+    {/* Hoisted out of the Sheet rather than nested inside it — the same
+        arrangement VisitDetailSheet uses for its own nested overlays. */}
+    {captionIndex !== null && photos[captionIndex] && (
+      <PhotoLightbox
+        photos={photos.map(toLightboxPhoto)}
+        index={captionIndex}
+        onIndexChange={setCaptionIndex}
+        onClose={() => setCaptionIndex(null)}
+        footer={
+          <LocalCaptionField
+            value={photos[captionIndex].caption ?? ''}
+            onChange={(caption) => setPhotoCaption(captionIndex, caption)}
+          />
+        }
+      />
+    )}
+    </>
+  )
+}
+
+/**
+ * Caption input for the completion form. Unlike the drawer's PhotoCaptionEditor
+ * this writes to local form state instead of the database — a photo captured in
+ * this session has no `photos` row until the form is submitted, and the form has
+ * to keep working offline either way.
+ */
+function LocalCaptionField({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <div className="space-y-1.5 border-t border-[--border] pt-3">
+      <label
+        htmlFor="logger-caption"
+        className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide"
+      >
+        Caption
+      </label>
+      <Textarea
+        id="logger-caption"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="What should someone notice in this photo?"
+        rows={2}
+        // ≥16px keeps iOS from zooming the viewport on focus.
+        className="text-base"
+      />
+      <p className="text-[11px] text-muted-foreground">Saved when you submit the visit.</p>
+    </div>
   )
 }

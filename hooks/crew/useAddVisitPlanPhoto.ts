@@ -37,14 +37,23 @@ export function useAddVisitPlanPhoto(visitId: string, propertyId: string) {
           type: 'plan',
           uploaded_by: employee?.id ?? null,
         })
-        .select('id, storage_path, type, created_at, caption')
+        .select('id, storage_path, type, created_at, caption, uploaded_by')
         .single()
       if (error) throw error
 
-      return data as StopDetail['photos'][number]
+      const photo = data as StopDetail['photos'][number]
+
+      // Sign it here so the caller can display the photo immediately — the
+      // shared ['photo-urls'] query won't have refetched yet, and the drawer
+      // opens the lightbox on the new photo so it can be captioned right away.
+      const { data: signed } = await supabase.storage
+        .from('photos')
+        .createSignedUrl(storagePath, 3600)
+
+      return { photo, url: signed?.signedUrl ?? null }
     },
 
-    onSuccess: (photo) => {
+    onSuccess: ({ photo }) => {
       queryClient.setQueryData<StopDetail | null>(['stop-detail', visitId], (old) =>
         old ? { ...old, photos: [...(old.photos ?? []), photo] } : old
       )

@@ -106,12 +106,17 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart, role }: V
 
   const [completionOpen, setCompletionOpen] = useState(false)
   const [skipOpen, setSkipOpen] = useState(false)
+  const [photoViewerOpen, setPhotoViewerOpen] = useState(false)
   const { data: currentEmployee } = useCurrentEmployee()
 
   // Mutations inside VisitDetailContent are direct-client (no Server Action /
   // revalidatePath), so the server-rendered schedule grid needs an explicit
   // refresh to pick up anything changed while the sheet was open.
   function handleOpenChange(next: boolean) {
+    // Dismissing the photo lightbox must not close this sheet with it — both are
+    // Radix overlays portaled to <body>, so the inner close can reach this one as
+    // an outside interaction.
+    if (!next && photoViewerOpen) return
     onOpenChange(next)
     if (!next) router.refresh()
   }
@@ -165,6 +170,7 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart, role }: V
               onOpenSkip={() => setSkipOpen(true)}
               showAddress={false}
               showInvoice
+              onPhotoViewerChange={setPhotoViewerOpen}
             />
           </div>
 
