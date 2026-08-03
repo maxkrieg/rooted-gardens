@@ -16,7 +16,9 @@ import {
   Pencil,
   FilePen,
   ExternalLink,
+  LayoutGrid,
 } from 'lucide-react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -95,7 +97,7 @@ export function VisitDetailContent({
   const completedBy = data.completedBy ?? []
   const photos = data.photos ?? []
 
-  const [notesOpen, setNotesOpen] = useState(false)
+  const [notesOpen, setNotesOpen] = useState(visit.status !== 'completed' && visit.status !== 'skipped')
   const [assignOpen, setAssignOpen] = useState(false)
   const [instructionOpen, setInstructionOpen] = useState(false)
   const [planOpen, setPlanOpen] = useState(false)
@@ -230,22 +232,37 @@ export function VisitDetailContent({
 
       {/* Address — hidden when the container (management Sheet) already shows it in its own header */}
       {showAddress && (
-        <div className="space-y-1.5">
+        <div className="space-y-3">
           <div className="flex items-start gap-2">
             <MapPin className="h-5 w-5 mt-1 text-muted-foreground shrink-0" />
             <p className="font-display text-2xl font-semibold leading-snug text-foreground">
               {property.address}
             </p>
           </div>
-          <a
-            href={mapsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="ml-7 inline-flex items-center gap-1.5 text-sm font-medium text-[--primary] hover:underline"
-          >
-            <MapIcon className="h-3.5 w-3.5 shrink-0" />
-            Open in Maps →
-          </a>
+          {/* Same pills as the management sheet, but h-11: these get tapped
+              outdoors, one-handed, sometimes with gloves on. */}
+          <div className="ml-7 flex flex-wrap items-center gap-2">
+            <Button asChild variant="outline" className="h-11 gap-1.5">
+              <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
+                <MapIcon className="h-4 w-4 shrink-0" />
+                Open in Maps
+              </a>
+            </Button>
+            {/* The return trip for the sheet's "Crew view" — carries the week so
+                the schedule loads the right window, and the visit id so the
+                detail sheet opens on arrival. Only owner/lead can reach
+                /management/*, so it's pointless for crew. */}
+            {canManage && (
+              <Button asChild variant="outline" className="h-11 gap-1.5">
+                <Link
+                  href={`/management/schedule?week=${visit.week_start}&visit=${data.visitId}`}
+                >
+                  <LayoutGrid className="h-4 w-4 shrink-0" />
+                  Manager view
+                </Link>
+              </Button>
+            )}
+          </div>
         </div>
       )}
 

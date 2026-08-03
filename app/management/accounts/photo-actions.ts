@@ -62,7 +62,7 @@ async function requireManagingEmployee(): Promise<
 export async function createPropertyPhoto(
   accountId: string,
   values: CreatePhotoValues,
-): Promise<{ error?: string }> {
+): Promise<{ error?: string; id?: string }> {
   const parsed = createPhotoSchema.safeParse(values)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Invalid photo data' }
@@ -73,14 +73,20 @@ export async function createPropertyPhoto(
 
   const supabase = await createClient()
 
-  const { error } = await supabase.from('photos').insert({
-    property_id: parsed.data.property_id,
-    visit_id: null,
-    storage_path: parsed.data.storage_path,
-    type: parsed.data.type,
-    caption: parsed.data.caption?.trim() || null,
-    uploaded_by: auth.employeeId,
-  })
+  // The new id comes back so the caller can open the photo for captioning as
+  // soon as the refreshed gallery data arrives.
+  const { data, error } = await supabase
+    .from('photos')
+    .insert({
+      property_id: parsed.data.property_id,
+      visit_id: null,
+      storage_path: parsed.data.storage_path,
+      type: parsed.data.type,
+      caption: parsed.data.caption?.trim() || null,
+      uploaded_by: auth.employeeId,
+    })
+    .select('id')
+    .single()
 
   if (error) {
     console.error('[createPropertyPhoto]', error)
@@ -88,7 +94,7 @@ export async function createPropertyPhoto(
   }
 
   revalidateAccount(accountId)
-  return {}
+  return { id: data.id }
 }
 
 /** Edit a photo's caption and/or correct its type. */

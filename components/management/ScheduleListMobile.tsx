@@ -13,6 +13,7 @@ import { ScheduleEmptyState } from '@/components/management/ScheduleEmptyState'
 import { useVisitTimings } from '@/components/management/SessionsProvider'
 import { isVisitInProgress, isVisitMissed, formatElapsed } from '@/lib/utils/visits'
 import { groupRowsByAccount } from '@/lib/utils/schedule'
+import { syncVisitUrlParam } from '@/lib/utils/visit-url'
 import { formatAccountPrice } from '@/lib/utils/accounts'
 import { Button } from '@/components/ui/button'
 import { VisitStatusBadge, FrequencyBadge, BillingTypeBadge, InvoiceStatusBadge } from '@/components/management/badges'
@@ -66,12 +67,19 @@ export function ScheduleListMobile({
   const [assignOpen, setAssignOpen] = useState(false)
   const [assignGroup, setAssignGroup] = useState<RouteGroup | null>(null)
 
+  function handleSheetOpenChange(next: boolean) {
+    setSheetOpen(next)
+    if (!next) syncVisitUrlParam(null)
+  }
+
   function handleRowClick(row: SchedulePropertyRow, visit: VisitWithCrew | null) {
     if (!week) return
     if (visit) {
       setSheetRow({ ...row, visit })
       setSheetWeek(week.weekStart)
       setSheetOpen(true)
+      // The phone list renders a single week — that IS the window start.
+      syncVisitUrlParam(visit.id, week.weekStart)
     } else {
       const cellKey = `${row.property.id}-${week.weekStart}`
       setCreatingKey(cellKey)
@@ -270,7 +278,7 @@ export function ScheduleListMobile({
       {sheetRow && (
         <VisitDetailSheet
           open={sheetOpen}
-          onOpenChange={setSheetOpen}
+          onOpenChange={handleSheetOpenChange}
           row={sheetRow}
           weekStart={sheetWeek}
           role={role}

@@ -20,6 +20,9 @@ import { createPropertyPhoto } from '@/app/management/accounts/photo-actions'
 interface PhotoUploadDropzoneProps {
   accountId: string
   properties: { id: string; address: string }[]
+  /** Reports the newest photo of a successful batch, so the gallery can open it
+   *  for captioning and categorizing without a trip through the thumbnails. */
+  onUploaded?: (photoId: string) => void
 }
 
 /**
@@ -35,7 +38,11 @@ interface PhotoUploadDropzoneProps {
  * Action. Routing 20 MB through a Server Action would exceed both Next's default
  * body limit and the serverless request ceiling in production.
  */
-export function PhotoUploadDropzone({ accountId, properties }: PhotoUploadDropzoneProps) {
+export function PhotoUploadDropzone({
+  accountId,
+  properties,
+  onUploaded,
+}: PhotoUploadDropzoneProps) {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
   // dragenter/dragleave also fire for child elements, so a plain boolean flickers
@@ -78,6 +85,7 @@ export function PhotoUploadDropzone({ accountId, properties }: PhotoUploadDropzo
 
     const supabase = createClient()
     let succeeded = 0
+    let newestPhotoId: string | undefined
     const failures: string[] = []
 
     setProgress({ done: 0, total: accepted.length })
@@ -112,6 +120,9 @@ export function PhotoUploadDropzone({ accountId, properties }: PhotoUploadDropzo
       }
 
       succeeded += 1
+      // Last one wins: the gallery sorts newest-first, so opening the most
+      // recent puts the whole batch within reach of the lightbox's next arrow.
+      newestPhotoId = result.id ?? newestPhotoId
     }
 
     setProgress(null)
@@ -121,6 +132,9 @@ export function PhotoUploadDropzone({ accountId, properties }: PhotoUploadDropzo
       // The action revalidates the path; refresh pulls the new RSC payload so the
       // server-rendered gallery re-renders with freshly signed URLs.
       router.refresh()
+      // The gallery resolves this id against the refreshed data and opens the
+      // lightbox once it arrives.
+      if (newestPhotoId) onUploaded?.(newestPhotoId)
     }
     if (failures.length > 0) {
       toast.error(

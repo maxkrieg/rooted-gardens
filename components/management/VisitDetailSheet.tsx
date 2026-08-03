@@ -1,10 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { format, parseISO } from 'date-fns'
-import { Map } from 'lucide-react'
+import { addDays, format, parseISO } from 'date-fns'
+import { CalendarDays, Map, Smartphone } from 'lucide-react'
 import {
   Sheet,
   SheetClose,
@@ -107,6 +107,14 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart, role }: V
   const [completionOpen, setCompletionOpen] = useState(false)
   const [skipOpen, setSkipOpen] = useState(false)
   const [photoViewerOpen, setPhotoViewerOpen] = useState(false)
+  // See the guard in handleOpenChange: the lightbox unmounts before the trailing
+  // event reaches this Sheet, so `photoViewerOpen` is already false by then.
+  const photoClosedAt = useRef(0)
+
+  function handlePhotoViewerChange(open: boolean) {
+    if (!open) photoClosedAt.current = Date.now()
+    setPhotoViewerOpen(open)
+  }
   const { data: currentEmployee } = useCurrentEmployee()
 
   // Mutations inside VisitDetailContent are direct-client (no Server Action /
@@ -114,9 +122,9 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart, role }: V
   // refresh to pick up anything changed while the sheet was open.
   function handleOpenChange(next: boolean) {
     // Dismissing the photo lightbox must not close this sheet with it — both are
-    // Radix overlays portaled to <body>, so the inner close can reach this one as
-    // an outside interaction.
-    if (!next && photoViewerOpen) return
+    // Radix overlays portaled to <body>, so the inner close reaches this one as
+    // an outside interaction, arriving just after the lightbox has unmounted.
+    if (!next && (photoViewerOpen || Date.now() - photoClosedAt.current < 500)) return
     onOpenChange(next)
     if (!next) router.refresh()
   }
@@ -127,6 +135,11 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart, role }: V
   // could be missing these arrays even though StopDetail declares them required.
   const assignedCrew = data.assignedCrew ?? []
   const completedBy = data.completedBy ?? []
+
+  // Full Mon–Sun span, not just the start date — the owner is placing this visit
+  // in a week, and a lone start date makes them do the arithmetic.
+  const weekStartDate = parseISO(weekStart)
+  const weekRangeLabel = `${format(weekStartDate, 'EEE MMM d')} – ${format(addDays(weekStartDate, 6), 'EEE MMM d')}`
 
   return (
     <>
@@ -140,26 +153,58 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart, role }: V
           className="w-full sm:max-w-lg flex flex-col p-0 gap-0"
           onCloseAutoFocus={(e) => e.preventDefault()}
         >
-          <SheetHeader className="px-6 pt-6 pb-4 border-b border-border shrink-0">
-            <SheetTitle className="font-display text-lg leading-tight">{row.property.address}</SheetTitle>
-            <a
-              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.property.address)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-[--primary] hover:underline w-fit"
-            >
-              <Map className="h-3.5 w-3.5 shrink-0" />
-              Open in Maps
-            </a>
-            <SheetDescription>
+          {/* Identity block, read top-down: which account, which property, which
+              week. The owner reopens this sheet constantly across properties and
+              weeks, so all three answer at a glance before any action. */}
+          <SheetHeader className="px-6 pt-6 pb-4 border-b border-border shrink-0 gap-0 space-y-3">
+            {/* pr-8 keeps the week chip clear of the Sheet's own close button,
+                which is absolutely positioned at top-right. */}
+            <div className="flex items-center justify-between gap-3 pr-8">
+              {/* The account owns the property, so it reads as an eyebrow above
+                  the address rather than trailing after it. */}
               <Link
                 href={`/management/accounts/${row.account.id}`}
-                className="font-medium text-[--primary] hover:underline"
+                className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-widest text-muted-foreground hover:text-[--primary] transition-colors"
               >
                 {row.account.name}
-              </Link>{' '}
-              · Week of {format(parseISO(weekStart), 'MMM d')}
+              </Link>
+              {/* Weekdays are spelled out because the whole app thinks in Mon–Sun
+                  weeks — "Mon … Sun" makes the boundaries unmistakable when
+                  jumping between weeks. */}
+              <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-[11px] font-semibold text-[--accent-foreground] tabular-nums">
+                <CalendarDays className="h-3 w-3 shrink-0" />
+                {weekRangeLabel}
+              </span>
+            </div>
+
+            <SheetTitle className="font-display text-xl leading-snug">
+              {row.property.address}
+            </SheetTitle>
+
+            <SheetDescription className="sr-only">
+              Visit at {row.property.address} for {row.account.name}, week of {weekRangeLabel}.
             </SheetDescription>
+
+            <div className="flex items-center gap-2">
+              <Button asChild variant="outline" size="sm" className="h-9 gap-1.5">
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.property.address)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Map className="h-3.5 w-3.5 shrink-0" />
+                  Open in Maps
+                </a>
+              </Button>
+              {/* The phone icon is the point: this is the stop exactly as crew see
+                  it on their own phones. */}
+              <Button asChild variant="outline" size="sm" className="h-9 gap-1.5">
+                <Link href={`/crew/stop/${data.visitId}`}>
+                  <Smartphone className="h-3.5 w-3.5 shrink-0" />
+                  Crew view
+                </Link>
+              </Button>
+            </div>
           </SheetHeader>
 
           <div className="flex-1 overflow-y-auto px-6 py-6">
@@ -170,7 +215,7 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart, role }: V
               onOpenSkip={() => setSkipOpen(true)}
               showAddress={false}
               showInvoice
-              onPhotoViewerChange={setPhotoViewerOpen}
+              onPhotoViewerChange={handlePhotoViewerChange}
             />
           </div>
 

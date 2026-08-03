@@ -6,6 +6,7 @@ import { addDays, format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { getWeekStart, groupRowsByAccount } from '@/lib/utils/schedule'
+import { syncVisitUrlParam } from '@/lib/utils/visit-url'
 import { formatAccountPrice } from '@/lib/utils/accounts'
 import { createVisit } from '@/app/management/schedule/actions'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
@@ -72,6 +73,8 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
       setSheetRow({ ...row, visit })
       setSheetWeek(weekStart)
       setSheetOpen(true)
+      // weeks[0] is the leftmost rendered column — the window the server built.
+      syncVisitUrlParam(visit.id, weeks[0]?.weekStart)
     } else {
       const cellKey = `${row.property.id}-${weekStart}`
       setCreatingKey(cellKey)
@@ -83,6 +86,11 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
         }
       })
     }
+  }
+
+  function handleSheetOpenChange(next: boolean) {
+    setSheetOpen(next)
+    if (!next) syncVisitUrlParam(null)
   }
 
   function handleCellKeyDown(
@@ -249,7 +257,7 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
       {sheetRow && (
         <VisitDetailSheet
           open={sheetOpen}
-          onOpenChange={setSheetOpen}
+          onOpenChange={handleSheetOpenChange}
           row={sheetRow}
           weekStart={sheetWeek}
           role={role}

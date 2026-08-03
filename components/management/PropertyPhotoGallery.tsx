@@ -33,12 +33,20 @@ export function PropertyPhotoGallery({
   canManage,
   loadError,
 }: PropertyPhotoGalleryProps) {
+  // Tracked by photo id rather than position, for two reasons: a freshly
+  // uploaded photo can be named before the refreshed server data has arrived
+  // (the lightbox simply opens once it does), and recategorizing a photo
+  // reshuffles the groups without the open photo silently becoming a different
+  // one.
+  const [openPhotoId, setOpenPhotoId] = useState<string | null>(null)
+
   // Lightbox navigation walks one property's photos, flattened across its groups
   // — staying inside the section the owner was looking at.
-  const [active, setActive] = useState<{ propertyId: string; index: number } | null>(null)
-
-  const activeProperty = active ? grouped.find((g) => g.propertyId === active.propertyId) : undefined
+  const activeProperty = openPhotoId
+    ? grouped.find((g) => g.groups.some((group) => group.photos.some((p) => p.id === openPhotoId)))
+    : undefined
   const activePhotos = activeProperty ? activeProperty.groups.flatMap((g) => g.photos) : []
+  const activeIndex = activePhotos.findIndex((p) => p.id === openPhotoId)
 
   if (loadError) {
     return (
@@ -70,7 +78,13 @@ export function PropertyPhotoGallery({
 
   return (
     <div className="space-y-6">
-      {canManage && <PhotoUploadDropzone accountId={accountId} properties={properties} />}
+      {canManage && (
+        <PhotoUploadDropzone
+          accountId={accountId}
+          properties={properties}
+          onUploaded={setOpenPhotoId}
+        />
+      )}
 
       {grouped.length === 0 ? (
         <EmptyState
@@ -80,10 +94,6 @@ export function PropertyPhotoGallery({
         />
       ) : (
         grouped.map((property) => {
-          // Indices are into the property-wide flattened list, so lightbox
-          // navigation can cross group boundaries.
-          const flattened = property.groups.flatMap((g) => g.photos)
-
           return (
             <section key={property.propertyId} className="space-y-4">
               <div className="flex items-baseline justify-between gap-3">
@@ -107,12 +117,7 @@ export function PropertyPhotoGallery({
                       <button
                         key={photo.id}
                         type="button"
-                        onClick={() =>
-                          setActive({
-                            propertyId: property.propertyId,
-                            index: flattened.findIndex((p) => p.id === photo.id),
-                          })
-                        }
+                        onClick={() => setOpenPhotoId(photo.id)}
                         aria-label={photo.caption ?? `Open ${group.label} photo`}
                         className="group relative aspect-square w-full rounded-xl overflow-hidden border border-border bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
@@ -157,21 +162,23 @@ export function PropertyPhotoGallery({
         })
       )}
 
-      {active && activeProperty && (
+      {/* activeIndex is -1 in the gap between uploading a photo and its refreshed
+          data arriving — the lightbox opens on its own once the photo resolves. */}
+      {activeProperty && activeIndex >= 0 && (
         <PhotoLightbox
           photos={activePhotos}
-          index={active.index}
+          index={activeIndex}
           subtitle={activeProperty.address}
-          onIndexChange={(next) => setActive({ ...active, index: next })}
-          onClose={() => setActive(null)}
+          onIndexChange={(next) => setOpenPhotoId(activePhotos[next]?.id ?? null)}
+          onClose={() => setOpenPhotoId(null)}
           footer={
-            canManage && activePhotos[active.index] ? (
+            canManage ? (
               // Keyed by photo id so the caption draft resets between photos.
               <PhotoEditor
-                key={activePhotos[active.index].id}
+                key={activePhotos[activeIndex].id}
                 accountId={accountId}
-                photo={activePhotos[active.index]}
-                onClose={() => setActive(null)}
+                photo={activePhotos[activeIndex]}
+                onClose={() => setOpenPhotoId(null)}
               />
             ) : undefined
           }

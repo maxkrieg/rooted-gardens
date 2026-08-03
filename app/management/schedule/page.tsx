@@ -14,6 +14,7 @@ import { ScheduleListMobile } from '@/components/management/ScheduleListMobile'
 import { ScheduleNav } from '@/components/management/ScheduleNav'
 import { ScheduleFilterBar } from '@/components/management/ScheduleFilterBar'
 import { SessionsProvider } from '@/components/management/SessionsProvider'
+import { DeepLinkedVisitSheet } from '@/components/management/DeepLinkedVisitSheet'
 import type { Account, EmployeeRole } from '@/types/app'
 
 export default async function SchedulePage({
@@ -25,6 +26,9 @@ export default async function SchedulePage({
     account?: string
     crew?: string
     status?: string
+    /** Deep link from the crew stop page — opens this visit's detail sheet on
+     *  arrival. Paired with `week` so the right 4-week window is fetched. */
+    visit?: string
   }>
 }) {
   const params = await searchParams
@@ -102,6 +106,13 @@ export default async function SchedulePage({
             filtered={filtered}
           />
         </div>
+        {/* Rendered once, outside both layouts — both are always mounted, so
+            giving each the deep link opened two stacked sheets. */}
+        <DeepLinkedVisitSheet
+          weeks={weeks}
+          visitId={params.visit}
+          role={role as EmployeeRole}
+        />
       </SessionsProvider>
     </div>
   )

@@ -106,6 +106,16 @@ export function VisitLogger({
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   // Which photo the caption lightbox is showing, by index into `photos`.
   const [captionIndex, setCaptionIndex] = useState<number | null>(null)
+  // When the lightbox last closed. Closing it is a two-step sequence — the
+  // lightbox tears down first, and only then does the trailing event reach this
+  // Sheet — so a guard that only checks `captionIndex` sees null by that point
+  // and lets the close through. This timestamp survives the gap.
+  const photoClosedAt = useRef(0)
+
+  function closeCaption() {
+    photoClosedAt.current = Date.now()
+    setCaptionIndex(null)
+  }
 
   function setPhotoCaption(index: number, caption: string) {
     setPhotos((prev) => prev.map((p, i) => (i === index ? { ...p, caption } : p)))
@@ -222,11 +232,12 @@ export function VisitLogger({
   function handleOpenChange(next: boolean) {
     // Dismissing the caption lightbox must never tear down the form underneath
     // it. Two stacked Radix overlays both portal to <body>, so closing the inner
-    // one can reach this Sheet as an outside-interaction and take the whole form
+    // one reaches this Sheet as an outside interaction and takes the whole form
     // with it — losing everything typed so far. Every close path (X, Esc,
-    // outside click) funnels through here, so refusing while a photo is open
-    // covers all of them.
-    if (!next && captionIndex !== null) return
+    // outside click) funnels through here, so this covers all of them; the
+    // timestamp catches the trailing event that arrives after the lightbox has
+    // already unmounted.
+    if (!next && (captionIndex !== null || Date.now() - photoClosedAt.current < 500)) return
     if (!next) resetForm()
     onOpenChange(next)
   }
@@ -590,11 +601,12 @@ export function VisitLogger({
         photos={photos.map(toLightboxPhoto)}
         index={captionIndex}
         onIndexChange={setCaptionIndex}
-        onClose={() => setCaptionIndex(null)}
+        onClose={closeCaption}
         footer={
           <LocalCaptionField
             value={photos[captionIndex].caption ?? ''}
             onChange={(caption) => setPhotoCaption(captionIndex, caption)}
+            onDone={closeCaption}
           />
         }
       />
@@ -608,16 +620,22 @@ export function VisitLogger({
  * this writes to local form state instead of the database — a photo captured in
  * this session has no `photos` row until the form is submitted, and the form has
  * to keep working offline either way.
+ *
+ * Because there's no save request to react to, the caption would otherwise give
+ * no feedback at all — hence the explicit Done button and the note about when it
+ * actually persists.
  */
 function LocalCaptionField({
   value,
   onChange,
+  onDone,
 }: {
   value: string
   onChange: (value: string) => void
+  onDone: () => void
 }) {
   return (
-    <div className="space-y-1.5 border-t border-[--border] pt-3">
+    <div className="space-y-2 border-t border-[--border] pt-3">
       <label
         htmlFor="logger-caption"
         className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide"
@@ -633,7 +651,16 @@ function LocalCaptionField({
         // ≥16px keeps iOS from zooming the viewport on focus.
         className="text-base"
       />
-      <p className="text-[11px] text-muted-foreground">Saved when you submit the visit.</p>
+      <div className="flex items-center gap-3">
+        <p className="text-[11px] text-muted-foreground flex-1">
+          {value.trim()
+            ? 'Added — saved with the visit when you submit.'
+            : 'Saved with the visit when you submit.'}
+        </p>
+        <Button type="button" className="h-11 px-6 shrink-0" onClick={onDone}>
+          Done
+        </Button>
+      </div>
     </div>
   )
 }

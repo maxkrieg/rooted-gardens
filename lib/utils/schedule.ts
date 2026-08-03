@@ -118,3 +118,30 @@ export function groupRowsByAccount(
 
   return groups
 }
+
+/**
+ * Locate a visit within a loaded schedule window, so a `?visit=<id>` deep link
+ * can open its detail sheet directly. Returns the row with `visit` narrowed to
+ * the matching one — the shape VisitDetailSheet expects.
+ *
+ * Callers pass the weeks they already hold, so a visit outside the loaded window
+ * simply isn't found; the link carries `week` alongside `visit` to make sure the
+ * right window is fetched in the first place.
+ */
+export function findVisitInWeeks(
+  weeks: ScheduleWeek[],
+  visitId: string | undefined,
+): { row: SchedulePropertyRow; weekStart: string } | null {
+  if (!visitId) return null
+
+  for (const week of weeks) {
+    for (const group of week.routeGroups) {
+      for (const row of group.rows) {
+        if (row.visit?.id === visitId) {
+          return { row, weekStart: week.weekStart }
+        }
+      }
+    }
+  }
+  return null
+}
