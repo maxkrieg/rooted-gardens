@@ -1037,13 +1037,48 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   There is no separate durable channel for start/stop — if the app is closed they catch
   up on next open. (Coalesce duplicate events from a session that syncs already-ended.)
 
-- [ ] **8.4 — Revenue and operations reporting**
+- [x] **8.4 — Revenue and operations reporting**
   *Depends on: 5.6, 4.4*
   Add a Reports section to the management sidebar. Include:
   (1) Revenue by month (bar chart — invoiced amount, not scheduled)
   (2) Visits per crew member per week (who's doing the most work)
   (3) Per-account visit frequency vs scheduled frequency (is anyone being
   under-served?) Use shadcn charts or recharts. Keep it simple — 3 charts max.
+  **Built:** `/management/reports`, visible to all three management roles (no
+  `proxy.ts` change — `MANAGEMENT_ROLES` and the existing RLS SELECT policies
+  already cover owner/lead/accountant). Server-rendered: `page.tsx` aggregates all
+  three datasets in one `Promise.all` and hands plain data to `'use client'` chart
+  components, so nothing client-side touches Supabase. A single `?year=` nav
+  (`ReportsYearNav`, plain `<Link>`s so it stays a server component) sits above all
+  three cards and scopes every one of them. shadcn `chart` pulled **recharts 2.15.4**,
+  not 3 — that's the pairing the shadcn registry ships `chart.tsx` against, and 2.15.4
+  declares React 19 in its peer deps, so it was kept rather than forcing v3 and
+  breaking the generated wrapper.
+  **The non-obvious part — the palette is computed, not chosen.** The intuitive
+  Field & Foliage data pair (`--primary` sage + `--clay`) *fails hard*: sage sits at
+  OKLCH C=0.077, under the 0.10 chroma floor (it reads gray as a fill), and
+  sage↔clay collapse to ΔE 3.6 under protanopia — a textbook green/red failure where
+  a protanope sees one color. Snapping to passing while holding hue families gave
+  `--chart-1` = the design system's existing denim (`.status-invoiced` `#3f6e97`)
+  deepened one step to `#31649e`, and `--chart-2` = clay `#c2683e`; dark mode is
+  re-stepped, not flipped (`#5590cb` / `#cf7549`). Both modes pass all six checks
+  (protan ΔE 18.0 / 18.6). Sage also stays out of charts on principle — it already
+  means "completed" everywhere else in this app, so a green bar would read as status.
+  Re-validate before touching the tokens; the command is in the `globals.css` comment.
+  **Two chart forms differ from the naive reading of the task above**, for the same
+  measured reasons: (2) is **small multiples** (one mini column chart per crew member,
+  single hue, shared y-scale) rather than a stacked bar — ~18 crew is far past the
+  categorical series cap, and faceting is the standard answer; (3) is a **diverging
+  bar centered on the contracted target** (clay behind / denim ahead, neutral gray
+  zero rule) rather than red-amber-green adherence bars, which would have been a
+  value-ramp re-encoding what bar length already shows. Every chart ships a
+  "View as table" twin so no value is reachable only by hovering, plus empty states,
+  keyboard-reachable tooltips, and `prefers-reduced-motion` gating on the bar
+  animations.
+  *Follow-up, not built:* `supabase/seed.sql` has no `invoices` rows, so the revenue
+  chart is legitimately empty against seed data — it needs either real pushed
+  invoices or a seed block (including one invoice paid the following January, to
+  exercise the cross-year `.or()` filter in `getRevenueByMonth`).
 
 - [ ] **8.5 — Error states and empty states**
   *Depends on: Phases 2–7 (audit pass over everything built)*
@@ -1059,8 +1094,9 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   (or browser DevTools device emulation). Cover every crew surface, including the
   `/crew/schedule` page (4.11) — verify its week-nav buttons are easily tappable, the
   search/crew/route-group filter row doesn't cause horizontal scroll, and rows aren't hidden
-  under the bottom nav. Check: tap target sizes (min 44px), no horizontal
-  scroll, inputs don't zoom on focus (font-size ≥ 16px on inputs), bottom sheet doesn't get
+  under the bottom nav. Consider sticky headers to help user maintain context when scrolling.
+  Check: tap target sizes (min 44px), no horizontal
+  scroll, inputs don't zoom on focus (font-size ≥ 16px on inputs), bottom sheets don't get
   covered by keyboard, "Add to Home Screen" prompt works, back navigation works
   naturally. Fix any rough edges found.
 

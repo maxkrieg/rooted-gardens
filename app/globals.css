@@ -40,6 +40,10 @@
   --color-bark: var(--bark);
   --color-sap: var(--sap);
 
+  /* Data-viz series slots (task 8.4) */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+
   /* Border radius */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -80,6 +84,19 @@
   --ochre: #d9a441;
   --bark: #4a3b2e;
   --sap: #6fa84b;
+
+  /* Chart series slots — fixed order, assigned in sequence, never cycled.
+     These are NOT free-choice brand colors: they were snapped to the nearest
+     passing step and validated (OKLCH lightness band, chroma floor >= 0.10,
+     protan/deutan separation, contrast vs the --card surface).
+     --primary sage fails here twice — C=0.077 reads gray as a fill, and
+     sage/clay collapse to dE 3.6 under protanopia — so slot 1 is the design
+     system's denim (--status-invoiced #3f6e97) deepened one step to clear the
+     chroma floor. Sage also stays out of charts because it already means
+     "completed" everywhere else in this app. Re-validate before editing:
+       node scripts/validate_palette.js "#31649e,#c2683e" --mode light --surface "#fcfaf4" */
+  --chart-1: #31649e;
+  --chart-2: #c2683e;
 }
 
 /* ── Dark theme ("soil at dusk") ───────────────────────────────────────── */
@@ -103,6 +120,11 @@
   --border: #353026;
   --input: #353026;
   --ring: #6b9a78;
+
+  /* Dark-mode series slots — re-stepped, not an automatic flip of the light
+     values. Validated against the dark --card surface (#24211b). */
+  --chart-1: #5590cb;
+  --chart-2: #cf7549;
 }
 
 /* ── Base styles ────────────────────────────────────────────────────────── */

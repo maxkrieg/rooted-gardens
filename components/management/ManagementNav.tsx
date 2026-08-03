@@ -9,6 +9,7 @@ import {
   Users,
   Receipt,
   Route,
+  BarChart3,
   Truck,
   UserCircle,
   Menu,
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
   { href: '/management/accounts', label: 'Accounts', icon: Users },
   { href: '/management/route-groups', label: 'Routes', icon: Route },
   { href: '/management/billing', label: 'Billing', icon: Receipt },
+  { href: '/management/reports', label: 'Reports', icon: BarChart3 },
   { href: '/management/fleet', label: 'Fleet', icon: Truck },
   { href: '/management/team', label: 'Team', icon: UserCircle, ownerOnly: true },
 ]
