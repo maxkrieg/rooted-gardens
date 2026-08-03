@@ -3,6 +3,7 @@
 import { useCallback, useState, useSyncExternalStore } from 'react'
 import { ChevronDown, Table2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { StateMark } from '@/components/states/StateMark'
 
 /**
  * Subscribe to a CSS media query. `useSyncExternalStore` rather than
@@ -92,11 +93,21 @@ export function ReportCard({
   )
 }
 
-/** Empty state — says what's missing and what to do about it. */
+/**
+ * Empty state — says what's missing and what to do about it.
+ *
+ * Keeps its own free-text `children` API rather than EmptyState's title/hint
+ * split: each chart's copy is one continuous sentence naming the year in
+ * question, and forcing it into a heading would only make it read worse. It
+ * borrows the shared botanical mark so it still sits in the same family
+ * (task 8.5). A failed query is handled separately on the reports page, so this
+ * only ever means "no data".
+ */
 export function ReportEmpty({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-center min-h-[12rem] rounded-xl border border-dashed border-border bg-background/50 px-6">
-      <p className="text-sm text-muted-foreground text-center max-w-xs leading-relaxed">
+    <div className="flex min-h-[12rem] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-background/50 px-6 py-8">
+      <StateMark variant="seed" />
+      <p className="max-w-xs text-center text-sm leading-relaxed text-muted-foreground">
         {children}
       </p>
     </div>

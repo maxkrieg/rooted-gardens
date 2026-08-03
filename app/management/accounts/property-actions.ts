@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { propertyFormSchema, type PropertyFormValues } from '@/lib/validators/property'
+import { toUserMessage } from '@/lib/errors'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -36,8 +37,7 @@ export async function createProperty(
   })
 
   if (error) {
-    console.error('[createProperty]', error)
-    return { error: error.message }
+    return { error: toUserMessage(error, 'Could not add the property.', '[createProperty]') }
   }
 
   revalidateAccount(accountId)
@@ -70,8 +70,7 @@ export async function updateProperty(
     .eq('id', id)
 
   if (error) {
-    console.error('[updateProperty]', error)
-    return { error: error.message }
+    return { error: toUserMessage(error, 'Could not save the property.', '[updateProperty]') }
   }
 
   revalidateAccount(accountId)

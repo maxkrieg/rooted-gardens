@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { Building2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
+import { EmptyState } from '@/components/states/EmptyState'
+import { ErrorState } from '@/components/states/ErrorState'
 import { Badge } from '@/components/ui/badge'
 import { VisitStatusBadge, InvoiceStatusBadge } from '@/components/management/badges'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
@@ -14,6 +16,9 @@ interface RecentVisitsListProps {
   visits: RecentVisit[]
   account: Account
   role: EmployeeRole | undefined
+  /** The visits query failed. Without this, an outage renders "No visits yet" on
+   *  an account that may have plenty (task 8.5). */
+  loadError?: boolean
 }
 
 /**
@@ -22,7 +27,7 @@ interface RecentVisitsListProps {
  * sheet's open/row state itself (mirroring ScheduleGrid/ScheduleListMobile), since
  * the sheet is a client-only concern the server-rendered account page can't hold.
  */
-export function RecentVisitsList({ visits, account, role }: RecentVisitsListProps) {
+export function RecentVisitsList({ visits, account, role, loadError }: RecentVisitsListProps) {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sheetVisit, setSheetVisit] = useState<RecentVisit | null>(null)
 
@@ -32,12 +37,28 @@ export function RecentVisitsList({ visits, account, role }: RecentVisitsListProp
     setSheetOpen(true)
   }
 
+  if (loadError) {
+    return (
+      <Card className="rounded-2xl border border-border shadow-warm">
+        <CardContent className="p-0">
+          <ErrorState
+            title="Recent visits didn't load."
+            hint="Check your connection, then try again."
+          />
+        </CardContent>
+      </Card>
+    )
+  }
+
   if (visits.length === 0) {
     return (
       <Card className="rounded-2xl border border-border shadow-warm">
-        <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-          <Building2 className="h-8 w-8 text-muted-foreground/40 mb-3" />
-          <p className="text-sm text-muted-foreground">No visits recorded yet.</p>
+        <CardContent className="p-0">
+          <EmptyState
+            variant="seed"
+            title="No visits yet"
+            hint="Visits appear here once crew log them in the field."
+          />
         </CardContent>
       </Card>
     )

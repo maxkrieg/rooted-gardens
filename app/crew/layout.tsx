@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Clock, User, CalendarRange } from 'lucide-react'
 import { OfflineBanner } from '@/components/crew/OfflineBanner'
+import { SessionNotice } from '@/components/crew/SessionNotice'
 import { flushMutationQueue } from '@/lib/crew/mutation-queue'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { useCrewRealtimeSync } from '@/hooks/crew/useCrewRealtimeSync'
@@ -17,7 +18,7 @@ const navItems = [
 
 export default function CrewLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const { data: employee } = useCurrentEmployee()
+  const { data: employee, isError: employeeError } = useCurrentEmployee()
 
   // Flush any mutations that were queued during a prior offline session
   useEffect(() => {
@@ -30,6 +31,8 @@ export default function CrewLayout({ children }: { children: React.ReactNode }) 
   return (
     <div className="flex flex-col min-h-[100dvh] bg-background">
       <OfflineBanner />
+      {/* Silent failure here breaks "My stops", History, and realtime all at once. */}
+      {employeeError && !employee && <SessionNotice />}
       {/* Main scrollable content — leaves room for the bottom nav */}
       <main className="flex-1 overflow-y-auto pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))]">
         {children}

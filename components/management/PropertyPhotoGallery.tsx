@@ -2,8 +2,10 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Images, MapPin } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/states/EmptyState'
+import { ErrorState } from '@/components/states/ErrorState'
 import { PhotoLightbox } from '@/components/PhotoLightbox'
 import { PhotoEditor } from '@/components/management/PhotoEditor'
 import { PhotoUploadDropzone } from '@/components/management/PhotoUploadDropzone'
@@ -50,10 +52,9 @@ export function PropertyPhotoGallery({
 
   if (loadError) {
     return (
-      <EmptyState
-        icon={<Images className="h-10 w-10 text-muted-foreground/30 mb-4" />}
-        title="Could not load photos."
-        hint="Something went wrong reaching the photo library. Try refreshing the page."
+      <ErrorState
+        title="Photos didn't load."
+        hint="Check your connection, then try again."
       />
     )
   }
@@ -61,17 +62,15 @@ export function PropertyPhotoGallery({
   if (properties.length === 0) {
     return (
       <EmptyState
-        icon={<MapPin className="h-10 w-10 text-muted-foreground/30 mb-4" />}
-        title="No properties yet."
-        hint="Add a property on the Details tab before uploading photos."
+        variant="seed"
+        title="No properties yet"
+        hint="Photos hang off properties, so add one on the Details tab first."
         action={
-          <Link
-            href={`/management/accounts/${accountId}`}
-            className="text-sm text-[--primary] hover:underline mt-3"
-          >
-            Go to Details
-          </Link>
+          <Button asChild variant="outline">
+            <Link href={`/management/accounts/${accountId}`}>Go to Details</Link>
+          </Button>
         }
+        className="rounded-2xl border border-dashed border-border"
       />
     )
   }
@@ -88,9 +87,10 @@ export function PropertyPhotoGallery({
 
       {grouped.length === 0 ? (
         <EmptyState
-          icon={<Images className="h-10 w-10 text-muted-foreground/30 mb-4" />}
-          title="No photos yet."
+          variant="seed"
+          title="No photos yet"
           hint="Upload how-to photos so new crew know exactly how this property should be cared for."
+          className="rounded-2xl border border-dashed border-border"
         />
       ) : (
         grouped.map((property) => {
@@ -184,27 +184,6 @@ export function PropertyPhotoGallery({
           }
         />
       )}
-    </div>
-  )
-}
-
-function EmptyState({
-  icon,
-  title,
-  hint,
-  action,
-}: {
-  icon: React.ReactNode
-  title: string
-  hint: string
-  action?: React.ReactNode
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-border rounded-2xl">
-      {icon}
-      <p className="text-sm text-muted-foreground mb-1">{title}</p>
-      <p className="text-xs text-muted-foreground max-w-xs">{hint}</p>
-      {action}
     </div>
   )
 }

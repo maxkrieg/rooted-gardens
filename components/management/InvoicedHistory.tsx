@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/table'
 import { BillingTypeBadge, InvoiceStatusBadge } from '@/components/management/badges'
 import { SortableTableHead } from '@/components/management/SortableTableHead'
+import { EmptyState } from '@/components/states/EmptyState'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { HistoryDateRangeFilter } from '@/components/management/HistoryDateRangeFilter'
 import { pollInvoiceStatuses, refreshInvoiceStatuses } from '@/app/management/billing/actions'
@@ -192,9 +193,20 @@ export function InvoicedHistory({
     const ids = filtered.map((inv) => inv.id)
     if (ids.length === 0) return
     startRefresh(async () => {
-      const { processed, errors } = await refreshInvoiceStatuses(ids)
+      const { processed, errors, failedInvoiceIds, reason } = await refreshInvoiceStatuses(ids)
       if (errors > 0) {
-        toast.warning(`Refreshed ${processed} invoice${processed === 1 ? '' : 's'}, ${errors} failed`)
+        // Name the invoices that failed. A bare count told the accountant
+        // something was wrong but nothing they could act on.
+        const named = (failedInvoiceIds ?? []).slice(0, 5).join(', ')
+        const more = (failedInvoiceIds?.length ?? 0) > 5 ? ` +${failedInvoiceIds!.length - 5} more` : ''
+        toast.warning(
+          `Refreshed ${processed} of ${processed + errors} — ${errors} didn't update`,
+          {
+            description:
+              reason ?? (named ? `Check these in QuickBooks: ${named}${more}` : undefined),
+            duration: 8000,
+          },
+        )
       } else {
         toast.success(`Refreshed ${processed} invoice${processed === 1 ? '' : 's'} from QuickBooks`)
       }
@@ -345,9 +357,12 @@ export function InvoicedHistory({
       </div>
 
       {sorted.length === 0 ? (
-        <div className="flex items-center justify-center py-16 text-sm text-muted-foreground rounded-xl border border-border bg-card">
-          No invoices for {rangeLabel}.
-        </div>
+        <EmptyState
+          variant="pruned"
+          title={`No invoices for ${rangeLabel}`}
+          hint="Pick a wider date range, or push some from the Queue tab."
+          className="rounded-xl border border-border bg-card"
+        />
       ) : (
         <div className="rounded-xl border border-border bg-card shadow-warm overflow-hidden">
           <Table>

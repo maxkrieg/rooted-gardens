@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { AccountsTable } from '@/components/management/AccountsTable'
+import { ErrorState } from '@/components/states/ErrorState'
 import type { Account, AccountListRow } from '@/types/app'
 
 /**
@@ -17,19 +18,26 @@ export default async function AccountsPage() {
     .order('name')
 
   if (accountsError) {
+    console.error('[accounts] list', accountsError)
     return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
-        Could not load accounts — try refreshing.
-      </div>
+      <ErrorState
+        title="Accounts didn't load."
+        hint="Check your connection, then try again."
+      />
     )
   }
 
   // ── 2. Last visit per account (max ended_at of any completed visit) ─────
-  const { data: visitsData } = await supabase
+  // A failure here is not fatal: the list is still useful without the
+  // "last visit" column, so log it and let those cells read as "No visits yet"
+  // rather than failing the whole page.
+  const { data: visitsData, error: visitsError } = await supabase
     .from('visits')
     .select('account_id, ended_at')
     .not('ended_at', 'is', null)
     .order('ended_at', { ascending: false })
+
+  if (visitsError) console.error('[accounts] last-visit lookup', visitsError)
 
   // Reduce to a map of account_id → most recent ended_at.
   // Since rows are ordered DESC, the first occurrence per account is the max.

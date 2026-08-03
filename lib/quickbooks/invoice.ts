@@ -2,6 +2,7 @@ import { format, parseISO } from 'date-fns'
 import { qboPromise } from '@/lib/quickbooks/client'
 import type QuickBooks from 'node-quickbooks'
 import type { Account, VisitWithLocation } from '@/types/app'
+import { describeQboError, qboFaultMessage } from '@/lib/quickbooks/errors'
 
 const SERVICE_ITEM_NAME = process.env.QBO_SERVICE_ITEM_NAME || 'Services'
 
@@ -83,7 +84,10 @@ export async function pushAccountInvoice(
   try {
     itemId = await getServiceItemId(qbo)
   } catch (err) {
-    return { error: err instanceof Error ? err.message : 'Could not find QuickBooks service item' }
+    console.error('[pushAccountInvoice] getServiceItemId', describeQboError(err))
+    return {
+      error: `Could not find the "${SERVICE_ITEM_NAME}" product in QuickBooks. Create it there, then try again.`,
+    }
   }
 
   let lines: InvoiceLine[]
@@ -122,7 +126,11 @@ export async function pushAccountInvoice(
     )
     return { qboInvoiceId: invoice.Id }
   } catch (err) {
-    console.error('[pushAccountInvoice] createInvoice', err)
-    return { error: 'QuickBooks rejected the invoice' }
+    console.error('[pushAccountInvoice] createInvoice', describeQboError(err))
+    // Forward Intuit's own validation message when there is one — it's written
+    // for a bookkeeper ("Duplicate Document Number") and is exactly what the
+    // accountant needs to fix it. Without it they only knew that it failed.
+    const fault = qboFaultMessage(err)
+    return { error: fault ? `QuickBooks rejected the invoice — ${fault}` : 'QuickBooks rejected the invoice.' }
   }
 }

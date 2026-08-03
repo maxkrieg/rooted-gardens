@@ -8,10 +8,12 @@ import { Button } from '@/components/ui/button'
 import { ProfileEditSheet } from '@/components/crew/ProfileEditSheet'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { createClient } from '@/lib/supabase/client'
+import { Skeleton } from '@/components/ui/skeleton'
+import { ErrorState } from '@/components/states/ErrorState'
 
 export default function ProfilePage() {
   const router = useRouter()
-  const { data: employee } = useCurrentEmployee()
+  const { data: employee, isLoading, isError, refetch } = useCurrentEmployee()
   const [editOpen, setEditOpen] = useState(false)
 
   async function handleSignOut() {
@@ -26,12 +28,37 @@ export default function ProfilePage() {
 
   const smsOptIn = employee ? !employee.sms_opt_out : false
 
+  // The name used to sit at a bare '…' forever on both a slow load and a hard
+  // failure, with no way to tell them apart or to recover.
+  if (isLoading && !employee) {
+    return (
+      <div className="p-4 space-y-6">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-5 w-20 rounded-full" />
+        </div>
+        <Skeleton className="h-44 w-full rounded-2xl" />
+        <Skeleton className="h-12 w-full rounded-lg" />
+      </div>
+    )
+  }
+
+  if (isError && !employee) {
+    return (
+      <ErrorState
+        title="Your profile didn't load."
+        hint="You may be out of signal. Try again once you're back online."
+        onRetry={() => refetch()}
+      />
+    )
+  }
+
   return (
     <div className="p-4 space-y-6">
       {/* Header */}
       <div className="space-y-1">
         <h1 className="font-display text-2xl font-semibold text-foreground">
-          {employee?.name ?? '…'}
+          {employee?.name ?? '—'}
         </h1>
         {roleLabel && (
           <span className="inline-block text-xs font-semibold uppercase tracking-wide px-2.5 py-0.5 rounded-full bg-secondary text-secondary-foreground">

@@ -3,6 +3,7 @@ import QuickBooks from 'node-quickbooks'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { createServiceClient } from '@/lib/supabase/service'
+import { toUserMessage } from '@/lib/errors'
 
 // Refresh proactively if the stored token is expiring within this window.
 const REFRESH_BUFFER_MS = 5 * 60 * 1000
@@ -83,8 +84,13 @@ export async function upsertIntegrationTokens(
     : await supabase.from('integrations').insert({ service: 'quickbooks', ...tokens })
 
   if (error) {
-    console.error('[upsertIntegrationTokens]', error)
-    return { error: error.message }
+    return {
+      error: toUserMessage(
+        error,
+        'Connected to QuickBooks, but saving the connection failed. Try connecting again.',
+        '[upsertIntegrationTokens]',
+      ),
+    }
   }
   return {}
 }

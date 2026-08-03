@@ -10,6 +10,7 @@ import {
   type EquipmentFormValues,
   type MaintenanceLogFormValues,
 } from '@/lib/validators/fleet'
+import { toUserMessage } from '@/lib/errors'
 
 /**
  * Fleet Server Actions (tasks 6.1 + 6.3).
@@ -37,8 +38,7 @@ export async function createVehicle(values: VehicleFormValues): Promise<{ error?
   const supabase = await createClient()
   const { error } = await supabase.from('vehicles').insert(vehiclePayload(parsed.data))
   if (error) {
-    console.error('[createVehicle]', error)
-    return { error: error.message }
+    return { error: toUserMessage(error, 'Could not add the vehicle.', '[createVehicle]') }
   }
   revalidatePath('/management/fleet')
   return {}
@@ -54,8 +54,7 @@ export async function updateVehicle(
   const supabase = await createClient()
   const { error } = await supabase.from('vehicles').update(vehiclePayload(parsed.data)).eq('id', id)
   if (error) {
-    console.error('[updateVehicle]', error)
-    return { error: error.message }
+    return { error: toUserMessage(error, 'Could not save the vehicle.', '[updateVehicle]') }
   }
   revalidatePath('/management/fleet')
   return {}
@@ -78,8 +77,7 @@ export async function createEquipment(values: EquipmentFormValues): Promise<{ er
   const supabase = await createClient()
   const { error } = await supabase.from('equipment').insert(equipmentPayload(parsed.data))
   if (error) {
-    console.error('[createEquipment]', error)
-    return { error: error.message }
+    return { error: toUserMessage(error, 'Could not add the equipment.', '[createEquipment]') }
   }
   revalidatePath('/management/fleet')
   return {}
@@ -95,8 +93,7 @@ export async function updateEquipment(
   const supabase = await createClient()
   const { error } = await supabase.from('equipment').update(equipmentPayload(parsed.data)).eq('id', id)
   if (error) {
-    console.error('[updateEquipment]', error)
-    return { error: error.message }
+    return { error: toUserMessage(error, 'Could not save the equipment.', '[updateEquipment]') }
   }
   revalidatePath('/management/fleet')
   return {}
@@ -125,8 +122,7 @@ export async function logMaintenance(
     cost: parsed.data.cost ?? null,
   })
   if (error) {
-    console.error('[logMaintenance]', error)
-    return { error: error.message }
+    return { error: toUserMessage(error, 'Could not log the maintenance.', '[logMaintenance]') }
   }
 
   if ('equipmentId' in target) {

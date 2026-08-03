@@ -3,6 +3,7 @@ import type QuickBooks from 'node-quickbooks'
 import { qboPromise } from '@/lib/quickbooks/client'
 import type { Database } from '@/types/database'
 import type { Invoice, InvoiceStatus } from '@/types/app'
+import { describeQboError } from '@/lib/quickbooks/errors'
 
 // `node-quickbooks` uses `export =`, so its ambient interfaces can't be named-
 // imported — the subset of a QBO Invoice we read is declared locally (same
@@ -82,34 +83,6 @@ export function deriveInvoiceStatus(
  *  (to fetch), and the set-once timestamps (so they're only stamped the first
  *  time the invoice reaches that state). */
 type SyncableInvoice = Pick<Invoice, 'id' | 'qbo_invoice_id' | 'sent_at' | 'paid_at'>
-
-interface QboFaultError {
-  Message?: string
-  Detail?: string
-  code?: string
-}
-interface QboErrorShape {
-  response?: { status?: number; data?: { Fault?: { Error?: QboFaultError[] } } }
-  Fault?: { Error?: QboFaultError[] }
-}
-
-/**
- * Concise one-line summary of a node-quickbooks / axios error. Critically, this
- * avoids `console.error(err)` on the raw AxiosError, which dumps hundreds of
- * lines AND embeds the QBO access token (the `Authorization: Bearer ...` header)
- * into the logs on every failure.
- */
-function describeQboError(err: unknown): string {
-  const e = err as QboErrorShape
-  const status = e?.response?.status
-  const fault = e?.response?.data?.Fault ?? e?.Fault
-  const first = fault?.Error?.[0]
-  const msg = first?.Detail ?? first?.Message ?? first?.code
-  if (status && msg) return `HTTP ${status}: ${msg}`
-  if (status) return `HTTP ${status}`
-  if (err instanceof Error) return err.message
-  return 'unknown error'
-}
 
 /**
  * Fetches one invoice from QBO, derives its status, and writes the snapshot back.

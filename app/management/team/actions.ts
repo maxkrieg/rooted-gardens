@@ -5,6 +5,7 @@ import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { employeeFormSchema, type EmployeeFormValues } from '@/lib/validators/employee'
+import { toUserMessage } from '@/lib/errors'
 
 /**
  * Team Server Actions (task 7.1). Owner-only.
@@ -54,8 +55,7 @@ export async function createEmployee(values: EmployeeFormValues): Promise<{ erro
   const supabase = await createClient()
   const { error } = await supabase.from('employees').insert(employeePayload(parsed.data))
   if (error) {
-    console.error('[createEmployee]', error)
-    return { error: error.message }
+    return { error: toUserMessage(error, 'Could not add the employee.', '[createEmployee]') }
   }
   revalidatePath('/management/team')
   return {}
@@ -94,19 +94,21 @@ export async function updateEmployee(
       email: newEmail,
     })
     if (authErr) {
-      console.error('[updateEmployee] auth email sync', authErr)
+      // toUserMessage already maps the "already registered" case; anything else
+      // is a GoTrue internal message that means nothing to an owner.
       return {
-        error: /already|exists|registered/i.test(authErr.message)
-          ? 'That email is already used by another user.'
-          : `Could not update login email: ${authErr.message}`,
+        error: toUserMessage(
+          authErr,
+          'Could not update the login email. The rest of the changes were not saved.',
+          '[updateEmployee] auth email sync',
+        ),
       }
     }
   }
 
   const { error } = await supabase.from('employees').update(employeePayload(parsed.data)).eq('id', id)
   if (error) {
-    console.error('[updateEmployee]', error)
-    return { error: error.message }
+    return { error: toUserMessage(error, 'Could not save the employee.', '[updateEmployee]') }
   }
   revalidatePath('/management/team')
   return {}
@@ -123,8 +125,7 @@ export async function setEmployeeSmsOptIn(id: string, optIn: boolean): Promise<{
   const supabase = await createClient()
   const { error } = await supabase.from('employees').update({ sms_opt_out: !optIn }).eq('id', id)
   if (error) {
-    console.error('[setEmployeeSmsOptIn]', error)
-    return { error: error.message }
+    return { error: toUserMessage(error, 'Could not update the text-message setting.', '[setEmployeeSmsOptIn]') }
   }
   revalidatePath('/management/team')
   return {}
@@ -164,11 +165,12 @@ export async function inviteEmployee(id: string): Promise<{ error?: string }> {
     redirectTo: `${origin}/auth/callback`,
   })
   if (error) {
-    console.error('[inviteEmployee]', error)
     return {
-      error: /already been registered|already exists/i.test(error.message)
-        ? 'A user with this email already exists in auth'
-        : error.message,
+      error: toUserMessage(
+        error,
+        'Could not send the invitation. Check the email address and try again.',
+        '[inviteEmployee]',
+      ),
     }
   }
 

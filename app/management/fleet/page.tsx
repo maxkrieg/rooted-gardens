@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { FleetView } from '@/components/management/FleetView'
+import { ErrorState } from '@/components/states/ErrorState'
 import type { Vehicle, Equipment, MaintenanceLog } from '@/types/app'
 
 /**
@@ -18,10 +19,15 @@ export default async function FleetPage() {
   ])
 
   if (vehiclesRes.error || equipmentRes.error || logsRes.error) {
+    console.error(
+      '[fleet]',
+      vehiclesRes.error ?? equipmentRes.error ?? logsRes.error,
+    )
     return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
-        Could not load fleet — try refreshing.
-      </div>
+      <ErrorState
+        title="Fleet and equipment didn't load."
+        hint="Check your connection, then try again."
+      />
     )
   }
 

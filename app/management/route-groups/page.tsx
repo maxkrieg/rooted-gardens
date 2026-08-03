@@ -2,6 +2,8 @@ import { Route } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { RouteGroupCard } from '@/components/management/RouteGroupCard'
 import { RouteGroupSheet } from '@/components/management/RouteGroupSheet'
+import { EmptyState } from '@/components/states/EmptyState'
+import { ErrorState } from '@/components/states/ErrorState'
 import type { Property, PropertyWithAccount, RouteGroup } from '@/types/app'
 
 /**
@@ -20,17 +22,19 @@ export default async function RouteGroupsPage() {
     .order('name', { ascending: true })
 
   if (groupsError) {
+    console.error('[route-groups] groups', groupsError)
     return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
-        Could not load route groups — try refreshing.
-      </div>
+      <ErrorState
+        title="Route groups didn't load."
+        hint="Check your connection, then try again."
+      />
     )
   }
 
   const routeGroups = (groupsData ?? []) as RouteGroup[]
 
   // ── 2. All property_route_group assignments ────────────────────────────
-  const { data: assignmentsData } = await supabase
+  const { data: assignmentsData, error: assignmentsError } = await supabase
     .from('property_route_groups')
     .select('property_id, route_group_id')
 
@@ -56,10 +60,23 @@ export default async function RouteGroupsPage() {
   }
 
   // ── 3. All properties with their account name ─────────────────────────
-  const { data: propertiesData } = await supabase
+  const { data: propertiesData, error: propertiesError } = await supabase
     .from('properties')
     .select('*, accounts(name)')
     .order('address', { ascending: true })
+
+  // Both of these are load-bearing: without assignments every group renders
+  // "No properties assigned yet", and without properties the same. Either would
+  // be a confident lie about the routes, so fail the page instead.
+  if (assignmentsError || propertiesError) {
+    console.error('[route-groups] assignments/properties', assignmentsError ?? propertiesError)
+    return (
+      <ErrorState
+        title="Route assignments didn't load."
+        hint="Check your connection, then try again."
+      />
+    )
+  }
 
   const allProperties: PropertyWithAccount[] = (propertiesData ?? []).map((row) => {
     const { accounts: accountData, ...property } = row as typeof row & {
@@ -92,13 +109,13 @@ export default async function RouteGroupsPage() {
 
       {/* Route group cards */}
       {routeGroups.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <Route className="h-10 w-10 text-muted-foreground/30 mb-4" />
-          <p className="text-sm text-muted-foreground mb-1">No route groups yet.</p>
-          <p className="text-xs text-muted-foreground">
-            Create one to start organizing your properties into routes.
-          </p>
-        </div>
+        <EmptyState
+          variant="seed"
+          title="No route groups yet"
+          hint="Create one to start organizing your properties into daily crew routes."
+          // RouteGroupSheet renders its own "New Route Group" trigger.
+          action={<RouteGroupSheet />}
+        />
       ) : (
         <div className="space-y-4 pb-8">
           {routeGroups.map((group, idx) => {

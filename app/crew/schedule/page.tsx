@@ -16,6 +16,9 @@ import { useWeekSchedule } from '@/hooks/crew/useWeekSchedule'
 import { useActiveEmployees } from '@/hooks/crew/useActiveEmployees'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { formatWeekParam, getWeekStart, parseWeekParam } from '@/lib/utils/schedule'
+import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/states/EmptyState'
+import { ErrorState, StaleNotice } from '@/components/states/ErrorState'
 import type { SchedulePropertyRow } from '@/types/app'
 
 function rowMatches(row: SchedulePropertyRow, filters: ScheduleFilters): boolean {
@@ -64,9 +67,20 @@ function CrewSchedulePage() {
     window.history.replaceState(null, '', url)
   }, [])
 
-  const { data: schedule, isLoading } = useWeekSchedule(week)
+  const { data: schedule, isLoading, isError, refetch } = useWeekSchedule(week)
   const { data: employees = [] } = useActiveEmployees()
   const { data: me } = useCurrentEmployee()
+
+  // The stale-cache rule (CLAUDE.md, Data Architecture): a refresh failure must
+  // never take away stops the crew member already has. Only show the error state
+  // when there is nothing cached to show — otherwise annotate the stale data.
+  const showErrorState = isError && !schedule
+  const showStaleNotice = isError && !!schedule
+
+  const hasActiveFilters =
+    filters.routeGroup !== EMPTY_FILTERS.routeGroup ||
+    filters.crew !== EMPTY_FILTERS.crew ||
+    filters.status !== EMPTY_FILTERS.status
   const canManage = me?.role === 'owner' || me?.role === 'lead'
 
   // Default to the current user's own stops ("My stops") once their employee record
@@ -190,19 +204,43 @@ function CrewSchedulePage() {
         />
       </div>
 
+      {showStaleNotice && <StaleNotice />}
+
       {/* Body */}
       <div className="p-4 space-y-4">
         {isLoading && !schedule ? (
           <div className="space-y-3">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-24 rounded-2xl bg-muted animate-pulse" />
+              <Skeleton key={i} className="h-24 rounded-2xl" />
             ))}
           </div>
+        ) : showErrorState ? (
+          <ErrorState
+            title="The schedule didn't load."
+            hint="You may be out of signal. Try again once you're back online."
+            onRetry={() => refetch()}
+          />
         ) : totalVisible === 0 ? (
-          <div className="flex flex-col items-center justify-center text-center gap-3 py-20 text-muted-foreground">
-            <CalendarRange className="h-10 w-10 opacity-40" />
-            <p className="text-sm">No stops match this week and filters.</p>
-          </div>
+          // Two different empty states: filters hiding everything is fixable
+          // right here, an empty week is not.
+          hasActiveFilters ? (
+            <EmptyState
+              variant="pruned"
+              title="No stops match your filters"
+              hint="Clear them to see the whole week."
+              action={
+                <Button variant="outline" onClick={() => setFilters(EMPTY_FILTERS)}>
+                  Clear filters
+                </Button>
+              }
+            />
+          ) : (
+            <EmptyState
+              variant="sprig"
+              title="No stops this week"
+              hint="Nothing is scheduled yet. Check another week, or ask an owner."
+            />
+          )
         ) : (
           filteredGroups.map((group) => (
             <div

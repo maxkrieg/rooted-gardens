@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { accountFormSchema, type AccountFormValues } from '@/lib/validators/account'
 import { syncCustomer, type SyncCustomerResult } from '@/lib/quickbooks/sync'
+import { toUserMessage } from '@/lib/errors'
 
 /** Shared helper — builds the DB insert/update payload from validated form values. */
 function buildPayload(data: AccountFormValues) {
@@ -48,8 +49,7 @@ export async function createAccount(
   const { error } = await supabase.from('accounts').insert(buildPayload(parsed.data))
 
   if (error) {
-    console.error('[createAccount]', error)
-    return { error: error.message }
+    return { error: toUserMessage(error, 'Could not create the account.', '[createAccount]') }
   }
 
   revalidatePath('/management/accounts')
@@ -79,8 +79,7 @@ export async function updateAccount(
     .eq('id', id)
 
   if (error) {
-    console.error('[updateAccount]', error)
-    return { error: error.message }
+    return { error: toUserMessage(error, 'Could not save the account.', '[updateAccount]') }
   }
 
   revalidatePath('/management/accounts')

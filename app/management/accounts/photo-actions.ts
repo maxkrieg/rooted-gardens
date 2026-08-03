@@ -8,6 +8,7 @@ import {
   type CreatePhotoValues,
   type UpdatePhotoValues,
 } from '@/lib/validators/photo'
+import { toUserMessage } from '@/lib/errors'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -89,8 +90,7 @@ export async function createPropertyPhoto(
     .single()
 
   if (error) {
-    console.error('[createPropertyPhoto]', error)
-    return { error: error.message }
+    return { error: toUserMessage(error, 'Could not save the photo.', '[createPropertyPhoto]') }
   }
 
   revalidateAccount(accountId)
@@ -121,8 +121,7 @@ export async function updatePropertyPhoto(
   const { error } = await supabase.from('photos').update(patch).eq('id', photoId)
 
   if (error) {
-    console.error('[updatePropertyPhoto]', error)
-    return { error: error.message }
+    return { error: toUserMessage(error, 'Could not update the photo.', '[updatePropertyPhoto]') }
   }
 
   revalidateAccount(accountId)
@@ -170,8 +169,7 @@ export async function deletePropertyPhoto(
 
   const { error } = await supabase.from('photos').delete().eq('id', photoId)
   if (error) {
-    console.error('[deletePropertyPhoto]', error)
-    return { error: error.message }
+    return { error: toUserMessage(error, 'Could not delete the photo.', '[deletePropertyPhoto]') }
   }
 
   revalidateAccount(accountId)

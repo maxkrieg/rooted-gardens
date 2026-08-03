@@ -31,6 +31,7 @@ import {
 import { AccountCard } from '@/components/management/AccountCard'
 import { AccountForm } from '@/components/management/AccountForm'
 import { AccountStatusBadge, BillingTypeBadge } from '@/components/management/badges'
+import { EmptyState } from '@/components/states/EmptyState'
 import { formatAccountPrice } from '@/lib/utils/accounts'
 import type { AccountListRow, AccountStatus, BillingType } from '@/types/app'
 
@@ -63,6 +64,37 @@ export function AccountsTable({ accounts }: AccountsTableProps) {
   function handleRowClick(id: string) {
     router.push(`/management/accounts/${id}`)
   }
+
+  function clearFilters() {
+    setSearch('')
+    setStatusFilter('all')
+    setBillingFilter('all')
+  }
+
+  // One element, rendered by both the desktop table and the mobile card list.
+  // The two cases are genuinely different problems with different fixes: an
+  // account list that has never been filled in needs the "add" button, and one
+  // hidden behind filters needs those cleared.
+  const emptyState =
+    accounts.length === 0 ? (
+      <EmptyState
+        variant="seed"
+        title="No accounts yet"
+        hint="Accounts are who gets invoiced. Add one, then give it the properties you service."
+        action={<Button onClick={() => setSheetOpen(true)}>Add your first account</Button>}
+      />
+    ) : (
+      <EmptyState
+        variant="pruned"
+        title="No accounts match your filters"
+        hint="Widen the search, or clear the filters to see all of them."
+        action={
+          <Button variant="outline" onClick={clearFilters}>
+            Clear filters
+          </Button>
+        }
+      />
+    )
 
   return (
     <>
@@ -142,14 +174,9 @@ export function AccountsTable({ accounts }: AccountsTableProps) {
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={6}
-                  className="h-40 text-center text-muted-foreground"
-                >
-                  {accounts.length === 0
-                    ? 'No accounts yet. Add your first one.'
-                    : 'No accounts match the current filters.'}
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={6} className="p-0">
+                  {emptyState}
                 </TableCell>
               </TableRow>
             ) : (
@@ -196,13 +223,7 @@ export function AccountsTable({ accounts }: AccountsTableProps) {
       {/* Mobile card list (< md) */}
       <div className="md:hidden flex flex-col gap-3">
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground gap-2">
-            <p className="text-sm">
-              {accounts.length === 0
-                ? 'No accounts yet. Add your first one.'
-                : 'No accounts match the current filters.'}
-            </p>
-          </div>
+          emptyState
         ) : (
           filtered.map((account) => (
             <AccountCard key={account.id} account={account} />

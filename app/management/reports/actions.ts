@@ -45,7 +45,13 @@ export interface MonthlyRevenue {
  * carry the flat rate), so a plain sum is correct with no per-billing-type
  * special-casing — see docs/INVOICING.md.
  */
-export async function getRevenueByMonth(year: number): Promise<MonthlyRevenue[]> {
+export interface RevenueReport {
+  months: MonthlyRevenue[]
+  /** True when the query failed — see the note on CrewVisitsReport.loadError. */
+  loadError?: boolean
+}
+
+export async function getRevenueByMonth(year: number): Promise<RevenueReport> {
   const supabase = await createClient()
   const start = startOfYear(new Date(year, 0, 1))
   const end = endOfYear(new Date(year, 0, 1))
@@ -68,7 +74,7 @@ export async function getRevenueByMonth(year: number): Promise<MonthlyRevenue[]>
 
   if (error) {
     console.error('[getRevenueByMonth]', error)
-    return months
+    return { months, loadError: true }
   }
 
   for (const row of (data ?? []) as {
@@ -91,7 +97,7 @@ export async function getRevenueByMonth(year: number): Promise<MonthlyRevenue[]>
     }
   }
 
-  return months
+  return { months }
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -111,6 +117,10 @@ export interface CrewVisitsReport {
   windowLabel: string
   /** Max weekly count across all crew — the shared y-scale for small multiples. */
   maxWeekly: number
+  /** True when the query failed, so the page can say so instead of drawing a
+   *  chart of zeroes — "nobody did any work this year" is a very different claim
+   *  from "this didn't load" (task 8.5). */
+  loadError?: boolean
 }
 
 /**
@@ -147,7 +157,7 @@ export async function getVisitsPerCrewByWeek(year: number): Promise<CrewVisitsRe
 
   if (error) {
     console.error('[getVisitsPerCrewByWeek]', error)
-    return empty
+    return { ...empty, loadError: true }
   }
 
   const weekIndex = new Map(weekStarts.map((w, i) => [format(w, 'yyyy-MM-dd'), i]))
@@ -209,6 +219,8 @@ export interface AdherenceReport {
   onTargetCount: number
   windowLabel: string
   weeks: number
+  /** True when the query failed — see the note on CrewVisitsReport.loadError. */
+  loadError?: boolean
 }
 
 /**
@@ -254,7 +266,7 @@ export async function getFrequencyAdherence(year: number): Promise<AdherenceRepo
       '[getFrequencyAdherence]',
       visitsResult.error ?? accountsResult.error,
     )
-    return emptyReport
+    return { ...emptyReport, loadError: true }
   }
 
   const visits = (visitsResult.data ?? []) as {

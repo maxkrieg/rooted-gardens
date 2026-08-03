@@ -28,6 +28,7 @@ import { BillingTypeBadge } from '@/components/management/badges'
 import { createContractInvoice, type ContractAccountOverview } from '@/app/management/billing/actions'
 import { createContractInvoiceSchema, type CreateContractInvoiceValues } from '@/lib/validators/contractInvoice'
 import { formatAccountPrice } from '@/lib/utils/accounts'
+import { EmptyState } from '@/components/states/EmptyState'
 import type { Account } from '@/types/app'
 
 interface ContractInvoicingProps {
@@ -47,9 +48,12 @@ export function ContractInvoicing({ accounts, qboConnected }: ContractInvoicingP
 
   if (accounts.length === 0) {
     return (
-      <div className="flex items-center justify-center py-16 text-sm text-muted-foreground rounded-xl border border-border bg-card">
-        No active contract accounts.
-      </div>
+      <EmptyState
+        variant="seed"
+        title="No contract accounts"
+        hint="Accounts billed a flat periodic rate show up here. Set an account's billing type to Contract to add one."
+        className="rounded-xl border border-border bg-card"
+      />
     )
   }
 

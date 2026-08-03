@@ -5,6 +5,7 @@ import { Building2, ChevronUp, ChevronDown, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { EmptyState } from '@/components/states/EmptyState'
 import { RouteGroupSheet } from '@/components/management/RouteGroupSheet'
 import { PropertyAssignmentSheet } from '@/components/management/PropertyAssignmentSheet'
 import { deleteRouteGroup, moveRouteGroup } from '@/app/management/route-groups/actions'
@@ -128,7 +129,14 @@ export function RouteGroupCard({
       <CardContent className="px-4 pb-4">
         {/* Assigned properties list */}
         {assignedProperties.length === 0 ? (
-          <p className="text-sm text-muted-foreground italic mb-3">No properties assigned yet.</p>
+          // Nested inside a card that already has its own "Assign" control, so
+          // this stays compact — the mark and CTA would be noise at this depth.
+          <EmptyState
+            compact
+            title="No properties assigned"
+            hint="Assign properties to put this group on the schedule."
+            className="mb-3"
+          />
         ) : (
           <ul className="space-y-1 mb-3">
             {assignedProperties.map((property) => (

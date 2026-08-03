@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { addDays, endOfDay, format, min as minDate, parseISO, startOfDay } from 'date-fns'
 import { Camera, X } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -50,6 +51,9 @@ interface VisitLoggerProps {
   visitId: string
   employeeId: string
   propertyId: string
+  /** Property address, stored on each queued mutation so the "changes that
+   *  didn't save" sheet can name the stop even with no connection. */
+  label?: string
   assignedCrew: Array<{ employee_id: string; name: string }>
   // The visit's start time, if the job was started. When set, the Start time field
   // is shown prefilled and editable; otherwise the crew can opt into a manual start.
@@ -75,6 +79,7 @@ export function VisitLogger({
   visitId,
   employeeId,
   propertyId,
+  label,
   assignedCrew,
   startedAt,
   weekStart,
@@ -320,27 +325,35 @@ export function VisitLogger({
     const endedAt = new Date(endTime).toISOString()
     const startedAtISO = new Date(startTime).toISOString()
 
-    await enqueueMutation('completion', {
-      visitId,
-      employeeId,
-      presentEmployeeIds: presentIds,
-      serviceTypes,
-      completionNote: completionNote.trim() || undefined,
-      startedAt: startedAtISO,
-      endedAt,
-    })
+    await enqueueMutation(
+      'completion',
+      {
+        visitId,
+        employeeId,
+        presentEmployeeIds: presentIds,
+        serviceTypes,
+        completionNote: completionNote.trim() || undefined,
+        startedAt: startedAtISO,
+        endedAt,
+      },
+      label,
+    )
 
     // Enqueue metadata for each newly captured photo — previously uploaded
     // photos (with an id, from initialPhotos) are already persisted.
     for (const photo of photos.filter((p) => !p.id && p.storagePath)) {
-      await enqueueMutation('photo', {
-        visitId,
-        propertyId,
-        storagePath: photo.storagePath,
-        uploadedBy: employeeId,
-        type: 'visit',
-        caption: photo.caption?.trim() || undefined,
-      })
+      await enqueueMutation(
+        'photo',
+        {
+          visitId,
+          propertyId,
+          storagePath: photo.storagePath,
+          uploadedBy: employeeId,
+          type: 'visit',
+          caption: photo.caption?.trim() || undefined,
+        },
+        label,
+      )
     }
 
     // Captions edited on photos that were already persisted need their own
@@ -348,15 +361,29 @@ export function VisitLogger({
     for (const photo of photos.filter(
       (p) => p.id && (p.caption ?? '') !== (p.initialCaption ?? ''),
     )) {
-      await enqueueMutation('photo_caption', {
-        photoId: photo.id!,
-        caption: photo.caption?.trim() || null,
-      })
+      await enqueueMutation(
+        'photo_caption',
+        { photoId: photo.id!, caption: photo.caption?.trim() || null },
+        label,
+      )
     }
 
     // Flush mutations now — we know we're online because photo upload enforces it.
     // Without this, the photo row sits in the IDB queue until the next layout mount.
-    await flushMutationQueue()
+    const result = await flushMutationQueue()
+
+    // This is the most expensive false success in the app: a completion that
+    // never reached the server used to be written into the cache as 'completed'
+    // and the form closed anyway, so the crew member believed the visit was
+    // logged — and it would never be invoiced (task 8.5). Keep the form open with
+    // their entries intact so they can try again from the review sheet.
+    if (result.failed > 0) {
+      setSubmitting(false)
+      toast.error('That didn’t save.', {
+        description: 'Check "Changes that didn’t save" at the top of the screen.',
+      })
+      return
+    }
 
     // Invalidate stop-detail so photos appear if user navigates back to this stop,
     // and the week schedule so its in-progress pulse clears on completion.

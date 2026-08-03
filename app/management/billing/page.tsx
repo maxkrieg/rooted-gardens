@@ -1,6 +1,9 @@
+import { Suspense } from 'react'
 import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { TableSkeleton } from '@/components/states/skeletons'
+import { ErrorState } from '@/components/states/ErrorState'
 import { parseRoleCookie } from '@/lib/utils/role-cookie'
 import { getQboConnectionStatus } from '@/lib/quickbooks/client'
 import { QuickBooksConnect } from '@/components/management/QuickBooksConnect'
@@ -98,19 +101,36 @@ export default async function BillingPage({ searchParams }: Props) {
         </Link>
       </div>
 
-      {resolvedView === 'invoices' ? (
-        <InvoicedTab range={resolvedRange} role={role as EmployeeRole} />
-      ) : resolvedView === 'contracts' ? (
-        <ContractsTab qboConnected={qboStatus !== 'disconnected'} />
-      ) : (
-        <QueueTab qboConnected={qboStatus !== 'disconnected'} />
-      )}
+      {/* Each tab does its own querying, so stream it rather than blocking the
+          header and tab row behind it — switching tabs should feel immediate even
+          when the invoice range being fetched is a wide one. The key resets the
+          boundary per tab so a switch shows the skeleton instead of the old table. */}
+      <Suspense key={resolvedView} fallback={<TableSkeleton rows={8} />}>
+        {resolvedView === 'invoices' ? (
+          <InvoicedTab range={resolvedRange} role={role as EmployeeRole} />
+        ) : resolvedView === 'contracts' ? (
+          <ContractsTab qboConnected={qboStatus !== 'disconnected'} />
+        ) : (
+          <QueueTab qboConnected={qboStatus !== 'disconnected'} />
+        )}
+      </Suspense>
     </div>
   )
 }
 
 async function QueueTab({ qboConnected }: { qboConnected: boolean }) {
-  const visits = await getUninvoicedVisits()
+  const { data: visits, loadError } = await getUninvoicedVisits()
+  // An empty queue and a failed query look identical once the rows are gone, and
+  // for an accountant they mean opposite things — "nothing to bill" versus
+  // "we don't know what's unbilled". Never let the failure read as the former.
+  if (loadError) {
+    return (
+      <ErrorState
+        title="The invoice queue didn't load."
+        hint="Don't invoice from this list until it loads — it may be incomplete."
+      />
+    )
+  }
   return <InvoiceQueue visits={visits} qboConnected={qboConnected} />
 }
 
@@ -119,9 +139,17 @@ async function InvoicedTab({ range, role }: { range: ResolvedDateRange; role: Em
     getInvoicesForRange(range),
     getRevenueSummary(),
   ])
+  if (invoices.loadError) {
+    return (
+      <ErrorState
+        title="Invoice history didn't load."
+        hint="Check your connection, then try again."
+      />
+    )
+  }
   return (
     <InvoicedHistory
-      invoices={invoices}
+      invoices={invoices.data}
       rangeLabel={range.label}
       rangePreset={range.preset}
       customStart={range.customStart}
@@ -133,6 +161,14 @@ async function InvoicedTab({ range, role }: { range: ResolvedDateRange; role: Em
 }
 
 async function ContractsTab({ qboConnected }: { qboConnected: boolean }) {
-  const accounts = await getContractAccountsOverview()
+  const { data: accounts, loadError } = await getContractAccountsOverview()
+  if (loadError) {
+    return (
+      <ErrorState
+        title="Contract accounts didn't load."
+        hint="Check your connection, then try again."
+      />
+    )
+  }
   return <ContractInvoicing accounts={accounts} qboConnected={qboConnected} />
 }

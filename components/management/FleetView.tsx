@@ -10,6 +10,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import { EmptyState } from '@/components/states/EmptyState'
 import { FleetItemCard } from '@/components/management/FleetItemCard'
 import { VehicleForm } from '@/components/management/VehicleForm'
 import { EquipmentForm } from '@/components/management/EquipmentForm'
@@ -48,9 +49,16 @@ export function FleetView({ vehicles, equipment, logsByVehicle, logsByEquipment 
 
         {vehicles.length === 0 ? (
           <EmptyState
-            icon={<Truck className="h-10 w-10 text-muted-foreground/30 mb-4" />}
-            title="No vehicles yet."
+            variant="seed"
+            title="No vehicles yet"
             hint="Add your trucks and trailers to track their status and maintenance."
+            action={
+              <Button className="gap-2" onClick={() => setNewVehicleOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Add your first vehicle
+              </Button>
+            }
+            className="rounded-2xl border border-dashed border-border"
           />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -75,9 +83,16 @@ export function FleetView({ vehicles, equipment, logsByVehicle, logsByEquipment 
 
         {equipment.length === 0 ? (
           <EmptyState
-            icon={<Wrench className="h-10 w-10 text-muted-foreground/30 mb-4" />}
-            title="No equipment yet."
+            variant="seed"
+            title="No equipment yet"
             hint="Add mowers, trimmers, and blowers to track service schedules."
+            action={
+              <Button className="gap-2" onClick={() => setNewEquipmentOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Add your first item
+              </Button>
+            }
+            className="rounded-2xl border border-dashed border-border"
           />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -113,16 +128,6 @@ export function FleetView({ vehicles, equipment, logsByVehicle, logsByEquipment 
           </div>
         </SheetContent>
       </Sheet>
-    </div>
-  )
-}
-
-function EmptyState({ icon, title, hint }: { icon: React.ReactNode; title: string; hint: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-border rounded-2xl">
-      {icon}
-      <p className="text-sm text-muted-foreground mb-1">{title}</p>
-      <p className="text-xs text-muted-foreground max-w-xs">{hint}</p>
     </div>
   )
 }

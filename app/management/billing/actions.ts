@@ -24,7 +24,18 @@ import type { Account, Invoice, InvoiceWithVisits, VisitWithLocation } from '@/t
  * and `as_needed` accounts have no stored rate to auto-price a queue push against
  * — both are the wrong fit for a visit-completion-driven queue (see docs/INVOICING.md).
  */
-export async function getUninvoicedVisits(): Promise<VisitWithLocation[]> {
+/**
+ * Wrapper for billing reads (task 8.5). These used to log and return `[]` on
+ * failure, which the accountant sees as "nothing to invoice" — the single most
+ * expensive false-empty in the app, because it means money quietly not billed.
+ * The flag lets the page say "this didn't load" instead.
+ */
+export interface LoadResult<T> {
+  data: T
+  loadError?: boolean
+}
+
+export async function getUninvoicedVisits(): Promise<LoadResult<VisitWithLocation[]>> {
   const supabase = await createClient()
 
   const { data, error } = await supabase
@@ -36,12 +47,14 @@ export async function getUninvoicedVisits(): Promise<VisitWithLocation[]> {
 
   if (error) {
     console.error('[getUninvoicedVisits]', error)
-    return []
+    return { data: [], loadError: true }
   }
 
-  return ((data ?? []) as unknown as VisitWithLocation[]).filter(
-    (v) => v.account.billing_type === 'per_visit',
-  )
+  return {
+    data: ((data ?? []) as unknown as VisitWithLocation[]).filter(
+      (v) => v.account.billing_type === 'per_visit',
+    ),
+  }
 }
 
 export interface PushResult {
@@ -225,7 +238,7 @@ export interface DateRange {
 export async function getInvoicesForRange({
   start,
   end,
-}: DateRange): Promise<InvoiceWithVisits[]> {
+}: DateRange): Promise<LoadResult<InvoiceWithVisits[]>> {
   const supabase = await createClient()
 
   const { data, error } = await supabase
@@ -237,15 +250,17 @@ export async function getInvoicesForRange({
 
   if (error) {
     console.error('[getInvoicesForRange]', error)
-    return []
+    return { data: [], loadError: true }
   }
 
-  return (data ?? []) as unknown as InvoiceWithVisits[]
+  return { data: (data ?? []) as unknown as InvoiceWithVisits[] }
 }
 
 export interface RevenueSummary {
   mtd: { total: number; perVisit: number; contract: number; label: string }
   ytd: { total: number; perVisit: number; contract: number; label: string }
+  /** True when the query failed, so the tiles can read "—" rather than "$0". */
+  loadError?: boolean
 }
 
 /**
@@ -271,7 +286,11 @@ export async function getRevenueSummary(): Promise<RevenueSummary> {
 
   if (error || !data) {
     console.error('[getRevenueSummary]', error)
-    return { mtd: { ...empty, label: monthLabel }, ytd: { ...empty, label: yearLabel } }
+    return {
+      mtd: { ...empty, label: monthLabel },
+      ytd: { ...empty, label: yearLabel },
+      loadError: true,
+    }
   }
 
   const mtd = { ...empty }
@@ -306,7 +325,9 @@ export interface ContractAccountOverview {
   lastInvoice: Invoice | null
 }
 
-export async function getContractAccountsOverview(): Promise<ContractAccountOverview[]> {
+export async function getContractAccountsOverview(): Promise<
+  LoadResult<ContractAccountOverview[]>
+> {
   const supabase = await createClient()
 
   const { data: accounts, error: accountsError } = await supabase
@@ -318,7 +339,7 @@ export async function getContractAccountsOverview(): Promise<ContractAccountOver
 
   if (accountsError || !accounts) {
     console.error('[getContractAccountsOverview] accounts', accountsError)
-    return []
+    return { data: [], loadError: true }
   }
 
   const { data: invoices, error: invoicesError } = await supabase
@@ -333,10 +354,12 @@ export async function getContractAccountsOverview(): Promise<ContractAccountOver
 
   const typedInvoices = (invoices ?? []) as unknown as Invoice[]
 
-  return accounts.map((account) => ({
-    account,
-    lastInvoice: typedInvoices.find((inv) => inv.account_id === account.id) ?? null,
-  }))
+  return {
+    data: accounts.map((account) => ({
+      account,
+      lastInvoice: typedInvoices.find((inv) => inv.account_id === account.id) ?? null,
+    })),
+  }
 }
 
 export interface CreateContractInvoiceInput {
@@ -460,6 +483,12 @@ export async function createContractInvoice(
 export interface RefreshInvoiceStatusesResult {
   processed: number
   errors: number
+  /** QBO invoice numbers that failed, so the accountant can check those directly
+   *  in QuickBooks. A bare "3 failed" left them with nothing to act on. */
+  failedInvoiceIds?: string[]
+  /** Set when the whole run failed for one shared reason (e.g. QBO disconnected)
+   *  rather than per-invoice. */
+  reason?: string
 }
 
 /**
@@ -491,19 +520,23 @@ export async function refreshInvoiceStatuses(
   try {
     qbo = await getQuickBooksClient()
   } catch {
-    return { processed: 0, errors: data.length }
+    return {
+      processed: 0,
+      errors: data.length,
+      reason: 'QuickBooks is not connected. Reconnect it from this page, then refresh again.',
+    }
   }
 
   let processed = 0
-  let errors = 0
+  const failedInvoiceIds: string[] = []
   for (const row of data) {
     const res = await syncInvoiceStatus(supabase, qbo, row)
-    if (res.error) errors++
+    if (res.error) failedInvoiceIds.push(row.qbo_invoice_id)
     else processed++
   }
 
   revalidatePath('/management/billing')
-  return { processed, errors }
+  return { processed, errors: failedInvoiceIds.length, failedInvoiceIds }
 }
 
 /** How recently an invoice must have been synced for the background poll to skip

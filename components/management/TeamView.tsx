@@ -10,6 +10,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import { EmptyState } from '@/components/states/EmptyState'
 import { EmployeeCard } from '@/components/management/EmployeeCard'
 import { EmployeeForm } from '@/components/management/EmployeeForm'
 import type { Employee } from '@/types/app'
@@ -32,13 +33,18 @@ export function TeamView({ employees }: { employees: Employee[] }) {
       </div>
 
       {employees.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-border rounded-2xl">
-          <Users className="h-10 w-10 text-muted-foreground/30 mb-4" />
-          <p className="text-sm text-muted-foreground mb-1">No employees yet.</p>
-          <p className="text-xs text-muted-foreground max-w-xs">
-            Add your crew, leads, and office staff to manage roles and app access.
-          </p>
-        </div>
+        <EmptyState
+          variant="seed"
+          title="No one on the team yet"
+          hint="Add your crew, leads, and office staff to manage roles and app access."
+          action={
+            <Button className="gap-2" onClick={() => setNewOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Add your first employee
+            </Button>
+          }
+          className="rounded-2xl border border-dashed border-border"
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {employees.map((e) => (

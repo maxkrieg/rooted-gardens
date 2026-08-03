@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 import { getWeekStart } from '@/lib/utils/schedule'
 import { cn } from '@/lib/utils'
 import { CrewsOnSitePanel } from '@/components/management/CrewsOnSitePanel'
+import { EmptyState } from '@/components/states/EmptyState'
+import { SectionError } from '@/components/states/ErrorState'
 import type { Equipment, Vehicle, VisitWithDetails } from '@/types/app'
 
 export default async function DashboardPage() {
@@ -31,6 +33,18 @@ export default async function DashboardPage() {
       .not('started_at', 'is', null)
       .is('ended_at', null),
   ])
+
+  // Report failures per section, not per page. These four queries feed four
+  // independent panels, and blanking the whole dashboard because the fleet query
+  // timed out would hide the schedule the owner actually opened it for.
+  // Critically, a failed query must NOT fall through to `[]` — that renders
+  // "Nothing scheduled this week" during an outage, which is simply untrue.
+  const visitsFailed = !!visitsResult.error
+  const fleetFailed = !!equipmentResult.error || !!vehiclesResult.error
+  if (visitsResult.error) console.error('[dashboard] visits', visitsResult.error)
+  if (equipmentResult.error) console.error('[dashboard] equipment', equipmentResult.error)
+  if (vehiclesResult.error) console.error('[dashboard] vehicles', vehiclesResult.error)
+  if (inProgressResult.error) console.error('[dashboard] in-progress', inProgressResult.error)
 
   const visits = (visitsResult.data ?? []) as unknown as VisitWithDetails[]
   const maintenanceEquipment = (equipmentResult.data ?? []) as Equipment[]
@@ -66,12 +80,19 @@ export default async function DashboardPage() {
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
           This Week
         </h2>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatCard label="Scheduled" value={scheduledVisits.length} colorClass="status-scheduled" />
-          <StatCard label="Completed" value={completedCount} colorClass="status-completed" />
-          <StatCard label="Skipped" value={skippedCount} colorClass="status-skipped" />
-          <StatCard label="Uninvoiced" value={uninvoicedCount} colorClass="status-invoiced" />
-        </div>
+        {visitsFailed ? (
+          <SectionError
+            title="This week's numbers didn't load."
+            hint="They'll be back once the connection recovers."
+          />
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <StatCard label="Scheduled" value={scheduledVisits.length} colorClass="status-scheduled" />
+            <StatCard label="Completed" value={completedCount} colorClass="status-completed" />
+            <StatCard label="Skipped" value={skippedCount} colorClass="status-skipped" />
+            <StatCard label="Uninvoiced" value={uninvoicedCount} colorClass="status-invoiced" />
+          </div>
+        )}
       </section>
 
       {/* ── Crews on site now (live) ──────────────────────────────────────── */}
@@ -82,8 +103,18 @@ export default async function DashboardPage() {
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
           Scheduled This Week
         </h2>
-        {sortedScheduled.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nothing scheduled this week.</p>
+        {visitsFailed ? (
+          <SectionError
+            title="The schedule didn't load."
+            hint="Refresh to try again — nothing has changed."
+          />
+        ) : sortedScheduled.length === 0 ? (
+          <EmptyState
+            compact
+            variant="sprig"
+            title="Nothing scheduled this week"
+            hint="Add stops from the Schedule to fill the week."
+          />
         ) : (
           <div className="space-y-2">
             {sortedScheduled.map((visit) => (
@@ -98,8 +129,15 @@ export default async function DashboardPage() {
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
           Outstanding Crew Instructions
         </h2>
-        {outstandingInstructions.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No outstanding instructions.</p>
+        {visitsFailed ? (
+          <SectionError title="Crew instructions didn't load." hint="Refresh to try again." />
+        ) : outstandingInstructions.length === 0 ? (
+          <EmptyState
+            compact
+            variant="sprig"
+            title="No outstanding instructions"
+            hint="One-off notes you add to a visit show up here until it's done."
+          />
         ) : (
           <div className="space-y-2">
             {outstandingInstructions.map((visit) => (
@@ -109,20 +147,29 @@ export default async function DashboardPage() {
         )}
       </section>
 
-      {/* ── Fleet & equipment — only when something needs attention ────────── */}
-      {hasFleetIssues && (
+      {/* ── Fleet & equipment — only when something needs attention ──────────
+          A failed query still gets a section: silently hiding it would tell the
+          owner nothing needs maintenance, which is exactly the wrong reassurance. */}
+      {(hasFleetIssues || fleetFailed) && (
         <section>
           <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
             Fleet &amp; Equipment
           </h2>
-          <div className="space-y-2">
-            {maintenanceVehicles.map((v) => (
-              <FleetCard key={v.id} name={v.name} kind="Vehicle" />
-            ))}
-            {maintenanceEquipment.map((e) => (
-              <FleetCard key={e.id} name={e.name} kind={e.type} />
-            ))}
-          </div>
+          {fleetFailed ? (
+            <SectionError
+              title="Maintenance status didn't load."
+              hint="Check the Fleet page directly."
+            />
+          ) : (
+            <div className="space-y-2">
+              {maintenanceVehicles.map((v) => (
+                <FleetCard key={v.id} name={v.name} kind="Vehicle" />
+              ))}
+              {maintenanceEquipment.map((e) => (
+                <FleetCard key={e.id} name={e.name} kind={e.type} />
+              ))}
+            </div>
+          )}
         </section>
       )}
     </div>

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { routeGroupFormSchema, type RouteGroupFormValues } from '@/lib/validators/routeGroup'
+import { toUserMessage } from '@/lib/errors'
 
 function revalidate() {
   revalidatePath('/management/route-groups')
@@ -36,8 +37,7 @@ export async function createRouteGroup(
   })
 
   if (error) {
-    console.error('[createRouteGroup]', error)
-    return { error: error.message }
+    return { error: toUserMessage(error, 'Could not create the route group.', '[createRouteGroup]') }
   }
 
   revalidate()
@@ -61,8 +61,7 @@ export async function updateRouteGroup(
     .eq('id', id)
 
   if (error) {
-    console.error('[updateRouteGroup]', error)
-    return { error: error.message }
+    return { error: toUserMessage(error, 'Could not save the route group.', '[updateRouteGroup]') }
   }
 
   revalidate()
@@ -103,14 +102,14 @@ export async function moveRouteGroup(
     .update({ sort_order: neighbor.sort_order })
     .eq('id', current.id)
 
-  if (e1) return { error: e1.message }
+  if (e1) return { error: toUserMessage(e1, 'Could not reorder the route groups.', '[moveRouteGroup]') }
 
   const { error: e2 } = await supabase
     .from('route_groups')
     .update({ sort_order: current.sort_order })
     .eq('id', neighbor.id)
 
-  if (e2) return { error: e2.message }
+  if (e2) return { error: toUserMessage(e2, 'Could not reorder the route groups.', '[moveRouteGroup]') }
 
   revalidate()
   return {}
@@ -125,8 +124,7 @@ export async function deleteRouteGroup(id: string): Promise<{ error?: string }> 
   const { error } = await supabase.from('route_groups').delete().eq('id', id)
 
   if (error) {
-    console.error('[deleteRouteGroup]', error)
-    return { error: error.message }
+    return { error: toUserMessage(error, 'Could not delete the route group.', '[deleteRouteGroup]') }
   }
 
   revalidate()
@@ -158,8 +156,7 @@ export async function assignProperty(
     )
 
   if (error) {
-    console.error('[assignProperty]', error)
-    return { error: error.message }
+    return { error: toUserMessage(error, 'Could not assign the property.', '[assignProperty]') }
   }
 
   revalidate()
@@ -181,8 +178,7 @@ export async function unassignProperty(
     .eq('route_group_id', routeGroupId)
 
   if (error) {
-    console.error('[unassignProperty]', error)
-    return { error: error.message }
+    return { error: toUserMessage(error, 'Could not remove the property from this route.', '[unassignProperty]') }
   }
 
   revalidate()

@@ -1,5 +1,6 @@
 import { getDB, type MutationType, type QueuedMutation } from './idb'
 import { createClient } from '@/lib/supabase/client'
+import { toUserMessage } from '@/lib/errors'
 import type { PhotoType } from '@/types/app'
 
 // Payload types
@@ -58,9 +59,22 @@ type MutationPayload =
   | { type: 'photo_caption'; payload: PhotoCaptionPayload }
   | { type: 'skip'; payload: SkipPayload }
 
+/**
+ * How many times a mutation is retried before it is parked as 'failed'.
+ *
+ * `attempts` was already being incremented before task 8.5, but nothing ever
+ * read it: a mutation that could never succeed (an RLS denial, a visit deleted
+ * out from under it) was retried on every mount and every reconnect, forever,
+ * while the banner sat on "Syncing 1 change…" and the crew member believed their
+ * completion had been recorded. Five attempts is generous for a transient blip
+ * and short enough that a genuine failure surfaces the same day.
+ */
+export const MAX_ATTEMPTS = 5
+
 export async function enqueueMutation(
   type: MutationType,
-  payload: MutationPayload['payload']
+  payload: MutationPayload['payload'],
+  label?: string,
 ): Promise<void> {
   const db = await getDB()
   const mutation: QueuedMutation = {
@@ -69,18 +83,43 @@ export async function enqueueMutation(
     payload,
     timestamp: new Date().toISOString(),
     attempts: 0,
+    status: 'pending',
+    label,
   }
   await db.add('mutations', mutation)
 }
 
+/** Mutations still awaiting sync. Excludes parked ('failed') ones. */
 export async function getPendingMutations(): Promise<QueuedMutation[]> {
   const db = await getDB()
-  return db.getAllFromIndex('mutations', 'by-timestamp')
+  const all: QueuedMutation[] = await db.getAllFromIndex('mutations', 'by-timestamp')
+  return all.filter((m) => m.status !== 'failed')
 }
 
-export async function getPendingCount(): Promise<number> {
+/** Mutations that gave up — what the review sheet lists. */
+export async function getFailedMutations(): Promise<QueuedMutation[]> {
   const db = await getDB()
-  return db.count('mutations')
+  const all: QueuedMutation[] = await db.getAllFromIndex('mutations', 'by-timestamp')
+  return all.filter((m) => m.status === 'failed')
+}
+
+export interface QueueCounts {
+  pending: number
+  failed: number
+}
+
+export async function getQueueCounts(): Promise<QueueCounts> {
+  const db = await getDB()
+  const all: QueuedMutation[] = await db.getAll('mutations')
+  return {
+    pending: all.filter((m) => m.status !== 'failed').length,
+    failed: all.filter((m) => m.status === 'failed').length,
+  }
+}
+
+/** Back-compat shim — pending-only count, as callers already expect. */
+export async function getPendingCount(): Promise<number> {
+  return (await getQueueCounts()).pending
 }
 
 export async function markMutationDone(id: string): Promise<void> {
@@ -88,19 +127,72 @@ export async function markMutationDone(id: string): Promise<void> {
   await db.delete('mutations', id)
 }
 
-async function incrementAttempts(mutation: QueuedMutation): Promise<void> {
+/** Discard a parked mutation the crew member has decided to give up on. */
+export async function discardMutation(id: string): Promise<void> {
   const db = await getDB()
-  await db.put('mutations', { ...mutation, attempts: mutation.attempts + 1 })
+  await db.delete('mutations', id)
 }
 
-// Dispatches each pending mutation to Supabase. Called on reconnect and on app mount.
-// Handlers for 'completion' and 'photo' are stubs until tasks 4.4 / 4.5 land.
-export async function flushMutationQueue(): Promise<void> {
-  if (typeof navigator !== 'undefined' && !navigator.onLine) return
+/** Move a parked mutation back into the queue for one more run of attempts. */
+export async function retryMutation(id: string): Promise<void> {
+  const db = await getDB()
+  const mutation = (await db.get('mutations', id)) as QueuedMutation | undefined
+  if (!mutation) return
+  await db.put('mutations', {
+    ...mutation,
+    attempts: 0,
+    status: 'pending',
+    lastError: undefined,
+  })
+}
+
+/**
+ * Records a failed attempt, parking the mutation once it has burned through
+ * MAX_ATTEMPTS. Returns true when the mutation was parked.
+ */
+async function recordFailure(mutation: QueuedMutation, err: unknown): Promise<boolean> {
+  const db = await getDB()
+  const attempts = mutation.attempts + 1
+  const parked = attempts >= MAX_ATTEMPTS
+  await db.put('mutations', {
+    ...mutation,
+    attempts,
+    status: parked ? 'failed' : 'pending',
+    lastError: toUserMessage(err, 'It could not be saved.', `[mutation-queue:${mutation.type}]`),
+  })
+  return parked
+}
+
+export interface FlushResult {
+  /** Mutations that reached Supabase on this run. */
+  synced: number
+  /** Mutations parked as 'failed' on this run. */
+  failed: number
+  /** Mutations still queued afterwards (transient failures + anything skipped). */
+  pending: number
+  /** True when the flush didn't run because the device is offline. */
+  offline: boolean
+}
+
+/**
+ * Dispatches each pending mutation to Supabase. Called on reconnect and on app mount.
+ *
+ * Returns a summary rather than void (task 8.5) so callers can tell the crew
+ * member what actually happened instead of assuming success — SkipSheet and
+ * VisitLogger used to write "completed" into the cache and navigate away
+ * regardless of the outcome.
+ */
+export async function flushMutationQueue(): Promise<FlushResult> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    const counts = await getQueueCounts()
+    return { synced: 0, failed: 0, pending: counts.pending, offline: true }
+  }
 
   const pending = await getPendingMutations()
-  if (pending.length === 0) return
+  if (pending.length === 0) return { synced: 0, failed: 0, pending: 0, offline: false }
 
+  let synced = 0
+  let failed = 0
   const supabase = createClient()
 
   for (const mutation of pending) {
@@ -210,9 +302,13 @@ export async function flushMutationQueue(): Promise<void> {
           console.warn('[mutation-queue] unknown mutation type:', (mutation as QueuedMutation).type)
       }
       await markMutationDone(mutation.id)
+      synced++
     } catch (err) {
       console.error('[mutation-queue] flush error for', mutation.type, err)
-      await incrementAttempts(mutation)
+      if (await recordFailure(mutation, err)) failed++
     }
   }
+
+  const counts = await getQueueCounts()
+  return { synced, failed, pending: counts.pending, offline: false }
 }

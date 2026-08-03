@@ -2,7 +2,9 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { format, parseISO, startOfMonth, endOfMonth } from 'date-fns'
-import { Check, ChevronsUpDown } from 'lucide-react'
+import { Check, ChevronsUpDown, TriangleAlert } from 'lucide-react'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { EmptyState } from '@/components/states/EmptyState'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -34,7 +36,7 @@ import {
 import { AccountInvoiceDrawer } from '@/components/management/AccountInvoiceDrawer'
 import { SortableTableHead, type SortDir } from '@/components/management/SortableTableHead'
 import { BillingTypeBadge } from '@/components/management/badges'
-import { pushInvoicesToQuickBooks } from '@/app/management/billing/actions'
+import { pushInvoicesToQuickBooks, type PushResult } from '@/app/management/billing/actions'
 import {
   groupVisitsByAccount,
   resolveDateRange,
@@ -83,6 +85,9 @@ export function InvoiceQueue({ visits, qboConnected }: InvoiceQueueProps) {
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'account', dir: 'asc' })
   const [drawerAccountId, setDrawerAccountId] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  /** Outcome of the most recent batch push, kept on screen so failures survive
+   *  longer than a toast — the accountant needs to work through them one by one. */
+  const [pushResults, setPushResults] = useState<PushResult[] | null>(null)
 
   // Reset selection whenever the visit set changes (e.g. after a push
   // revalidates the page) — nothing is pre-selected, so a stale id from a
@@ -185,23 +190,36 @@ export function InvoiceQueue({ visits, qboConnected }: InvoiceQueueProps) {
     if (ids.length === 0) return
     startTransition(async () => {
       const results = await pushInvoicesToQuickBooks(ids)
-      for (const r of results) {
-        if (r.success) {
-          toast.success(`${r.accountName}: invoice pushed`, {
-            description: `QuickBooks invoice ${r.qboInvoiceId}`,
-          })
-        } else {
-          toast.error(`${r.accountName}: push failed`, { description: r.error })
-        }
+      setPushResults(results)
+
+      // One toast for the batch, not one per account: a 12-account push used to
+      // stack 12 toasts, and the failures scrolled past before they could be
+      // read. Detail lives in the results panel below the table, which persists.
+      const failed = results.filter((r) => !r.success)
+      const pushed = results.length - failed.length
+      if (failed.length === 0) {
+        toast.success(`Pushed ${pushed} invoice${pushed === 1 ? '' : 's'} to QuickBooks`)
+      } else {
+        toast.error(
+          pushed > 0
+            ? `Pushed ${pushed} of ${results.length} — ${failed.length} didn't go through`
+            : `None of the ${failed.length} invoice${failed.length === 1 ? '' : 's'} went through`,
+          { description: 'See what failed below the table.', duration: 8000 },
+        )
       }
     })
   }
 
   if (visits.length === 0) {
+    // 'sprig', not 'seed': an empty billing queue means everything completed has
+    // been billed. That's the goal, not a gap to fill.
     return (
-      <div className="flex items-center justify-center py-16 text-sm text-muted-foreground rounded-xl border border-border bg-card">
-        No completed visits awaiting invoice.
-      </div>
+      <EmptyState
+        variant="sprig"
+        title="Everything's invoiced"
+        hint="Completed visits show up here as soon as crew log them."
+        className="rounded-xl border border-border bg-card"
+      />
     )
   }
 
@@ -360,9 +378,13 @@ export function InvoiceQueue({ visits, qboConnected }: InvoiceQueueProps) {
           </TableHeader>
           <TableBody>
             {groups.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={4} className="py-12 text-center text-sm text-muted-foreground">
-                  No accounts match these filters.
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={4} className="p-0">
+                  <EmptyState
+                    variant="pruned"
+                    title="No accounts match these filters"
+                    hint="Widen the date range or clear the account filter."
+                  />
                 </TableCell>
               </TableRow>
             ) : (
@@ -400,6 +422,39 @@ export function InvoiceQueue({ visits, qboConnected }: InvoiceQueueProps) {
           </TableBody>
         </Table>
       </div>
+
+      {pushResults && pushResults.some((r) => !r.success) && (
+        <Alert variant="warning">
+          <TriangleAlert className="h-4 w-4" />
+          <AlertTitle>
+            {pushResults.filter((r) => !r.success).length} invoice
+            {pushResults.filter((r) => !r.success).length === 1 ? '' : 's'} didn&rsquo;t reach
+            QuickBooks
+          </AlertTitle>
+          <AlertDescription>
+            <ul className="mt-1 space-y-1">
+              {pushResults
+                .filter((r) => !r.success)
+                .map((r) => (
+                  <li key={r.accountId}>
+                    <span className="font-medium text-foreground">{r.accountName}</span>
+                    {r.error ? ` — ${r.error}` : ''}
+                  </li>
+                ))}
+            </ul>
+            <p className="mt-2">
+              Their visits are still in the queue. Fix the cause in QuickBooks, then push again.
+            </p>
+            <button
+              type="button"
+              onClick={() => setPushResults(null)}
+              className="mt-2 font-medium text-foreground underline underline-offset-4"
+            >
+              Dismiss
+            </button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {drawerGroup && (
         <AccountInvoiceDrawer

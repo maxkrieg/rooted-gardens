@@ -1080,13 +1080,92 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   invoices or a seed block (including one invoice paid the following January, to
   exercise the cross-year `.or()` filter in `getRevenueByMonth`).
 
-- [ ] **8.5 — Error states and empty states**
+- [x] **8.5 — Error states and empty states**
   *Depends on: Phases 2–7 (audit pass over everything built)*
   Audit all pages for missing error boundaries, loading states, and empty states.
   Every list view needs an empty state with a helpful message and a CTA.
   Every async operation needs a loading indicator. Wrap the app in an
   `ErrorBoundary`. Add Supabase query error handling with user-friendly messages
   ("Could not load schedule — try refreshing"). No raw error strings shown to users.
+  **This was not a cosmetic pass.** The audit found three real defects, and they
+  drove the shape of the fix:
+  (1) **Failures were disguised as emptiness.** The dashboard ran four queries and
+  checked none of them, so an outage rendered "Nothing scheduled this week" to an
+  owner. **No crew component read `isError` — not one**, so a failed
+  `/crew/schedule` read said "No stops match your filters", `/crew/history` went
+  blank, and `/crew/stop/[id]` said "Stop not found." The billing queue returned
+  `[]` on failure, which to an accountant means "nothing to bill" — the most
+  expensive false-empty in the app.
+  (2) **Raw Postgres reached the screen.** 24 sites did `return { error: error.message }`
+  and the toast pattern rendered it verbatim, so an RLS denial or the accountant
+  column-guard trigger surfaced as `new row violates row-level security policy…`.
+  (3) **The crew offline queue silently lost work** — see the dedicated note below.
+
+  **Built.** `lib/errors.ts` is the single boundary between machine errors and
+  words a user reads: `toUserMessage` maps on the *error code* (SQLSTATE / PostgREST
+  / GoTrue), never the message text, and always logs the original. Fixing it at the
+  action boundary fixed all ~13 toast call sites at once with no component changes.
+  New `components/states/` holds `EmptyState`, `ErrorState` + `SectionError` +
+  `StaleNotice`, `ErrorBoundary` (mounted in `providers.tsx` inside the query
+  provider so retry can reach the cache), and route-shaped `skeletons.tsx`.
+  14 route special-files were added where there had been **zero**: `global-error`,
+  `error` at root/management/crew (nested *inside* their layouts, so the sidebar and
+  bottom nav survive), `not-found`, and `loading.tsx` for all nine management
+  segments. `shadcn` `skeleton` + `alert` were installed (neither existed).
+
+  **The design decision worth keeping: absence has a vocabulary.** Five situations
+  used to render as the same gray sentence. They now carry one of four stroke-only
+  botanical marks keyed to *meaning, not to page* — **seed** (nothing set up yet →
+  primary CTA), **pruned stem** (filters matched nothing → "Clear filters"),
+  **tied sprig** (all done — an empty billing queue is good news, not a gap), and
+  **broken stem** in clay (failed → "Try again"). Getting the variant right matters
+  more than the wording. `CLAUDE.md` already asked for "organic line motifs in empty
+  states"; this is that, and it's the one place a drawing belongs in an otherwise
+  data-dense tool. Skeletons are shape-accurate (they mirror real heights so nothing
+  reflows on settle) and use a slow warm sweep rather than a gray pulse, gated by
+  `prefers-reduced-motion` per the precedent 8.4 set.
+
+  **The crew stale-cache rule** (the behavioral half): on `/crew/*` an error never
+  replaces cached data. `isError && !data` → `ErrorState`; `isError && data` → the
+  stale data plus a `StaleNotice` hairline. That's what `CLAUDE.md`'s "show stale
+  data gracefully" has to mean in rural VT.
+
+  **Offline queue dead-letter — the highest-stakes part.** `mutation-queue.ts`
+  incremented `attempts` and *nothing ever read it*: a poisoned mutation (RLS
+  denial, deleted visit) retried forever on every mount while the banner sat on
+  "Syncing 1 change…". Worse, `SkipSheet` and `VisitLogger` wrote `completed` into
+  the cache and navigated away **regardless of outcome**, so a completion that never
+  reached the server looked done forever — and a lost completion is a lost invoice.
+  Now: IDB v2 adds `status`/`lastError`/`label` (the upgrade defaults existing rows
+  to `pending` — dropping them would lose the exact work this fixes),
+  `MAX_ATTEMPTS = 5` parks a mutation as `failed`, `flushMutationQueue` returns
+  `{ synced, failed, pending, offline }` instead of `void`, the two sheets no longer
+  claim false success, and `OfflineBanner` gains a third **clay** state —
+  "N changes didn't save", tappable into `StuckChangesSheet` with per-item
+  Try again / Discard. Queued-while-offline is still a success; only a parked
+  mutation is not.
+
+  **QuickBooks** was already the best-behaved area; two raw leaks were closed, and
+  `describeQboError` moved to `lib/quickbooks/errors.ts` alongside a new
+  `qboFaultMessage` — the one class of upstream text the app deliberately forwards,
+  because an Intuit business-validation fault ("Duplicate Document Number") is
+  written for a bookkeeper and is exactly what the accountant needs. The per-account
+  toast loop (12 accounts → 12 stacked toasts) collapsed to one summary toast plus a
+  persistent results panel naming what failed; the status refresh now names the
+  invoices that didn't update instead of reporting a bare count.
+
+  *Deviations from the plan, both deliberate:* `getScheduleForWeek` still **throws**
+  rather than returning a typed result — the page fetches four weeks in parallel and
+  a partial window would be a misleading schedule, so the new `management/error.tsx`
+  is the right catcher; the message is sanitized first. And `ReportEmpty` kept its
+  free-text `children` API (borrowing only the mark) because each chart's copy is one
+  continuous sentence naming the year, which a title/hint split would only worsen.
+  *Not done, flagged:* server-side zod errors are still flattened to
+  `parsed.error.issues[0]`, and no `form.setError()` call exists in the repo, so the
+  offending field isn't highlighted. Those strings are already user-safe, so it fails
+  no 8.5 criterion — worth its own task. `VisitLogger`'s manual
+  `startTimeError`/`endTimeError` state (it bypasses react-hook-form) is likewise
+  left for a separate refactor.
 
 - [ ] **8.6 — Mobile experience polish**
   *Depends on: Phase 4, 3.10*

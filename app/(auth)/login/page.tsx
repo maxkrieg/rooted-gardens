@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { toUserMessage } from '@/lib/errors'
 
 export default function LoginPage({
   searchParams,
@@ -24,8 +25,11 @@ function LoginForm({
   const [email, setEmail] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
+  // `?detail=` used to carry the raw GoTrue message straight into the page; the
+  // callback no longer sends it. An expired or already-used link is by far the
+  // most common cause, so name it rather than saying "sign-in failed".
   const [error, setError] = useState<string | null>(
-    params.error ? (params.detail ?? 'Sign-in failed — try again.') : null
+    params.error ? 'That sign-in link didn’t work. It may have expired — request a new one below.' : null
   )
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -42,7 +46,9 @@ function LoginForm({
     })
 
     if (authError) {
-      setError(authError.message)
+      setError(
+        toUserMessage(authError, 'Could not send the sign-in email. Try again.', '[login]'),
+      )
       setLoading(false)
     } else {
       setSubmitted(true)

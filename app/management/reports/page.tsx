@@ -3,6 +3,7 @@ import { ReportsYearNav } from '@/components/management/ReportsYearNav'
 import { RevenueByMonthChart } from '@/components/management/reports/RevenueByMonthChart'
 import { VisitsPerCrewSmallMultiples } from '@/components/management/reports/VisitsPerCrewSmallMultiples'
 import { FrequencyAdherenceChart } from '@/components/management/reports/FrequencyAdherenceChart'
+import { SectionError } from '@/components/states/ErrorState'
 import {
   getRevenueByMonth,
   getVisitsPerCrewByWeek,
@@ -44,9 +45,29 @@ export default async function ReportsPage({ searchParams }: Props) {
         <ReportsYearNav year={year} />
       </div>
 
-      <RevenueByMonthChart data={revenue} year={year} />
-      <VisitsPerCrewSmallMultiples report={crewVisits} />
-      <FrequencyAdherenceChart report={adherence} year={year} />
+      {/* Each report fails independently. A chart drawn from a failed query is
+          all zeroes, which reads as "nobody billed anything this year" — a much
+          worse answer than saying the data didn't load (task 8.5). */}
+      {revenue.loadError ? (
+        <SectionError
+          title="Revenue didn't load."
+          hint="Refresh to try again. Invoices in QuickBooks are unaffected."
+        />
+      ) : (
+        <RevenueByMonthChart data={revenue.months} year={year} />
+      )}
+
+      {crewVisits.loadError ? (
+        <SectionError title="Crew workload didn't load." hint="Refresh to try again." />
+      ) : (
+        <VisitsPerCrewSmallMultiples report={crewVisits} />
+      )}
+
+      {adherence.loadError ? (
+        <SectionError title="Service cadence didn't load." hint="Refresh to try again." />
+      ) : (
+        <FrequencyAdherenceChart report={adherence} year={year} />
+      )}
     </div>
   )
 }

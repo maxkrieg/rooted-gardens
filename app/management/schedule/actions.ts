@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { buildScheduleWeek, type ScheduleAssignment } from '@/lib/utils/schedule'
 import type { RouteGroup, ScheduleWeek, VisitWithCrew } from '@/types/app'
+import { toUserMessage } from '@/lib/errors'
 
 export async function getScheduleForWeek(weekStart: string): Promise<ScheduleWeek> {
   const supabase = await createClient()
@@ -25,9 +26,17 @@ export async function getScheduleForWeek(weekStart: string): Promise<ScheduleWee
       .eq('week_start', weekStart),
   ])
 
-  if (routeGroupsResult.error) throw new Error(routeGroupsResult.error.message)
-  if (assignmentsResult.error) throw new Error(assignmentsResult.error.message)
-  if (visitsResult.error) throw new Error(visitsResult.error.message)
+  // Throwing is the right call here — the page fetches four weeks in parallel and
+  // a partial window would be a misleading schedule, so app/management/error.tsx
+  // catches this and renders a proper ErrorState with the sidebar intact.
+  // The message is sanitized first: Next surfaces it verbatim in development, and
+  // a raw Postgres string is exactly what task 8.5 keeps off the screen.
+  const readError = routeGroupsResult.error ?? assignmentsResult.error ?? visitsResult.error
+  if (readError) {
+    throw new Error(
+      toUserMessage(readError, "The schedule didn't load.", '[getScheduleForWeek]'),
+    )
+  }
 
   const routeGroups = routeGroupsResult.data as RouteGroup[]
   const assignments = (assignmentsResult.data ?? []) as unknown as ScheduleAssignment[]
@@ -51,8 +60,7 @@ export async function createVisit(
   })
 
   if (error) {
-    console.error('[createVisit]', error)
-    return { error: error.message }
+    return { error: toUserMessage(error, 'Could not add the stop.', '[createVisit]') }
   }
 
   revalidatePath('/management/schedule')
@@ -73,8 +81,7 @@ export async function bulkAssignRoute(
     .eq('route_group_id', routeGroupId)
 
   if (prgsError) {
-    console.error('[bulkAssignRoute:prgs]', prgsError)
-    return { error: prgsError.message }
+    return { error: toUserMessage(prgsError, 'Could not assign the route.', '[bulkAssignRoute]') }
   }
 
   const propertyIds = (prgs ?? []).map((r) => r.property_id)
@@ -87,8 +94,7 @@ export async function bulkAssignRoute(
     .in('property_id', propertyIds)
 
   if (visitsError) {
-    console.error('[bulkAssignRoute:visits]', visitsError)
-    return { error: visitsError.message }
+    return { error: toUserMessage(visitsError, 'Could not assign the route.', '[bulkAssignRoute]') }
   }
 
   const visitIds = (visits ?? []).map((v) => v.id)
@@ -100,12 +106,10 @@ export async function bulkAssignRoute(
   ])
 
   if (updateResult.error) {
-    console.error('[bulkAssignRoute:update]', updateResult.error)
-    return { error: updateResult.error.message }
+    return { error: toUserMessage(updateResult.error, 'Could not assign the route.', '[bulkAssignRoute]') }
   }
   if (deleteResult.error) {
-    console.error('[bulkAssignRoute:delete]', deleteResult.error)
-    return { error: deleteResult.error.message }
+    return { error: toUserMessage(deleteResult.error, 'Could not assign the route.', '[bulkAssignRoute]') }
   }
 
   if (employeeIds.length > 0) {
@@ -118,8 +122,7 @@ export async function bulkAssignRoute(
     )
     const { error: insertError } = await supabase.from('visit_crew').insert(rows)
     if (insertError) {
-      console.error('[bulkAssignRoute:insert]', insertError)
-      return { error: insertError.message }
+      return { error: toUserMessage(insertError, 'Could not assign the route.', '[bulkAssignRoute]') }
     }
   }
 

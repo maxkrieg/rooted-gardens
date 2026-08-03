@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getQuickBooksClient, qboPromise } from '@/lib/quickbooks/client'
 import type QuickBooks from 'node-quickbooks'
+import { toUserMessage } from '@/lib/errors'
 
 export interface SyncCustomerResult {
   error?: string
@@ -168,8 +169,13 @@ export async function syncCustomer(accountId: string): Promise<SyncCustomerResul
     .eq('id', accountId)
 
   if (updateError) {
-    console.error('[syncCustomer] update', updateError)
-    return { error: updateError.message }
+    return {
+      error: toUserMessage(
+        updateError,
+        'The QuickBooks customer was created, but linking it to this account failed. Try syncing again.',
+        '[syncCustomer] update',
+      ),
+    }
   }
 
   return { qboCustomerId: qboCustomerId ?? undefined, action }

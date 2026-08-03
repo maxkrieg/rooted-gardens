@@ -31,8 +31,11 @@ export async function GET(request: NextRequest) {
     if (!error) {
       return NextResponse.redirect(new URL(next, request.url))
     }
+    // The raw GoTrue message used to ride along in `?detail=` and render on the
+    // login page. It said nothing useful to a crew member and put internals in a
+    // shareable URL — the login page now writes its own copy from the code alone.
     console.error('[auth/callback] exchangeCodeForSession error:', error)
-    return NextResponse.redirect(new URL(`/login?error=auth_failed&detail=${encodeURIComponent(error.message)}`, request.url))
+    return NextResponse.redirect(new URL('/login?error=auth_failed', request.url))
   }
 
   console.error('[auth/callback] no code param in request:', request.url)

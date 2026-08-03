@@ -14,10 +14,13 @@ import { VisitLogger } from '@/components/crew/VisitLogger'
 import { SkipSheet } from '@/components/crew/SkipSheet'
 import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
 import { enqueueMutation, flushMutationQueue } from '@/lib/crew/mutation-queue'
+import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/states/EmptyState'
+import { ErrorState } from '@/components/states/ErrorState'
 import type { EmployeeRole } from '@/types/app'
 
 function SkeletonBlock({ className }: { className?: string }) {
-  return <div className={`rounded-lg bg-muted animate-pulse ${className}`} />
+  return <Skeleton className={className} />
 }
 
 function LoadingSkeleton() {
@@ -44,7 +47,7 @@ export default function StopDetailPage() {
   const { visitId } = useParams<{ visitId: string }>()
   const router = useRouter()
   const queryClient = useQueryClient()
-  const { data: stop, isLoading } = useStopDetail(visitId)
+  const { data: stop, isLoading, isError, refetch } = useStopDetail(visitId)
   const { data: employee } = useCurrentEmployee()
   const [completionOpen, setCompletionOpen] = useState(false)
   const [skipOpen, setSkipOpen] = useState(false)
@@ -68,11 +71,31 @@ export default function StopDetailPage() {
 
   if (isLoading && !stop) return <LoadingSkeleton />
 
+  // A load failure and a genuinely missing stop both used to render "Stop not
+  // found." — which sends a crew member driving to the wrong conclusion about a
+  // job that is actually still on their list. Separate them.
+  if (isError && !stop) {
+    return (
+      <ErrorState
+        title="This stop didn't load."
+        hint="You may be out of signal. Try again once you're back online."
+        onRetry={() => refetch()}
+      />
+    )
+  }
+
   if (!stop) {
     return (
-      <div className="p-8 text-center text-muted-foreground">
-        Stop not found.
-      </div>
+      <EmptyState
+        variant="pruned"
+        title="This stop isn't here"
+        hint="It may have been removed from the schedule."
+        action={
+          <Button variant="outline" onClick={() => router.push('/crew/schedule')}>
+            Back to schedule
+          </Button>
+        }
+      />
     )
   }
 
@@ -92,7 +115,7 @@ export default function StopDetailPage() {
     if (!employee?.id || inProgress) return
     const startedAt = new Date().toISOString()
     setOptimisticStartedAt(startedAt)
-    await enqueueMutation('job_start', { visitId, startedAt })
+    await enqueueMutation('job_start', { visitId, startedAt }, stop?.property.address)
     await flushMutationQueue()
     queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
     queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
@@ -213,6 +236,7 @@ export default function StopDetailPage() {
         visitId={visitId}
         employeeId={employee?.id ?? ''}
         propertyId={stop.property.id}
+        label={stop.property.address}
         assignedCrew={stop.assignedCrew ?? []}
         startedAt={visitStartedAt}
         weekStart={visit.week_start}
@@ -232,6 +256,7 @@ export default function StopDetailPage() {
       <SkipSheet
         visitId={visitId}
         employeeId={employee?.id ?? ''}
+        label={stop.property.address}
         inProgress={inProgress}
         initialSkipReason={visit.skip_reason ?? undefined}
         open={skipOpen}

@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { crewProfileSchema, type CrewProfileValues } from '@/lib/validators/employee'
+import { toUserMessage } from '@/lib/errors'
 
 /**
  * Crew self-service profile update (crew /profile) — online-only.
@@ -34,8 +35,7 @@ export async function updateMyProfile(values: CrewProfileValues): Promise<{ erro
     })
     .eq('user_id', user.id)
   if (error) {
-    console.error('[updateMyProfile]', error)
-    return { error: error.message }
+    return { error: toUserMessage(error, 'Could not save your profile.', '[updateMyProfile]') }
   }
   return {}
 }

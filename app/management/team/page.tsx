@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { TeamView } from '@/components/management/TeamView'
+import { ErrorState } from '@/components/states/ErrorState'
 import type { Employee } from '@/types/app'
 
 /**
@@ -32,10 +33,12 @@ export default async function TeamPage() {
     .order('name')
 
   if (error) {
+    console.error('[team] employees', error)
     return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
-        Could not load the team — try refreshing.
-      </div>
+      <ErrorState
+        title="The team didn't load."
+        hint="Check your connection, then try again."
+      />
     )
   }
 

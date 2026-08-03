@@ -18,6 +18,7 @@ import { PropertyPhotoGallery } from '@/components/management/PropertyPhotoGalle
 import { QboLinkStatus } from '@/components/management/QboLinkStatus'
 import { FrequencyBadge } from '@/components/management/badges'
 import { RecentVisitsList } from '@/components/management/RecentVisitsList'
+import { EmptyState } from '@/components/states/EmptyState'
 import { createClient } from '@/lib/supabase/server'
 import { cn } from '@/lib/utils'
 import { formatAccountPrice } from '@/lib/utils/accounts'
@@ -165,8 +166,14 @@ async function DetailsTab({
       : Promise.resolve({ data: [] as { property_id: string; route_groups: { id: string; name: string } | null }[] }),
   ])
 
+  if (visitsResult.error) console.error('[account detail] visits', visitsResult.error)
   const visits = (visitsResult.data ?? []) as RecentVisit[]
 
+  // Route-group labels are decorative on this page — a failure just omits the
+  // badge, so it's logged rather than surfaced.
+  if ('error' in routeGroupAssignments && routeGroupAssignments.error) {
+    console.error('[account detail] route groups', routeGroupAssignments.error)
+  }
   const routeGroupByPropertyId = new Map<string, { id: string; name: string }>()
   for (const row of routeGroupAssignments.data ?? []) {
     if (row.route_groups) routeGroupByPropertyId.set(row.property_id, row.route_groups)
@@ -245,8 +252,14 @@ async function DetailsTab({
 
         {account.properties.length === 0 ? (
           <Card className="rounded-2xl border border-border shadow-warm">
-            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-              <p className="text-sm text-muted-foreground">No properties yet.</p>
+            <CardContent className="p-0">
+              <EmptyState
+                variant="seed"
+                title="No properties yet"
+                hint="Add the addresses this account is billed for — scheduling works off properties, not accounts."
+                // PropertySheet renders its own "Add Property" trigger.
+                action={<PropertySheet accountId={account.id} />}
+              />
             </CardContent>
           </Card>
         ) : (
@@ -319,6 +332,7 @@ async function DetailsTab({
           visits={visits}
           account={account}
           role={role}
+          loadError={!!visitsResult.error}
         />
       </section>
     </div>

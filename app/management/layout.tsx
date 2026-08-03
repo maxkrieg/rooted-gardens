@@ -12,13 +12,17 @@ export default async function ManagementLayout({
   } = await supabase.auth.getUser()
 
   // Role drives which nav items show (e.g. Team is owner-only, task 7.1).
+  // A failed lookup silently hides nav items, which reads to an owner as the app
+  // having lost features rather than as an error — so log it loudly. Access itself
+  // is still gated by proxy.ts and RLS, so degrading to the narrower nav is safe.
   let role: string | null = null
   if (user) {
-    const { data: employee } = await supabase
+    const { data: employee, error } = await supabase
       .from('employees')
       .select('role')
       .eq('user_id', user.id)
       .single()
+    if (error) console.error('[management/layout] role lookup', error)
     role = employee?.role ?? null
   }
 

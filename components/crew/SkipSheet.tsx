@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -17,6 +18,9 @@ import type { StopDetail } from '@/hooks/crew/useStopDetail'
 interface SkipSheetProps {
   visitId: string
   employeeId: string
+  /** Property address, stored on the queued mutation so the "changes that didn't
+   *  save" sheet can name the stop even with no connection. */
+  label?: string
   // Whether the visit is currently in progress — skipping stops the on-site clock.
   inProgress?: boolean
   initialSkipReason?: string
@@ -28,6 +32,7 @@ interface SkipSheetProps {
 export function SkipSheet({
   visitId,
   employeeId,
+  label,
   inProgress,
   initialSkipReason,
   open,
@@ -47,13 +52,30 @@ export function SkipSheet({
 
     const endedAt = new Date().toISOString()
 
-    await enqueueMutation('skip', {
-      visitId,
-      skipReason: skipReason.trim() || undefined,
-      endedAt: inProgress ? endedAt : undefined,
-    })
+    await enqueueMutation(
+      'skip',
+      {
+        visitId,
+        skipReason: skipReason.trim() || undefined,
+        endedAt: inProgress ? endedAt : undefined,
+      },
+      label,
+    )
 
-    await flushMutationQueue()
+    const result = await flushMutationQueue()
+
+    // A hard failure used to be indistinguishable from success here: the cache
+    // was set to 'skipped' and the sheet closed regardless, so a skip that never
+    // reached the server looked done forever (task 8.5). Queued-while-offline is
+    // still a success — that's the whole point of the queue — but a parked
+    // mutation is not, so leave the sheet open and say so.
+    if (result.failed > 0) {
+      setSubmitting(false)
+      toast.error('That didn’t save.', {
+        description: 'Check "Changes that didn’t save" at the top of the screen.',
+      })
+      return
+    }
 
     queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
     queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
@@ -70,6 +92,10 @@ export function SkipSheet({
         },
       }
     })
+
+    if (result.offline) {
+      toast.success('Skipped — it’ll sync when you have signal.')
+    }
 
     setSkipReason('')
     setSubmitting(false)

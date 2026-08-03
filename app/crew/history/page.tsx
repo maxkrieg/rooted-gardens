@@ -2,9 +2,11 @@
 
 import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
-import { Clock } from 'lucide-react'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { useHistoryStops } from '@/hooks/crew/useHistoryStops'
+import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/states/EmptyState'
+import { ErrorState, StaleNotice } from '@/components/states/ErrorState'
 
 const SERVICE_TYPE_LABELS: Record<string, string> = {
   mow: 'Mow',
@@ -18,17 +20,17 @@ const SERVICE_TYPE_LABELS: Record<string, string> = {
 
 function RowSkeleton() {
   return (
-    <div className="flex items-center gap-3 px-4 py-3 animate-pulse">
+    <div className="flex items-center gap-3 px-4 py-3">
       <div className="w-14 shrink-0">
-        <div className="h-4 w-12 rounded bg-muted" />
-        <div className="mt-1 h-3 w-8 rounded bg-muted" />
+        <Skeleton className="h-4 w-12 rounded" />
+        <Skeleton className="mt-1 h-3 w-8 rounded" />
       </div>
       <div className="flex-1 min-w-0 space-y-1.5">
-        <div className="h-4 w-40 rounded bg-muted" />
-        <div className="h-3 w-24 rounded bg-muted" />
+        <Skeleton className="h-4 w-40 rounded" />
+        <Skeleton className="h-3 w-24 rounded" />
       </div>
       <div className="flex gap-1.5 shrink-0">
-        <div className="h-5 w-12 rounded-full bg-muted" />
+        <Skeleton className="h-5 w-12 rounded-full" />
       </div>
     </div>
   )
@@ -36,9 +38,14 @@ function RowSkeleton() {
 
 export default function HistoryPage() {
   const { data: employee } = useCurrentEmployee()
-  const { data: stops, isLoading } = useHistoryStops(employee?.id)
+  const { data: stops, isLoading, isError, refetch } = useHistoryStops(employee?.id)
 
   const isInitialLoad = isLoading && !stops
+  // Without this branch a failed query left `stops` undefined, so neither the
+  // empty state nor the list rendered and the page was simply blank below the
+  // heading. Cached history still wins over an error (the stale-cache rule).
+  const showErrorState = isError && !stops
+  const showStaleNotice = isError && !!stops
 
   return (
     <div className="pb-6">
@@ -55,14 +62,22 @@ export default function HistoryPage() {
         </div>
       )}
 
-      {!isInitialLoad && stops?.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center px-4">
-          <Clock className="h-12 w-12 text-muted-foreground/30" />
-          <div>
-            <p className="font-display text-lg font-semibold text-foreground">No history yet</p>
-            <p className="mt-1 text-sm text-muted-foreground">Completed stops will appear here.</p>
-          </div>
-        </div>
+      {showStaleNotice && <StaleNotice />}
+
+      {showErrorState && (
+        <ErrorState
+          title="Your history didn't load."
+          hint="You may be out of signal. Try again once you're back online."
+          onRetry={() => refetch()}
+        />
+      )}
+
+      {!isInitialLoad && !showErrorState && stops?.length === 0 && (
+        <EmptyState
+          variant="seed"
+          title="No history yet"
+          hint="Stops you complete will show up here."
+        />
       )}
 
       {stops && stops.length > 0 && (

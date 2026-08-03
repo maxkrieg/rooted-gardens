@@ -47,6 +47,7 @@ import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
 import type { EmployeeRole, VisitStatus } from '@/types/app'
+import { toastCrewError } from '@/lib/crew/errors'
 
 const VISIT_STATUS_OPTIONS: VisitStatus[] = ['scheduled', 'completed', 'skipped']
 
@@ -203,14 +204,6 @@ export function VisitDetailContent({
     }
   }
 
-  function handleOfflineOrGenericError(err: unknown, genericMessage: string) {
-    if (err instanceof Error && err.message === 'offline') {
-      toast.error('This needs a connection.')
-    } else {
-      toast.error(genericMessage)
-    }
-  }
-
   function handleStatusSelect(next: VisitStatus) {
     if (next === visit.status) return
     if (next === 'skipped') {
@@ -223,7 +216,7 @@ export function VisitDetailContent({
     }
     // next === 'scheduled' — revert from skipped/completed
     revert.mutate(undefined, {
-      onError: (err) => handleOfflineOrGenericError(err, 'Could not update status. Try again.'),
+      onError: (err) => toastCrewError(err, 'Could not update status. Try again.'),
     })
   }
 
@@ -453,7 +446,7 @@ export function VisitDetailContent({
                     value={visit.vehicle_id ?? 'none'}
                     onValueChange={(v) =>
                       updateVehicle.mutate(v === 'none' ? null : v, {
-                        onError: (err) => handleOfflineOrGenericError(err, 'Could not update vehicle. Try again.'),
+                        onError: (err) => toastCrewError(err, 'Could not update vehicle. Try again.'),
                       })
                     }
                   >
