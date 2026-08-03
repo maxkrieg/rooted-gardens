@@ -26,11 +26,9 @@ export async function getScheduleForWeek(weekStart: string): Promise<ScheduleWee
       .eq('week_start', weekStart),
   ])
 
-  // Throwing is the right call here — the page fetches four weeks in parallel and
-  // a partial window would be a misleading schedule, so app/management/error.tsx
-  // catches this and renders a proper ErrorState with the sidebar intact.
-  // The message is sanitized first: Next surfaces it verbatim in development, and
-  // a raw Postgres string is exactly what task 8.5 keeps off the screen.
+  // Throw rather than return: the page fetches four weeks in parallel and a
+  // partial window would be a misleading schedule, so management/error.tsx
+  // catches it. Sanitized first — Next surfaces the message verbatim in dev.
   const readError = routeGroupsResult.error ?? assignmentsResult.error ?? visitsResult.error
   if (readError) {
     throw new Error(

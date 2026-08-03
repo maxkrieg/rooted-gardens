@@ -372,11 +372,9 @@ export function VisitLogger({
     // Without this, the photo row sits in the IDB queue until the next layout mount.
     const result = await flushMutationQueue()
 
-    // This is the most expensive false success in the app: a completion that
-    // never reached the server used to be written into the cache as 'completed'
-    // and the form closed anyway, so the crew member believed the visit was
-    // logged — and it would never be invoiced (task 8.5). Keep the form open with
-    // their entries intact so they can try again from the review sheet.
+    // The most expensive false success in the app: a completion that never
+    // landed was cached as 'completed' and the form closed, so it was believed
+    // logged and never invoiced. Keep the form open with their entries intact.
     if (result.failed > 0) {
       setSubmitting(false)
       toast.error('That didn’t save.', {

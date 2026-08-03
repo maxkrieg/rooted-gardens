@@ -25,10 +25,8 @@ import type { Account, Invoice, InvoiceWithVisits, VisitWithLocation } from '@/t
  * — both are the wrong fit for a visit-completion-driven queue (see docs/INVOICING.md).
  */
 /**
- * Wrapper for billing reads (task 8.5). These used to log and return `[]` on
- * failure, which the accountant sees as "nothing to invoice" — the single most
- * expensive false-empty in the app, because it means money quietly not billed.
- * The flag lets the page say "this didn't load" instead.
+ * Billing reads used to return `[]` on failure, which the accountant reads as
+ * "nothing to invoice" — the most expensive false-empty in the app.
  */
 export interface LoadResult<T> {
   data: T
@@ -483,11 +481,9 @@ export async function createContractInvoice(
 export interface RefreshInvoiceStatusesResult {
   processed: number
   errors: number
-  /** QBO invoice numbers that failed, so the accountant can check those directly
-   *  in QuickBooks. A bare "3 failed" left them with nothing to act on. */
+  /** Which invoices failed — a bare "3 failed" left nothing to act on. */
   failedInvoiceIds?: string[]
-  /** Set when the whole run failed for one shared reason (e.g. QBO disconnected)
-   *  rather than per-invoice. */
+  /** Set when the whole run failed for one shared reason (e.g. disconnected). */
   reason?: string
 }
 

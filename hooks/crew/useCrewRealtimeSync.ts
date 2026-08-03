@@ -49,10 +49,15 @@ export function useCrewRealtimeSync(employeeId: string | undefined) {
           const relation =
             (payload.new as { relation?: string })?.relation ??
             (payload.old as { relation?: string })?.relation
-          if (relation !== 'assigned') return
 
+          // Refresh on either relation — "My stops" matches assigned OR
+          // completed, so a completion row changes what this person should see.
           queryClient.invalidateQueries({ queryKey: ['crew-today-stops', employeeId] })
           queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
+
+          // ...but only an assignment is a schedule change worth announcing; a
+          // completion row is usually their own logging coming back around.
+          if (relation !== 'assigned') return
 
           // Debounce toast — show at most once per 3 s to handle bulk assignments
           const now = Date.now()

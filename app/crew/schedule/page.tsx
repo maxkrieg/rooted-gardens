@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { addDays, addWeeks, format } from 'date-fns'
@@ -25,10 +25,12 @@ function rowMatches(row: SchedulePropertyRow, filters: ScheduleFilters): boolean
   if (filters.routeGroup !== 'all' && row.routeGroup.id !== filters.routeGroup) return false
 
   if (filters.crew !== 'all') {
-    const assigned = (row.visit?.visit_crew ?? []).some(
-      (vc) => vc.relation === 'assigned' && vc.employee_id === filters.crew
+    // Either relation counts: crew are routinely added to a visit only via the
+    // completion form, so matching 'assigned' alone hid their finished work.
+    const mine = (row.visit?.visit_crew ?? []).some(
+      (vc) => vc.employee_id === filters.crew
     )
-    if (!assigned) return false
+    if (!mine) return false
   }
 
   if (filters.status !== 'all') {
@@ -37,6 +39,27 @@ function rowMatches(row: SchedulePropertyRow, filters: ScheduleFilters): boolean
   }
 
   return true
+}
+
+/** The body has exactly one of these five states at a time. */
+type BodyView = 'loading' | 'error' | 'no-matches' | 'empty-week' | 'stops'
+
+/**
+ * Split out from the JSX so the precedence reads on its own: a first load beats
+ * an error, cached stops beat an error (the stale-cache rule), and an empty
+ * result means two different things depending on whether filters are hiding it.
+ */
+function resolveBodyView(input: {
+  isLoading: boolean
+  isError: boolean
+  hasSchedule: boolean
+  hasActiveFilters: boolean
+  totalVisible: number
+}): BodyView {
+  if (input.isLoading && !input.hasSchedule) return 'loading'
+  if (input.isError && !input.hasSchedule) return 'error'
+  if (input.totalVisible > 0) return 'stops'
+  return input.hasActiveFilters ? 'no-matches' : 'empty-week'
 }
 
 export default function CrewSchedulePageRoute() {
@@ -54,6 +77,10 @@ function CrewSchedulePage() {
   // history.replaceState — a router navigation would be a network round-trip, and
   // crew are frequently offline.
   const [week, setWeek] = useState(() => parseWeekParam(searchParams.get('week')))
+
+  // Opens on the whole week for everyone. "My stops" used to auto-apply, from
+  // when it was this page's only filter; alongside the others it just read as an
+  // empty schedule. Opt-in now.
   const [filters, setFilters] = useState<ScheduleFilters>(EMPTY_FILTERS)
 
   const thisWeek = getWeekStart(new Date())
@@ -71,27 +98,24 @@ function CrewSchedulePage() {
   const { data: employees = [] } = useActiveEmployees()
   const { data: me } = useCurrentEmployee()
 
-  // The stale-cache rule (CLAUDE.md, Data Architecture): a refresh failure must
-  // never take away stops the crew member already has. Only show the error state
-  // when there is nothing cached to show — otherwise annotate the stale data.
-  const showErrorState = isError && !schedule
+  // Stale-cache rule: a refresh failure never takes away stops crew already
+  // have — cached data wins, the failure is annotated. See resolveBodyView.
   const showStaleNotice = isError && !!schedule
 
   const hasActiveFilters =
     filters.routeGroup !== EMPTY_FILTERS.routeGroup ||
     filters.crew !== EMPTY_FILTERS.crew ||
     filters.status !== EMPTY_FILTERS.status
+
+  /** "My stops" is the only filter on — worth naming in the empty state, which
+   *  then reads better than a generic "no stops match your filters". */
+  const isMineOnly =
+    !!me?.id &&
+    filters.crew === me.id &&
+    filters.routeGroup === EMPTY_FILTERS.routeGroup &&
+    filters.status === EMPTY_FILTERS.status
   const canManage = me?.role === 'owner' || me?.role === 'lead'
 
-  // Default to the current user's own stops ("My stops") once their employee record
-  // loads — done here rather than in the initial state because `me` is fetched async.
-  const didInitCrew = useRef(false)
-  useEffect(() => {
-    if (!didInitCrew.current && me?.id) {
-      didInitCrew.current = true
-      setFilters((f) => ({ ...f, crew: me.id }))
-    }
-  }, [me?.id])
 
   const routeGroups = useMemo(
     () => schedule?.routeGroups.map((g) => g.routeGroup) ?? [],
@@ -109,6 +133,80 @@ function CrewSchedulePage() {
   }, [schedule, filters])
 
   const totalVisible = filteredGroups.reduce((sum, g) => sum + g.rows.length, 0)
+
+  const bodyView = resolveBodyView({
+    isLoading,
+    isError,
+    hasSchedule: !!schedule,
+    hasActiveFilters,
+    totalVisible,
+  })
+
+  const bodyViews: Record<BodyView, () => React.ReactNode> = {
+    loading: () => (
+      <div className="space-y-3">
+        {[...Array(4)].map((_, i) => (
+          <Skeleton key={i} className="h-24 rounded-2xl" />
+        ))}
+      </div>
+    ),
+
+    error: () => (
+      <ErrorState
+        title="The schedule didn't load."
+        hint="You may be out of signal. Try again once you're back online."
+        onRetry={() => refetch()}
+      />
+    ),
+
+    // Filters are hiding the week — name which one and offer the undo.
+    'no-matches': () => (
+      <EmptyState
+        variant="pruned"
+        title={isMineOnly ? 'None of this week’s stops are yours' : 'No stops match your filters'}
+        hint={
+          isMineOnly
+            ? 'Other crew may have stops this week.'
+            : 'Clear them to see the whole week.'
+        }
+        action={
+          <Button variant="outline" onClick={() => setFilters(EMPTY_FILTERS)}>
+            {isMineOnly ? 'Show all stops' : 'Clear filters'}
+          </Button>
+        }
+      />
+    ),
+
+    'empty-week': () => (
+      <EmptyState
+        variant="sprig"
+        title="No stops this week"
+        hint="Nothing is scheduled yet. Check another week, or ask an owner."
+      />
+    ),
+
+    stops: () =>
+      filteredGroups.map((group) => (
+        <div
+          key={group.routeGroup.id}
+          className="rounded-2xl border border-[--border] bg-card overflow-hidden shadow-[0_1px_2px_rgba(43,42,36,.04),_0_6px_16px_-4px_rgba(43,42,36,.08)]"
+        >
+          <div className="flex items-center justify-between px-4 py-2.5 bg-secondary border-b border-[--border]">
+            <span className="text-sm font-semibold text-secondary-foreground">
+              {group.routeGroup.name}
+            </span>
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {group.rows.length}
+            </span>
+          </div>
+          <div className="divide-y divide-[--border]">
+            {group.rows.map((row) => (
+              <ScheduleStopRow key={row.property.id} row={row} />
+            ))}
+          </div>
+        </div>
+      )),
+  }
 
   return (
     <div className="flex flex-col">
@@ -160,10 +258,10 @@ function CrewSchedulePage() {
             size="sm"
             className="h-9 text-xs"
             onClick={() =>
-              setFilters((f) => ({
-                ...f,
-                status: f.status === 'scheduled' ? 'all' : 'scheduled',
-              }))
+              setFilters({
+                ...filters,
+                status: filters.status === 'scheduled' ? 'all' : 'scheduled',
+              })
             }
           >
             Incomplete
@@ -174,10 +272,10 @@ function CrewSchedulePage() {
             className="h-9 text-xs"
             disabled={!me?.id}
             onClick={() =>
-              setFilters((f) => ({
-                ...f,
-                crew: f.crew === me?.id ? 'all' : (me?.id ?? 'all'),
-              }))
+              setFilters({
+                ...filters,
+                crew: filters.crew === me?.id ? 'all' : (me?.id ?? 'all'),
+              })
             }
           >
             My stops
@@ -207,63 +305,7 @@ function CrewSchedulePage() {
       {showStaleNotice && <StaleNotice />}
 
       {/* Body */}
-      <div className="p-4 space-y-4">
-        {isLoading && !schedule ? (
-          <div className="space-y-3">
-            {[...Array(4)].map((_, i) => (
-              <Skeleton key={i} className="h-24 rounded-2xl" />
-            ))}
-          </div>
-        ) : showErrorState ? (
-          <ErrorState
-            title="The schedule didn't load."
-            hint="You may be out of signal. Try again once you're back online."
-            onRetry={() => refetch()}
-          />
-        ) : totalVisible === 0 ? (
-          // Two different empty states: filters hiding everything is fixable
-          // right here, an empty week is not.
-          hasActiveFilters ? (
-            <EmptyState
-              variant="pruned"
-              title="No stops match your filters"
-              hint="Clear them to see the whole week."
-              action={
-                <Button variant="outline" onClick={() => setFilters(EMPTY_FILTERS)}>
-                  Clear filters
-                </Button>
-              }
-            />
-          ) : (
-            <EmptyState
-              variant="sprig"
-              title="No stops this week"
-              hint="Nothing is scheduled yet. Check another week, or ask an owner."
-            />
-          )
-        ) : (
-          filteredGroups.map((group) => (
-            <div
-              key={group.routeGroup.id}
-              className="rounded-2xl border border-[--border] bg-card overflow-hidden shadow-[0_1px_2px_rgba(43,42,36,.04),_0_6px_16px_-4px_rgba(43,42,36,.08)]"
-            >
-              <div className="flex items-center justify-between px-4 py-2.5 bg-secondary border-b border-[--border]">
-                <span className="text-sm font-semibold text-secondary-foreground">
-                  {group.routeGroup.name}
-                </span>
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {group.rows.length}
-                </span>
-              </div>
-              <div className="divide-y divide-[--border]">
-                {group.rows.map((row) => (
-                  <ScheduleStopRow key={row.property.id} row={row} />
-                ))}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+      <div className="p-4 space-y-4">{bodyViews[bodyView]()}</div>
     </div>
   )
 }

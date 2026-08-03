@@ -4,10 +4,8 @@ import { useEffect } from 'react'
 import { ErrorState } from '@/components/states/ErrorState'
 
 /**
- * Management route error boundary. Nested inside `app/management/layout.tsx`, so
- * the sidebar survives and the owner can navigate elsewhere instead of being
- * stranded on a dead screen — which matters more here than anywhere, since owners
- * hit these routes from a phone in the field.
+ * Nested inside `app/management/layout.tsx` so the sidebar survives and the owner
+ * can navigate elsewhere rather than being stranded on a dead screen.
  */
 export default function ManagementError({
   error,

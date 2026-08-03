@@ -94,14 +94,9 @@ export function ReportCard({
 }
 
 /**
- * Empty state — says what's missing and what to do about it.
- *
- * Keeps its own free-text `children` API rather than EmptyState's title/hint
- * split: each chart's copy is one continuous sentence naming the year in
- * question, and forcing it into a heading would only make it read worse. It
- * borrows the shared botanical mark so it still sits in the same family
- * (task 8.5). A failed query is handled separately on the reports page, so this
- * only ever means "no data".
+ * Keeps free-text `children` rather than EmptyState's title/hint split — each
+ * chart's copy is one sentence naming the year, which a heading would only
+ * worsen. Borrows the shared mark. Load failures are handled on the page.
  */
 export function ReportEmpty({ children }: { children: React.ReactNode }) {
   return (

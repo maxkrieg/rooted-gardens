@@ -4,12 +4,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { getQueueCounts, flushMutationQueue } from '@/lib/crew/mutation-queue'
 
 /**
- * Connectivity + offline-queue state for the crew shell.
- *
- * `failedCount` (task 8.5) is what turns a silently stuck queue into something
- * the crew member can act on: mutations that exhausted their retries are parked
- * rather than retried forever, and the banner escalates instead of sitting on
- * "Syncing 1 change…" indefinitely.
+ * Connectivity + offline-queue state for the crew shell. `failedCount` is what
+ * turns a silently stuck queue into something the crew member can act on.
  */
 export function useOfflineStatus() {
   // Always start online/empty to match SSR; the effect corrects it on the client.
@@ -24,17 +20,15 @@ export function useOfflineStatus() {
         setFailedCount(failed)
       })
       .catch((err) => {
-        // IndexedDB can be unavailable (private mode, storage pressure). Don't
-        // break the shell over it, but don't swallow it silently either — this
-        // hook is the only thing standing between a stuck queue and the user.
+        // IDB can be unavailable (private mode, storage pressure). Don't break
+        // the shell, but don't swallow it — this is the only stuck-queue signal.
         console.error('[useOfflineStatus] queue counts', err)
       })
   }, [])
 
   useEffect(() => {
-    // Correct the online state from navigator on mount (SSR started at true).
-    // Deferred to a microtask so this isn't a synchronous setState in an effect,
-    // which cascades an extra render.
+    // Correct from navigator on mount (SSR started at true), deferred to a
+    // microtask so it isn't a synchronous setState in an effect.
     let cancelled = false
     void Promise.resolve().then(() => {
       if (!cancelled) setIsOnline(navigator.onLine)

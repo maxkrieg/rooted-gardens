@@ -9,16 +9,9 @@ import { StateMark } from '@/components/states/StateMark'
 import { cn } from '@/lib/utils'
 
 /**
- * The full-surface failure state: a whole page or a whole list could not load.
- *
- * Copy contract (task 8.5): `title` says what didn't happen, `hint` says what to
- * do. Neither ever contains an error message — raw text is mapped at the action
- * boundary by `lib/errors.ts` and logged, never rendered. No apologies, no
- * "Oops", no "Something went wrong" on its own.
- *
- * With no `onRetry`, the button refreshes the route, which is the right recovery
- * for a server-rendered page. Client surfaces that hold their own cache (crew
- * React Query) pass `refetch` instead so the retry doesn't blow away state.
+ * Full-surface failure — neither `title` nor `hint` ever carries an error
+ * message. With no `onRetry` the button refreshes the route; client surfaces
+ * holding their own cache pass `refetch` so retrying doesn't discard it.
  */
 export function ErrorState({
   title = "That didn't load.",
@@ -66,12 +59,9 @@ export function ErrorState({
 }
 
 /**
- * The compact variant: one section of an otherwise-healthy page failed.
- *
- * This is the workhorse for the management dashboard, where four independent
- * queries feed four sections. Failing the whole page because the fleet query
- * timed out would hide the schedule the owner actually opened the page for — so
- * failures are reported at section granularity and the rest still renders.
+ * One section of an otherwise-healthy page failed. Blanking the dashboard because
+ * the fleet query timed out would hide the schedule the owner came for, so
+ * failures report at section granularity and the rest still renders.
  */
 export function SectionError({
   title = "This didn't load.",
@@ -105,9 +95,8 @@ export function SectionError({
 }
 
 /**
- * The stale-data hairline for `/crew/*`. Crew work where there is no signal, so a
- * refresh failure must never replace data they already have — it annotates it.
- * See the Data Architecture section of CLAUDE.md ("show stale data gracefully").
+ * Stale-data hairline for `/crew/*`. A refresh failure annotates the data crew
+ * already have rather than replacing it (CLAUDE.md, "show stale data gracefully").
  */
 export function StaleNotice({ className }: { className?: string }) {
   return (

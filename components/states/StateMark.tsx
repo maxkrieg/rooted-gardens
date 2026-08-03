@@ -1,43 +1,25 @@
 import { cn } from '@/lib/utils'
 
 /**
- * The botanical state marks — the app's vocabulary for "there is nothing here".
- *
- * Four line drawings, keyed to *meaning* rather than to page, so that the four
- * situations that used to render as the same gray sentence are now distinguishable
- * at a glance:
- *
- *   seed    — nothing set up yet (first run)        → pairs with a primary CTA
- *   pruned  — filters cut everything away           → pairs with "Clear filters"
- *   sprig   — all done, nothing left to act on      → no CTA, this is good news
- *   broken  — something failed                      → pairs with "Try again"
- *
- * Stroke-only, no fill, no animation. They appear *only* inside EmptyState and
- * ErrorState — this is the one place in an otherwise data-dense internal tool
- * where a drawing belongs, and spending the boldness here keeps everything else quiet.
- *
- * Drawn on a 48×48 grid at 1.25px so the weight matches the 1px card borders they
- * sit inside. Kept as one component with a switch rather than a <symbol> sprite:
- * a sprite would need mounting in the root layout, which is more machinery than
- * four icons justify.
+ * Marks for the app's absence/failure states, keyed to meaning rather than page:
+ * seed = nothing set up yet, pruned = filters hid it, sprig = done, broken =
+ * failed. 1.25px so the weight matches the card borders they sit inside.
  */
 
 export type StateMarkVariant = 'seed' | 'pruned' | 'sprig' | 'broken'
 
 const TONE: Record<StateMarkVariant, string> = {
-  // Sand — the same hue as the card borders, so a first-run screen reads as an
-  // unfilled form rather than as a problem.
+  // Sand reads as an unfilled form, not a problem; sage means finished work;
+  // clay is the app's established "needs attention" hue.
   seed: 'text-[var(--border)]',
   pruned: 'text-[var(--border)]',
-  // Sage, because an empty billing queue means the work is finished.
   sprig: 'text-primary/40',
-  // Clay — the app's established "needs attention" hue.
   broken: 'text-[var(--clay)]/70',
 }
 
 function MarkPaths({ variant }: { variant: StateMarkVariant }) {
   switch (variant) {
-    // A seed resting on the soil line, not yet planted.
+    // A seed on the soil line, not yet planted.
     case 'seed':
       return (
         <>
@@ -59,7 +41,7 @@ function MarkPaths({ variant }: { variant: StateMarkVariant }) {
         </>
       )
 
-    // Three stems gathered and tied with twine — the work is bundled up.
+    // Three stems gathered and tied — the work is bundled up.
     case 'sprig':
       return (
         <>
@@ -71,7 +53,7 @@ function MarkPaths({ variant }: { variant: StateMarkVariant }) {
         </>
       )
 
-    // A stem snapped part-way up, the break marked by the offset angle.
+    // A stem snapped part-way up.
     case 'broken':
       return (
         <>

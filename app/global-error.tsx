@@ -3,13 +3,9 @@
 import { useEffect } from 'react'
 
 /**
- * Last resort: an error thrown by the root layout itself, before fonts, theme
- * tokens, or providers are mounted. It replaces the entire document, so it must
- * ship its own <html>/<body> and cannot rely on globals.css or any component
- * that imports it.
- *
- * Styles are inlined with the Field & Foliage light values hard-coded, because
- * the CSS variables that normally carry them may not have loaded.
+ * The root layout itself threw, before fonts, tokens, or providers mounted. It
+ * replaces the whole document, so it ships its own <html>/<body> and inlines the
+ * Field & Foliage values — the CSS variables may not have loaded.
  */
 export default function GlobalError({
   error,

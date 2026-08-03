@@ -54,9 +54,8 @@ export default async function SchedulePage({
   const cookieStore = await cookies()
   const role = parseRoleCookie(cookieStore.get('rg-role')?.value)?.role ?? 'crew'
 
-  // Not fatal — these only populate the crew/vehicle pickers in the filter bar
-  // and detail sheet. The schedule itself (the reason the page exists) still
-  // renders, and getScheduleForWeek surfaces its own failure separately.
+  // Not fatal — these only populate the crew/vehicle pickers. The schedule
+  // itself still renders, and getScheduleForWeek reports its own failure.
   if (employeesResult.error) console.error('[schedule] employees', employeesResult.error)
   if (vehiclesResult.error) console.error('[schedule] vehicles', vehiclesResult.error)
 

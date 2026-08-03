@@ -45,9 +45,8 @@ export default async function ReportsPage({ searchParams }: Props) {
         <ReportsYearNav year={year} />
       </div>
 
-      {/* Each report fails independently. A chart drawn from a failed query is
-          all zeroes, which reads as "nobody billed anything this year" — a much
-          worse answer than saying the data didn't load (task 8.5). */}
+      {/* Each report fails independently — a chart of zeroes reads as "nobody
+          billed anything this year", which is worse than saying it didn't load. */}
       {revenue.loadError ? (
         <SectionError
           title="Revenue didn't load."

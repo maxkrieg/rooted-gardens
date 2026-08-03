@@ -65,9 +65,8 @@ export default async function RouteGroupsPage() {
     .select('*, accounts(name)')
     .order('address', { ascending: true })
 
-  // Both of these are load-bearing: without assignments every group renders
-  // "No properties assigned yet", and without properties the same. Either would
-  // be a confident lie about the routes, so fail the page instead.
+  // Load-bearing: without either, every group renders "No properties assigned
+  // yet" — a confident lie about the routes. Fail the page instead.
   if (assignmentsError || propertiesError) {
     console.error('[route-groups] assignments/properties', assignmentsError ?? propertiesError)
     return (

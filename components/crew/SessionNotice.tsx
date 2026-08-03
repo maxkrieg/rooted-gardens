@@ -4,15 +4,9 @@ import Link from 'next/link'
 import { TriangleAlert } from 'lucide-react'
 
 /**
- * Shown when the crew member's own employee record can't be loaded.
- *
- * This used to fail completely silently, and it degrades five things at once:
- * realtime sync never subscribes, the "My stops" filter stays disabled, History
- * is permanently `enabled: false`, and Profile shows an ellipsis forever. A crew
- * member would just see an app that had quietly stopped working.
- *
- * Only shown when there is no cached employee — with a cached record everything
- * keeps working offline, which is the point of the cache.
+ * The crew member's own employee record couldn't load. This used to fail
+ * silently while degrading realtime sync, "My stops", History, and Profile all at
+ * once. Only shown with no cached employee — a cached one still works offline.
  */
 export function SessionNotice() {
   return (

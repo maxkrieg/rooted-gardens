@@ -209,11 +209,8 @@
 }
 
 /* ── Loading skeletons ──────────────────────────────────────────────────────
-   A slow warm sweep instead of an opacity pulse: on the paper background a
-   pulsing gray block reads as a broken image, while a sweep reads as "still
-   arriving". 1.8s is deliberately unhurried — crew are often on slow rural
-   connections and a fast blink makes the wait feel worse than it is.
-   Consumed by <Skeleton> (components/ui/skeleton.tsx).                        */
+   A slow warm sweep instead of an opacity pulse — on paper, a pulsing gray block
+   reads as a broken image. Consumed by components/ui/skeleton.tsx.            */
 .skeleton-paper {
   position: relative;
   overflow: hidden;

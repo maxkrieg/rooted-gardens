@@ -28,9 +28,7 @@ export default async function AccountsPage() {
   }
 
   // ── 2. Last visit per account (max ended_at of any completed visit) ─────
-  // A failure here is not fatal: the list is still useful without the
-  // "last visit" column, so log it and let those cells read as "No visits yet"
-  // rather than failing the whole page.
+  // Not fatal — the list is still useful without the "last visit" column.
   const { data: visitsData, error: visitsError } = await supabase
     .from('visits')
     .select('account_id, ended_at')

@@ -2,18 +2,9 @@ import { cn } from '@/lib/utils'
 import { StateMark, type StateMarkVariant } from '@/components/states/StateMark'
 
 /**
- * The one empty state for the whole app. Replaces ~18 one-off gray paragraphs
- * and three overlapping local `EmptyState` functions (FleetView, PropertyPhotoGallery,
- * ScheduleEmptyState).
- *
- * Copy rules, applied at every call site:
- *   - `title` names what isn't there, in Fraunces. Not "Nothing here".
- *   - `hint` says what to do about it, in one plain sentence.
- *   - `action` is a real control whenever the user can act. An empty screen is an
- *     invitation, and "No accounts yet" with no way to add one is a dead end.
- *   - `variant` carries the *kind* of emptiness (see StateMark). Getting this right
- *     matters more than the wording: 'sprig' tells an accountant an empty billing
- *     queue is good news, where 'seed' would imply something is missing.
+ * The one empty state for the whole app. Pick `variant` carefully (see
+ * StateMark) — it's what tells an accountant an empty billing queue is good news
+ * rather than a gap.
  */
 export function EmptyState({
   variant = 'seed',
@@ -28,7 +19,7 @@ export function EmptyState({
   hint?: string
   action?: React.ReactNode
   className?: string
-  /** Denser padding + no mark, for empty states nested inside a card or table cell. */
+  /** Denser, no mark — for empty states nested inside a card or table cell. */
   compact?: boolean
 }) {
   return (

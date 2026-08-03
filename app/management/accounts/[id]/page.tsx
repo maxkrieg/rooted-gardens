@@ -169,8 +169,7 @@ async function DetailsTab({
   if (visitsResult.error) console.error('[account detail] visits', visitsResult.error)
   const visits = (visitsResult.data ?? []) as RecentVisit[]
 
-  // Route-group labels are decorative on this page — a failure just omits the
-  // badge, so it's logged rather than surfaced.
+  // Decorative here — a failure just omits the badge, so log rather than surface.
   if ('error' in routeGroupAssignments && routeGroupAssignments.error) {
     console.error('[account detail] route groups', routeGroupAssignments.error)
   }
@@ -257,7 +256,7 @@ async function DetailsTab({
                 variant="seed"
                 title="No properties yet"
                 hint="Add the addresses this account is billed for — scheduling works off properties, not accounts."
-                // PropertySheet renders its own "Add Property" trigger.
+                // PropertySheet renders its own trigger.
                 action={<PropertySheet accountId={account.id} />}
               />
             </CardContent>

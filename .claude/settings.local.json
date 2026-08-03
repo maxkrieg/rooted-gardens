@@ -9,7 +9,8 @@
       "WebFetch(domain:docs.claude.com)",
       "Bash(npx shadcn@latest *)",
       "Bash(npm run *)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(find *)"
     ]
   }
 }

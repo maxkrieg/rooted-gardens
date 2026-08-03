@@ -3,13 +3,8 @@ import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/states/EmptyState'
 
 /**
- * 404. Reached by a mistyped URL and by `notFound()` in
- * app/management/accounts/[id]/page.tsx, which until now fell through to Next's
- * default black-and-white page.
- *
- * The link goes to the dashboard rather than "back": someone who followed a stale
- * link to a deleted account wants a working starting point, not the page they
- * just came from.
+ * 404, reached by a mistyped URL or `notFound()` on a deleted account. Links to
+ * the dashboard rather than "back" — a stale link needs a working starting point.
  */
 export default function NotFound() {
   return (

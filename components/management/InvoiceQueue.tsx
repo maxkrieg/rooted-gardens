@@ -192,9 +192,8 @@ export function InvoiceQueue({ visits, qboConnected }: InvoiceQueueProps) {
       const results = await pushInvoicesToQuickBooks(ids)
       setPushResults(results)
 
-      // One toast for the batch, not one per account: a 12-account push used to
-      // stack 12 toasts, and the failures scrolled past before they could be
-      // read. Detail lives in the results panel below the table, which persists.
+      // One toast for the batch — 12 accounts used to stack 12, and failures
+      // scrolled past. Detail persists in the results panel below the table.
       const failed = results.filter((r) => !r.success)
       const pushed = results.length - failed.length
       if (failed.length === 0) {
@@ -211,8 +210,7 @@ export function InvoiceQueue({ visits, qboConnected }: InvoiceQueueProps) {
   }
 
   if (visits.length === 0) {
-    // 'sprig', not 'seed': an empty billing queue means everything completed has
-    // been billed. That's the goal, not a gap to fill.
+    // 'sprig', not 'seed' — an empty queue means everything is billed.
     return (
       <EmptyState
         variant="sprig"

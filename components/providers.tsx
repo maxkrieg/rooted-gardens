@@ -54,9 +54,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
             // Crew queries should show stale cached data when offline
             // rather than throwing a network error
             gcTime: 1000 * 60 * 60 * 24,
-            // Retry transient failures (crew are on flaky rural connections) but
-            // give up immediately on RLS denials and expired sessions — retrying
-            // those just delays the error the user actually needs to see.
+            // Retry transient failures, but give up at once on RLS denials and
+            // expired sessions — retrying only delays the real error.
             retry: (failureCount, error) => failureCount < 2 && isRetryableError(error),
             retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
           },

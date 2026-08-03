@@ -117,9 +117,8 @@ export interface CrewVisitsReport {
   windowLabel: string
   /** Max weekly count across all crew — the shared y-scale for small multiples. */
   maxWeekly: number
-  /** True when the query failed, so the page can say so instead of drawing a
-   *  chart of zeroes — "nobody did any work this year" is a very different claim
-   *  from "this didn't load" (task 8.5). */
+  /** Query failed — the page says so instead of drawing a chart of zeroes,
+   *  which would claim nobody did any work this year. */
   loadError?: boolean
 }
 

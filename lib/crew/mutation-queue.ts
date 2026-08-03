@@ -60,14 +60,9 @@ type MutationPayload =
   | { type: 'skip'; payload: SkipPayload }
 
 /**
- * How many times a mutation is retried before it is parked as 'failed'.
- *
- * `attempts` was already being incremented before task 8.5, but nothing ever
- * read it: a mutation that could never succeed (an RLS denial, a visit deleted
- * out from under it) was retried on every mount and every reconnect, forever,
- * while the banner sat on "Syncing 1 change…" and the crew member believed their
- * completion had been recorded. Five attempts is generous for a transient blip
- * and short enough that a genuine failure surfaces the same day.
+ * Retries before a mutation is parked as 'failed'. `attempts` used to be
+ * incremented and never read, so an RLS denial retried forever while the banner
+ * sat on "Syncing 1 change…" and the crew member believed it had saved.
  */
 export const MAX_ATTEMPTS = 5
 
@@ -146,10 +141,8 @@ export async function retryMutation(id: string): Promise<void> {
   })
 }
 
-/**
- * Records a failed attempt, parking the mutation once it has burned through
- * MAX_ATTEMPTS. Returns true when the mutation was parked.
- */
+/** Records a failed attempt; parks the mutation past MAX_ATTEMPTS. Returns
+ *  true when it was parked. */
 async function recordFailure(mutation: QueuedMutation, err: unknown): Promise<boolean> {
   const db = await getDB()
   const attempts = mutation.attempts + 1
@@ -175,12 +168,9 @@ export interface FlushResult {
 }
 
 /**
- * Dispatches each pending mutation to Supabase. Called on reconnect and on app mount.
- *
- * Returns a summary rather than void (task 8.5) so callers can tell the crew
- * member what actually happened instead of assuming success — SkipSheet and
- * VisitLogger used to write "completed" into the cache and navigate away
- * regardless of the outcome.
+ * Dispatches pending mutations to Supabase, on reconnect and on app mount.
+ * Returns a summary rather than void so callers can report what actually
+ * happened — SkipSheet and VisitLogger used to claim success unconditionally.
  */
 export async function flushMutationQueue(): Promise<FlushResult> {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {

@@ -71,10 +71,8 @@ export function AccountsTable({ accounts }: AccountsTableProps) {
     setBillingFilter('all')
   }
 
-  // One element, rendered by both the desktop table and the mobile card list.
-  // The two cases are genuinely different problems with different fixes: an
-  // account list that has never been filled in needs the "add" button, and one
-  // hidden behind filters needs those cleared.
+  // Shared by the desktop table and the mobile list. Two different problems: a
+  // list never filled in needs "add", one hidden by filters needs them cleared.
   const emptyState =
     accounts.length === 0 ? (
       <EmptyState

@@ -129,8 +129,7 @@ export function RouteGroupCard({
       <CardContent className="px-4 pb-4">
         {/* Assigned properties list */}
         {assignedProperties.length === 0 ? (
-          // Nested inside a card that already has its own "Assign" control, so
-          // this stays compact — the mark and CTA would be noise at this depth.
+          // The card already has its own "Assign" control, so stay compact.
           <EmptyState
             compact
             title="No properties assigned"

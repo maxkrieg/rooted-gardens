@@ -16,15 +16,9 @@ interface State {
 }
 
 /**
- * App-wide React error boundary (task 8.5).
- *
- * Next's `error.tsx` files cover render errors inside a *route segment*, but not
- * errors thrown from the providers or from client components that live above the
- * segment — and `/crew/*` is client-first, so an exception in a React Query
- * consumer would otherwise unmount the whole tree to a blank screen. This is the
- * outermost net.
- *
- * The caught error is logged and never rendered.
+ * The outermost net. Next's `error.tsx` only covers render errors inside a route
+ * segment; `/crew/*` is client-first, so an exception in a React Query consumer
+ * would otherwise blank the tree. The caught error is logged, never rendered.
  */
 export class ErrorBoundary extends Component<Props, State> {
   state: State = { error: null }

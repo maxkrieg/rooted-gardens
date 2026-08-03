@@ -9,9 +9,8 @@ const alertVariants = cva(
     variants: {
       variant: {
         default: "bg-card border-border text-foreground",
-        // Clay rather than destructive red: a section that failed to load is not
-        // a destructive action, and clay is already this app's "needs attention"
-        // hue (the on-site indicator).
+        // Clay, not destructive red — a section that failed to load isn't a
+        // destructive action, and clay is already the "needs attention" hue.
         warning:
           "border-[var(--clay)]/30 bg-[var(--clay)]/[0.06] text-foreground [&>svg]:text-[var(--clay)]",
         destructive:

@@ -195,8 +195,7 @@ export function InvoicedHistory({
     startRefresh(async () => {
       const { processed, errors, failedInvoiceIds, reason } = await refreshInvoiceStatuses(ids)
       if (errors > 0) {
-        // Name the invoices that failed. A bare count told the accountant
-        // something was wrong but nothing they could act on.
+        // Name what failed — a bare count gave nothing to act on.
         const named = (failedInvoiceIds ?? []).slice(0, 5).join(', ')
         const more = (failedInvoiceIds?.length ?? 0) > 5 ? ` +${failedInvoiceIds!.length - 5} more` : ''
         toast.warning(

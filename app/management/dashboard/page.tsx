@@ -34,11 +34,9 @@ export default async function DashboardPage() {
       .is('ended_at', null),
   ])
 
-  // Report failures per section, not per page. These four queries feed four
-  // independent panels, and blanking the whole dashboard because the fleet query
-  // timed out would hide the schedule the owner actually opened it for.
-  // Critically, a failed query must NOT fall through to `[]` — that renders
-  // "Nothing scheduled this week" during an outage, which is simply untrue.
+  // Fail per section, not per page — one dead query shouldn't blank the rest.
+  // A failure must not fall through to `[]`: that renders "Nothing scheduled
+  // this week" during an outage, which is simply untrue.
   const visitsFailed = !!visitsResult.error
   const fleetFailed = !!equipmentResult.error || !!vehiclesResult.error
   if (visitsResult.error) console.error('[dashboard] visits', visitsResult.error)
@@ -148,8 +146,7 @@ export default async function DashboardPage() {
       </section>
 
       {/* ── Fleet & equipment — only when something needs attention ──────────
-          A failed query still gets a section: silently hiding it would tell the
-          owner nothing needs maintenance, which is exactly the wrong reassurance. */}
+          A failure still renders: hiding it would imply nothing needs service. */}
       {(hasFleetIssues || fleetFailed) && (
         <section>
           <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">

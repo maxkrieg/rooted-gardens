@@ -5,17 +5,9 @@ import { useOfflineStatus } from '@/hooks/crew/useOfflineStatus'
 import { StuckChangesSheet } from '@/components/crew/StuckChangesSheet'
 
 /**
- * The crew shell's connectivity strip. Three states, in escalating order:
- *
- *   clay  — something didn't save and has stopped retrying. Tappable; this is
- *           the only one that demands attention, and it wins over the others
- *           because a lost completion is a lost invoice (task 8.5).
- *   ochre — offline. Expected in the field, so it informs rather than alarms.
- *   sage  — online with work still syncing.
- *
- * Before 8.5 there was no clay state: a permanently failing mutation kept the
- * queue non-empty, so this sat on "Syncing 1 change…" forever and the crew
- * member had no way to know their work never landed.
+ * Connectivity strip, escalating: clay = something didn't save and stopped
+ * retrying (tappable, wins over the rest — a lost completion is a lost invoice),
+ * ochre = offline, sage = syncing.
  */
 export function OfflineBanner() {
   const { isOnline, pendingCount, failedCount, refreshCount } = useOfflineStatus()

@@ -2,14 +2,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 
 /**
- * Route-shaped loading skeletons for the management `loading.tsx` files.
- *
- * The rule these follow: a skeleton mirrors the dimensions of the thing it stands
- * in for. Heights and widths here are copied from the real components (h1 is
- * `text-2xl`, cards are `rounded-2xl` with `p-4/5`, stat cards are a 2/4-column
- * grid) so that when data arrives nothing shifts. A generic spinner would be
- * less work and worse — owners open these routes on a phone, where a reflow
- * costs them the tap they had already started.
+ * Route-shaped skeletons for the management `loading.tsx` files. Dimensions are
+ * copied from the real components so nothing shifts when data arrives — owners
+ * open these on a phone, where a reflow costs them the tap they'd started.
  */
 
 /** `<h1 className="font-display text-2xl">` plus an optional right-hand control. */

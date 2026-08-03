@@ -1,8 +1,8 @@
 import { openDB, type IDBPDatabase } from 'idb'
 
 const DB_NAME = 'rooted-crew'
-// v2 (task 8.5) added `status` + `lastError` to queued mutations so a permanently
-// failing one can be parked instead of retried forever. See the upgrade handler.
+// v2 added `status` + `lastError` so a permanently failing mutation can be
+// parked instead of retried forever.
 const DB_VERSION = 2
 
 export type MutationType =
@@ -13,12 +13,8 @@ export type MutationType =
   | 'job_stop'
   | 'skip'
 
-/**
- * 'pending' — still to be sent, will be retried on the next flush.
- * 'failed'  — gave up after MAX_ATTEMPTS. Excluded from flushes so a poisoned
- *             mutation stops burning a request on every app open, and surfaced
- *             to the crew member so a lost completion can't stay invisible.
- */
+/** 'failed' mutations are excluded from flushes, so a poisoned one stops burning
+ *  a request on every app open, and surfaced so lost work can't stay invisible. */
 export type MutationStatus = 'pending' | 'failed'
 
 export interface QueuedMutation {
@@ -49,9 +45,8 @@ export function getDB(): Promise<IDBPDatabase> {
           db.createObjectStore('rq-cache')
         }
 
-        // v1 → v2: rows predate `status`. Default them to 'pending' so work a
-        // crew member queued before the update still syncs — dropping it would
-        // silently lose completions, the exact failure this change exists to fix.
+        // v1 → v2: rows predate `status`. Default to 'pending' so work queued
+        // before the update still syncs rather than being silently dropped.
         if (oldVersion > 0 && oldVersion < 2) {
           const store = tx.objectStore('mutations')
           store.openCursor().then(function assign(cursor): unknown {

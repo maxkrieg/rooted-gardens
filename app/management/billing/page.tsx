@@ -101,10 +101,8 @@ export default async function BillingPage({ searchParams }: Props) {
         </Link>
       </div>
 
-      {/* Each tab does its own querying, so stream it rather than blocking the
-          header and tab row behind it — switching tabs should feel immediate even
-          when the invoice range being fetched is a wide one. The key resets the
-          boundary per tab so a switch shows the skeleton instead of the old table. */}
+      {/* Stream each tab rather than blocking the header behind it. The key
+          resets the boundary so a switch shows the skeleton, not the old table. */}
       <Suspense key={resolvedView} fallback={<TableSkeleton rows={8} />}>
         {resolvedView === 'invoices' ? (
           <InvoicedTab range={resolvedRange} role={role as EmployeeRole} />
@@ -120,9 +118,8 @@ export default async function BillingPage({ searchParams }: Props) {
 
 async function QueueTab({ qboConnected }: { qboConnected: boolean }) {
   const { data: visits, loadError } = await getUninvoicedVisits()
-  // An empty queue and a failed query look identical once the rows are gone, and
-  // for an accountant they mean opposite things — "nothing to bill" versus
-  // "we don't know what's unbilled". Never let the failure read as the former.
+  // "Nothing to bill" and "we don't know what's unbilled" are opposite things to
+  // an accountant. Never let the failure read as the former.
   if (loadError) {
     return (
       <ErrorState
