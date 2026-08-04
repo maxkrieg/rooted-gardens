@@ -1350,13 +1350,19 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 > self-service account management — that stays out of scope, see CLAUDE.md). The blog
 > ("Gardening Notes") is **deferred** — link out to the existing site for now.
 >
+> **Content source:** copy/structure for the new pages is adapted from the live site,
+> myrootedgardens.com — page-by-page: home → `/`, Lawn → `/lawn`, Gardens → `/gardens`,
+> About → `/our-team`, FAQ → `/faq`, Jobs → `/jobs`, Gardening Notes (deferred link-out) →
+> `/blog`. Treat it as a content reference, not a pixel spec — rebuild in Field & Foliage
+> styling, don't copy markup/CSS.
+>
 > Additive and depends on earlier phases: lead→account conversion reuses the Phase 2
 > account/property forms + `get_my_role()` RLS helper; ~~the new-lead SMS reuses the Twilio
 > `send-sms` Edge Function (8.2)~~ (deferred — 9.7 ships in-app-only); the Leads inbox lives
 > in the management shell (1.6). The
 > public marketing pages themselves only need the design system (1.1).
 
-- [ ] **9.1 — `leads` table + RLS migration**
+- [x] **9.1 — `leads` table + RLS migration**
   *Depends on: 1.2, 2.1*
   New migration `supabase/migrations/0xx_leads.sql` creating `leads`:
   `id uuid PK`, `kind text CHECK (kind IN ('service_inquiry','job_application'))`,
@@ -1370,6 +1376,37 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   RLS (reuse `get_my_role()` from 2.1): **anon role INSERT only** (the public form — no
   reads); `owner` / `lead` SELECT/UPDATE; `accountant` / `crew` no access. Update
   `types/database.ts` (`supabase gen types`) and add a `Lead` app type in `types/app.ts`.
+
+  **Built:** `supabase/migrations/20260804130000_leads.sql`, per the plan above, plus a
+  `char_length` CHECK on `name`/`email`/`phone`/`address`/`message` as a DB-level backstop
+  against abuse of the anon-writable endpoint (Zod in 9.5 can be bypassed; this can't). The
+  anon INSERT policy additionally constrains `status='new' AND source='website' AND
+  assigned_to IS NULL AND converted_account_id IS NULL`, so a hostile poster can create only
+  a fresh, untriaged lead — never one that already looks assigned or converted. Because this
+  is the first anon-writable table in the app, and `initial_schema.sql` explicitly grants
+  `anon` nothing, an explicit `GRANT INSERT ON public.leads TO anon` was required alongside
+  the RLS policy — RLS alone doesn't confer privilege. Verified end-to-end against the
+  linked dev project via `supabase db query --linked` (role-switched INSERT/SELECT checks,
+  CHECK-constraint boundary tests, `updated_at` trigger).
+
+  **Carry-forward gotcha for 9.5:** `anon` has INSERT but no SELECT, so a
+  `.insert(...).select()` round-trip will fail — PostgreSQL requires SELECT visibility to
+  return a row via `RETURNING`, even from an INSERT. The 9.5 Server Action must call
+  `.insert(...)` with no `.select()` chained (supabase-js then sends `Prefer:
+  return=minimal`). Confirmed by testing directly against the linked project: the same
+  INSERT succeeds silently without `.select()` and errors `new row violates row-level
+  security policy` with it.
+
+  **Also fixed (pre-existing bug, out of scope for 9.1 but discovered while touching the
+  Realtime publication):** `supabase/migrations/20260804120000_fix_realtime_publication.sql`.
+  `supabase_realtime` existed on the linked project but had **zero tables** in it — not
+  `FOR ALL TABLES` (confirmed `puballtables = false`), just never populated. Every
+  `postgres_changes` subscription in the app (`SessionsProvider`, `CrewsOnSitePanel`,
+  `useCrewRealtimeSync`) had therefore never received a single live event: the schedule's
+  in-progress overlay, the dashboard's "Crews on site now" pulse, and crew
+  assignment/schedule sync were all silently static, showing only what was on the page at
+  load. The fix adds `visits` and `visit_crew` to the publication; `leads` is added by the
+  9.1 migration itself for the 9.7 toast.
   Add 2–3 seed leads to `supabase/seed.sql` (one per `kind`) so the inbox has data.
 
 - [ ] **9.2 — Public route group, shared layout & proxy allowlist**
@@ -1390,13 +1427,14 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   regenerative landscapes"), two service-line cards (The Electric Lawn / Rooted Gardens
   design), the ELA partnership badge, a "Field Notes" teaser that **links out** to the
   existing blog (deferred), and a prominent "Get started" CTA → the inquiry form (9.5).
-  Phone-first, responsive.
+  Content reference: myrootedgardens.com (home). Phone-first, responsive.
 
 - [ ] **9.4 — Marketing sub-pages: Lawn, Gardens, About, FAQ**
   *Depends on: 9.2*
   Content pages mirroring the live site, Field & Foliage styled, each with a contextual
   inquiry CTA. Lawn / Gardens describe each division's services + its contact. FAQ uses a
   shadcn `accordion` (add via CLI). Keep copy centralized so owners can revise it easily.
+  Content reference: myrootedgardens.com/lawn, /gardens, /our-team (→ `/about`), /faq.
 
 - [ ] **9.5 — Public inquiry form + spam protection + Server Action**
   *Depends on: 9.2, 9.1*
@@ -1414,6 +1452,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   email, phone, position interest, message, optional **resume upload** → Supabase Storage)
   that inserts a `leads` row with `kind='job_application'` and the extras in `details`
   (position, resume path). Reuse the 9.5 spam protection + Server Action pattern.
+  Content reference: myrootedgardens.com/jobs.
 
 - [ ] **9.7 — New-lead notification (in-app + ~~SMS~~)**
   *Depends on: 9.5, ~~8.2~~*
@@ -1444,7 +1483,11 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 ### ✅ Verifying Phase 9 — Public Site & Lead Intake
 
 **Automated:** `npm run build` · `npm run typecheck` · `npm run lint` pass;
-`supabase db reset` applies the new `leads` migration + seed cleanly.
+`supabase db push --linked` applies the new `leads` migration cleanly (this project's
+workflow is cloud-only — see CLAUDE.md — so `supabase db reset` doesn't apply here and
+`supabase/seed.sql`'s 3 sample leads aren't auto-loaded; insert them by hand via
+`supabase db query --linked` / the SQL editor if the 9.8 inbox needs sample data to
+develop against).
 
 **Functional (against seed data):**
 - Signed out, `/`, `/lawn`, `/gardens`, `/about`, `/faq`, `/jobs`, `/contact` all load (public

@@ -284,6 +284,75 @@ export type Database = {
           },
         ]
       }
+      leads: {
+        Row: {
+          address: string | null
+          assigned_to: string | null
+          converted_account_id: string | null
+          created_at: string
+          details: Json | null
+          email: string | null
+          id: string
+          kind: string
+          message: string | null
+          name: string
+          phone: string | null
+          service_interest: string | null
+          source: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          assigned_to?: string | null
+          converted_account_id?: string | null
+          created_at?: string
+          details?: Json | null
+          email?: string | null
+          id?: string
+          kind: string
+          message?: string | null
+          name: string
+          phone?: string | null
+          service_interest?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          assigned_to?: string | null
+          converted_account_id?: string | null
+          created_at?: string
+          details?: Json | null
+          email?: string | null
+          id?: string
+          kind?: string
+          message?: string | null
+          name?: string
+          phone?: string | null
+          service_interest?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_converted_account_id_fkey"
+            columns: ["converted_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       maintenance_logs: {
         Row: {
           cost: number | null

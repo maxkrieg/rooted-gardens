@@ -3,7 +3,7 @@
 -- Run via: supabase db reset
 -- UUID segments: 0001=accounts, 0002=properties,
 --   0004=route_groups, 0005=employees, 0006=vehicles, 0007=equipment,
---   0008=visits
+--   0008=visits, 0009=leads
 -- (service_zones eliminated — frequency now lives on properties; one
 -- visit per property per week.)
 -- =============================================================
@@ -348,3 +348,23 @@ UPDATE visits SET started_at = '2026-06-09 09:00:00+00', ended_at = '2026-06-09 
 -- OPEN: Sarah tapped Start on Old Stone Front Lawn (v18) — ended_at IS NULL → in progress
 UPDATE visits SET started_at = '2026-06-13 10:00:00+00', ended_at = NULL
   WHERE id = '00000000-0000-0000-0008-000000000018';
+
+-- =====================
+-- LEADS (3) — task 9.1. One row per kind, mixed pipeline status, so the
+-- 9.8 Leads inbox has both a kind filter and a status filter to exercise.
+-- =====================
+INSERT INTO leads (id, kind, status, name, email, phone, address, service_interest, message, source, details, assigned_to) VALUES
+  ('00000000-0000-0000-0009-000000000001', 'service_inquiry', 'new', 'Priya Anand',
+   'priya.anand@email.com', '802-555-0301', '18 Quechee Rd, Norwich, VT 05055',
+   'lawn', 'Looking for weekly mowing starting this spring — about half an acre, mostly flat.',
+   'website', NULL, NULL),
+  -- Already triaged by Ralph — exercises the inbox's "contacted" filter and assigned_to join.
+  ('00000000-0000-0000-0009-000000000002', 'service_inquiry', 'contacted', 'Ben Okafor',
+   'bokafor@email.com', '802-555-0302', '9 River Rd, Hanover, NH 03755',
+   'garden', 'Interested in a native pollinator garden install along the back fence line.',
+   'website', NULL, '00000000-0000-0000-0005-000000000001'),
+  -- Job application — details carries the kind-specific extras (task 9.6).
+  ('00000000-0000-0000-0009-000000000003', 'job_application', 'new', 'Casey Marlowe',
+   'cmarlowe@email.com', '802-555-0303', NULL,
+   NULL, 'Two seasons on a landscaping crew, comfortable with mowers and hand tools.',
+   'website', '{"position": "Crew Member — Lawn", "resume_path": null}'::jsonb, NULL);

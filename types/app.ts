@@ -14,6 +14,7 @@ export type Photo = Tables<'photos'>
 export type Integration = Tables<'integrations'>
 export type Invoice = Tables<'invoices'>
 export type MaintenanceLog = Tables<'maintenance_logs'>
+export type Lead = Tables<'leads'>
 
 // A property enriched with its account name and current route group — used by
 // the route-groups management page and its Assign Properties sheet.
@@ -113,6 +114,32 @@ export const PHOTO_GROUP_KEYS = [
   'other',
 ] as const
 export type PhotoGroupKey = (typeof PHOTO_GROUP_KEYS)[number]
+
+// `Lead`/`LEAD_*` below is the Phase 9 CRM entity (a prospect from the public
+// marketing site) — unrelated to the `'lead'` value in EMPLOYEE_ROLES above,
+// which is a crew lead's job title. The names collide; the concepts don't.
+export const LEAD_KINDS = ['service_inquiry', 'job_application'] as const
+export type LeadKind = (typeof LEAD_KINDS)[number]
+
+export const LEAD_STATUSES = ['new', 'contacted', 'qualified', 'won', 'lost'] as const
+export type LeadStatus = (typeof LEAD_STATUSES)[number]
+
+// Derived from SERVICE_SIDES so the two can't drift apart.
+export const LEAD_SERVICE_INTERESTS = [...SERVICE_SIDES, 'other'] as const
+export type LeadServiceInterest = (typeof LEAD_SERVICE_INTERESTS)[number]
+
+export const LEAD_KIND_LABELS: Record<LeadKind, string> = {
+  service_inquiry: 'Inquiry',
+  job_application: 'Job Application',
+}
+
+export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
+  new: 'New',
+  contacted: 'Contacted',
+  qualified: 'Qualified',
+  won: 'Won',
+  lost: 'Lost',
+}
 
 // ─── Joined / composite types ─────────────────────────────────────────────────
 
