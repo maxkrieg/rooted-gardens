@@ -148,7 +148,9 @@ export function VisitPlanPhotos({
                       type="button"
                       onClick={() => handleDelete(photo.id, photo.storage_path)}
                       disabled={deletePhoto.isPending}
-                      className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-foreground text-background flex items-center justify-center disabled:opacity-50"
+                      // Badge stays 20px so it doesn't swamp the 64px thumb; the
+                      // touch target is expanded invisibly instead.
+                      className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-foreground text-background flex items-center justify-center disabled:opacity-50 pointer-coarse:before:absolute pointer-coarse:before:-inset-3 pointer-coarse:before:content-['']"
                       aria-label="Remove photo"
                     >
                       <X className="h-3 w-3" />
@@ -175,7 +177,7 @@ export function VisitPlanPhotos({
               type="button"
               variant="outline"
               size="sm"
-              className="h-9 gap-1.5"
+              className="gap-1.5"
               onClick={() => fileInputRef.current?.click()}
               disabled={photos.length >= MAX_PLAN_PHOTOS || addPhoto.isPending}
             >

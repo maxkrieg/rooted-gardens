@@ -34,7 +34,7 @@ export default async function ReportsPage({ searchParams }: Props) {
   ])
 
   return (
-    <div className="p-4 lg:p-6 space-y-6 max-w-5xl">
+    <div className="space-y-6 max-w-5xl">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="font-display text-2xl font-semibold text-foreground">Reports</h1>

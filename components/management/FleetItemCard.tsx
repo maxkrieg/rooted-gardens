@@ -100,7 +100,7 @@ export function FleetItemCard(props: FleetItemCardProps) {
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-1.5 h-9"
+                className="gap-1.5"
                 onClick={() => setEditOpen(true)}
               >
                 <Pencil className="h-3.5 w-3.5" />
@@ -110,7 +110,7 @@ export function FleetItemCard(props: FleetItemCardProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-1.5 h-9"
+                  className="gap-1.5"
                   onClick={() => setLogging(true)}
                 >
                   <Plus className="h-3.5 w-3.5" />

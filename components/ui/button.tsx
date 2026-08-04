@@ -19,11 +19,16 @@ const buttonVariants = cva(
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },
+      // `pointer-coarse:` raises every touch target to the 44px minimum without
+      // loosening desktop density (the accountant's billing tables and the
+      // desktop schedule grid are deliberately dense). An explicit h-8/h-9 in a
+      // caller's className still wins via tailwind-merge — those call sites are
+      // fixed individually rather than fought here.
       size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-9 rounded-md px-3",
+        default: "h-10 pointer-coarse:h-11 px-4 py-2",
+        sm: "h-9 pointer-coarse:h-11 rounded-md px-3",
         lg: "h-11 rounded-md px-8",
-        icon: "h-10 w-10",
+        icon: "h-10 w-10 pointer-coarse:size-11",
       },
     },
     defaultVariants: {

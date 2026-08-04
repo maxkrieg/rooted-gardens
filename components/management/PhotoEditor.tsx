@@ -108,7 +108,6 @@ export function PhotoEditor({
         <Button
           type="button"
           size="sm"
-          className="h-9"
           disabled={!captionChanged || isPending}
           onClick={handleSaveCaption}
         >
@@ -142,7 +141,6 @@ export function PhotoEditor({
               type="button"
               variant="destructive"
               size="sm"
-              className="h-9"
               disabled={isPending}
               onClick={handleDelete}
             >
@@ -152,7 +150,6 @@ export function PhotoEditor({
               type="button"
               variant="outline"
               size="sm"
-              className="h-9"
               disabled={isPending}
               onClick={() => setConfirmingDelete(false)}
             >
@@ -164,7 +161,7 @@ export function PhotoEditor({
             type="button"
             variant="ghost"
             size="sm"
-            className="h-9 gap-1.5 text-destructive hover:text-destructive"
+            className="gap-1.5 text-destructive hover:text-destructive"
             onClick={() => setConfirmingDelete(true)}
           >
             <Trash2 className="h-4 w-4" />

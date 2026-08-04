@@ -41,7 +41,7 @@ export function QuickBooksConnect({ status, canManage, feedback }: QuickBooksCon
       <span className="text-sm text-muted-foreground">QuickBooks</span>
       <QboStatusBadge status={status} />
       {canManage && status !== 'connected' && (
-        <Button asChild size="sm" variant="outline" className="h-8 text-xs">
+        <Button asChild size="sm" variant="outline" className="text-xs">
           <a href="/api/quickbooks/connect">Connect QuickBooks</a>
         </Button>
       )}

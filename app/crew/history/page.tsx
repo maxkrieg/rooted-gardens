@@ -49,7 +49,9 @@ export default function HistoryPage() {
 
   return (
     <div className="pb-6">
-      <div className="px-4 pt-4 pb-3">
+      {/* Sticky, matching Schedule and Stop Detail — the one long list in the
+          app with no context anchor otherwise. */}
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-[--border] px-4 pt-4 pb-3">
         <h1 className="font-display text-2xl font-semibold text-foreground">History</h1>
       </div>
 

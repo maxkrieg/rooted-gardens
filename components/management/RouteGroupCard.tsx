@@ -53,7 +53,7 @@ export function RouteGroupCard({
         <div className="flex items-start justify-between gap-3">
           {/* Name + count */}
           <div className="min-w-0">
-            <h3 className="font-display text-base font-semibold text-foreground leading-tight">
+            <h3 className="font-display text-base font-semibold text-foreground leading-tight truncate">
               {routeGroup.name}
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">
@@ -63,12 +63,12 @@ export function RouteGroupCard({
           </div>
 
           {/* Action buttons */}
-          <div className="flex items-center gap-0.5 shrink-0">
+          <div className="flex items-center gap-1 shrink-0">
             {/* Reorder */}
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground disabled:opacity-30"
+              className="text-muted-foreground hover:text-foreground disabled:opacity-30"
               disabled={isFirst || pending}
               onClick={() => handleMove('up')}
               aria-label="Move route group up"
@@ -78,7 +78,7 @@ export function RouteGroupCard({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground disabled:opacity-30"
+              className="text-muted-foreground hover:text-foreground disabled:opacity-30"
               disabled={isLast || pending}
               onClick={() => handleMove('down')}
               aria-label="Move route group down"
@@ -96,7 +96,7 @@ export function RouteGroupCard({
                 <Button
                   variant="destructive"
                   size="sm"
-                  className="h-8 text-xs px-2"
+                  className="text-xs px-2"
                   disabled={pending}
                   onClick={handleDelete}
                 >
@@ -105,7 +105,7 @@ export function RouteGroupCard({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-8 text-xs px-2"
+                  className="text-xs px-2"
                   onClick={() => setConfirmDelete(false)}
                 >
                   Cancel
@@ -115,7 +115,7 @@ export function RouteGroupCard({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                className="text-muted-foreground hover:text-destructive"
                 onClick={() => setConfirmDelete(true)}
                 aria-label="Delete route group"
               >

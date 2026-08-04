@@ -1,6 +1,6 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Users } from 'lucide-react'
 import { FrequencyBadge, VisitStatusBadge } from '@/components/management/badges'
 import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
@@ -15,7 +15,6 @@ function firstName(name: string): string {
 }
 
 export function ScheduleStopRow({ row }: ScheduleStopRowProps) {
-  const router = useRouter()
   const { property, account, visit } = row
 
   const assignedCrew = (visit?.visit_crew ?? [])
@@ -41,15 +40,12 @@ export function ScheduleStopRow({ row }: ScheduleStopRowProps) {
   }
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={() => router.push(`/crew/stop/${visit.id}`)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') router.push(`/crew/stop/${visit.id}`)
-      }}
+    // A real anchor, not a role="button" div — long-press, open-in-new-tab and
+    // native link semantics all come free, and the History list already does this.
+    <Link
+      href={`/crew/stop/${visit.id}`}
       className={[
-        'px-4 py-3 flex flex-col gap-1.5 min-h-[44px] cursor-pointer active:bg-accent/40 transition-colors select-none',
+        'px-4 py-3 flex flex-col gap-1.5 min-h-[44px] active:bg-accent/40 transition-colors',
         visit.status === 'skipped' ? 'opacity-60' : '',
       ].join(' ')}
     >
@@ -99,6 +95,6 @@ export function ScheduleStopRow({ row }: ScheduleStopRowProps) {
           <span className="italic">Unassigned</span>
         )}
       </div>
-    </div>
+    </Link>
   )
 }

@@ -47,12 +47,12 @@ export function ScheduleNav({ windowStart, filters }: ScheduleNavProps) {
   const singleWeekLabel = `${format(windowStartDate, 'MMM d')} – ${format(addDays(windowStartDate, 6), 'MMM d')}`
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex flex-wrap items-center gap-1.5">
       {!isCurrentWeekVisible && (
         <Button
           variant="outline"
           size="sm"
-          className="h-8 px-3 text-xs"
+          className="text-xs"
           onClick={() => goToWeek(format(currentWeekStart, 'yyyy-MM-dd'))}
         >
           Today
@@ -62,7 +62,6 @@ export function ScheduleNav({ windowStart, filters }: ScheduleNavProps) {
       <Button
         variant="outline"
         size="icon"
-        className="h-8 w-8"
         onClick={() => navigate(-1)}
         aria-label="Previous week"
       >
@@ -74,14 +73,13 @@ export function ScheduleNav({ windowStart, filters }: ScheduleNavProps) {
         {rangeLabel}
       </span>
       {/* Mobile: single week */}
-      <span className="lg:hidden font-display text-sm font-medium text-foreground px-1 min-w-[100px] text-center">
+      <span className="lg:hidden font-display text-sm font-medium text-foreground px-1 text-center">
         {singleWeekLabel}
       </span>
 
       <Button
         variant="outline"
         size="icon"
-        className="h-8 w-8"
         onClick={() => navigate(1)}
         aria-label="Next week"
       >
@@ -90,11 +88,11 @@ export function ScheduleNav({ windowStart, filters }: ScheduleNavProps) {
 
       <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
         <PopoverTrigger asChild>
-          <Button variant="outline" size="icon" className="h-8 w-8" aria-label="Open calendar">
+          <Button variant="outline" size="icon" aria-label="Open calendar">
             <CalendarIcon className="h-4 w-4" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[320px] p-0" align="end">
+        <PopoverContent className="w-[320px] p-0" align="end" collisionPadding={8}>
           <Calendar
             mode="single"
             selected={windowStartDate}

@@ -75,9 +75,16 @@ export default async function SchedulePage({
   const filtered = hasActiveScheduleFilters(filters)
 
   return (
-    <div className="p-4 lg:p-6">
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <h1 className="font-display text-2xl font-semibold text-foreground">Schedule</h1>
+    // No p-4 lg:p-6 here — the management layout already applies it, and
+    // doubling it up cost every page 32px of usable width on a phone.
+    <div>
+      {/* Wraps rather than overflows: at 375px the title plus the nav
+          (three 44px buttons + label, plus the conditional "Today" button)
+          doesn't fit on one line. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 mb-4">
+        <h1 className="min-w-0 truncate font-display text-2xl font-semibold text-foreground">
+          Schedule
+        </h1>
         <ScheduleNav windowStart={format(base, 'yyyy-MM-dd')} filters={filters} />
       </div>
       <div className="mb-6">

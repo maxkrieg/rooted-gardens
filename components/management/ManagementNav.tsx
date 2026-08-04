@@ -57,7 +57,7 @@ function NavLinks({ pathname, items, onNavigate }: NavLinksProps) {
                 href={href}
                 onClick={onNavigate}
                 className={cn(
-                  'relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                  'relative flex items-center gap-3 px-3 py-2.5 pointer-coarse:py-3 rounded-lg text-sm font-medium transition-colors',
                   active
                     ? 'bg-accent text-accent-foreground'
                     : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
@@ -84,7 +84,9 @@ interface SidebarFooterProps {
 
 function SidebarFooter({ userEmail, onLogout }: SidebarFooterProps) {
   return (
-    <div className="border-t border-border px-3 py-3 shrink-0">
+    // Bottom safe-area padding: the mobile drawer renders this hard against the
+    // home indicator on notched devices with no other footer below it.
+    <div className="border-t border-border px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] shrink-0">
       {userEmail && (
         <p className="text-xs text-muted-foreground truncate px-1 mb-2" title={userEmail}>
           {userEmail}
@@ -92,7 +94,7 @@ function SidebarFooter({ userEmail, onLogout }: SidebarFooterProps) {
       )}
       <Button
         variant="ghost"
-        className="w-full justify-start gap-2 text-sm h-9 text-muted-foreground hover:text-foreground px-2"
+        className="w-full justify-start gap-2 text-sm text-muted-foreground hover:text-foreground px-2"
         onClick={onLogout}
       >
         <LogOut className="h-4 w-4 shrink-0" />
@@ -130,7 +132,9 @@ export function ManagementNav({ userEmail, role }: ManagementNavProps) {
   async function handleLogout() {
     const supabase = createClient()
     await supabase.auth.signOut()
-    router.push('/login')
+    // replace, not push — Back after signing out shouldn't re-enter the
+    // authenticated shell just to be bounced by the proxy.
+    router.replace('/login')
     router.refresh()
   }
 
@@ -160,12 +164,16 @@ export function ManagementNav({ userEmail, role }: ManagementNavProps) {
         <SidebarFooter userEmail={userEmail} onLogout={handleLogout} />
       </aside>
 
-      {/* Mobile top header — visible below lg */}
-      <header className="lg:hidden fixed top-0 inset-x-0 h-14 bg-card border-b border-border z-40 flex items-center px-4 gap-3">
+      {/* Mobile top header — visible below lg. Fixed height is the bar plus the
+          notch inset, with padding-top absorbing the inset so the bar itself
+          stays 3.5rem tall; the main content offset in layout.tsx matches. */}
+      <header
+        className="lg:hidden fixed top-0 inset-x-0 h-[calc(3.5rem+env(safe-area-inset-top,0px))] pt-[env(safe-area-inset-top,0px)] bg-card border-b border-border z-40 flex items-center px-4 gap-3"
+      >
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 shrink-0 -ml-1.5"
+          className="shrink-0 -ml-1.5"
           onClick={() => setMobileOpen(true)}
           aria-label="Open navigation menu"
         >
@@ -180,7 +188,7 @@ export function ManagementNav({ userEmail, role }: ManagementNavProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 shrink-0"
+          className="shrink-0"
           onClick={() => setPaletteOpen(true)}
           aria-label="Search accounts"
         >

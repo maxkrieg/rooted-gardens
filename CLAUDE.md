@@ -42,8 +42,16 @@ web app. Parent company is **Tigertown Farm LLC**.
   dynamic-by-default, which suits this always-fresh business app.
 - **Tailwind CSS** — utility-first styling
 - **shadcn/ui** — component library (installed via CLI, components live in `components/ui/`)
-- **Serwist** (`@serwist/next`) — PWA manifest and service worker for crew mobile install.
-  Replaces `next-pwa` (unmaintained and webpack-based — incompatible with Turbopack/Next 16)
+- **Serwist** (`@serwist/turbopack`, NOT `@serwist/next` — that's the webpack integration and
+  would break the Turbopack build) — PWA manifest and service worker for crew mobile install.
+  Replaces `next-pwa` (unmaintained and webpack-based — incompatible with Turbopack/Next 16).
+  Turbopack doesn't support build plugins, so `@serwist/turbopack`'s `withSerwist` in
+  `next.config.ts` does nothing but register the `esbuild`/`esbuild-wasm` external package —
+  the worker itself is compiled and served by a Route Handler,
+  `app/serwist/[path]/route.ts` (`createSerwistRoute`), at `/serwist/sw.js`. The worker
+  source lives at `app/sw.ts` — it's excluded from the main `tsconfig.json` (webworker lib
+  conflicts with the DOM lib) and typechecked separately via `npm run typecheck:sw`
+  (`tsconfig.sw.json`).
 - **lucide-react** — icons
 - **react-hook-form** + **zod** — form handling and validation
 - **date-fns** — date manipulation (NOT moment.js, NOT dayjs)
@@ -722,7 +730,7 @@ were always designed as in-app only, and they are built and working.)
   after schema changes and commit `types/database.ts`
 - Keep schedule-related logic in `lib/utils/schedule.ts`
 - Keep QBO sync logic in `lib/quickbooks/sync.ts` — never inline it
-- **Check trio:** `npm run build` · `npm run typecheck` · `npm run lint` — use `npm run typecheck` (not `npx tsc --noEmit`) for type checking
+- **Check trio:** `npm run build` · `npm run typecheck` · `npm run lint` — use `npm run typecheck` (not `npx tsc --noEmit`) for type checking. `app/sw.ts` is excluded from the main typecheck (webworker lib) — run `npm run typecheck:sw` when touching it; `npm run build` also fails if it's broken, since `createSerwistRoute` compiles it at build time.
 
 ---
 

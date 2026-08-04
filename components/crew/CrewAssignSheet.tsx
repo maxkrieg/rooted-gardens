@@ -48,7 +48,9 @@ export function CrewAssignSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[85dvh] overflow-y-auto">
+      {/* max-h / overflow / rounding / safe-area padding all come from the
+          bottom SheetContent variant now. */}
+      <SheetContent side="bottom">
         <SheetHeader className="text-left">
           <SheetTitle className="font-display">Assigned crew</SheetTitle>
           <SheetDescription>Tap a name to add or remove them from this stop.</SheetDescription>

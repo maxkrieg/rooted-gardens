@@ -413,10 +413,10 @@ export function VisitLogger({
   return (
     <>
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent
-        side="bottom"
-        className="max-h-[88vh] overflow-y-auto rounded-t-2xl px-0 pb-0"
-      >
+      {/* max-h/overflow/rounded/safe-area now come from the bottom SheetContent
+          variant itself; pb-0 here because the sticky footer below owns its
+          own safe-area padding instead. */}
+      <SheetContent side="bottom" className="px-0 pb-0">
         <SheetHeader className="px-4 pb-2">
           <SheetTitle className="font-display text-xl">Log Completion</SheetTitle>
         </SheetHeader>
@@ -598,7 +598,10 @@ export function VisitLogger({
           </div>
         </div>
 
-        <SheetFooter className="flex-row gap-2 px-4 pt-2 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] border-t border-[--border] bg-background">
+        {/* sticky, not just last-in-flow — this is the tallest, input-densest
+            sheet in the app, and Submit/Cancel must stay reachable even when
+            the on-screen keyboard is covering the bottom of the scrollport. */}
+        <SheetFooter className="sticky bottom-0 flex-row gap-2 border-t border-[--border] bg-background px-4 pt-2 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
           <Button
             type="button"
             variant="outline"

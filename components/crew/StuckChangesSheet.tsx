@@ -95,7 +95,9 @@ export function StuckChangesSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto">
+      {/* max-h / overflow / rounding / safe-area padding all come from the
+          bottom SheetContent variant now. */}
+      <SheetContent side="bottom">
         <SheetHeader>
           <SheetTitle className="font-display">Changes that didn&rsquo;t save</SheetTitle>
           <SheetDescription>

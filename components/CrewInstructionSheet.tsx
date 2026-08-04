@@ -56,7 +56,9 @@ export function CrewInstructionSheet({
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl px-0 pb-0">
+      {/* max-h / overflow / rounding come from the bottom SheetContent variant;
+          pb-0 because the footer below owns its own safe-area padding. */}
+      <SheetContent side="bottom" className="px-0 pb-0">
         <SheetHeader className="px-4 pb-2 text-left">
           <SheetTitle className="font-display text-xl">Crew instruction</SheetTitle>
         </SheetHeader>

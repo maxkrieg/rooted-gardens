@@ -133,10 +133,35 @@
     border-color: var(--border);
   }
 
+  html {
+    /* Stop iOS from inflating text when a phone is rotated to landscape. */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  html,
+  body {
+    /* Backstop only — real overflow is fixed at the offending component.
+       `clip` rather than `hidden` so it can't create a scroll container and
+       break the app's sticky headers. */
+    overflow-x: clip;
+  }
+
   body {
     background-color: var(--background);
     color: var(--foreground);
     font-feature-settings: "rlig" 1, "calt" 1;
+    /* The grey flash on tap reads as jank on the crew PWA; the components all
+       carry their own :active / hover states. */
+    -webkit-tap-highlight-color: transparent;
+    /* Kill the rubber-band overscroll so the installed app doesn't feel like a
+       web page being dragged around. */
+    overscroll-behavior-y: none;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
   }
 
   /* Visit status badge colors */

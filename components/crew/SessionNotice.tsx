@@ -16,7 +16,10 @@ export function SessionNotice() {
     >
       <TriangleAlert className="h-4 w-4 shrink-0 text-[var(--clay)]" aria-hidden />
       <span>We couldn&rsquo;t confirm who you are.</span>
-      <Link href="/login" className="font-medium underline underline-offset-4">
+      <Link
+        href="/login"
+        className="inline-flex min-h-11 items-center font-medium underline underline-offset-4"
+      >
         Sign in again
       </Link>
     </div>

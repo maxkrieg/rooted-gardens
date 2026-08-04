@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useQueryClient } from '@tanstack/react-query'
@@ -52,6 +52,14 @@ export default function StopDetailPage() {
   const [completionOpen, setCompletionOpen] = useState(false)
   const [skipOpen, setSkipOpen] = useState(false)
 
+  // A stop is routinely a cold entry point — the PWA launching straight into it,
+  // a shared link, or a jump from the management visit sheet — and in those
+  // cases there's no history to go back to, so the button would dead-end.
+  const goBack = useCallback(() => {
+    if (window.history.length > 1) router.back()
+    else router.replace('/crew/schedule')
+  }, [router])
+
   // Optimistic start so the Start cell flips to a running timer immediately, before
   // the queued visit update syncs. Real data (visit.started_at) takes over once present.
   const [optimisticStartedAt, setOptimisticStartedAt] = useState<string | null>(null)
@@ -91,7 +99,7 @@ export default function StopDetailPage() {
         title="This stop isn't here"
         hint="It may have been removed from the schedule."
         action={
-          <Button variant="outline" onClick={() => router.push('/crew/schedule')}>
+          <Button variant="outline" onClick={() => router.replace('/crew/schedule')}>
             Back to schedule
           </Button>
         }
@@ -131,7 +139,7 @@ export default function StopDetailPage() {
           variant="ghost"
           size="icon"
           className="h-11 w-11 -ml-2 shrink-0"
-          onClick={() => router.back()}
+          onClick={goBack}
           aria-label="Go back"
         >
           <ArrowLeft className="h-5 w-5" />
@@ -141,7 +149,7 @@ export default function StopDetailPage() {
         {canManage ? (
           <Link
             href={`/management/accounts/${account.id}`}
-            className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-widest text-muted-foreground hover:text-[--primary] transition-colors"
+            className="inline-flex min-h-11 min-w-0 items-center truncate text-[11px] font-semibold uppercase tracking-widest text-muted-foreground hover:text-[--primary] transition-colors"
           >
             {account.name}
           </Link>
@@ -250,7 +258,7 @@ export default function StopDetailPage() {
         }
         open={completionOpen}
         onOpenChange={setCompletionOpen}
-        onSuccess={() => router.push('/crew/schedule')}
+        onSuccess={() => router.replace('/crew/schedule')}
       />
 
       <SkipSheet
@@ -261,7 +269,7 @@ export default function StopDetailPage() {
         initialSkipReason={visit.skip_reason ?? undefined}
         open={skipOpen}
         onOpenChange={setSkipOpen}
-        onSuccess={() => router.push('/crew/schedule')}
+        onSuccess={() => router.replace('/crew/schedule')}
       />
     </>
   )

@@ -451,7 +451,7 @@ export function InvoicedHistory({
                             }}
                             aria-label={isExpanded ? 'Collapse visits' : 'Expand visits'}
                             aria-expanded={isExpanded}
-                            className="shrink-0 rounded p-1 hover:bg-accent/60 transition-colors"
+                            className="relative shrink-0 rounded p-1 hover:bg-accent/60 transition-colors pointer-coarse:before:absolute pointer-coarse:before:-inset-2.5 pointer-coarse:before:content-['']"
                           >
                             <ChevronDown
                               className="h-4 w-4 text-muted-foreground transition-transform duration-200"

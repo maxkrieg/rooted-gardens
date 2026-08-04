@@ -147,7 +147,10 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Run on all routes except Next.js internals and static assets
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // Run on all routes except Next.js internals and static assets.
+    // `serwist` and `manifest.json` are excluded so the service-worker and
+    // manifest fetches don't each pay for a Supabase getUser() round-trip —
+    // and so the worker can never be redirected to /login.
+    '/((?!_next/static|_next/image|favicon.ico|serwist/|manifest.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

@@ -212,37 +212,38 @@ function CrewSchedulePage() {
     <div className="flex flex-col">
       {/* Header — week nav is the hero; filters sit inline across the top */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-[--border] px-4 py-3 space-y-2.5">
-        {/* Row 1: title + week nav */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <h1 className="font-display text-xl font-semibold text-foreground">Schedule</h1>
+        {/* Row 1: title + week nav. Wraps rather than overflowing — at 320px the
+            title, the Manage pill, and 44px arrows don't fit on one line. */}
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+          <div className="flex min-w-0 items-center gap-2">
+            <h1 className="truncate font-display text-xl font-semibold text-foreground">
+              Schedule
+            </h1>
             {canManage && (
               <Link
                 href={`/management/schedule?week=${formatWeekParam(week)}`}
-                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[--border] bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground hover:bg-accent hover:text-[--accent-foreground]"
+                className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full border border-[--border] bg-secondary px-3 text-xs font-medium text-secondary-foreground hover:bg-accent hover:text-[--accent-foreground]"
               >
                 <LayoutGrid className="h-3.5 w-3.5" />
                 Manage
               </Link>
             )}
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex min-w-0 items-center gap-1">
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9"
               onClick={() => changeWeek(addWeeks(week, -1))}
               aria-label="Previous week"
             >
               <ChevronLeft className="h-5 w-5" />
             </Button>
-            <span className="text-sm font-medium text-muted-foreground tabular-nums min-w-[112px] text-center">
+            <span className="min-w-0 flex-1 text-center text-sm font-medium tabular-nums text-muted-foreground">
               {format(week, 'MMM d')} – {format(addDays(week, 6), 'MMM d')}
             </span>
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9"
               onClick={() => changeWeek(addWeeks(week, 1))}
               aria-label="Next week"
             >
@@ -251,12 +252,13 @@ function CrewSchedulePage() {
           </div>
         </div>
 
-        {/* Row 2: quick toggles */}
-        <div className="flex items-center gap-1.5">
+        {/* Row 2: quick toggles — wraps; the third chip is conditional and at
+            44px tall the row has no headroom left on a small phone. */}
+        <div className="flex flex-wrap items-center gap-1.5">
           <Button
             variant={filters.status === 'scheduled' ? 'default' : 'outline'}
             size="sm"
-            className="h-9 text-xs"
+            className="text-xs"
             onClick={() =>
               setFilters({
                 ...filters,
@@ -269,7 +271,7 @@ function CrewSchedulePage() {
           <Button
             variant={me?.id && filters.crew === me.id ? 'default' : 'outline'}
             size="sm"
-            className="h-9 text-xs"
+            className="text-xs"
             disabled={!me?.id}
             onClick={() =>
               setFilters({
@@ -284,7 +286,7 @@ function CrewSchedulePage() {
             <Button
               variant="outline"
               size="sm"
-              className="h-9 text-xs"
+              className="text-xs"
               onClick={() => changeWeek(thisWeek)}
             >
               This week

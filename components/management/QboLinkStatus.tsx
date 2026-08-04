@@ -37,12 +37,14 @@ export function QboLinkStatus({ accountId, qboCustomerId }: QboLinkStatusProps) 
   }
 
   return (
-    <div className="flex items-center gap-2 border-t border-border pt-3">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-border pt-3">
       {qboCustomerId ? (
         <>
           <CheckCircle2 className="h-4 w-4 shrink-0 text-[#2f6e45]" />
           <span className="text-sm text-[#2f6e45] font-medium">Linked to QuickBooks</span>
-          <span className="text-sm text-muted-foreground font-mono ml-1">· {qboCustomerId}</span>
+          <span className="min-w-0 truncate text-sm text-muted-foreground font-mono ml-1">
+            · {qboCustomerId}
+          </span>
           <a
             href={qboCustomerUrl(qboCustomerId)}
             target="_blank"
@@ -62,7 +64,7 @@ export function QboLinkStatus({ accountId, qboCustomerId }: QboLinkStatusProps) 
       <Button
         size="sm"
         variant="outline"
-        className="h-7 text-xs ml-auto shrink-0"
+        className="text-xs ml-auto shrink-0"
         disabled={pending}
         onClick={handleSync}
       >

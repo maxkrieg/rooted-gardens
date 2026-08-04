@@ -19,7 +19,9 @@ export default function ProfilePage() {
   async function handleSignOut() {
     const supabase = createClient()
     await supabase.auth.signOut()
-    router.push('/login')
+    // replace, not push — Back after signing out shouldn't re-enter the
+    // authenticated shell just to be bounced by the proxy.
+    router.replace('/login')
   }
 
   const roleLabel = employee?.role
@@ -76,7 +78,7 @@ export default function ProfilePage() {
           <Button
             variant="ghost"
             size="sm"
-            className="gap-1.5 h-8 -mr-2"
+            className="gap-1.5 -mr-2"
             onClick={() => setEditOpen(true)}
             disabled={!employee}
           >

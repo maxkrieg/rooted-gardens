@@ -123,7 +123,7 @@ export function ScheduleListMobile({
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-6 px-2 text-xs font-medium text-secondary-foreground/70 hover:text-foreground hover:bg-secondary-foreground/10 normal-case tracking-normal"
+                  className="px-2 text-xs font-medium text-secondary-foreground/70 hover:text-foreground hover:bg-secondary-foreground/10 normal-case tracking-normal"
                   onClick={(e) => {
                     e.stopPropagation()
                     setAssignGroup(routeGroup)

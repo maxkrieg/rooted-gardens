@@ -44,7 +44,10 @@ const CommandInput = React.forwardRef<
     <CommandPrimitive.Input
       ref={ref}
       className={cn(
-        "flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
+        // text-base on mobile to avoid iOS zoom-on-focus. The CommandDialog
+        // override only reaches dialog-hosted inputs; the popover-hosted ones
+        // (schedule filters, billing account pickers) rely on this base class.
+        "flex h-11 w-full rounded-md bg-transparent py-3 text-base md:text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
         className
       )}
       {...props}

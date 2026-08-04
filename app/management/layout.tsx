@@ -26,13 +26,16 @@ export default async function ManagementLayout({
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    // dvh, not vh — iOS Safari's collapsing URL bar makes 100vh taller than the
+    // visible viewport, which left a sliver of dead space at the bottom.
+    <div className="min-h-[100dvh] bg-background">
       <ManagementNav userEmail={user?.email} role={role} />
 
       {/* Main content area:
-          - Mobile: offset below the fixed top header (h-14 = pt-14)
+          - Mobile: offset below the fixed top header, whose own height already
+            absorbs the safe-area inset (see ManagementNav) — match it here too.
           - Desktop: offset right of the fixed sidebar (w-56 = ml-56), no top padding */}
-      <main className="lg:ml-56 pt-14 lg:pt-0 min-h-screen">
+      <main className="lg:ml-56 pt-[calc(3.5rem+env(safe-area-inset-top,0px))] lg:pt-0 min-h-[100dvh]">
         <div className="p-4 lg:p-6 h-full">{children}</div>
       </main>
     </div>

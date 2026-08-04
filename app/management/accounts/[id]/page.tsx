@@ -104,7 +104,7 @@ export default async function AccountDetailPage({ params, searchParams }: Props)
         <Link
           href={`/management/accounts/${id}`}
           className={cn(
-            'px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+            'inline-flex items-center min-h-11 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
             resolvedView === 'details'
               ? 'border-primary text-foreground'
               : 'border-transparent text-muted-foreground hover:text-foreground',
@@ -115,7 +115,7 @@ export default async function AccountDetailPage({ params, searchParams }: Props)
         <Link
           href={`/management/accounts/${id}?view=photos`}
           className={cn(
-            'px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+            'inline-flex items-center min-h-11 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
             resolvedView === 'photos'
               ? 'border-primary text-foreground'
               : 'border-transparent text-muted-foreground hover:text-foreground',

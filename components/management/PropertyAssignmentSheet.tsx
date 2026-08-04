@@ -108,7 +108,7 @@ export function PropertyAssignmentSheet({
       <Button
         variant="outline"
         size="sm"
-        className="gap-1.5 h-8 text-xs"
+        className="gap-1.5 text-xs"
         onClick={() => setOpen(true)}
       >
         <MapIcon className="h-3.5 w-3.5" />
@@ -129,7 +129,7 @@ export function PropertyAssignmentSheet({
               <Button
                 variant={unassignedOnly ? 'default' : 'outline'}
                 size="sm"
-                className="h-9 text-xs"
+                className="text-xs"
                 onClick={() => setUnassignedOnly((v) => !v)}
               >
                 Unassigned only

@@ -117,7 +117,7 @@ export function PhotoLightbox({
             <img
               src={photo.url}
               alt={photo.caption ?? 'Property photo'}
-              className="max-h-[65vh] w-auto mx-auto object-contain"
+              className="max-h-[50dvh] w-auto mx-auto object-contain"
             />
           ) : (
             <div className="h-64 flex items-center justify-center text-sm text-muted-foreground">
@@ -149,7 +149,10 @@ export function PhotoLightbox({
           )}
         </div>
 
-        <div className="p-5 space-y-4 max-h-[35vh] overflow-y-auto">
+        {/* dvh, not vh — and sized so image + body fit inside the DialogContent's
+            own max-h-[85dvh] cap, so the caption field (with the keyboard up)
+            doesn't land in a doubly-nested scroll container. */}
+        <div className="p-5 space-y-4 max-h-[30dvh] overflow-y-auto">
           <div className="flex items-center justify-between gap-3 text-sm">
             <span className="text-muted-foreground">
               {photoTypeLabel(photo.type)} ·{' '}

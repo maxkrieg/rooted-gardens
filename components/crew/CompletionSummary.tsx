@@ -66,7 +66,7 @@ export function CompletionSummary({
             type="button"
             variant="ghost"
             size="sm"
-            className="h-9 gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+            className="gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
             onClick={handleEdit}
           >
             <Pencil className="h-3.5 w-3.5" />
@@ -81,7 +81,7 @@ export function CompletionSummary({
           <>
             {/* Time row */}
             {(visit.started_at || visit.ended_at) && (
-              <div className="flex items-start gap-6">
+              <div className="flex flex-wrap items-start gap-x-4 gap-y-3">
                 <div className="space-y-0.5">
                   <p className="font-display text-base font-semibold text-foreground tabular-nums">
                     {formatDate(visit.ended_at ?? visit.week_start)}

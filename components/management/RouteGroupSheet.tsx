@@ -27,7 +27,7 @@ export function RouteGroupSheet({ routeGroup }: RouteGroupSheetProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+          className="text-muted-foreground hover:text-foreground"
           onClick={() => setOpen(true)}
           aria-label="Edit route group"
         >
@@ -35,7 +35,7 @@ export function RouteGroupSheet({ routeGroup }: RouteGroupSheetProps) {
         </Button>
       ) : (
         <Button
-          className="gap-2 h-10"
+          className="gap-2"
           onClick={() => setOpen(true)}
         >
           <Plus className="h-4 w-4" />

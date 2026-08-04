@@ -65,7 +65,7 @@ export default async function DashboardPage() {
   const hasFleetIssues = maintenanceEquipment.length > 0 || maintenanceVehicles.length > 0
 
   return (
-    <div className="p-4 lg:p-6 space-y-8 max-w-3xl">
+    <div className="space-y-8 max-w-3xl">
       <div>
         <h1 className="font-display text-2xl font-semibold text-foreground">Dashboard</h1>
         <p className="text-sm text-muted-foreground mt-0.5">

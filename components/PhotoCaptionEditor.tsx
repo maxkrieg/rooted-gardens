@@ -69,7 +69,6 @@ export function PhotoCaptionEditor({
       <Button
         type="button"
         size="sm"
-        className="h-9"
         disabled={!changed || updateCaption.isPending}
         onClick={handleSave}
       >

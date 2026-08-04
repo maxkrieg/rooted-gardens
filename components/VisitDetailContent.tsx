@@ -392,7 +392,7 @@ export function VisitDetailContent({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 -mr-1 -mt-1 shrink-0"
+                    className="-mr-1 -mt-1 shrink-0"
                     onClick={() => setInstructionOpen(true)}
                     aria-label="Edit crew instruction"
                   >
@@ -411,7 +411,7 @@ export function VisitDetailContent({
                     Assigned Crew
                   </p>
                   {canReassign && !isFinalVisit && (
-                    <Button variant="outline" size="sm" className="h-8 -mt-1 shrink-0" onClick={() => setAssignOpen(true)}>
+                    <Button variant="outline" size="sm" className="-mt-1 shrink-0" onClick={() => setAssignOpen(true)}>
                       Manage
                     </Button>
                   )}

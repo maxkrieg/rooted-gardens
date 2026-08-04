@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Fraunces, Hanken_Grotesk } from 'next/font/google'
 import { Providers } from '@/components/providers'
 import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration'
@@ -26,12 +26,30 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'default',
+    // 'black-translucent' lets the web app paint under the status bar, which is
+    // what viewportFit: 'cover' below assumes. Pairs with the safe-area insets
+    // used by the crew bottom nav and sheet footers.
+    statusBarStyle: 'black-translucent',
     title: 'Rooted Crew',
   },
   icons: {
     apple: '/icons/icon-192.png',
   },
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  // Required for env(safe-area-inset-*) to resolve to anything but 0px on
+  // notched iOS. Without it every safe-area calc in the app is a no-op.
+  viewportFit: 'cover',
+  // No maximum-scale / user-scalable: blocking pinch-zoom fails WCAG 1.4.4, and
+  // it isn't needed — every input bases at text-base (16px), which is what
+  // actually prevents iOS zoom-on-focus.
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#F6F3EA' },
+    { media: '(prefers-color-scheme: dark)', color: '#1C1A15' },
+  ],
 }
 
 export default function RootLayout({
@@ -41,11 +59,6 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        {/* Prevent zoom on input focus on iOS (crew field use) */}
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-        <meta name="theme-color" content="#4A7C59" />
-      </head>
       <body
         className={`${fraunces.variable} ${hankenGrotesk.variable} antialiased`}
       >

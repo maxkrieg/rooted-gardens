@@ -111,7 +111,7 @@ export function PropertyPhotosSection({
               <button
                 type="button"
                 onClick={() => setLimit('all')}
-                className="text-xs font-medium text-[--primary] hover:underline"
+                className="inline-flex min-h-11 items-center text-xs font-medium text-[--primary] hover:underline"
               >
                 Show all {total} photos
               </button>

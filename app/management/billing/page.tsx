@@ -53,7 +53,7 @@ export default async function BillingPage({ searchParams }: Props) {
   const qboStatus = await getQboConnectionStatus()
 
   return (
-    <div className="p-4 lg:p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <h1 className="font-display text-2xl font-semibold text-foreground">Billing</h1>
         <div className="flex items-center gap-4">
@@ -69,7 +69,7 @@ export default async function BillingPage({ searchParams }: Props) {
         <Link
           href="/management/billing?view=queue"
           className={cn(
-            'px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+            'inline-flex items-center min-h-11 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
             resolvedView === 'queue'
               ? 'border-primary text-foreground'
               : 'border-transparent text-muted-foreground hover:text-foreground',
@@ -80,7 +80,7 @@ export default async function BillingPage({ searchParams }: Props) {
         <Link
           href="/management/billing?view=invoices"
           className={cn(
-            'px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+            'inline-flex items-center min-h-11 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
             resolvedView === 'invoices'
               ? 'border-primary text-foreground'
               : 'border-transparent text-muted-foreground hover:text-foreground',
@@ -91,7 +91,7 @@ export default async function BillingPage({ searchParams }: Props) {
         <Link
           href="/management/billing?view=contracts"
           className={cn(
-            'px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+            'inline-flex items-center min-h-11 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
             resolvedView === 'contracts'
               ? 'border-primary text-foreground'
               : 'border-transparent text-muted-foreground hover:text-foreground',

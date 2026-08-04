@@ -186,7 +186,7 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart, role }: V
             </SheetDescription>
 
             <div className="flex items-center gap-2">
-              <Button asChild variant="outline" size="sm" className="h-9 gap-1.5">
+              <Button asChild variant="outline" size="sm" className="gap-1.5">
                 <a
                   href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.property.address)}`}
                   target="_blank"
@@ -198,7 +198,7 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart, role }: V
               </Button>
               {/* The phone icon is the point: this is the stop exactly as crew see
                   it on their own phones. */}
-              <Button asChild variant="outline" size="sm" className="h-9 gap-1.5">
+              <Button asChild variant="outline" size="sm" className="gap-1.5">
                 <Link href={`/crew/stop/${data.visitId}`}>
                   <Smartphone className="h-3.5 w-3.5 shrink-0" />
                   Crew view
@@ -219,7 +219,11 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart, role }: V
             />
           </div>
 
-          <SheetFooter className="px-6 py-4 border-t border-border shrink-0">
+          {/* Bottom safe-area padding: a right-side sheet is full-width on a
+              phone (w-full sm:max-w-lg) and sits flush against the home
+              indicator on notched iPhones — the bottom variant handles this
+              itself, but side="right" doesn't. */}
+          <SheetFooter className="px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] border-t border-border shrink-0">
             <SheetClose asChild>
               <Button type="button" variant="outline" className="w-full sm:w-auto">
                 Close

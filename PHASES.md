@@ -219,6 +219,15 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   theme color, standalone display mode). Add PWA meta tags to the root layout.
   The crew layout should have no sidebar — bottom nav only. Ensure the viewport
   meta tag prevents zoom on input focus.
+  *Correction (8.6):* `@serwist/next` is the webpack integration and was never
+  actually installed — `withSerwist` from `@serwist/turbopack` only registers an
+  external package and compiles nothing under Turbopack. The worker wasn't
+  actually served until 8.6 added `app/serwist/[path]/route.ts`
+  (`createSerwistRoute`); until then `app/sw.ts` was dead code (excluded from
+  the main tsconfig, never built) and a hand-written `public/sw.js` shipped in
+  its place. The "prevent zoom" viewport tag was also removed in 8.6 — it
+  disabled pinch-zoom (WCAG 1.4.4), which wasn't needed once inputs are
+  `text-base`.
 
 - [x] **1.8 — Role-based routing proxy**
   *Depends on: 1.2, 1.4*
@@ -1167,7 +1176,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   `startTimeError`/`endTimeError` state (it bypasses react-hook-form) is likewise
   left for a separate refactor.
 
-- [ ] **8.6 — Mobile experience polish**
+- [x] **8.6 — Mobile experience polish**
   *Depends on: Phase 4, 3.10*
   Audit the crew PWA and the phone-primary management views on real iOS and Android devices
   (or browser DevTools device emulation). Cover every crew surface, including the
@@ -1178,6 +1187,141 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   scroll, inputs don't zoom on focus (font-size ≥ 16px on inputs), bottom sheets don't get
   covered by keyboard, "Add to Home Screen" prompt works, back navigation works
   naturally. Fix any rough edges found.
+
+  **Built:** The task's own text names `/crew/today`, a route deleted before 8.6
+  started (crew home moved to `/crew/schedule`, commit `7d00c93`) — and that stale
+  reference had leaked into shipped artifacts: `public/manifest.json`'s
+  `start_url` and the placeholder `public/sw.js`'s offline fallback both still
+  pointed at the 404, so an installed PWA cold-started into nothing. Auditing
+  that led to the bigger finding: Serwist was never actually wired up (see the
+  1.7 correction above) — what shipped was a hand-written placeholder from task
+  4.1 that precached one dead route. 8.6 fixed the wiring
+  (`app/serwist/[path]/route.ts` + the `@serwist/turbopack/worker` import),
+  which now genuinely precaches the app (60 entries at last build) instead of
+  nothing. `ServiceWorkerRegistration` explicitly unregisters the old `/sw.js`
+  on load, since a 404 on the update check doesn't unregister an existing
+  worker — devices with the placeholder already installed would otherwise be
+  stranded on it. Added `components/crew/InstallPrompt.tsx` (`beforeinstallprompt`
+  capture + iOS Safari Share-sheet instructions), since nothing in the repo
+  handled that event despite the task's own "Add to Home Screen" criterion.
+
+  Every `env(safe-area-inset-*)` call in the app (7 sites, all on `/crew/*`) was
+  silently resolving to `0px` — `app/layout.tsx` never set `viewport-fit=cover`.
+  Moved the hand-written `<meta viewport>` tag to a proper `export const
+  viewport`, dropped `maximum-scale=1, user-scalable=no` (blocks pinch-zoom,
+  WCAG 1.4.4, and unnecessary once inputs are confirmed `text-base`), and
+  extended safe-area handling to `/management/*`, which had none — the mobile
+  header, the drawer's sign-out row, and two right-side sheet footers
+  (`VisitDetailSheet`, `AccountInvoiceDrawer`) all sat flush against notch/home-
+  indicator insets.
+
+  No `Button` size cleared 44px except `lg` (`default` 40px, `sm` 36px, `icon`
+  40px) — the root cause behind most individual tap-target findings, including
+  the crew week-nav arrows named in the task text. Fixed at the primitive with
+  a `pointer-coarse:` variant (native in Tailwind 4.3) on `button.tsx`,
+  `select.tsx`, and `checkbox.tsx`, so touch devices get 44px while desktop
+  density — the billing tables, the desktop schedule grid — is untouched;
+  explicit `h-8`/`h-9` overrides at ~30 individual call sites (both surfaces)
+  were dropped so the variant could apply. `sheet.tsx`'s and `dialog.tsx`'s
+  close button went from a bare 16px icon to a real 44px hit target in one
+  edit, fixing every sheet and dialog in the app at once. The bottom `Sheet`
+  variant now carries `max-h-[85dvh] overflow-y-auto rounded-t-2xl` and its own
+  safe-area padding itself — four crew sheets had none of that before, one had
+  it as `88vh` (the iOS URL-bar bug), and every caller had been hand-rolling it
+  separately. `dialog.tsx` gained the same `max-h-[85dvh] overflow-y-auto`,
+  which is what makes `RouteAssignDialog`'s ~18-person crew checklist
+  (previously unbounded in a viewport-centered box, unreachable on a phone)
+  actually reachable.
+
+  `VisitLogger`'s footer is now `sticky bottom-0` inside its own scroll
+  container rather than an ordinary flow child, so Submit/Cancel can't scroll
+  away behind the on-screen keyboard — the highest-stakes keyboard-coverage
+  case, since it's the completion form. `PhotoLightbox` moved from `vh` to
+  `dvh` and had its image/body split rebalanced to fit inside the dialog's own
+  new `85dvh` cap instead of nesting two independent scroll regions.
+  `OfflineBanner` dropped its own `sticky` — it was pinned in a different
+  containing block than the page's own sticky headers and silently covered
+  them (the schedule week-nav, the stop-detail back button) whenever a
+  mutation got stuck.
+
+  Fixed the two real horizontal-overflow cases the audit found: the crew and
+  management schedule page headers both computed wider than a 320px viewport
+  once week-nav gets a "Today"/"This week" button (now `flex-wrap` +
+  `truncate` on the title). Also removed a duplicated `p-4 lg:p-6` on four
+  management pages (schedule, dashboard, billing, reports) that were
+  re-applying padding the layout already provides — 32px of width back on
+  every page that had the worst overflow margins.
+
+  Back-navigation fixes: the crew stop page's `router.back()` is a dead end on
+  a cold entry (PWA launch, a shared link, a jump from the management visit
+  sheet) — guarded on `window.history.length` with a `/crew/schedule` fallback.
+  Post-completion/skip/sign-out navigation switched from `push` to `replace` on
+  both surfaces, so Back doesn't return to a just-finished stop or re-enter the
+  authenticated shell after signing out. `ScheduleStopRow` changed from a
+  `role="button"` div to a real `Link`.
+
+  *Not done, flagged:* `VisitLogger.tsx:171`'s pre-existing
+  `react-hooks/set-state-in-effect` lint error is unrelated to this task (it's
+  in the crew-assignment initialization effect, never touched here) and was
+  left as-is. `Switch` (SMS consent toggle) wasn't given the `pointer-coarse:`
+  treatment `Checkbox` got — worth a follow-up if it comes up in review.
+  `public/icons/icon-*.png` are still flat color squares with no logo art —
+  left the manifest's `"purpose": "any maskable"` alone since a solid fill
+  masks cleanly either way, but real artwork will need a genuinely padded
+  `maskable` variant split from the plain `any` icon, or Android will crop it.
+
+  **Manual device verification — not yet done, do before closing 8.6 out for
+  real.** All automated checks pass (`build` / `typecheck` / `lint` /
+  `typecheck:sw`), but nothing here has been confirmed on an actual phone yet.
+
+  *Getting a phone talking to the local dev server:* a bare LAN IP over HTTP
+  covers the layout items below (items 4–8) but **not** the PWA items (1–3) —
+  those need a secure context, which a plain `http://<lan-ip>:3000` won't
+  satisfy on a real device.
+  - Layout/keyboard/back-nav: same Wi-Fi, `npm run dev`, add your machine's LAN
+    IP to `allowedDevOrigins` in `next.config.ts` (currently only `127.0.0.1`),
+    visit `http://<lan-ip>:3000/crew/schedule` from the phone.
+  - PWA items: Android + USB is the cleanest — `adb reverse tcp:3000
+    tcp:3000`, then open `http://localhost:3000` in Chrome on the phone
+    (Chrome treats `localhost` as secure even tunneled over USB, and
+    `chrome://inspect` mirrors full DevTools). iOS or no cable — use an HTTPS
+    tunnel (ngrok / Cloudflare Tunnel) and add its hostname to
+    `allowedDevOrigins` too. Or push a Vercel preview deploy, which sidesteps
+    all of this.
+
+  1. *Install.* Safari → Share → Add to Home Screen. Launch from the home
+     screen: it must open `/crew/schedule`, not a 404. On Android, confirm the
+     `beforeinstallprompt` bar appears and installs.
+  2. *Stale worker.* On a device that already had the old placeholder
+     installed, load the new build and confirm in DevTools → Application →
+     Service Workers that `/sw.js` is gone and `/serwist/sw.js` is active.
+  3. *Offline.* DevTools → Offline (or airplane mode), reload: the shell
+     renders from precache and today's stops render from the IndexedDB React
+     Query cache. Log a completion offline, reconnect, confirm it flushes.
+  4. *Safe areas.* On a notched device in standalone: the bottom nav clears
+     the home indicator, the stop-detail action bar sits above the nav, sheet
+     footers aren't clipped, and the management mobile header clears the
+     status bar.
+  5. *Keyboard.* Open the completion sheet, focus the note textarea, confirm
+     Submit/Cancel stay reachable. Repeat for the photo-caption field in the
+     lightbox and the skip-reason textarea.
+  6. *Zoom.* With `user-scalable=no` removed, focus each `Select` and
+     `CommandInput` and confirm no zoom-on-focus. Confirm pinch-zoom now works.
+  7. *Overflow at 320px.* Walk `/crew/schedule` (navigate two weeks away so
+     "This week" appears), `/crew/stop/[id]`, `/crew/history`,
+     `/management/schedule` (two weeks away, so "Today" appears),
+     `/management/dashboard`, `/management/route-groups`. Per page:
+     `document.documentElement.scrollWidth ===
+     document.documentElement.clientWidth`.
+  8. *Tap targets.* Spot-check the crew week-nav arrows, the management
+     hamburger, the "Assign Route" button on the phone schedule, and the
+     route-group icon cluster.
+  9. *Assign Route dialog.* Open it from the phone schedule with the full
+     ~18-person roster and confirm the list scrolls inside the dialog and the
+     footer stays reachable.
+  10. *Back nav.* Deep-link straight to `/crew/stop/[id]` in a fresh tab and
+      confirm Back lands on the schedule rather than dead-ending. Complete a
+      visit and confirm Back doesn't return to it.
 
 ### ✅ Verifying Phase 8 — Polish, Reporting & Notifications
 

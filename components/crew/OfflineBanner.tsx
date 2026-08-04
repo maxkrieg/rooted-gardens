@@ -21,7 +21,12 @@ export function OfflineBanner() {
         <button
           type="button"
           onClick={() => setReviewOpen(true)}
-          className="sticky top-0 z-40 flex w-full min-h-11 items-center justify-center gap-2 px-4 py-2 text-sm font-sans font-medium"
+          // Not sticky — it already renders at the top of the layout's outer
+          // flex column, above <main>. Making it sticky as well put it in a
+          // different containing block from the page's own sticky headers
+          // (schedule week-nav, stop-detail back button), so it silently
+          // covered them whenever a mutation got stuck.
+          className="flex w-full min-h-11 items-center justify-center gap-2 px-4 py-2 text-sm font-sans font-medium"
           style={{
             backgroundColor: 'oklch(from var(--clay) l c h / 0.14)',
             color: 'var(--bark)',
@@ -49,7 +54,7 @@ export function OfflineBanner() {
     <div
       role="status"
       aria-live="polite"
-      className="sticky top-0 z-40 flex items-center justify-center gap-2 px-4 py-2 text-sm font-sans font-medium"
+      className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-sans font-medium"
       style={{
         backgroundColor: isOnline ? 'var(--accent)' : 'oklch(from var(--ochre) l c h / 0.15)',
         color: isOnline ? 'var(--accent-foreground)' : 'var(--bark)',

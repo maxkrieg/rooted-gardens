@@ -171,7 +171,7 @@ export function AccountInvoiceDrawer({
           })}
         </div>
 
-        <SheetFooter className="flex-row justify-end gap-2 border-t border-border p-4">
+        <SheetFooter className="flex-row justify-end gap-2 border-t border-border px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
             Cancel
           </Button>
