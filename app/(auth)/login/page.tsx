@@ -1,6 +1,8 @@
 'use client'
 
 import { use, useState } from 'react'
+import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -76,6 +78,16 @@ function LoginForm({
   return (
     <main className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm space-y-6">
+        {/* Since / became the public marketing home (task 9.2), staff landing
+            here on a stale bookmark or a mistyped URL need a way back out. */}
+        <Link
+          href="/"
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground w-fit"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Back to the site
+        </Link>
+
         <div className="text-center">
           <h1 className="font-display text-3xl font-semibold text-foreground tracking-tight">
             Rooted Gardens

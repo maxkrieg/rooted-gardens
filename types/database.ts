@@ -566,6 +566,77 @@ export type Database = {
         }
         Relationships: []
       }
+      site_collection_items: {
+        Row: {
+          collection: string
+          created_at: string
+          data: Json
+          id: string
+          published: boolean
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          collection: string
+          created_at?: string
+          data: Json
+          id?: string
+          published?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          collection?: string
+          created_at?: string
+          data?: Json
+          id?: string
+          published?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      site_content: {
+        Row: {
+          created_at: string
+          id: string
+          key: string
+          kind: string
+          page: string
+          updated_at: string
+          updated_by: string | null
+          value: Json | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key: string
+          kind: string
+          page: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key?: string
+          kind?: string
+          page?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_content_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vehicles: {
         Row: {
           created_at: string

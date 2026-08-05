@@ -1356,11 +1356,19 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
 > `/blog`. Treat it as a content reference, not a pixel spec — rebuild in Field & Foliage
 > styling, don't copy markup/CSS.
 >
+> **Content is owner-editable, not hardcoded (added at 9.2):** the owners must be able to
+> change every word, photo, phone number, email, and social link on the public site
+> themselves, with no code change. Page/section text and images, global contact info +
+> socials, and repeating lists (FAQ, job openings, team bios) live in `site_content` /
+> `site_collection_items` (9.2) and are edited inline, WYSIWYG, save-as-you-go via 9.2.5 —
+> not through separate management forms. Adding new pages or nav items is still a code
+> change; the route set itself stays fixed.
+>
 > Additive and depends on earlier phases: lead→account conversion reuses the Phase 2
 > account/property forms + `get_my_role()` RLS helper; ~~the new-lead SMS reuses the Twilio
 > `send-sms` Edge Function (8.2)~~ (deferred — 9.7 ships in-app-only); the Leads inbox lives
-> in the management shell (1.6). The
-> public marketing pages themselves only need the design system (1.1).
+> in the management shell (1.6). The public marketing pages need the design system (1.1)
+> plus the 9.2 content model — they are not static/hardcoded pages.
 
 - [x] **9.1 — `leads` table + RLS migration**
   *Depends on: 1.2, 2.1*
@@ -1409,7 +1417,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   9.1 migration itself for the 9.7 toast.
   Add 2–3 seed leads to `supabase/seed.sql` (one per `kind`) so the inbox has data.
 
-- [ ] **9.2 — Public route group, shared layout & proxy allowlist**
+- [x] **9.2 — Public route group, shared layout, proxy allowlist & owner-editable content model**
   *Depends on: 1.1*
   Create the `app/(public)/` route group with `layout.tsx` — public chrome (top nav: Lawn,
   Gardens, About, FAQ, Jobs, Contact; footer with both division contacts (Matt / lawn,
@@ -1421,20 +1429,98 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   `/management/*` and `/crew/*` protected. Per-page `metadata` (title / description / Open
   Graph) for SEO. Field & Foliage styling throughout.
 
+  **Scope correction (before build):** the spec above assumed page copy lived in code. It
+  can't — the owners must be able to edit every word, phone number, email, and social link
+  themselves with no code change (confirmed: inline WYSIWYG, save = live, no new pages/nav).
+  9.2 therefore became the **content-model** task too, not just routing/chrome; the inline
+  editor itself is split out as **9.2.5**, sequenced immediately after, so 9.3/9.4/9.6 author
+  their real copy *through the editor* rather than in seed SQL.
+
+  **Built:** `supabase/migrations/20260804140000_site_content.sql` — `site_content` (one row
+  per named slot: `page` × `key` × `kind` × `value jsonb`, `UNIQUE(page,key)`) and
+  `site_collection_items` (ordered owner-managed lists: `faq` | `job` | `team`, shape
+  enforced by Zod in `lib/validators/site-content.ts`, not the DB). RLS: `SELECT` open to
+  `anon` + `authenticated` (public marketing content); `INSERT`/`UPDATE`/`DELETE` restricted
+  to `get_my_role() = 'owner'` only — narrower than most staff-write tables in this schema,
+  deliberately, since editing the public site is an owner-only action. Per the 9.1
+  carry-forward, `anon` needed an explicit `GRANT SELECT` — RLS alone confers nothing. Same
+  migration creates the **public** `site-media` Storage bucket (not signed-URL, unlike
+  `photos` — marketing images need stable, crawlable URLs), owner-only writes.
+  `next.config.ts` gained `images.remotePatterns` for it.
+
+  Read layer: `lib/content/defaults.ts` (hardcoded starting copy, verified against
+  myrootedgardens.com 2026-08-04 — doubles as the migration's seed source and the
+  runtime fallback so a deleted/missing row never blanks a page), `lib/content/site.ts`
+  (`getPageContent(page)` merges DB rows over defaults in one query; `getCollection(name)`
+  returns Zod-validated, ordered, published items), `lib/content/routes.ts`
+  (`PUBLIC_ROUTES`/`PUBLIC_NAV` — isomorphic, no React/Supabase import, so `proxy.ts` can use
+  it directly). All 7 public pages + `PublicHeader`/`PublicFooter` read through this layer;
+  nothing on the public site is a hardcoded string except layout/structure.
+
+  `proxy.ts`: two early returns before the Supabase client is constructed — `/` + `?code=`
+  forwards to `/auth/callback` (moved from the deleted `app/page.tsx`), then a
+  `PUBLIC_ROUTES` allowlist skips the `getUser()` round-trip entirely. `/login` deliberately
+  stays off the allowlist so "signed-in user on /login → dashboard" still fires.
+
+  PWA scoping (not in the original spec, but required once `/` went public): the "Rooted
+  Crew" `manifest`/`appleWebApp` metadata and `<ServiceWorkerRegistration />` moved off the
+  root layout onto `app/crew/layout.tsx` only, so marketing visitors aren't offered a crew-app
+  install. `app/crew/layout.tsx`'s interactive body (bottom nav, offline flush, realtime sync)
+  moved to `components/crew/CrewShell.tsx` since a `'use client'` layout can't export
+  `metadata`. `app/layout.tsx` gained `metadataBase`, a `title` template (`%s · Rooted
+  Gardens`), and a public-facing default `description` (replacing the old internal-app copy).
+  Added `app/robots.ts` / `app/sitemap.ts` off `PUBLIC_ROUTES`. `app/not-found.tsx` now links
+  `/` instead of `/management/dashboard`; the login page gained a "Back to the site" link.
+
+  Verified: `npm run build` / `typecheck` / `typecheck:sw` / `lint` all clean (pre-existing
+  lint findings in unrelated crew files untouched); `supabase db push --linked` applied
+  cleanly; role-switched `anon` SELECT-yes/INSERT-no confirmed via `supabase db query
+  --linked`; dev-server smoke test of all 7 public routes (200s, correct seeded copy/titles,
+  no manifest tag), the 404/redirect/robots/sitemap behavior, and that `/crew/schedule` still
+  declares the PWA manifest.
+
+- [ ] **9.2.5 — Inline WYSIWYG content editor**
+  *Depends on: 9.2*
+  The editing surface 9.2's data model was built for. Signed-in owners toggle "Edit" on the
+  live public page (`components/public/EditModeProvider.tsx`, resolved in
+  `app/(public)/layout.tsx` — check for an auth cookie before paying for a `getUser()` +
+  role lookup, so anonymous visitors pay nothing extra); editable regions light up in place.
+  Layout stays code-controlled so Field & Foliage styling can't be broken — only content is
+  editable. `EditableText` (click-to-edit), `EditableRichText` (Tiptap bubble toolbar: bold,
+  italic, link, bullet list, H2 — fixed bottom bar on phone, not a floating bubble, per the
+  owners' phone-primary usage), `EditableImage` (click to replace, uploads to `site-media`
+  the same browser→Storage-then-Server-Action pattern as `PhotoUploadDropzone`), and
+  `CollectionEditor` (in-place add/reorder/remove for `faq`/`job`/`team`, rendered where the
+  list appears). `app/(public)/actions.ts` (`'use server'`): `updateSiteSlot`,
+  `upsertCollectionItem`, `deleteCollectionItem`, `reorderCollection` — each re-checks
+  `role === 'owner'` for a good error message (RLS is the real boundary),
+  `revalidatePath`s on success. **Save = live**, no draft state. Store Tiptap **JSON**, not
+  HTML; render server-side via `@tiptap/html`'s `generateHTML` over a locked-down schema
+  (StarterKit minus code blocks, Link restricted to `http`/`https`/`mailto`/`tel`) — output is
+  schema-constrained by construction, no sanitizer dependency needed. New deps
+  (`@tiptap/react`, `@tiptap/pm`, `@tiptap/starter-kit`, `@tiptap/extension-link`,
+  `@tiptap/html`) must be `next/dynamic({ ssr: false })` and imported only behind `canEdit` —
+  the public bundle (anonymous visitors are the entire audience) must never carry Tiptap.
+
 - [ ] **9.3 — Home / landing page**
   *Depends on: 9.2*
   `app/(public)/page.tsx`: hero + mission ("your yard becomes part of a connected network of
   regenerative landscapes"), two service-line cards (The Electric Lawn / Rooted Gardens
   design), the ELA partnership badge, a "Field Notes" teaser that **links out** to the
   existing blog (deferred), and a prominent "Get started" CTA → the inquiry form (9.5).
-  Content reference: myrootedgardens.com (home). Phone-first, responsive.
+  Content reference: myrootedgardens.com (home). Phone-first, responsive. **Note:** the 9.2
+  shell already renders this page from `site_content` (`home` page slots); expand the layout
+  here and author the fuller copy through the 9.2.5 editor rather than hardcoding it.
 
 - [ ] **9.4 — Marketing sub-pages: Lawn, Gardens, About, FAQ**
   *Depends on: 9.2*
   Content pages mirroring the live site, Field & Foliage styled, each with a contextual
   inquiry CTA. Lawn / Gardens describe each division's services + its contact. FAQ uses a
-  shadcn `accordion` (add via CLI). Keep copy centralized so owners can revise it easily.
-  Content reference: myrootedgardens.com/lawn, /gardens, /our-team (→ `/about`), /faq.
+  shadcn `accordion` (add via CLI — 9.2's FAQ page is stacked cards, not yet an accordion).
+  **Note:** copy is centralized in `site_content` (not code, per the 9.2 pivot) so owners can
+  revise it via 9.2.5 without a deploy; the `faq` collection already backs this page — extend
+  its seeded 2 entries rather than inventing a separate FAQ data source. Content reference:
+  myrootedgardens.com/lawn, /gardens, /our-team (→ `/about`), /faq.
 
 - [ ] **9.5 — Public inquiry form + spam protection + Server Action**
   *Depends on: 9.2, 9.1*
@@ -1444,14 +1530,18 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   + lightweight **per-IP rate limit** (server-side; no external captcha unless abuse appears).
   Submit via a **Server Action** (online / management-side — Server Actions are correct here;
   the offline queue is crew-only) inserting a `leads` row (`kind='service_inquiry'`,
-  `status='new'`). Show a warm success state. Fires the 9.7 notification.
+  `status='new'`). Show a warm success state. Fires the 9.7 notification. **Note:** 9.2's
+  `/contact` shell currently shows direct division contact info in place of this form —
+  replace that block with the real form rather than appending to it.
 
 - [ ] **9.6 — Careers (Jobs) page + application**
   *Depends on: 9.2, 9.1*
   `app/(public)/jobs/page.tsx`: hiring pitch + any openings. A simple application form (name,
   email, phone, position interest, message, optional **resume upload** → Supabase Storage)
   that inserts a `leads` row with `kind='job_application'` and the extras in `details`
-  (position, resume path). Reuse the 9.5 spam protection + Server Action pattern.
+  (position, resume path). Reuse the 9.5 spam protection + Server Action pattern. **Note:**
+  open positions already render from the `job` collection (9.2/9.2.5 manage the listings
+  themselves); this task is specifically the application form each listing's "Apply" links to.
   Content reference: myrootedgardens.com/jobs.
 
 - [ ] **9.7 — New-lead notification (in-app + ~~SMS~~)**
@@ -1491,8 +1581,12 @@ develop against).
 
 **Functional (against seed data):**
 - Signed out, `/`, `/lawn`, `/gardens`, `/about`, `/faq`, `/jobs`, `/contact` all load (public
-  allowlist works); `/management/*` and `/crew/*` still redirect to `/login` (9.2).
+  allowlist works) rendering seeded `site_content` copy; `/management/*` and `/crew/*` still
+  redirect to `/login` (9.2).
 - Home renders both service lines + the inquiry CTA; sub-pages render with the FAQ accordion (9.3 / 9.4).
+- Signed in as `owner`, "Edit" appears on every public page; text/image/collection edits save
+  and are visible signed-out immediately (save = live); a `lead`/`crew`/`accountant` login
+  never sees the toggle (9.2.5).
 - Submitting the inquiry form inserts a `leads` row (`kind='service_inquiry'`, `status='new'`)
   and shows the success state; the honeypot / rate-limit reject obvious bots (9.5).
 - The careers form inserts `kind='job_application'` with the resume in Storage + `details` (9.6).
@@ -1504,6 +1598,12 @@ develop against).
 **Security / RLS (9.1):**
 - The anon / public role can INSERT into `leads` but cannot SELECT; `crew` / `accountant` have
   no `leads` access; `owner` / `lead` can read + update.
+
+**Security / RLS (9.2):**
+- `anon` and every staff role can `SELECT` `site_content` / `site_collection_items`; only
+  `owner` can `INSERT`/`UPDATE`/`DELETE` — `lead`/`crew`/`accountant` cannot, unlike most
+  staff-write tables in this schema (editing the public site is owner-only). `site-media`
+  Storage: public read, owner-only write.
 
 **Deferred with 8.2 — not part of shipping Phase 9:**
 - ~~The new-lead SMS reaches the matching owner via the `send-sms` Edge Function (9.7).~~

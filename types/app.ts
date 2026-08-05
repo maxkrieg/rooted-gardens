@@ -15,6 +15,8 @@ export type Integration = Tables<'integrations'>
 export type Invoice = Tables<'invoices'>
 export type MaintenanceLog = Tables<'maintenance_logs'>
 export type Lead = Tables<'leads'>
+export type SiteContentRow = Tables<'site_content'>
+export type SiteCollectionItemRow = Tables<'site_collection_items'>
 
 // A property enriched with its account name and current route group — used by
 // the route-groups management page and its Assign Properties sheet.
@@ -278,4 +280,55 @@ export type CrewStop = {
   property: Property
   account: Account
   isAssigned: boolean
+}
+
+// ─── Public marketing site content (Phase 9.2) ─────────────────────────────────
+// `site_content` slots and `site_collection_items` back the owner-editable public
+// site (app/(public)/*) — see lib/content/site.ts for the read layer and
+// lib/validators/site-content.ts for the Zod schemas these types line up with.
+
+export const SITE_PAGES = [
+  'global',
+  'home',
+  'lawn',
+  'gardens',
+  'about',
+  'faq',
+  'jobs',
+  'contact',
+] as const
+export type SitePage = (typeof SITE_PAGES)[number]
+
+export const SITE_CONTENT_KINDS = ['text', 'richtext', 'image', 'email', 'phone', 'url'] as const
+export type SiteContentKind = (typeof SITE_CONTENT_KINDS)[number]
+
+export const SITE_COLLECTIONS = ['faq', 'job', 'team'] as const
+export type SiteCollection = (typeof SITE_COLLECTIONS)[number]
+
+/** A resolved content slot — `value` is already unwrapped from the DB's jsonb
+ *  column and merged with lib/content/defaults.ts when no row exists yet, so
+ *  callers never see a missing slot, only an empty string. */
+export type SiteSlot = {
+  page: SitePage
+  key: string
+  kind: SiteContentKind
+  value: string
+}
+
+/** getPageContent()'s return shape: every slot for the requested page, keyed
+ *  for O(1) lookup in components, plus the raw list for iteration. */
+export type PageContent = {
+  page: SitePage
+  slots: Record<string, SiteSlot>
+}
+
+export type FaqItemData = { question: string; answer: string }
+export type JobItemData = { title: string; location: string; blurb: string }
+export type TeamItemData = { name: string; role: string; bio: string; image_path: string | null }
+
+export type SiteCollectionItem<T> = {
+  id: string
+  sortOrder: number
+  published: boolean
+  data: T
 }

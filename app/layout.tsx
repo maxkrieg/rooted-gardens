@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Fraunces, Hanken_Grotesk } from 'next/font/google'
 import { Providers } from '@/components/providers'
-import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration'
 import './globals.css'
 
 const fraunces = Fraunces({
@@ -21,18 +20,18 @@ const hankenGrotesk = Hanken_Grotesk({
 })
 
 export const metadata: Metadata = {
-  title: 'Rooted Gardens',
-  description: 'Internal business management for Rooted Gardens eco-landscaping',
-  manifest: '/manifest.json',
-  appleWebApp: {
-    capable: true,
-    // 'black-translucent' lets the web app paint under the status bar, which is
-    // what viewportFit: 'cover' below assumes. Pairs with the safe-area insets
-    // used by the crew bottom nav and sheet footers.
-    statusBarStyle: 'black-translucent',
-    title: 'Rooted Crew',
+  // Required for relative Open Graph/social image URLs (app/(public)/*) to
+  // resolve to absolute ones.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'),
+  title: {
+    default: 'Rooted Gardens',
+    template: '%s · Rooted Gardens',
   },
+  // Public-facing default (task 9.2 made `/` a marketing page) — management
+  // and crew routes are behind auth regardless of what this says.
+  description: 'Eco-minded lawn care and garden design serving Norwich, VT and the Upper Valley.',
   icons: {
+    icon: '/icons/icon-192.png',
     apple: '/icons/icon-192.png',
   },
 }
@@ -62,10 +61,7 @@ export default function RootLayout({
       <body
         className={`${fraunces.variable} ${hankenGrotesk.variable} antialiased`}
       >
-        <Providers>
-          <ServiceWorkerRegistration />
-          {children}
-        </Providers>
+        <Providers>{children}</Providers>
       </body>
     </html>
   )

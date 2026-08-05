@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import type { Database } from '@/types/database'
 import { formatRoleCookie, parseRoleCookie } from '@/lib/utils/role-cookie'
+import { PUBLIC_ROUTES } from '@/lib/content/routes'
 
 type EmployeeRole = 'owner' | 'lead' | 'crew' | 'accountant'
 
@@ -21,10 +22,32 @@ const ROLE_HOME: Record<EmployeeRole, string> = {
 }
 
 export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // Magic-link fallback: Supabase's configured Site URL is the app root, so a
+  // sign-in link can land on `/` with `?code=` (this used to be handled by
+  // app/page.tsx, before `/` became the public marketing home — task 9.2).
+  // clone() preserves the rest of the query string.
+  if (pathname === '/' && request.nextUrl.searchParams.has('code')) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/auth/callback'
+    return NextResponse.redirect(url)
+  }
+
+  // Public marketing pages (task 9.2) — no session needed, so skip the
+  // getUser() round-trip below entirely. `/login` is deliberately NOT on this
+  // list: it still needs the session check just below to redirect an
+  // already-signed-in user to their dashboard.
+  if (PUBLIC_ROUTES.includes(pathname as (typeof PUBLIC_ROUTES)[number])) {
+    return NextResponse.next({ request })
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   // Use anon key with cookies to refresh and validate the session.
-  // IMPORTANT: always call getUser() — never skip; it keeps the auth session alive.
+  // IMPORTANT: for every route reaching this point, always call getUser() —
+  // never skip; it keeps the auth session alive. (Public marketing routes
+  // return above and never reach here.)
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -50,7 +73,6 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const { pathname } = request.nextUrl
   const isManagement = pathname.startsWith('/management')
   const isCrew = pathname.startsWith('/crew')
   const isProtected = isManagement || isCrew

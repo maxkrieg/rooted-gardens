@@ -1,0 +1,82 @@
+'use client'
+
+import { useEffect } from 'react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { Clock, User, CalendarRange } from 'lucide-react'
+import { OfflineBanner } from '@/components/crew/OfflineBanner'
+import { SessionNotice } from '@/components/crew/SessionNotice'
+import { InstallPrompt } from '@/components/crew/InstallPrompt'
+import { flushMutationQueue } from '@/lib/crew/mutation-queue'
+import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
+import { useCrewRealtimeSync } from '@/hooks/crew/useCrewRealtimeSync'
+
+const navItems = [
+  { href: '/crew/schedule', label: 'Schedule', Icon: CalendarRange },
+  { href: '/crew/history', label: 'History', Icon: Clock },
+  { href: '/crew/profile', label: 'Profile', Icon: User },
+]
+
+/**
+ * The crew mobile shell — moved out of app/crew/layout.tsx (task 9.2) so
+ * that layout can stay a server component and export PWA metadata
+ * (`manifest`, `appleWebApp`), which a `'use client'` layout can't do.
+ */
+export function CrewShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
+  const { data: employee, isError: employeeError } = useCurrentEmployee()
+
+  // Flush any mutations that were queued during a prior offline session
+  useEffect(() => {
+    flushMutationQueue()
+  }, [])
+
+  // Push schedule changes to the React Query cache in real time
+  useCrewRealtimeSync(employee?.id)
+
+  return (
+    <div className="flex flex-col min-h-[100dvh] bg-background">
+      <OfflineBanner />
+      <InstallPrompt />
+      {/* Silent failure here breaks "My stops", History, and realtime all at once. */}
+      {employeeError && !employee && <SessionNotice />}
+      {/* Main scrollable content — nav height plus a little breathing room, so
+          the last row doesn't sit flush against the bottom bar. */}
+      <main className="flex-1 overflow-y-auto pb-[calc(3.5rem+0.5rem+env(safe-area-inset-bottom,0px))]">
+        {children}
+      </main>
+
+      {/* Bottom navigation bar */}
+      <nav
+        className="fixed bottom-0 inset-x-0 z-50 bg-card border-t border-border"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      >
+        <ul className="flex items-stretch h-14">
+          {navItems.map(({ href, label, Icon }) => {
+            const isActive = pathname === href || pathname.startsWith(href + '/')
+            return (
+              <li key={href} className="flex-1">
+                <Link
+                  href={href}
+                  className={[
+                    'flex flex-col items-center justify-center h-full gap-0.5 text-xs font-sans font-medium transition-colors',
+                    isActive
+                      ? 'text-primary'
+                      : 'text-muted-foreground hover:text-foreground',
+                  ].join(' ')}
+                >
+                  <Icon
+                    size={22}
+                    strokeWidth={isActive ? 2.25 : 1.75}
+                    aria-hidden
+                  />
+                  <span className="leading-none">{label}</span>
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      </nav>
+    </div>
+  )
+}

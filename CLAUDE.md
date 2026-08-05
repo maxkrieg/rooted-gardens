@@ -230,6 +230,52 @@ leads (
 -- RLS: anon role INSERT only (public form, no reads); owner/lead SELECT+UPDATE;
 -- crew/accountant no access. Realtime-enabled for the management new-lead toast.
 
+-- Owner-editable copy for the fixed public marketing pages (app/(public)/*). The
+-- owners must be able to change every word, phone number, email, and social link
+-- themselves with no code change — see UI Conventions below for the inline
+-- WYSIWYG editor this backs. `page='global'` slots (footer contacts, socials) are
+-- shared across every page; everything else is scoped to one route. [Phase 9.2]
+site_content (
+  id uuid PK,
+  page text NOT NULL            -- 'global' | 'home' | 'lawn' | 'gardens' | 'about' | 'faq' | 'jobs' | 'contact'
+    CHECK (page IN ('global', 'home', 'lawn', 'gardens', 'about', 'faq', 'jobs', 'contact')),
+  key text NOT NULL,            -- slot name, e.g. 'hero_heading', 'lawn_contact_phone'
+  kind text NOT NULL            -- drives which editor control renders + how the value validates
+    CHECK (kind IN ('text', 'richtext', 'image', 'email', 'phone', 'url')),
+  value jsonb,                  -- plain string for text/image/email/phone/url; Tiptap JSON for richtext
+  updated_by uuid FK → employees,
+  created_at, updated_at,
+  UNIQUE (page, key)
+)
+-- RLS: SELECT open to anon + all staff (public marketing content, requires an
+-- explicit anon GRANT — RLS alone confers nothing, same lesson as leads/9.1);
+-- INSERT/UPDATE restricted to owner only — narrower than most staff-write tables
+-- in this schema, since editing the live public site is deliberately owner-only.
+-- A missing/deleted row is NOT an error: lib/content/defaults.ts is the runtime
+-- fallback, so a page never renders blank.
+
+-- Ordered, owner-managed lists rendered on a fixed public page — FAQ entries,
+-- job openings, team bios. `data` shape is per-collection and enforced by Zod
+-- (lib/validators/site-content.ts), not the DB, mirroring leads.details. [Phase 9.2]
+site_collection_items (
+  id uuid PK,
+  collection text NOT NULL      -- 'faq' | 'job' | 'team'
+    CHECK (collection IN ('faq', 'job', 'team')),
+  sort_order integer NOT NULL DEFAULT 0,
+  published boolean NOT NULL DEFAULT true,  -- soft-hide (e.g. a filled job opening) without deleting
+  data jsonb NOT NULL,
+  created_at, updated_at
+)
+-- RLS: same shape as site_content — public SELECT, owner-only writes (DELETE too,
+-- since a stale FAQ/job/team entry can be removed outright, unlike site_content
+-- slots which are edited, never removed).
+
+-- Public (not signed-URL, unlike the `photos` bucket) Storage bucket for
+-- owner-uploaded marketing images referenced by site_content 'image' slots and
+-- site_collection_items.data.image_path (team bios). Public because marketing
+-- images need stable, cacheable, crawlable URLs. Owner-only writes.
+-- storage.buckets: 'site-media', public=true, 20MB limit, jpeg/png/webp.
+
 -- Physical locations (an account may have multiple properties)
 properties (
   id uuid PK,
