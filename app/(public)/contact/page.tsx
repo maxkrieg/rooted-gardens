@@ -1,14 +1,8 @@
-import type { Metadata } from 'next'
 import { getPageContent, getSlot } from '@/lib/content/site'
+import { pageMetadata } from '@/lib/content/metadata'
 import { EditableText } from '@/components/public/editing/EditableText'
 
-export async function generateMetadata(): Promise<Metadata> {
-  const content = await getPageContent('contact')
-  return {
-    title: getSlot(content, 'seo_title') || undefined,
-    description: getSlot(content, 'seo_description') || undefined,
-  }
-}
+export const generateMetadata = () => pageMetadata('contact')
 
 /**
  * 9.2 shell for the Contact page. The inquiry form (honeypot + rate limit +

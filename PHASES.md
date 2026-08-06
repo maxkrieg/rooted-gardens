@@ -1543,7 +1543,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   review; a live signed-in-as-crew spot check was attempted but inconclusive (a stale session
   cookie in the test browser tab) and not re-run.
 
-- [ ] **9.3 — Home / landing page**
+- [x] **9.3 — Home / landing page**
   *Depends on: 9.2*
   `app/(public)/page.tsx`: hero + mission ("your yard becomes part of a connected network of
   regenerative landscapes"), two service-line cards (The Electric Lawn / Rooted Gardens
@@ -1552,6 +1552,26 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   Content reference: myrootedgardens.com (home). Phone-first, responsive. **Note:** the 9.2
   shell already renders this page from `site_content` (`home` page slots); expand the layout
   here and author the fuller copy through the 9.2.5 editor rather than hardcoding it.
+
+  **Built:** expanded the 9.2 hero + two-card shell into the full landing page: hero (now
+  with an editable eyebrow + a `hero_image` slot), a hero photo band, the two service-line
+  teaser cards (unchanged data source — still read `heading`/`intro` off `lawn`/`gardens`,
+  editable on those pages), a mission statement section, a services-overview card, the ELA
+  membership badge (new `global.ela_url` slot, pill styled like `CredentialsLine`), a "Field
+  Notes" teaser linking out to the `global.blog_url` slot (defined since 9.2, unused until
+  now), and a closing CTA band on an `accent`-tinted section. All new copy lives in
+  `CONTENT_DEFAULTS.home` (`lib/content/defaults.ts`) — no migration needed, since a slot's
+  DB row is created on first owner edit via `updateSiteSlot`'s upsert; only
+  `site_collection_items` needs a seed migration (see 9.4's).
+  New component: `components/public/editing/EditableImageSlot.tsx` — 9.2.5 shipped
+  `EditableImage` but only wired it into the `team` collection item form, where the *parent*
+  owns persisting the path; a standalone page slot has no such parent, so this wrapper
+  persists via `updateSiteSlot({kind:'image'})` itself, same save/toast/refresh idiom as
+  `EditableText`. Renders nothing (not a broken image) when no path is set and the visitor
+  isn't in edit mode.
+  Also added `lib/content/metadata.ts` (`pageMetadata(page)`), replacing the byte-identical
+  `generateMetadata` block that had been copy-pasted into all seven public pages; applied to
+  home, lawn, gardens, about, faq, jobs, and contact so none of them can drift.
 
 - [ ] **9.4 — Marketing sub-pages: Lawn, Gardens, About, FAQ**
   *Depends on: 9.2*

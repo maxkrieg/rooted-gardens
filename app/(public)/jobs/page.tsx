@@ -1,18 +1,12 @@
 import Link from 'next/link'
-import type { Metadata } from 'next'
 import { getCollection, getPageContent, getSlot } from '@/lib/content/site'
+import { pageMetadata } from '@/lib/content/metadata'
 import { Button } from '@/components/ui/button'
 import { EditableText } from '@/components/public/editing/EditableText'
 import { CollectionSection } from '@/components/public/editing/CollectionSection'
 import type { JobItemData } from '@/types/app'
 
-export async function generateMetadata(): Promise<Metadata> {
-  const content = await getPageContent('jobs')
-  return {
-    title: getSlot(content, 'seo_title') || undefined,
-    description: getSlot(content, 'seo_description') || undefined,
-  }
-}
+export const generateMetadata = () => pageMetadata('jobs')
 
 /**
  * 9.2 shell for the careers page — the `job` collection rendered as cards.
