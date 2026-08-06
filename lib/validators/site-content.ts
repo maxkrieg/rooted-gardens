@@ -14,26 +14,54 @@ import { SITE_COLLECTIONS, SITE_CONTENT_KINDS, SITE_PAGES } from '@/types/app'
 export const sitePageSchema = z.enum(SITE_PAGES)
 export const siteContentKindSchema = z.enum(SITE_CONTENT_KINDS)
 
-/** A single slot value as edited/saved. `text`/`image` accept any non-empty
- *  string; `email`/`phone`/`url` get a light format check so a bad edit fails
- *  fast in the editor rather than silently breaking a mailto:/tel:/href. */
-export const siteSlotValueSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('text'), value: z.string().trim().max(5000) }),
-  z.object({ kind: z.literal('richtext'), value: z.string().trim().max(20000) }),
-  z.object({ kind: z.literal('image'), value: z.string().trim().max(512) }),
-  z.object({ kind: z.literal('email'), value: z.string().trim().email().max(320) }),
-  z.object({ kind: z.literal('phone'), value: z.string().trim().min(7).max(40) }),
-  z.object({ kind: z.literal('url'), value: z.string().trim().url().max(1000) }),
-])
+/** `updateSiteSlot` (app/(public)/actions.ts) only ever handles a plain-string
+ *  value — richtext goes through `updateRichTextSlotSchema` below instead,
+ *  since its value is `{ doc, html }`, not a string. */
+export const simpleContentKindSchema = z.enum(['text', 'image', 'email', 'phone', 'url'])
 
-export const updateSiteSlotSchema = z.object({
-  page: sitePageSchema,
-  key: z.string().trim().min(1).max(100),
-  kind: siteContentKindSchema,
-  value: z.string().trim().max(20000),
-})
+/** Per-kind format check on top of the base length cap — a bad edit fails
+ *  fast in the editor rather than silently breaking a mailto:/tel:/href on
+ *  the live site. `superRefine` (not a discriminated union) so the action
+ *  still gets back one flat, uniform `{page,key,kind,value}` shape. */
+export const updateSiteSlotSchema = z
+  .object({
+    page: sitePageSchema,
+    key: z.string().trim().min(1).max(100),
+    kind: simpleContentKindSchema,
+    value: z.string().trim().max(20000),
+  })
+  .superRefine((data, ctx) => {
+    if (data.kind === 'email' && !z.email().safeParse(data.value).success) {
+      ctx.addIssue({ code: 'custom', path: ['value'], message: 'Enter a valid email address' })
+    }
+    if (data.kind === 'url' && !z.url().safeParse(data.value).success) {
+      ctx.addIssue({ code: 'custom', path: ['value'], message: 'Enter a valid URL' })
+    }
+    if (data.kind === 'phone' && data.value.length < 7) {
+      ctx.addIssue({ code: 'custom', path: ['value'], message: 'Enter a valid phone number' })
+    }
+  })
 
 export type UpdateSiteSlotValues = z.infer<typeof updateSiteSlotSchema>
+
+/**
+ * `updateRichTextSlot` — `doc` is only shape-checked here (a real ProseMirror
+ * document, not arbitrary JSON); full structural validity is enforced by
+ * `getSchema`/`Node.fromJSON` throwing inside the action if the shape doesn't
+ * actually match the extension set in lib/content/richtext-schema.ts.
+ */
+export const richTextDocSchema = z.object({
+  type: z.literal('doc'),
+  content: z.array(z.unknown()),
+})
+
+export const updateRichTextSlotSchema = z.object({
+  page: sitePageSchema,
+  key: z.string().trim().min(1).max(100),
+  doc: richTextDocSchema,
+})
+
+export type UpdateRichTextSlotValues = z.infer<typeof updateRichTextSlotSchema>
 
 // ─── site_collection_items ──────────────────────────────────────────────────────
 
@@ -70,12 +98,30 @@ export function collectionItemDataSchema(collection: z.infer<typeof siteCollecti
   }
 }
 
+/** `sortOrder` and `published` are deliberately not client inputs here —
+ *  mirrors `route_groups`' `createRouteGroup` (append at max+1) /
+ *  `updateRouteGroup` (only touches the edited fields, never `sort_order`)
+ *  split: `upsertCollectionItem` only ever writes `data`; reordering goes
+ *  through the dedicated `moveCollectionItem` action below. */
 export const upsertCollectionItemSchema = z.object({
   id: z.string().uuid().optional(),
   collection: siteCollectionSchema,
-  sortOrder: z.number().int().min(0),
-  published: z.boolean(),
   data: z.record(z.string(), z.unknown()),
 })
 
 export type UpsertCollectionItemValues = z.infer<typeof upsertCollectionItemSchema>
+
+export const deleteCollectionItemSchema = z.object({
+  collection: siteCollectionSchema,
+  id: z.string().uuid(),
+})
+
+export type DeleteCollectionItemValues = z.infer<typeof deleteCollectionItemSchema>
+
+export const moveCollectionItemSchema = z.object({
+  collection: siteCollectionSchema,
+  id: z.string().uuid(),
+  direction: z.enum(['up', 'down']),
+})
+
+export type MoveCollectionItemValues = z.infer<typeof moveCollectionItemSchema>

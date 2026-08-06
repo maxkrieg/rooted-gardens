@@ -3,11 +3,37 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Leaf, Menu } from 'lucide-react'
+import { Leaf, Menu, Pencil } from 'lucide-react'
 import { PUBLIC_NAV } from '@/lib/content/routes'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useEditMode } from './editing/EditModeProvider'
+
+/** The "Edit" / "Editing" toggle — only ever rendered for a signed-in owner
+ *  (task 9.2.5). Shared between the desktop bar and the mobile drawer so the
+ *  two don't drift in styling. */
+function EditToggle({ className }: { className?: string }) {
+  const { canEdit, editing, setEditing } = useEditMode()
+  if (!canEdit) return null
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(!editing)}
+      className={cn(
+        'flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
+        editing
+          ? 'border-[var(--clay)] bg-[var(--clay)]/10 text-[var(--clay)]'
+          : 'border-border text-muted-foreground hover:text-foreground hover:border-input',
+        className,
+      )}
+    >
+      <Pencil className="h-3 w-3" />
+      {editing ? 'Editing' : 'Edit'}
+    </button>
+  )
+}
 
 /**
  * Sticky top nav for the public marketing site (`app/(public)/*`). Mirrors the
@@ -49,6 +75,7 @@ export function PublicHeader() {
         </nav>
 
         <div className="ml-auto hidden md:flex items-center gap-3">
+          <EditToggle />
           <Link href="/login" className="text-xs text-muted-foreground hover:text-foreground">
             Staff log in
           </Link>
@@ -99,6 +126,7 @@ export function PublicHeader() {
             </ul>
           </nav>
           <div className="border-t border-border px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] shrink-0 space-y-3">
+            <EditToggle className="w-full justify-center h-11 rounded-lg" />
             <Button asChild className="w-full">
               <Link href="/contact" onClick={() => setOpen(false)}>
                 Get started

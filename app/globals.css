@@ -233,6 +233,42 @@
   }
 }
 
+/* ── Public site rich text (task 9.2.5) ────────────────────────────────────
+   Minimal hand-written styling for the locked-down richtext extension set
+   (lib/content/richtext-schema.ts: bold, italic, link, bullet list, H2 —
+   nothing else). No @tailwindcss/typography plugin for a ~5-tag surface;
+   shared by both the live Tiptap editor content and the pre-rendered HTML
+   display (dangerouslySetInnerHTML) so editing and viewing look identical. */
+.prose-rt p {
+  margin-bottom: 0.75em;
+}
+.prose-rt p:last-child {
+  margin-bottom: 0;
+}
+.prose-rt strong {
+  font-weight: 600;
+}
+.prose-rt em {
+  font-style: italic;
+}
+.prose-rt a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.prose-rt ul {
+  list-style: disc;
+  padding-left: 1.25em;
+  margin-bottom: 0.75em;
+}
+.prose-rt h2 {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.5em;
+  color: var(--foreground);
+}
+
 /* ── Loading skeletons ──────────────────────────────────────────────────────
    A slow warm sweep instead of an opacity pulse — on paper, a pulsing gray block
    reads as a broken image. Consumed by components/ui/skeleton.tsx.            */

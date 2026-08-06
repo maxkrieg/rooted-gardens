@@ -307,12 +307,18 @@ export type SiteCollection = (typeof SITE_COLLECTIONS)[number]
 
 /** A resolved content slot — `value` is already unwrapped from the DB's jsonb
  *  column and merged with lib/content/defaults.ts when no row exists yet, so
- *  callers never see a missing slot, only an empty string. */
+ *  callers never see a missing slot, only an empty string. For `kind:
+ *  'richtext'`, `value` is always a pre-rendered, safe-to-inject HTML string
+ *  (see lib/content/site.ts) — never raw Tiptap JSON. `doc` carries that raw
+ *  Tiptap JSON for the editor to resume editing from; it's only present for a
+ *  richtext slot backed by an actual DB row (task 9.2.5) — undefined for
+ *  every other kind and for the still-default, no-row-yet case. */
 export type SiteSlot = {
   page: SitePage
   key: string
   kind: SiteContentKind
   value: string
+  doc?: unknown
 }
 
 /** getPageContent()'s return shape: every slot for the requested page, keyed

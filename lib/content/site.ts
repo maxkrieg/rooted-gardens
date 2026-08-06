@@ -3,6 +3,17 @@ import { collectionItemDataSchema, siteCollectionSchema } from '@/lib/validators
 import type { PageContent, SiteCollection, SiteCollectionItem, SitePage, SiteSlot } from '@/types/app'
 import { CONTENT_DEFAULTS } from './defaults'
 
+/** Minimal escaper for the richtext default-fallback case below — the input
+ *  is always a developer-authored string from defaults.ts, never user input,
+ *  but this keeps the invariant "SiteSlot.value is always safe HTML for a
+ *  richtext slot" true even for that path, with no exceptions to remember. */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
 /**
  * Server-only read layer for the public marketing site's DB-backed content
  * (task 9.2). Every public page calls `getPageContent` for its slots and
@@ -40,10 +51,30 @@ export async function getPageContent(page: SitePage): Promise<PageContent> {
   // and neither layer can leave the other half-populated.
   for (const layerPage of layers) {
     for (const [key, def] of Object.entries(CONTENT_DEFAULTS[layerPage] ?? {})) {
-      slots[key] = { page: layerPage, key, kind: def.kind, value: def.value }
+      // A still-default richtext slot has no DB row yet, so no Tiptap `doc`
+      // to resume editing from — the editor synthesizes a one-paragraph doc
+      // from this plain string itself. `value` still has to be safe,
+      // directly-renderable HTML, hence the escape-and-wrap.
+      slots[key] =
+        def.kind === 'richtext'
+          ? { page: layerPage, key, kind: def.kind, value: `<p>${escapeHtml(def.value)}</p>` }
+          : { page: layerPage, key, kind: def.kind, value: def.value }
     }
     for (const row of rows) {
       if (row.page !== layerPage || row.value === null || row.value === undefined) continue
+
+      if (row.kind === 'richtext') {
+        // task 9.2.5: a richtext row's jsonb value is `{ doc, html }` — `doc`
+        // is the Tiptap JSON the editor resumes from, `html` (rendered once,
+        // server-side, at save time — see app/(public)/actions.ts) is what
+        // every page read actually uses. Never re-render `doc` on read: that
+        // would mean pulling @tiptap/html + happy-dom into the hot read path.
+        const richValue = row.value as { doc?: unknown; html?: string }
+        if (typeof richValue?.html !== 'string') continue
+        slots[row.key] = { page: layerPage, key: row.key, kind: 'richtext', value: richValue.html, doc: richValue.doc }
+        continue
+      }
+
       slots[row.key] = {
         page: layerPage,
         key: row.key,

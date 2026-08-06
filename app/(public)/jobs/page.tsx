@@ -2,6 +2,8 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { getCollection, getPageContent, getSlot } from '@/lib/content/site'
 import { Button } from '@/components/ui/button'
+import { EditableText } from '@/components/public/editing/EditableText'
+import { CollectionSection } from '@/components/public/editing/CollectionSection'
 import type { JobItemData } from '@/types/app'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -23,39 +25,55 @@ export default async function JobsPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-16 sm:py-20">
-      <h1 className="font-display text-3xl sm:text-4xl font-semibold text-foreground tracking-tight">
-        {getSlot(content, 'heading')}
-      </h1>
-      <p className="mt-4 text-base text-muted-foreground leading-relaxed">{getSlot(content, 'intro')}</p>
+      <EditableText
+        page="jobs"
+        slotKey="heading"
+        kind="text"
+        value={getSlot(content, 'heading')}
+        as="h1"
+        className="font-display text-3xl sm:text-4xl font-semibold text-foreground tracking-tight"
+      />
+      <EditableText
+        page="jobs"
+        slotKey="intro"
+        kind="text"
+        value={getSlot(content, 'intro')}
+        as="p"
+        className="mt-4 text-base text-muted-foreground leading-relaxed"
+      />
 
-      {jobs.length > 0 ? (
-        <div className="mt-10 space-y-4">
-          {jobs.map((job) => (
-            <div key={job.id} className="rounded-2xl border border-border bg-card shadow-warm p-5">
-              <p className="font-display text-lg font-semibold text-foreground">{job.data.title}</p>
-              {job.data.location && (
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mt-0.5">
-                  {job.data.location}
-                </p>
-              )}
-              {job.data.blurb && (
-                <p className="text-sm text-muted-foreground leading-relaxed mt-2">{job.data.blurb}</p>
-              )}
-              <Button asChild variant="outline" size="sm" className="mt-3">
-                <Link href="/contact">Apply</Link>
-              </Button>
+      <div className="mt-10">
+        <CollectionSection collection="job" items={jobs}>
+          {jobs.length > 0 ? (
+            <div className="space-y-4">
+              {jobs.map((job) => (
+                <div key={job.id} className="rounded-2xl border border-border bg-card shadow-warm p-5">
+                  <p className="font-display text-lg font-semibold text-foreground">{job.data.title}</p>
+                  {job.data.location && (
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mt-0.5">
+                      {job.data.location}
+                    </p>
+                  )}
+                  {job.data.blurb && (
+                    <p className="text-sm text-muted-foreground leading-relaxed mt-2">{job.data.blurb}</p>
+                  )}
+                  <Button asChild variant="outline" size="sm" className="mt-3">
+                    <Link href="/contact">Apply</Link>
+                  </Button>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      ) : (
-        <p className="mt-10 text-sm text-muted-foreground">
-          No open positions right now — check back soon, or{' '}
-          <Link href="/contact" className="text-primary hover:underline">
-            reach out
-          </Link>{' '}
-          to introduce yourself.
-        </p>
-      )}
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No open positions right now — check back soon, or{' '}
+              <Link href="/contact" className="text-primary hover:underline">
+                reach out
+              </Link>{' '}
+              to introduce yourself.
+            </p>
+          )}
+        </CollectionSection>
+      </div>
     </div>
   )
 }

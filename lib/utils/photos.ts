@@ -21,8 +21,10 @@ import {
 export const MAX_PHOTO_BYTES = 20 * 1024 * 1024
 export const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 
-/** Mirrors the bucket's allowed_mime_types (migration 20260625142525). */
-function extensionForMimeType(mime: string): 'jpg' | 'png' | 'webp' {
+/** Mirrors the bucket's allowed_mime_types (migration 20260625142525).
+ *  Exported for reuse by lib/utils/site-media.ts — the site-media bucket
+ *  (task 9.2) was deliberately given the same size/type limits as `photos`. */
+export function extensionForMimeType(mime: string): 'jpg' | 'png' | 'webp' {
   if (mime === 'image/png') return 'png'
   if (mime === 'image/webp') return 'webp'
   return 'jpg'

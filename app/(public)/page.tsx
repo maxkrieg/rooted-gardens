@@ -2,7 +2,9 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { Leaf, Sprout } from 'lucide-react'
 import { getPageContent, getSlot } from '@/lib/content/site'
-import { Button } from '@/components/ui/button'
+import { EditableText } from '@/components/public/editing/EditableText'
+import { EditableRichText } from '@/components/public/editing/EditableRichText'
+import { EditableCtaButton } from '@/components/public/editing/EditableCtaButton'
 
 export async function generateMetadata(): Promise<Metadata> {
   const content = await getPageContent('home')
@@ -30,16 +32,23 @@ export default async function HomePage() {
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
           Norwich, VT · Upper Valley
         </p>
-        <h1 className="font-display text-4xl sm:text-5xl font-semibold text-foreground tracking-tight max-w-3xl mx-auto text-balance">
-          {getSlot(home, 'hero_heading')}
-        </h1>
-        <p className="mt-5 text-base sm:text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
-          {getSlot(home, 'hero_body')}
-        </p>
+        <EditableText
+          page="home"
+          slotKey="hero_heading"
+          kind="text"
+          value={getSlot(home, 'hero_heading')}
+          as="h1"
+          className="font-display text-4xl sm:text-5xl font-semibold text-foreground tracking-tight max-w-3xl mx-auto text-balance"
+        />
+        <EditableRichText
+          page="home"
+          slotKey="hero_body"
+          value={getSlot(home, 'hero_body')}
+          doc={home.slots['hero_body']?.doc}
+          className="mt-5 text-base sm:text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed"
+        />
         <div className="mt-8">
-          <Button asChild size="lg">
-            <Link href="/contact">{getSlot(home, 'cta_label')}</Link>
-          </Button>
+          <EditableCtaButton page="home" slotKey="cta_label" value={getSlot(home, 'cta_label')} href="/contact" size="lg" />
         </div>
       </section>
 

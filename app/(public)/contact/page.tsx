@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { getPageContent, getSlot } from '@/lib/content/site'
+import { EditableText } from '@/components/public/editing/EditableText'
 
 export async function generateMetadata(): Promise<Metadata> {
   const content = await getPageContent('contact')
@@ -22,46 +23,77 @@ export default async function ContactPage() {
   const divisions = [
     {
       label: 'Lawn · Stone · Pruning',
-      name: slot('lawn_contact_name'),
-      email: slot('lawn_contact_email'),
-      phone: slot('lawn_contact_phone'),
+      nameKey: 'lawn_contact_name',
+      emailKey: 'lawn_contact_email',
+      phoneKey: 'lawn_contact_phone',
     },
     {
       label: 'Gardens',
-      name: slot('garden_contact_name'),
-      email: slot('garden_contact_email'),
-      phone: slot('garden_contact_phone'),
+      nameKey: 'garden_contact_name',
+      emailKey: 'garden_contact_email',
+      phoneKey: 'garden_contact_phone',
     },
   ]
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-16 sm:py-20">
-      <h1 className="font-display text-3xl sm:text-4xl font-semibold text-foreground tracking-tight">
-        {slot('heading')}
-      </h1>
-      <p className="mt-4 text-base text-muted-foreground leading-relaxed">{slot('intro')}</p>
+      <EditableText
+        page="contact"
+        slotKey="heading"
+        kind="text"
+        value={slot('heading')}
+        as="h1"
+        className="font-display text-3xl sm:text-4xl font-semibold text-foreground tracking-tight"
+      />
+      <EditableText
+        page="contact"
+        slotKey="intro"
+        kind="text"
+        value={slot('intro')}
+        as="p"
+        className="mt-4 text-base text-muted-foreground leading-relaxed"
+      />
 
+      {/* Division contacts are `global` slots — the same ones the footer
+          edits (see PublicFooter.tsx), so an edit made from either place
+          shows up on both. */}
       <div className="mt-10 grid gap-5 sm:grid-cols-2">
         {divisions.map((division) => (
           <div key={division.label} className="rounded-2xl border border-border bg-card shadow-warm p-5">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
               {division.label}
             </p>
-            {division.name && <p className="font-display text-lg font-semibold text-foreground mt-1">{division.name}</p>}
+            <EditableText
+              page="global"
+              slotKey={division.nameKey}
+              kind="text"
+              value={slot(division.nameKey)}
+              as="p"
+              className="font-display text-lg font-semibold text-foreground mt-1"
+            />
             <div className="mt-2 space-y-1 text-sm">
-              {division.email && (
-                <a href={`mailto:${division.email}`} className="block text-primary hover:underline">
-                  {division.email}
-                </a>
-              )}
-              {division.phone && (
-                <a
-                  href={`tel:${division.phone.replace(/[^\d+]/g, '')}`}
-                  className="block text-muted-foreground hover:text-foreground"
-                >
-                  {division.phone}
-                </a>
-              )}
+              <EditableText
+                page="global"
+                slotKey={division.emailKey}
+                kind="email"
+                value={slot(division.emailKey)}
+                as="p"
+                href={slot(division.emailKey) ? `mailto:${slot(division.emailKey)}` : undefined}
+                className="block text-primary hover:underline"
+              />
+              <EditableText
+                page="global"
+                slotKey={division.phoneKey}
+                kind="phone"
+                value={slot(division.phoneKey)}
+                as="p"
+                href={
+                  slot(division.phoneKey)
+                    ? `tel:${slot(division.phoneKey).replace(/[^\d+]/g, '')}`
+                    : undefined
+                }
+                className="block text-muted-foreground hover:text-foreground"
+              />
             </div>
           </div>
         ))}

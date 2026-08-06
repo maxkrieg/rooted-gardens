@@ -1479,7 +1479,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   no manifest tag), the 404/redirect/robots/sitemap behavior, and that `/crew/schedule` still
   declares the PWA manifest.
 
-- [ ] **9.2.5 — Inline WYSIWYG content editor**
+- [x] **9.2.5 — Inline WYSIWYG content editor**
   *Depends on: 9.2*
   The editing surface 9.2's data model was built for. Signed-in owners toggle "Edit" on the
   live public page (`components/public/EditModeProvider.tsx`, resolved in
@@ -1501,6 +1501,47 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   (`@tiptap/react`, `@tiptap/pm`, `@tiptap/starter-kit`, `@tiptap/extension-link`,
   `@tiptap/html`) must be `next/dynamic({ ssr: false })` and imported only behind `canEdit` —
   the public bundle (anonymous visitors are the entire audience) must never carry Tiptap.
+
+  **Built, with three deviations from the spec above, all discovered during implementation:**
+
+  1. **Richtext HTML is rendered once, at save time — not per page view.** `@tiptap/html`'s
+     server `generateHTML` hard-depends on `happy-dom` to emulate a DOM in Node; calling it on
+     every public page load (anonymous traffic, the overwhelming case) would mean spinning up a
+     happy-dom `Window` per request for the rare case of an owner's edit. Instead a richtext
+     `site_content.value` stores `{ doc, html }` — both written together, once, inside
+     `updateRichTextSlot`. Reading a page is just `slot.value`, a plain pre-rendered string;
+     `@tiptap/html`/`happy-dom` are dependencies of exactly that one action, never the read path
+     or the client bundle. `lib/content/site.ts` picks `value`/`doc` apart per-row based on
+     `row.kind`, so a still-`'text'`-kind row (the two upgraded slots' 9.2 seed state) and an
+     already-`'richtext'`-kind row render correctly side by side — no migration needed, `kind`
+     upgrades itself the first time each slot is saved through the new editor.
+  2. **`next/dynamic` doesn't actually defer Tiptap under the App Router.** Verified during
+     the build: Next preloads every `next/dynamic(..., { ssr: false })` chunk reachable in a
+     page's server-rendered tree as an eager `<script async>` in the initial HTML, regardless of
+     the runtime conditional gating whether it ever mounts. (This turned out to be a `next dev`
+     -only artifact for chunk-naming purposes — the production build, checked separately, never
+     emitted the tag — but the fix is kept as the more robust approach regardless.)
+     `EditableRichText.tsx` instead fires a plain `import('./RichTextEditor')` from the click
+     handler, invisible to that preload heuristic. Confirmed clean in the production build: 0
+     eager references to the chunk in any page's HTML or `build-manifest.json`.
+  3. **Scope was narrowed to 2 richtext slots** (`global.org_tagline`, `home.hero_body`), not
+     all page intros — those are one short sentence each, so they got plain multi-line
+     `EditableText` instead of a Tiptap instance apiece. Reorder is `moveCollectionItem`
+     (verbatim port of `moveRouteGroup`'s swap-with-neighbor), not `reorderCollection`.
+     `@tiptap/extension-link` was dropped as a direct dependency — StarterKit v3 already bundles
+     it, configured via `StarterKit.configure({ link: {...} })`; installing it separately would
+     register Link twice.
+
+  Verified: `npm run build` / `typecheck` / `lint` / `typecheck:sw` all clean (same pre-existing
+  unrelated findings in crew files as 9.2, nothing new). Signed in as the owner seed account
+  (`maxwell.krieg+rg1@gmail.com`) via a browser session: Edit toggle appears and works; save
+  round-trips confirmed in the DB for `EditableText` (`updated_by` set) and `EditableRichText`
+  (bold formatting — `kind` flipped `text`→`richtext`, `value` became `{doc,html}`, `<strong>`
+  rendered correctly signed-out); `CollectionEditor` add/reorder/delete confirmed via DB on both
+  `faq` and `team` (including the null-`image_path` path); all test data cleaned up afterward.
+  Non-owner role gating (RLS + the action-level `requireOwner()` check) verified by code/policy
+  review; a live signed-in-as-crew spot check was attempted but inconclusive (a stale session
+  cookie in the test browser tab) and not re-run.
 
 - [ ] **9.3 — Home / landing page**
   *Depends on: 9.2*

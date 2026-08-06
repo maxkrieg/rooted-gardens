@@ -2,12 +2,17 @@ import Link from 'next/link'
 import { Leaf } from 'lucide-react'
 import { getPageContent, getSlot } from '@/lib/content/site'
 import { PUBLIC_NAV } from '@/lib/content/routes'
+import { EditableText } from '@/components/public/editing/EditableText'
+import { EditableRichText } from '@/components/public/editing/EditableRichText'
+import { CredentialsLine } from '@/components/public/CredentialsLine'
 
 /**
  * Public site footer. Every contact detail, social link, and the mission
  * line below is a `site_content` slot (page='global') — the 9.2.5 inline
  * editor makes all of it owner-editable in place, so nothing here should
- * ever become a hardcoded string again.
+ * ever become a hardcoded string again. `org_name`/`parent_company` are
+ * deliberately left plain (not Editable) — the root layout's title template
+ * and this footer's own copyright line assume a stable brand name.
  */
 export async function PublicFooter() {
   const content = await getPageContent('global')
@@ -18,15 +23,15 @@ export async function PublicFooter() {
   const divisions = [
     {
       label: 'Lawn · Stone · Pruning',
-      name: slot('lawn_contact_name'),
-      email: slot('lawn_contact_email'),
-      phone: slot('lawn_contact_phone'),
+      nameKey: 'lawn_contact_name',
+      emailKey: 'lawn_contact_email',
+      phoneKey: 'lawn_contact_phone',
     },
     {
       label: 'Gardens',
-      name: slot('garden_contact_name'),
-      email: slot('garden_contact_email'),
-      phone: slot('garden_contact_phone'),
+      nameKey: 'garden_contact_name',
+      emailKey: 'garden_contact_email',
+      phoneKey: 'garden_contact_phone',
     },
   ]
 
@@ -41,8 +46,21 @@ export async function PublicFooter() {
                 {slot('org_name')}
               </span>
             </div>
-            <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">{slot('org_tagline')}</p>
-            <p className="text-xs text-muted-foreground">{slot('mailing_address')}</p>
+            <EditableRichText
+              page="global"
+              slotKey="org_tagline"
+              value={slot('org_tagline')}
+              doc={content.slots['org_tagline']?.doc}
+              className="text-sm text-muted-foreground max-w-sm leading-relaxed"
+            />
+            <EditableText
+              page="global"
+              slotKey="mailing_address"
+              kind="text"
+              value={slot('mailing_address')}
+              as="p"
+              className="text-xs text-muted-foreground"
+            />
           </div>
 
           {divisions.map((division) => (
@@ -50,41 +68,41 @@ export async function PublicFooter() {
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
                 {division.label}
               </p>
-              {division.name && <p className="text-sm text-foreground">{division.name}</p>}
-              {division.email && (
-                <a
-                  href={`mailto:${division.email}`}
-                  className="block text-sm text-muted-foreground hover:text-foreground"
-                >
-                  {division.email}
-                </a>
-              )}
-              {division.phone && (
-                <a
-                  href={`tel:${division.phone.replace(/[^\d+]/g, '')}`}
-                  className="block text-sm text-muted-foreground hover:text-foreground"
-                >
-                  {division.phone}
-                </a>
-              )}
+              <EditableText
+                page="global"
+                slotKey={division.nameKey}
+                kind="text"
+                value={slot(division.nameKey)}
+                as="p"
+                className="text-sm text-foreground"
+              />
+              <EditableText
+                page="global"
+                slotKey={division.emailKey}
+                kind="email"
+                value={slot(division.emailKey)}
+                as="p"
+                href={slot(division.emailKey) ? `mailto:${slot(division.emailKey)}` : undefined}
+                className="block text-sm text-muted-foreground hover:text-foreground"
+              />
+              <EditableText
+                page="global"
+                slotKey={division.phoneKey}
+                kind="phone"
+                value={slot(division.phoneKey)}
+                as="p"
+                href={
+                  slot(division.phoneKey)
+                    ? `tel:${slot(division.phoneKey).replace(/[^\d+]/g, '')}`
+                    : undefined
+                }
+                className="block text-sm text-muted-foreground hover:text-foreground"
+              />
             </div>
           ))}
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground border-t border-border pt-6">
-          {slot('credentials_line')
-            .split('·')
-            .map((chip) => chip.trim())
-            .filter(Boolean)
-            .map((chip) => (
-              <span
-                key={chip}
-                className="rounded-full bg-card border border-border px-2.5 py-1 text-[11px] uppercase tracking-wide"
-              >
-                {chip}
-              </span>
-            ))}
-        </div>
+        <CredentialsLine value={slot('credentials_line')} />
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-t border-border pt-6">
           <nav className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -98,26 +116,22 @@ export async function PublicFooter() {
           {/* lucide-react ships no brand/logo marks, so socials are text links
               rather than mismatched generic icons. */}
           <div className="flex items-center gap-4 text-sm">
-            {slot('social_instagram') && (
-              <a
-                href={slot('social_instagram')}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-muted-foreground hover:text-foreground"
-              >
-                Instagram
-              </a>
-            )}
-            {slot('social_facebook') && (
-              <a
-                href={slot('social_facebook')}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-muted-foreground hover:text-foreground"
-              >
-                Facebook
-              </a>
-            )}
+            <EditableText
+              page="global"
+              slotKey="social_instagram"
+              kind="url"
+              value={slot('social_instagram')}
+              href={slot('social_instagram') || undefined}
+              className="text-muted-foreground hover:text-foreground"
+            />
+            <EditableText
+              page="global"
+              slotKey="social_facebook"
+              kind="url"
+              value={slot('social_facebook')}
+              href={slot('social_facebook') || undefined}
+              className="text-muted-foreground hover:text-foreground"
+            />
           </div>
         </div>
 
