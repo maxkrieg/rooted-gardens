@@ -1573,7 +1573,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   `generateMetadata` block that had been copy-pasted into all seven public pages; applied to
   home, lawn, gardens, about, faq, jobs, and contact so none of them can drift.
 
-- [ ] **9.4 — Marketing sub-pages: Lawn, Gardens, About, FAQ**
+- [x] **9.4 — Marketing sub-pages: Lawn, Gardens, About, FAQ**
   *Depends on: 9.2*
   Content pages mirroring the live site, Field & Foliage styled, each with a contextual
   inquiry CTA. Lawn / Gardens describe each division's services + its contact. FAQ uses a
@@ -1582,6 +1582,45 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   revise it via 9.2.5 without a deploy; the `faq` collection already backs this page — extend
   its seeded 2 entries rather than inventing a separate FAQ data source. Content reference:
   myrootedgardens.com/lawn, /gardens, /our-team (→ `/about`), /faq.
+
+  **Built**, per the plan above:
+  - **Lawn / Gardens**: each gained a `hero_image` slot, a "why this matters" stat-card pair
+    (lawn only — the electric-mowing rationale), a philosophy/principles section (new
+    `components/public/SlotList.tsx`, a fixed run of `{prefix}_{n}_title`/`_body` slot pairs
+    rendered as an editable card grid — 4 for lawn, 5 for gardens), a services list (new
+    `components/public/BulletList.tsx`, a newline-delimited slot rendered as a check-marked
+    list, collapsing to one multiline field in edit mode — mirrors `CredentialsLine`'s
+    `·`-split display/edit split), and each division's own contact block reusing the
+    `global.lawn_contact_*`/`global.garden_contact_*` slots the footer and `/contact` already
+    edit (one edit, shows up everywhere). Gardens additionally got a richtext philosophy
+    paragraph (`gardens.philosophy_body`, via `EditableRichText` — the app's third richtext
+    slot). **Deviation:** the plan's testimonial section was dropped — a customer testimonial
+    is one real person's specific words, which isn't something to originate on their behalf;
+    owners can add one through the editor once they have a quote they want published.
+  - **About**: gained a 5-step "how a project starts" process list (`SlotList`, `numbered`)
+    and the empty state the team grid was missing since 9.2 (`EmptyState variant="seed"`) —
+    matters less today since the team collection ships with real bios (below), but keeps the
+    page from ever rendering a blank hole if it's emptied out again through the editor.
+  - **FAQ**: replaced the stacked-card list with `npx shadcn@latest add accordion`
+    (`components/ui/accordion.tsx`, Radix-backed) — verified its `animate-accordion-up/down`
+    keyframes resolve under this repo's Tailwind v4/no-config setup (they ship in
+    `tw-animate-css`, already a dependency). Only the read-only render changed;
+    `CollectionSection` still swaps the whole block for `CollectionEditor` in edit mode, so
+    the accordion and the owner editor never interact.
+  - **Collection seed migration**
+    (`supabase/migrations/20260806000000_site_collections_phase_9_4.sql`, applied via
+    `supabase db push --linked`): replaced the 2 placeholder FAQ entries with 5 real
+    questions (service area, scope of work, project sizes, deer pressure, what "ecological
+    gardening" means), guarded to be a no-op if an owner has already edited/added/removed an
+    FAQ entry since 9.2; seeded 4 team bios (guarded by `NOT EXISTS` on the `team`
+    collection) with `image_path: null` so owners upload real photos through 9.2.5. Verified
+    via `supabase db query --linked` that all 5 FAQ rows and 4 team rows landed correctly and
+    the placeholder rows are gone.
+  - New `home`/`lawn`/`gardens`/`about` slot copy lives only in `lib/content/defaults.ts` —
+    no migration needed for slots (see 9.3's Built note); `types/app.ts`,
+    `lib/content/routes.ts`, `lib/content/site.ts`, `app/(public)/actions.ts`,
+    `lib/validators/site-content.ts`, and `CollectionEditor.tsx` were untouched — no new page,
+    collection, or content kind was added.
 
 - [ ] **9.5 — Public inquiry form + spam protection + Server Action**
   *Depends on: 9.2, 9.1*

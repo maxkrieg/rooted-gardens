@@ -1,20 +1,24 @@
-import Link from 'next/link'
-import type { Metadata } from 'next'
 import { getPageContent, getSlot } from '@/lib/content/site'
-import { Button } from '@/components/ui/button'
+import { pageMetadata } from '@/lib/content/metadata'
 import { EditableText } from '@/components/public/editing/EditableText'
+import { EditableRichText } from '@/components/public/editing/EditableRichText'
+import { EditableImageSlot } from '@/components/public/editing/EditableImageSlot'
+import { EditableCtaButton } from '@/components/public/editing/EditableCtaButton'
+import { SlotList } from '@/components/public/SlotList'
+import { BulletList } from '@/components/public/BulletList'
 
-export async function generateMetadata(): Promise<Metadata> {
-  const content = await getPageContent('gardens')
-  return {
-    title: getSlot(content, 'seo_title') || undefined,
-    description: getSlot(content, 'seo_description') || undefined,
-  }
-}
+export const generateMetadata = () => pageMetadata('gardens')
 
-/** 9.2 shell for the Gardens division page; 9.4 fills in the full service breakdown. */
+/**
+ * Rooted Gardens (garden design/maintenance) division page (task 9.4) —
+ * mirrors the shape of the Lawn page: hero photo, ecological principles
+ * (SlotList), a philosophy paragraph, a services list, and the division's
+ * own `global.garden_contact_*` contact block.
+ */
 export default async function GardensPage() {
   const content = await getPageContent('gardens')
+  const slot = (key: string) => getSlot(content, key)
+  const heroImagePath = slot('hero_image') || null
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-16 sm:py-20">
@@ -22,7 +26,7 @@ export default async function GardensPage() {
         page="gardens"
         slotKey="heading"
         kind="text"
-        value={getSlot(content, 'heading')}
+        value={slot('heading')}
         as="h1"
         className="font-display text-3xl sm:text-4xl font-semibold text-foreground tracking-tight"
       />
@@ -30,16 +34,99 @@ export default async function GardensPage() {
         page="gardens"
         slotKey="intro"
         kind="text"
-        value={getSlot(content, 'intro')}
+        value={slot('intro')}
         as="p"
         multiline
         className="mt-4 text-base text-muted-foreground leading-relaxed whitespace-pre-line"
       />
+
+      <EditableImageSlot
+        page="gardens"
+        slotKey="hero_image"
+        path={heroImagePath}
+        scope="gardens-hero_image"
+        alt="A Rooted Gardens design in bloom"
+        className="mt-8 h-56 sm:h-72 w-full rounded-2xl"
+      />
+
       <div className="mt-8">
-        <Button asChild>
-          <Link href="/contact">Get a garden quote</Link>
-        </Button>
+        <EditableCtaButton page="gardens" slotKey="cta_label" value={slot('cta_label')} href="/contact" />
       </div>
+
+      <section className="mt-14">
+        <EditableText
+          page="gardens"
+          slotKey="principles_heading"
+          kind="text"
+          value={slot('principles_heading')}
+          as="h2"
+          className="font-display text-2xl font-semibold text-foreground mb-5"
+        />
+        <SlotList page="gardens" content={content} prefix="principles" count={5} />
+      </section>
+
+      <section className="mt-14 rounded-2xl border-l-4 border-[var(--clay)] bg-secondary/50 p-6">
+        <EditableRichText
+          page="gardens"
+          slotKey="philosophy_body"
+          value={slot('philosophy_body')}
+          doc={content.slots['philosophy_body']?.doc}
+          className="text-base text-foreground leading-relaxed"
+        />
+      </section>
+
+      <section className="mt-14">
+        <EditableText
+          page="gardens"
+          slotKey="services_heading"
+          kind="text"
+          value={slot('services_heading')}
+          as="h2"
+          className="font-display text-2xl font-semibold text-foreground mb-5"
+        />
+        <BulletList page="gardens" slotKey="services_list" value={slot('services_list')} className="space-y-2.5" />
+      </section>
+
+      <section className="mt-14 rounded-2xl border border-border bg-card shadow-warm p-6">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Gardens</p>
+        <EditableText
+          page="global"
+          slotKey="garden_contact_name"
+          kind="text"
+          value={getSlot(content, 'garden_contact_name')}
+          as="p"
+          className="font-display text-lg font-semibold text-foreground mt-1"
+        />
+        <div className="mt-2 space-y-1 text-sm">
+          <EditableText
+            page="global"
+            slotKey="garden_contact_email"
+            kind="email"
+            value={getSlot(content, 'garden_contact_email')}
+            as="p"
+            href={
+              getSlot(content, 'garden_contact_email') ? `mailto:${getSlot(content, 'garden_contact_email')}` : undefined
+            }
+            className="block text-primary hover:underline"
+          />
+          <EditableText
+            page="global"
+            slotKey="garden_contact_phone"
+            kind="phone"
+            value={getSlot(content, 'garden_contact_phone')}
+            as="p"
+            href={
+              getSlot(content, 'garden_contact_phone')
+                ? `tel:${getSlot(content, 'garden_contact_phone').replace(/[^\d+]/g, '')}`
+                : undefined
+            }
+            className="block text-muted-foreground hover:text-foreground"
+          />
+        </div>
+        <div className="mt-4">
+          <EditableCtaButton page="gardens" slotKey="cta_label" value={slot('cta_label')} href="/contact" />
+        </div>
+      </section>
     </div>
   )
 }
