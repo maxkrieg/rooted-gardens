@@ -12,6 +12,17 @@ const supabaseHostname = supabaseUrl ? new URL(supabaseUrl).hostname : undefined
 const nextConfig: NextConfig = {
   // No webpack config — Turbopack is the default bundler (next dev --turbopack)
   allowedDevOrigins: ['127.0.0.1'],
+  experimental: {
+    // Task 9.6: submitJobApplication carries an optional resume file
+    // (capped at 4 MB — lib/utils/resumes.ts) through the Server Action as
+    // FormData. Default limit is 1MB; 6mb gives headroom over the 4MB file
+    // cap for multipart encoding overhead. Global setting — every Server
+    // Action gets the higher ceiling, which is strictly more permissive and
+    // fine, since nothing else in the app needs a lower one.
+    serverActions: {
+      bodySizeLimit: '6mb',
+    },
+  },
   images: {
     remotePatterns: supabaseHostname
       ? [

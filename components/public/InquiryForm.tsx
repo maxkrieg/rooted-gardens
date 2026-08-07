@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Textarea } from '@/components/ui/textarea'
 import { useEditMode } from '@/components/public/editing/EditModeProvider'
+import { useElapsedMs } from '@/hooks/useElapsedMs'
 import { submitInquiry } from '@/app/(public)/contact/actions'
 import { inquiryFormSchema, LEAD_SERVICE_INTEREST_LABELS, type InquiryFormValues } from '@/lib/validators/lead'
 import { SERVICE_SIDES } from '@/types/app'
@@ -38,14 +39,6 @@ const DEFAULT_VALUES: InquiryFormValues = {
   elapsedMs: 0,
 }
 
-/** How often `elapsedMs` advances while the form is open — mirrors the
- *  `setTick` interval pattern in ScheduleGrid/CrewsOnSitePanel. Coarse on
- *  purpose: `submitInquiry`'s timing check only cares whether the form was
- *  open for at least a couple seconds, not to the millisecond, so ticking a
- *  plain counter (no `Date.now()` call in the render path) is both simpler
- *  and satisfies the "no impure calls during render" rule. */
-const ELAPSED_TICK_MS = 500
-
 /**
  * The public inquiry form (task 9.5) — reachable at `/contact` (id="inquiry"
  * so the home CTA can deep-link to `#inquiry`). Submits through the
@@ -56,13 +49,8 @@ const ELAPSED_TICK_MS = 500
  */
 export function InquiryForm() {
   const [submitted, setSubmitted] = useState(false)
-  const [elapsedMs, setElapsedMs] = useState(0)
+  const elapsedMs = useElapsedMs()
   const { editing } = useEditMode()
-
-  useEffect(() => {
-    const id = setInterval(() => setElapsedMs((ms) => ms + ELAPSED_TICK_MS), ELAPSED_TICK_MS)
-    return () => clearInterval(id)
-  }, [])
 
   const form = useForm<InquiryFormValues>({
     resolver: zodResolver(inquiryFormSchema),

@@ -4,18 +4,27 @@ import { pageMetadata } from '@/lib/content/metadata'
 import { Button } from '@/components/ui/button'
 import { EditableText } from '@/components/public/editing/EditableText'
 import { CollectionSection } from '@/components/public/editing/CollectionSection'
+import { JobApplicationForm } from '@/components/public/JobApplicationForm'
 import type { JobItemData } from '@/types/app'
 
 export const generateMetadata = () => pageMetadata('jobs')
 
 /**
- * 9.2 shell for the careers page — the `job` collection rendered as cards.
- * The actual application form (upload to Storage, insert a
- * `kind='job_application'` lead) is task 9.6; for now "Apply" routes to the
- * general inquiry page.
+ * The careers page — the `job` collection rendered as cards, plus the real
+ * application form (task 9.6, `id="apply"`). Each listing's "Apply" button
+ * deep-links to `/jobs?position=<title>#apply`, prefilling (but not
+ * locking) the form's position field.
  */
-export default async function JobsPage() {
-  const [content, jobs] = await Promise.all([getPageContent('jobs'), getCollection<JobItemData>('job')])
+export default async function JobsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ position?: string }>
+}) {
+  const [content, jobs, params] = await Promise.all([
+    getPageContent('jobs'),
+    getCollection<JobItemData>('job'),
+    searchParams,
+  ])
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-16 sm:py-20">
@@ -52,7 +61,7 @@ export default async function JobsPage() {
                     <p className="text-sm text-muted-foreground leading-relaxed mt-2">{job.data.blurb}</p>
                   )}
                   <Button asChild variant="outline" size="sm" className="mt-3">
-                    <Link href="/contact">Apply</Link>
+                    <Link href={`/jobs?position=${encodeURIComponent(job.data.title)}#apply`}>Apply</Link>
                   </Button>
                 </div>
               ))}
@@ -60,13 +69,17 @@ export default async function JobsPage() {
           ) : (
             <p className="text-sm text-muted-foreground">
               No open positions right now — check back soon, or{' '}
-              <Link href="/contact" className="text-primary hover:underline">
+              <Link href="/jobs#apply" className="text-primary hover:underline">
                 reach out
               </Link>{' '}
               to introduce yourself.
             </p>
           )}
         </CollectionSection>
+      </div>
+
+      <div className="mt-10">
+        <JobApplicationForm key={params.position ?? ''} initialPosition={params.position} />
       </div>
     </div>
   )

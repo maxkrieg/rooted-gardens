@@ -49,6 +49,47 @@ export const inquiryFormSchema = z
 
 export type InquiryFormValues = z.infer<typeof inquiryFormSchema>
 
+/**
+ * Zod schema for the public job application form (task 9.6). A sibling of
+ * `inquiryFormSchema`, not an `.extend()` of it — `inquiryFormSchema` is a
+ * `ZodEffects` (its own `.refine()` above), which can't be extended, so the
+ * shared fields (name/email/phone/message, the email-or-phone refine, and
+ * the website/elapsedMs anti-spam pair with the same non-optional/no-
+ * `.default()` gotcha noted above) are simply repeated here.
+ *
+ * Only the form's text fields go through this schema — the resume `File`
+ * travels separately as part of the `FormData` `submitJobApplication`
+ * receives (see app/(public)/jobs/actions.ts), validated by
+ * `validateResumeFile` (lib/utils/resumes.ts) instead.
+ */
+export const jobApplicationFormSchema = z
+  .object({
+    name: z.string().trim().min(1, 'Name is required').max(200),
+    email: z
+      .string()
+      .trim()
+      .max(320)
+      .optional()
+      .refine((v) => !v || z.email().safeParse(v).success, {
+        message: 'Invalid email address',
+      }),
+    phone: z.string().trim().max(40).optional(),
+    // Free text, not an enum — open positions are a dynamic, owner-edited
+    // list (the `job` collection), and a visitor should be able to apply
+    // generally with no specific opening in mind. Cap mirrors
+    // jobItemDataSchema's `title` (lib/validators/site-content.ts).
+    position: z.string().trim().min(1, 'Let us know what role you’re interested in').max(150),
+    message: z.string().trim().max(5000).optional(),
+    website: z.string().max(200),
+    elapsedMs: z.number().nonnegative(),
+  })
+  .refine((d) => Boolean(d.email?.trim()) || Boolean(d.phone?.trim()), {
+    path: ['email'],
+    message: 'Enter an email or phone number so we can reach you',
+  })
+
+export type JobApplicationFormValues = z.infer<typeof jobApplicationFormSchema>
+
 /** Visitor-facing wording — distinct from the staff-facing
  *  `SERVICE_SIDE_LABELS` in lib/utils/team.ts, which describes an
  *  employee's assignment rather than pitching a service to a prospect. */

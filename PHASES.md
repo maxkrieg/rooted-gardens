@@ -1705,7 +1705,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   owner edit-mode disabling submit) was not run per standing guidance not to drive Chrome
   MCP for UI changes unless asked — worth a manual pass before shipping.
 
-- [ ] **9.6 — Careers (Jobs) page + application**
+- [x] **9.6 — Careers (Jobs) page + application**
   *Depends on: 9.2, 9.1*
   `app/(public)/jobs/page.tsx`: hiring pitch + any openings. A simple application form (name,
   email, phone, position interest, message, optional **resume upload** → Supabase Storage)
@@ -1714,6 +1714,86 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   open positions already render from the `job` collection (9.2/9.2.5 manage the listings
   themselves); this task is specifically the application form each listing's "Apply" links to.
   Content reference: myrootedgardens.com/jobs.
+
+  **Built**, per the plan above, plus:
+  - **Resume upload runs through the Server Action, not a new anon-writable Storage
+    bucket.** There's no `anon` Storage INSERT policy anywhere in the app — the existing
+    browser-direct-to-Storage pattern (`PhotoUploadDropzone`, `EditableImage`) only works
+    because the uploader is always an *authenticated staff member*, so the bucket's RLS
+    role check is the real gate. A public job applicant has no session to scope a policy
+    by, so an anon INSERT policy could only constrain `bucket_id` — any visitor could
+    upload directly via the Storage REST API, bypassing the honeypot/rate-limit entirely
+    (those only guard our own Server Action). Instead `submitJobApplication`
+    (`app/(public)/jobs/actions.ts`) uploads server-side via the **service-role client**
+    after the same spam/rate-limit gate 9.5 built, so the resume upload is covered by it
+    too. Confirmed directly against the linked project: an anon client can neither
+    `createSignedUrl` (returns "Object not found" — RLS makes the object invisible, not
+    just unreadable) nor `upload` to the `resumes` bucket.
+  - **New private `resumes` bucket** (`supabase/migrations/20260806130000_resumes_bucket.sql`,
+    4 MB / PDF+DOC+DOCX, mirroring the `site-media` migration's shape) has exactly **one**
+    policy — SELECT for `owner`/`lead` only, matching `leads_select`'s role set (not "any
+    staff" like `photos`, since resumes are PII and only ever read through the future
+    Leads inbox, 9.8). Deliberately no INSERT/UPDATE/DELETE policy for anyone — the
+    service-role client bypasses RLS/grants for both the upload and the orphan-cleanup-
+    on-failed-insert (mirrors `PhotoUploadDropzone`'s "blob landed but the row didn't"
+    cleanup), so none is needed.
+  - **`submitJobApplication` takes `FormData`, not a typed object** like `submitInquiry` —
+    FormData is the well-supported way to carry an optional binary `File` (the resume)
+    alongside text fields through a Server Action. The action re-parses the extracted
+    fields through `jobApplicationFormSchema` regardless (untrusted input either way);
+    `elapsedMs` arrives as a string off `FormData` and is `Number(...)`-coerced before
+    parsing, since the schema still expects a real `number` (same non-optional/no-
+    `.default()` gotcha as `inquiryFormSchema`, documented in `lib/validators/lead.ts`).
+  - **`jobApplicationFormSchema`** is a sibling of `inquiryFormSchema` in the same file
+    (not new), not an `.extend()` of it — `inquiryFormSchema` is a `ZodEffects` from its
+    own `.refine()`, which can't be extended. `position` is free text (1–150, capped like
+    `jobItemDataSchema`'s `title`), not an enum — open positions are a dynamic,
+    owner-edited list, and a visitor should be able to apply generally with no specific
+    opening in mind.
+  - **`lib/utils/resumes.ts`** mirrors `lib/utils/photos.ts`/`lib/utils/site-media.ts`:
+    `resumePath` is flat (`resumes/{uuid}.{ext}`, no entity id to scope by pre-insert,
+    unlike `propertyPhotoPath`) and `validateResumeFile` is used both client-side (an
+    immediate reject on an obviously-bad pick) and inside the Server Action (the real
+    backstop).
+  - **`JobApplicationDetails`** (`types/app.ts`) — `{ position, resume_path }` — is the
+    first shape given to `leads.details`, which was completely free-form and untouched
+    before this task (no CHECK constraint, no reader/writer anywhere).
+  - **Rate limit window is shared per-IP across both lead kinds**, unchanged from 9.5:
+    `enforceLeadRateLimit` keys only on `ip_hash`, not `kind`. Verified directly: 2
+    `service_inquiry` + 2 `job_application` attempts from the same hash allow the first 3
+    (regardless of kind) and block the 4th.
+  - **`hooks/useElapsedMs.ts`** — extracted the ticking-counter timing-check hook out of
+    `InquiryForm.tsx` (was inlined there) since `JobApplicationForm` needed the identical
+    logic; `InquiryForm.tsx` now consumes the same hook, behavior unchanged. The honeypot
+    JSX block itself was **not** extracted — ~10 lines with no real logic, and sharing it
+    generically across two different RHF `FieldValues` types wasn't worth the typing
+    complexity; `JobApplicationForm` repeats it verbatim.
+  - **Position prefill**: each `job` listing's "Apply" button links to
+    `/jobs?position=<title>#apply`; `JobApplicationForm`'s `position` field is a plain
+    editable `Input` defaulting to that value, not a locked/derived field. The empty-state
+    "reach out" link and the "no positions" copy's link both moved from `/contact` to
+    `/jobs#apply`. `JobsPage` is keyed by `params.position` so navigating between two
+    different "Apply" links remounts the form with the new prefill.
+  - **`next.config.ts`** gained `experimental.serverActions.bodySizeLimit: '6mb'`
+    (headroom over the 4 MB resume cap for multipart overhead) — a global setting, but
+    strictly more permissive and fine, since nothing else needs a lower ceiling.
+
+  Verified: `npm run build` / `typecheck` / `typecheck:sw` / `lint` all clean (only the
+  same pre-existing unrelated `VisitLogger.tsx` finding as 9.5, untouched). Migration
+  applied via `supabase db push --linked`; confirmed via `supabase db query --linked`
+  that the `resumes` bucket has exactly one policy (owner/lead SELECT) and no
+  INSERT/UPDATE/DELETE policy for anyone. A standalone script exercising the real code
+  against the linked dev project confirmed: `jobApplicationFormSchema` rejects a blank
+  position and a missing email-and-phone; `validateResumeFile` rejects an oversized file
+  and a disallowed type; the rate limit's shared-per-kind window behaves as designed; a
+  service-role resume upload succeeds and an anon client can neither read nor write the
+  bucket; a service-role signed URL correctly fetches the uploaded bytes (stand-in for
+  the not-yet-built 9.8 inbox); and a full anon `leads` insert with `kind='job_application'`
+  and populated `details.position`/`details.resume_path` lands correctly. All test rows
+  (`leads`, `lead_submissions`) and the uploaded test object were deleted afterward.
+  Browser-based UI verification (phone layout, position prefill/remount, edit-mode
+  disabling submit) was not run per standing guidance not to drive Chrome MCP for UI
+  changes unless asked — worth a manual pass before shipping.
 
 - [ ] **9.7 — New-lead notification (in-app + ~~SMS~~)**
   *Depends on: 9.5, ~~8.2~~*

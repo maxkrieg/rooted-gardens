@@ -143,6 +143,17 @@ export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
   lost: 'Lost',
 }
 
+/** Shape of a `job_application` lead's `details` jsonb (task 9.6) —
+ *  `details` itself is a totally free-form column with no DB constraint,
+ *  shaped by app code only, same convention as `site_collection_items.data`
+ *  (see JobItemData below). `resume_path` is null when no file was
+ *  attached; when set it's a path in the private `resumes` Storage bucket,
+ *  readable only by owner/lead via a signed URL. */
+export type JobApplicationDetails = {
+  position: string
+  resume_path: string | null
+}
+
 // ─── Joined / composite types ─────────────────────────────────────────────────
 
 /** Employee record joined to its auth.users identity (user_id is always set). */
