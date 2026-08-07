@@ -1,14 +1,17 @@
 import { getPageContent, getSlot } from '@/lib/content/site'
 import { pageMetadata } from '@/lib/content/metadata'
 import { EditableText } from '@/components/public/editing/EditableText'
+import { InquiryForm } from '@/components/public/InquiryForm'
 
 export const generateMetadata = () => pageMetadata('contact')
 
 /**
- * 9.2 shell for the Contact page. The inquiry form (honeypot + rate limit +
- * Server Action inserting a `leads` row) is task 9.5 — until then this page
- * gives a prospect a direct way to reach each division by phone/email
- * rather than a dead end.
+ * Task 9.5: the real inquiry form (honeypot + rate limit + Server Action
+ * inserting a `leads` row — see app/(public)/contact/actions.ts) replaces
+ * the 9.2 placeholder, which just listed each division's phone/email. Those
+ * numbers are kept as a compact "prefer to call?" footnote below the form,
+ * rather than as their own competing CTA — the full division cards still
+ * live in PublicFooter on every page.
  */
 export default async function ContactPage() {
   const content = await getPageContent('contact')
@@ -48,49 +51,62 @@ export default async function ContactPage() {
         className="mt-4 text-base text-muted-foreground leading-relaxed"
       />
 
+      <div className="mt-10">
+        <InquiryForm />
+      </div>
+
       {/* Division contacts are `global` slots — the same ones the footer
           edits (see PublicFooter.tsx), so an edit made from either place
-          shows up on both. */}
-      <div className="mt-10 grid gap-5 sm:grid-cols-2">
-        {divisions.map((division) => (
-          <div key={division.label} className="rounded-2xl border border-border bg-card shadow-warm p-5">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
-              {division.label}
-            </p>
-            <EditableText
-              page="global"
-              slotKey={division.nameKey}
-              kind="text"
-              value={slot(division.nameKey)}
-              as="p"
-              className="font-display text-lg font-semibold text-foreground mt-1"
-            />
-            <div className="mt-2 space-y-1 text-sm">
+          shows up on both. Kept as a compact line per division (name ·
+          phone · email) rather than the old full-width cards, since the
+          form above is now the page's primary path — this is just the
+          fallback for someone who'd rather call. */}
+      <div className="mt-10 border-t border-border pt-6">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
+          Prefer to call or email?
+        </p>
+        <div className="mt-3 space-y-2">
+          {divisions.map((division) => (
+            <div
+              key={division.label}
+              className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm"
+            >
+              <span className="text-muted-foreground">{division.label}</span>
               <EditableText
                 page="global"
-                slotKey={division.emailKey}
-                kind="email"
-                value={slot(division.emailKey)}
-                as="p"
-                href={slot(division.emailKey) ? `mailto:${slot(division.emailKey)}` : undefined}
-                className="block text-primary hover:underline"
+                slotKey={division.nameKey}
+                kind="text"
+                value={slot(division.nameKey)}
+                as="span"
+                className="font-medium text-foreground"
               />
+              <span className="text-border">·</span>
               <EditableText
                 page="global"
                 slotKey={division.phoneKey}
                 kind="phone"
                 value={slot(division.phoneKey)}
-                as="p"
+                as="span"
                 href={
                   slot(division.phoneKey)
                     ? `tel:${slot(division.phoneKey).replace(/[^\d+]/g, '')}`
                     : undefined
                 }
-                className="block text-muted-foreground hover:text-foreground"
+                className="text-muted-foreground hover:text-foreground"
+              />
+              <span className="text-border">·</span>
+              <EditableText
+                page="global"
+                slotKey={division.emailKey}
+                kind="email"
+                value={slot(division.emailKey)}
+                as="span"
+                href={slot(division.emailKey) ? `mailto:${slot(division.emailKey)}` : undefined}
+                className="text-primary hover:underline"
               />
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   )

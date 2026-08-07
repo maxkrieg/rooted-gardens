@@ -54,7 +54,7 @@ export default async function HomePage() {
           className="mt-5 text-base sm:text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed"
         />
         <div className="mt-8">
-          <EditableCtaButton page="home" slotKey="cta_label" value={getSlot(home, 'cta_label')} href="/contact" size="lg" />
+          <EditableCtaButton page="home" slotKey="cta_label" value={getSlot(home, 'cta_label')} href="/contact#inquiry" size="lg" />
         </div>
       </section>
 
@@ -191,7 +191,7 @@ export default async function HomePage() {
               page="home"
               slotKey="closing_cta_label"
               value={getSlot(home, 'closing_cta_label')}
-              href="/contact"
+              href="/contact#inquiry"
               size="lg"
             />
           </div>

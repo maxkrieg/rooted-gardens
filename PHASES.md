@@ -1622,7 +1622,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
     `lib/validators/site-content.ts`, and `CollectionEditor.tsx` were untouched — no new page,
     collection, or content kind was added.
 
-- [ ] **9.5 — Public inquiry form + spam protection + Server Action**
+- [x] **9.5 — Public inquiry form + spam protection + Server Action**
   *Depends on: 9.2, 9.1*
   Zod schema in `lib/validators/lead.ts`; form component (react-hook-form) reachable at
   `/contact` and embedded as the home CTA. Fields: name, email, phone, address, service
@@ -1633,6 +1633,77 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   `status='new'`). Show a warm success state. Fires the 9.7 notification. **Note:** 9.2's
   `/contact` shell currently shows direct division contact info in place of this form —
   replace that block with the real form rather than appending to it.
+
+  **Built**, per the plan above, plus:
+  - **`lead_submissions` migration** (`supabase/migrations/20260806120000_lead_submissions.sql`)
+    — a small DB-backed rate-limit ledger (hashed IP, `kind`, `created_at`), not in the
+    original spec. An in-process counter would reset on every cold start and is scoped to a
+    single serverless instance, neither of which holds up on Vercel. No grants to
+    `anon`/`authenticated` and no RLS policies — service-role only, same "absence of a
+    GRANT is the real boundary" lesson as 9.1/9.2's tables. `lib/leads/spam.ts`
+    (`enforceLeadRateLimit`) enforces a 3-per-10-minutes / 10-per-24-hours sliding window
+    per hashed IP and opportunistically prunes rows older than 24h on every check, so the
+    table never needs its own cron.
+  - **`lib/supabase/public.ts`** (`createPublicClient`) — a cookie-free client that is
+    always `anon`, added because `lib/supabase/server.ts` reads the request's session
+    cookies. A signed-in crew member submitting the public form would otherwise
+    authenticate as `authenticated`/`crew` and get denied by both `leads` INSERT
+    policies (`leads_insert_anon` is `TO anon` only; `leads_insert_staff` requires
+    owner/lead) — verified this is the correct fix by testing the anon insert directly
+    against the linked project. The public lead-intake Server Actions (9.5 and, later,
+    9.6) always insert as `anon`, regardless of who happens to be browsing.
+  - **`app/(public)/contact/actions.ts`** is a new file, deliberately separate from
+    `app/(public)/actions.ts` — that file is the owner-only content editor
+    (`requireOwner()` on every action); `submitInquiry` is the opposite by design, since
+    an anonymous visitor must be able to reach it. Order of operations: Zod parse →
+    honeypot/timing check (trips return a silent `{}` success with no insert — telling a
+    bot it was caught just teaches it to adapt) → DB rate limit → insert with no
+    `.select()` chained (the 9.1 carry-forward: `anon` has INSERT but no SELECT on
+    `leads`, so `RETURNING` fails RLS even from an INSERT).
+  - **Timing check without `Date.now()` in the render path:** `InquiryForm.tsx` ticks a
+    plain `elapsedMs` counter via `setInterval`/`setState` (mirroring the `setTick`
+    pattern already used by `ScheduleGrid`/`CrewsOnSitePanel`), rather than reading
+    `Date.now()` inside the `react-hook-form` `onSubmit` handler. The latter tripped the
+    repo's `react-hooks/purity` and `react-hooks/refs` ESLint rules — a function passed
+    into `form.handleSubmit(...)` is analyzed as reachable during render, so any impure
+    call or ref read inside it gets flagged, unlike a handler assigned directly to a JSX
+    `on*` prop (e.g. `VisitDetailSheet`'s `handleOpenChange`, which reads `Date.now()` via
+    a ref without issue because it's a direct assignment, not wrapped in another render-
+    time call).
+  - **Service options** are `SERVICE_SIDES` (`lawn` / `garden` / `both`) — matches how 9.7
+    will route the owner notification (lawn → Matt, garden → Krystyna, both → both).
+    `'other'` (part of the full `LEAD_SERVICE_INTERESTS`) stays a staff-only value for a
+    phone-in lead that doesn't fit either line.
+  - Home's CTA buttons keep linking to `/contact` (not a separate embedded form) — now
+    deep-linked to `/contact#inquiry`; `InquiryForm`'s root carries that `id`. Other public
+    pages' `/contact` links (header, FAQ, About, Lawn/Gardens CTAs) were left unanchored —
+    `/contact`'s form is right below the heading/intro on those pages, so the anchor only
+    mattered for home's much longer page. `jobs/page.tsx`'s "Apply" links still point at
+    `/contact` unchanged — that's a placeholder for 9.6's real application form, out of
+    scope here.
+  - The old two-card division-contact block was replaced by `InquiryForm` as the page's
+    primary content; the same `global.lawn_contact_*`/`garden_contact_*` slots now render
+    as a compact "Prefer to call or email?" line per division beneath the form (still
+    `EditableText`, so an edit from either place shows up on both) rather than duplicating
+    the footer's full cards.
+  - `types/database.ts` regenerated (`supabase gen types typescript --linked`) to include
+    `lead_submissions`.
+
+  Verified: `npm run build` / `typecheck` / `typecheck:sw` / `lint` all clean (only the
+  pre-existing unrelated `VisitLogger.tsx` finding, untouched by this task). Migration
+  applied via `supabase db push --linked`; confirmed via `supabase db query --linked` that
+  `lead_submissions` has RLS on and zero `anon`/`authenticated` grants. Role-switched
+  (`SET LOCAL ROLE anon`) direct insert into `leads` confirmed still works post-migration.
+  A standalone script exercising the real code (`checkLeadSpamSignals`, `inquiryFormSchema`,
+  `enforceLeadRateLimit`, and an anon insert through `createPublicClient`, all against the
+  linked dev project) confirmed: honeypot and too-fast signals are both detected; blank
+  name and missing-email-and-phone are both rejected; a valid submission passes; the rate
+  limiter allows 3 attempts and blocks the 4th within the short window; and the anon insert
+  lands with the expected defaults (`status='new'`, `source='website'`,
+  `assigned_to`/`converted_account_id` both null). All test rows (`leads` and
+  `lead_submissions`) were deleted afterward. Browser-based UI verification (mobile layout,
+  owner edit-mode disabling submit) was not run per standing guidance not to drive Chrome
+  MCP for UI changes unless asked — worth a manual pass before shipping.
 
 - [ ] **9.6 — Careers (Jobs) page + application**
   *Depends on: 9.2, 9.1*

@@ -284,6 +284,27 @@ export type Database = {
           },
         ]
       }
+      lead_submissions: {
+        Row: {
+          created_at: string
+          id: string
+          ip_hash: string
+          kind: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ip_hash: string
+          kind: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ip_hash?: string
+          kind?: string
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           address: string | null
