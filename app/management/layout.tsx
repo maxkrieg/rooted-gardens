@@ -25,11 +25,25 @@ export default async function ManagementLayout({
     role = employee?.role ?? null
   }
 
+  // Starting count for the Leads sidebar badge (task 9.7) — the nav's realtime
+  // effect re-queries this on every `leads` event, but a server-fetched
+  // starting value avoids a flash of "0" on first paint. Non-fatal: leads
+  // RLS only admits owner/lead, so this is a no-op (and logged) for anyone else.
+  let initialNewLeadCount = 0
+  if (role === 'owner' || role === 'lead') {
+    const { count, error } = await supabase
+      .from('leads')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'new')
+    if (error) console.error('[management/layout] new-lead count', error)
+    initialNewLeadCount = count ?? 0
+  }
+
   return (
     // dvh, not vh — iOS Safari's collapsing URL bar makes 100vh taller than the
     // visible viewport, which left a sliver of dead space at the bottom.
     <div className="min-h-[100dvh] bg-background">
-      <ManagementNav userEmail={user?.email} role={role} />
+      <ManagementNav userEmail={user?.email} role={role} initialNewLeadCount={initialNewLeadCount} />
 
       {/* Main content area:
           - Mobile: offset below the fixed top header, whose own height already

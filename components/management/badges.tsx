@@ -12,9 +12,12 @@ import type {
   EquipmentStatus,
   Frequency,
   InvoiceStatus,
+  LeadKind,
+  LeadStatus,
   VehicleStatus,
   VisitStatus,
 } from '@/types/app'
+import { LEAD_KIND_LABELS, LEAD_STATUS_LABELS } from '@/types/app'
 import type { ServiceDueState } from '@/lib/utils/fleet'
 import { serviceDueState } from '@/lib/utils/fleet'
 import type { QboConnectionStatus } from '@/lib/quickbooks/client'
@@ -223,6 +226,47 @@ export function QboStatusBadge({ status }: { status: QboConnectionStatus }) {
   return (
     <Badge variant="outline" className={`border-transparent uppercase tracking-wide text-[10px] font-semibold ${meta.className}`}>
       {meta.label}
+    </Badge>
+  )
+}
+
+// ─── Lead kind & status (task 9.8) ────────────────────────────────────────────
+
+// Reuses existing status-* colour classes (no new CSS): an inquiry reads as
+// "good news" (leaf green), a job application as neutral (stone).
+const LEAD_KIND_META: Record<LeadKind, { className: string }> = {
+  service_inquiry: { className: 'status-completed' },
+  job_application: { className: 'status-scheduled' },
+}
+
+export function LeadKindBadge({ kind }: { kind: string }) {
+  const meta = LEAD_KIND_META[kind as LeadKind] ?? { className: 'status-scheduled' }
+  const label = LEAD_KIND_LABELS[kind as LeadKind] ?? kind
+  return (
+    <Badge variant="outline" className={`border-transparent uppercase tracking-wide text-[10px] font-semibold ${meta.className}`}>
+      {label}
+    </Badge>
+  )
+}
+
+// Pipeline: new (needs attention) -> contacted -> qualified -> won/lost.
+// `new` deliberately reuses the denim "invoiced" hue rather than stone/gray —
+// it's the one status that means "nobody has looked at this yet," and denim
+// doesn't collide with any visit-status meaning the way green/amber/brick do.
+const LEAD_STATUS_META: Record<LeadStatus, { className: string }> = {
+  new:       { className: 'status-invoiced' },
+  contacted: { className: 'status-scheduled' },
+  qualified: { className: 'status-skipped' },
+  won:       { className: 'status-completed' },
+  lost:      { className: 'status-missed' },
+}
+
+export function LeadStatusBadge({ status }: { status: string }) {
+  const meta = LEAD_STATUS_META[status as LeadStatus] ?? { className: 'status-scheduled' }
+  const label = LEAD_STATUS_LABELS[status as LeadStatus] ?? status
+  return (
+    <Badge variant="outline" className={`border-transparent uppercase tracking-wide text-[10px] font-semibold ${meta.className}`}>
+      {label}
     </Badge>
   )
 }

@@ -2,11 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   LayoutDashboard,
   CalendarDays,
   Users,
+  Inbox,
   Receipt,
   Route,
   BarChart3,
@@ -17,21 +18,29 @@ import {
   Leaf,
   Search,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { CommandPalette } from '@/components/management/CommandPalette'
 import { createClient } from '@/lib/supabase/client'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { LEAD_KIND_LABELS } from '@/types/app'
+import type { LeadKind } from '@/types/app'
 
+// `roles` gates a nav item to specific roles — undefined means every
+// management role sees it. Leads is owner/lead (matching leads RLS exactly);
+// Team is owner-only (task 7.1), converted from the old `ownerOnly: true`
+// flag to the same mechanism so there's a single way to gate a nav item.
 const NAV_ITEMS = [
   { href: '/management/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/management/schedule', label: 'Schedule', icon: CalendarDays },
   { href: '/management/accounts', label: 'Accounts', icon: Users },
+  { href: '/management/leads', label: 'Leads', icon: Inbox, roles: ['owner', 'lead'] },
   { href: '/management/route-groups', label: 'Routes', icon: Route },
   { href: '/management/billing', label: 'Billing', icon: Receipt },
   { href: '/management/reports', label: 'Reports', icon: BarChart3 },
   { href: '/management/fleet', label: 'Fleet', icon: Truck },
-  { href: '/management/team', label: 'Team', icon: UserCircle, ownerOnly: true },
+  { href: '/management/team', label: 'Team', icon: UserCircle, roles: ['owner'] },
 ]
 
 const SIDEBAR_LOGO_CLASSES =
@@ -43,14 +52,18 @@ interface NavLinksProps {
   pathname: string
   items: NavItem[]
   onNavigate?: () => void
+  /** Live count of status='new' leads (task 9.7) — rendered as a pill on the
+   *  Leads item only. 0/undefined renders no badge. */
+  newLeadCount?: number
 }
 
-function NavLinks({ pathname, items, onNavigate }: NavLinksProps) {
+function NavLinks({ pathname, items, onNavigate, newLeadCount = 0 }: NavLinksProps) {
   return (
     <nav className="flex-1 overflow-y-auto py-3 px-2">
       <ul className="space-y-0.5">
         {items.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(href + '/')
+          const badge = href === '/management/leads' && newLeadCount > 0 ? newLeadCount : null
           return (
             <li key={href}>
               <Link
@@ -67,7 +80,15 @@ function NavLinks({ pathname, items, onNavigate }: NavLinksProps) {
                   <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-primary rounded-r-full" />
                 )}
                 <Icon className="h-[18px] w-[18px] shrink-0" />
-                {label}
+                <span className="flex-1">{label}</span>
+                {badge !== null && (
+                  <span
+                    className="ml-auto shrink-0 rounded-full bg-primary px-1.5 min-w-5 text-center text-[11px] font-semibold text-primary-foreground tabular-nums"
+                    aria-label={`${badge} new lead${badge === 1 ? '' : 's'}`}
+                  >
+                    {badge > 9 ? '9+' : badge}
+                  </span>
+                )}
               </Link>
             </li>
           )
@@ -107,16 +128,23 @@ function SidebarFooter({ userEmail, onLogout }: SidebarFooterProps) {
 interface ManagementNavProps {
   userEmail?: string | null
   role?: string | null
+  /** Server-fetched starting count of status='new' leads (task 9.7) — avoids
+   *  a flash of "0" while the realtime effect's first count query is in
+   *  flight. See app/management/layout.tsx. */
+  initialNewLeadCount?: number
 }
 
-export function ManagementNav({ userEmail, role }: ManagementNavProps) {
+export function ManagementNav({ userEmail, role, initialNewLeadCount = 0 }: ManagementNavProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [newLeadCount, setNewLeadCount] = useState(initialNewLeadCount)
+  const lastToastAt = useRef<number>(0)
 
-  // Owner-only items (e.g. Team, task 7.1) are hidden from other roles.
-  const navItems = NAV_ITEMS.filter((item) => !item.ownerOnly || role === 'owner')
+  // Role-gated items (Leads = owner/lead, Team = owner-only) are hidden from
+  // everyone else.
+  const navItems = NAV_ITEMS.filter((item) => !item.roles || (!!role && item.roles.includes(role)))
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -128,6 +156,60 @@ export function ManagementNav({ userEmail, role }: ManagementNavProps) {
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [])
+
+  // New-lead notification (task 9.7, in-app half only — see CLAUDE.md on the
+  // 8.2 SMS deferral). Owned here rather than a dedicated provider: this is
+  // the one management client component mounted on every route, and the
+  // badge is its only consumer. Re-queries the live count on every event
+  // rather than incrementing a local counter, so it stays correct when
+  // another owner/lead triages a lead from their own session — a Server
+  // Action's revalidatePath('/management/leads') doesn't reach this sidebar,
+  // which lives in the layout, not the page.
+  useEffect(() => {
+    if (role !== 'owner' && role !== 'lead') return
+
+    const supabase = createClient()
+
+    async function refreshCount() {
+      const { count } = await supabase
+        .from('leads')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'new')
+      setNewLeadCount(count ?? 0)
+    }
+
+    const channel = supabase
+      .channel('management_leads')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'leads' },
+        (payload) => {
+          refreshCount()
+
+          if (payload.eventType !== 'INSERT') return
+
+          // Debounce — a burst of INSERTs (unlikely, but matches the
+          // useCrewRealtimeSync precedent) shouldn't stack toasts.
+          const now = Date.now()
+          if (now - lastToastAt.current < 3_000) return
+          lastToastAt.current = now
+
+          const lead = payload.new as { id: string; name: string; kind: string }
+          toast('New website inquiry', {
+            description: `${lead.name} — ${LEAD_KIND_LABELS[lead.kind as LeadKind] ?? lead.kind}`,
+            action: {
+              label: 'View',
+              onClick: () => router.push(`/management/leads?lead=${lead.id}`),
+            },
+          })
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [role, router])
 
   async function handleLogout() {
     const supabase = createClient()
@@ -160,7 +242,7 @@ export function ManagementNav({ userEmail, role }: ManagementNavProps) {
             </kbd>
           </button>
         </div>
-        <NavLinks pathname={pathname} items={navItems} />
+        <NavLinks pathname={pathname} items={navItems} newLeadCount={newLeadCount} />
         <SidebarFooter userEmail={userEmail} onLogout={handleLogout} />
       </aside>
 
@@ -173,11 +255,24 @@ export function ManagementNav({ userEmail, role }: ManagementNavProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="shrink-0 -ml-1.5"
+          className="relative shrink-0 -ml-1.5"
           onClick={() => setMobileOpen(true)}
-          aria-label="Open navigation menu"
+          aria-label={
+            newLeadCount > 0
+              ? `Open navigation menu — ${newLeadCount} new lead${newLeadCount === 1 ? '' : 's'}`
+              : 'Open navigation menu'
+          }
         >
           <Menu className="h-5 w-5" />
+          {/* The drawer is closed by default, so a badge only inside it is
+              invisible on a phone — the owners' primary device. This dot is
+              the mobile-header-visible half of the same 9.7 count. */}
+          {newLeadCount > 0 && (
+            <span
+              aria-hidden
+              className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary ring-2 ring-card"
+            />
+          )}
         </Button>
         <div className="flex items-center gap-2 flex-1">
           <Leaf className="h-4 w-4 text-primary" />
@@ -211,7 +306,12 @@ export function ManagementNav({ userEmail, role }: ManagementNavProps) {
               Rooted Gardens
             </span>
           </div>
-          <NavLinks pathname={pathname} items={navItems} onNavigate={() => setMobileOpen(false)} />
+          <NavLinks
+            pathname={pathname}
+            items={navItems}
+            onNavigate={() => setMobileOpen(false)}
+            newLeadCount={newLeadCount}
+          />
           <SidebarFooter userEmail={userEmail} onLogout={handleLogout} />
         </SheetContent>
       </Sheet>

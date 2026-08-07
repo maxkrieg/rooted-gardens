@@ -182,6 +182,13 @@ export type VisitCrewWithEmployee = VisitCrew & {
   employee: Employee
 }
 
+/** A lead joined to its assignee (task 9.8 inbox) — null when unassigned.
+ *  Embedded via the real FK constraint name (`leads_assigned_to_fkey`), not a
+ *  bare `employees` join, since `leads` also FKs to `accounts`. */
+export type LeadWithAssignee = Lead & {
+  assigned: Pick<Employee, 'id' | 'name'> | null
+}
+
 /** Visit with its property and account. */
 export type VisitWithLocation = Visit & {
   property: Property

@@ -157,6 +157,16 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(url)
     }
 
+    // The Leads inbox (task 9.8) is owner/lead-only, matching the `leads`
+    // table's RLS policies exactly (migration 20260804130000) — an accountant
+    // is a valid management user but has zero leads access, so send them home
+    // rather than showing a permanently empty inbox.
+    if (pathname.startsWith('/management/leads') && role !== 'owner' && role !== 'lead') {
+      const url = request.nextUrl.clone()
+      url.pathname = ROLE_HOME[role] ?? '/management/dashboard'
+      return NextResponse.redirect(url)
+    }
+
     if (isCrew && !CREW_ROLES.includes(role)) {
       const url = request.nextUrl.clone()
       url.pathname = ROLE_HOME[role] ?? '/management/dashboard'

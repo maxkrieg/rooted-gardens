@@ -1795,7 +1795,7 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   disabling submit) was not run per standing guidance not to drive Chrome MCP for UI
   changes unless asked — worth a manual pass before shipping.
 
-- [ ] **9.7 — New-lead notification (in-app + ~~SMS~~)**
+- [x] **9.7 — New-lead notification (in-app + ~~SMS~~)**
   *Depends on: 9.5, ~~8.2~~*
   > **Build the in-app half only** — the SMS half is blocked by the 8.2 deferral
   > (2026-07-25). Ship the Realtime toast + unread badge; skip the `send-sms` routing until
@@ -1806,12 +1806,83 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   the `send-sms` Edge Function (8.2) — never call Twilio inline. Message is a minimal nudge
   ("New website inquiry from [name] — open the app"). No email.
 
-- [ ] **9.8 — Management Leads inbox & pipeline**
+  **Built** — in-app half only, per the deferral note above; no `send-sms` call, no email,
+  anywhere. Owned in `ManagementNav.tsx` (already the one management client component
+  mounted on every route) rather than a new provider — a `management_leads` Realtime
+  channel (`event: '*'`, table `leads`) re-queries a live `count(*) WHERE status='new'` on
+  every event and toasts on `INSERT`, debounced 3s like `useCrewRealtimeSync`. Re-querying
+  the count (not incrementing a local counter) keeps it correct when a second owner/lead
+  triages a lead from their own session — a Server Action's `revalidatePath` doesn't reach
+  the sidebar, which lives in the layout, not the page. `app/management/layout.tsx` fetches
+  a starting count server-side (`initialNewLeadCount`) so there's no flash of "0" before the
+  realtime effect's first query lands; gated to `role IN ('owner','lead')`, matching `leads`
+  RLS, so an accountant's session never opens the channel. The toast's "View" action routes
+  to `/management/leads?lead=<id>` (this app's first use of sonner's `action:` option),
+  which the 9.8 inbox opens directly via its own deep-link handling. The badge itself renders
+  in two places since the mobile nav drawer is closed by default: a numeric pill (`9+` capped)
+  on the Leads `NavLinks` item, shared by the desktop sidebar and the drawer, plus a plain dot
+  on the mobile hamburger button so the count is visible without opening the drawer.
+
+- [x] **9.8 — Management Leads inbox & pipeline**
   *Depends on: 9.1, 1.6*
   `app/management/leads/page.tsx`: list inquiries + job applications, filter by `kind` /
   `status`, advance status through the pipeline (new → contacted → qualified → won / lost) and
   assign to an owner — all via Server Actions. Add "Leads" to the management sidebar (1.6).
   Phone-responsive (cards on phone, table on desktop), per the management UI rules.
+
+  **Built**, per the plan above, plus:
+  - **Route gating**: `/management/leads` is owner/lead only (matching `leads` RLS exactly,
+    not the broader `MANAGEMENT_ROLES`), gated in `proxy.ts` alongside the existing
+    `/management/team` owner-only branch, and re-checked defense-in-depth in
+    `app/management/leads/page.tsx` (same posture as `team/page.tsx`). `ManagementNav.tsx`'s
+    `ownerOnly: true` flag was generalized to `roles?: string[]` so Team (`['owner']`) and
+    Leads (`['owner', 'lead']`) share one gating mechanism instead of adding a second flag.
+  - **Detail is a Sheet, not a route** (`components/management/LeadDetailSheet.tsx`), per the
+    plan's decision — matches `RouteGroupSheet` / `EmployeeCard`'s edit sheet. No "Convert to
+    Account" action; that's task 9.9, not built.
+  - **`app/management/leads/actions.ts`**: `updateLeadStatus`, `assignLead`, and
+    `getLeadResumeUrl` follow the `team/actions.ts` shape (`requireLeadAccess()` mirrors
+    `requireOwner()` but admits owner/lead, `Promise<{ error?: string }>`, `toUserMessage`,
+    `revalidatePath`). `getLeadResumeUrl` re-reads `details.resume_path` from the DB rather
+    than trusting a client-supplied path, then signs it with the **RLS-respecting** server
+    client (5-minute expiry) — unlike 9.6's upload path, the reader here is always a
+    signed-in owner/lead with a real session, so the `resumes` bucket's existing
+    owner/lead SELECT policy is the real gate and no service-role client is needed.
+  - **`components/management/LeadsInbox.tsx`** is a structural port of `AccountsTable.tsx`:
+    client-side search/kind/status filtering (not the newer URL-state convention — a short
+    inbox at this company's volume, and the URL is already carrying the sheet deep link),
+    the same table-on-desktop/cards-on-phone split, and the same two-empty-states idiom
+    (`variant="seed"` for a genuinely empty inbox, `variant="pruned"` + Clear filters when
+    filters hid everything). `components/management/LeadCard.tsx` mirrors `AccountCard.tsx`
+    but takes `onClick` instead of wrapping a `<Link>`, since detail is a sheet.
+  - **`?lead=` deep link**: `LeadsPage` reads `searchParams` (RSC) and passes `initialLeadId`
+    down, rather than the client inbox calling `useSearchParams()` itself — same reasoning
+    as the schedule page's `DeepLinkedVisitSheet`, avoiding a Suspense boundary. New
+    `lib/utils/lead-url.ts` (`syncLeadUrlParam`) mirrors `lib/utils/visit-url.ts`'s native
+    `history.replaceState` idiom, for the same reason: a `router.replace` would re-run the
+    page's `leads` + `employees` queries on every sheet open/close. Selection state
+    (`selectedLeadId`) deliberately persists after the sheet closes — only `sheetOpen` flips
+    — so the Sheet's own close animation has content to animate away.
+  - **Badges** — `LeadKindBadge` / `LeadStatusBadge` added to `badges.tsx`, no new CSS:
+    reuse the existing `status-*` tokens (`new`→denim "needs attention", `contacted`→stone,
+    `qualified`→ochre, `won`→leaf, `lost`→brick).
+  - **`LEAD_SERVICE_INTEREST_LABELS_FULL`** (`lib/validators/lead.ts`) extends the existing
+    visitor-facing `LEAD_SERVICE_INTEREST_LABELS` (`SERVICE_SIDES`-keyed) with `other` — the
+    inbox can render a staff-entered `'other'` lead that a public visitor could never submit.
+    `leadStatusSchema` / `leadAssigneeSchema` are the file's first staff-side schemas,
+    siblings of the public form schemas, not extensions (documented inline, same reasoning
+    as `inquiryFormSchema` vs `jobApplicationFormSchema`).
+  - **`types/app.ts`** gained `LeadWithAssignee` (embeds the assignee via the real FK
+    constraint name, `leads_assigned_to_fkey`, since `leads` also FKs to `accounts`).
+
+  Verified: `npm run build` / `typecheck` / `typecheck:sw` / `lint` all clean (only the
+  same pre-existing unrelated `VisitLogger.tsx` finding as 9.5/9.6, untouched). No migration
+  — `leads` RLS, its indexes, and Realtime publication membership were all already in place
+  from 9.1; the `resumes` bucket's owner/lead SELECT policy from 9.6. Browser-based UI
+  verification (the realtime toast round-trip, phone layout, sheet deep-link) was not run
+  per standing guidance not to drive Chrome MCP for UI changes unless asked — worth a manual
+  pass before shipping, along with seeding sample leads by hand (`supabase db query
+  --linked`) since this project's cloud-only workflow doesn't auto-load `seed.sql`.
 
 - [ ] **9.9 — Convert lead → account**
   *Depends on: 9.8, 2.3, 2.5*

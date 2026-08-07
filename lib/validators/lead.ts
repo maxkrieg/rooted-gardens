@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { SERVICE_SIDES } from '@/types/app'
+import { LEAD_STATUSES, SERVICE_SIDES, type LeadServiceInterest } from '@/types/app'
 
 /**
  * Zod schema for the public inquiry form (task 9.5). Single source of truth
@@ -98,3 +98,24 @@ export const LEAD_SERVICE_INTEREST_LABELS: Record<(typeof SERVICE_SIDES)[number]
   garden: 'Garden design & care',
   both: 'Both',
 }
+
+/** All four `LeadServiceInterest` values, including the staff-only 'other' —
+ *  the inbox (task 9.8) can show a phone-in lead an owner tagged 'other', which
+ *  a public visitor can never submit (see the comment on inquiryFormSchema
+ *  above), so the visitor-facing map alone doesn't cover every value it renders. */
+export const LEAD_SERVICE_INTEREST_LABELS_FULL: Record<LeadServiceInterest, string> = {
+  ...LEAD_SERVICE_INTEREST_LABELS,
+  other: 'Other',
+}
+
+/**
+ * Staff-side schemas (task 9.8) — siblings of the public form schemas above,
+ * not extensions of them: `inquiryFormSchema`/`jobApplicationFormSchema` are
+ * visitor input for creating a lead; these validate an owner/lead triaging one
+ * that already exists, a completely different shape (a bare status or a
+ * nullable assignee id, not a form's worth of contact fields).
+ */
+export const leadStatusSchema = z.enum(LEAD_STATUSES)
+
+/** `null` clears `leads.assigned_to` (unassign); otherwise a uuid string. */
+export const leadAssigneeSchema = z.uuid().nullable()
