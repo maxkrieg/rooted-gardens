@@ -58,6 +58,18 @@ See `CLAUDE.md` for full context, tech stack, schema, and conventions.
 > `employees.hourly_rate` is retained for pay-rate reference (it is not part of time
 > tracking). The affected task descriptions below are left as historical record but marked
 > `[removed]`.
+>
+> **Post-launch removal (2026-08-07):** `leads.assigned_to` — the per-lead "assign to an
+> owner/lead" concept built in **9.8** — was dropped entirely (migration
+> `20260807090000_drop_leads_assigned_to.sql`, which also rewrote the `leads_insert_anon`
+> RLS policy to drop its `assigned_to IS NULL` clause). The Leads inbox doesn't need a
+> separate assignment step at this company's volume — owners/leads triage inline. This
+> removed `assignLead` (`app/management/leads/actions.ts`), `leadAssigneeSchema`
+> (`lib/validators/lead.ts`), the Assignee `Select` in `LeadDetailSheet`, and the Assigned
+> column/badge in `LeadsInbox`/`LeadCard`. `types/app.ts`'s `LeadWithAssignee` (added in
+> 9.8, extended in 9.9) is now `LeadWithConverted` — it only ever carries the
+> `converted_account_id` embed today. Task descriptions for **9.8** and **9.9** below are
+> left as historical record of what was built at the time.
 
 > **Deferral (2026-07-25):** all **SMS** work is deferred — **8.2** (Twilio delivery
 > infrastructure), **8.3** (schedule-change notifications), and the Phase 0 lead-time item

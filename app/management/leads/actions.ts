@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { leadAssigneeSchema, leadStatusSchema } from '@/lib/validators/lead'
+import { leadStatusSchema } from '@/lib/validators/lead'
 import { accountFormSchema, type AccountFormValues } from '@/lib/validators/account'
 import { buildAccountPayload } from '@/lib/utils/accounts'
 import { toUserMessage } from '@/lib/errors'
@@ -42,28 +42,6 @@ export async function updateLeadStatus(id: string, status: string): Promise<{ er
   const { error } = await supabase.from('leads').update({ status: parsed.data }).eq('id', id)
   if (error) {
     return { error: toUserMessage(error, 'Could not update the lead.', '[updateLeadStatus]') }
-  }
-  revalidatePath('/management/leads')
-  return {}
-}
-
-export async function assignLead(
-  id: string,
-  employeeId: string | null,
-): Promise<{ error?: string }> {
-  const auth = await requireLeadAccess()
-  if (auth.error) return { error: auth.error }
-
-  const parsed = leadAssigneeSchema.safeParse(employeeId)
-  if (!parsed.success) return { error: 'Invalid assignee' }
-
-  const supabase = await createClient()
-  const { error } = await supabase
-    .from('leads')
-    .update({ assigned_to: parsed.data })
-    .eq('id', id)
-  if (error) {
-    return { error: toUserMessage(error, 'Could not assign the lead.', '[assignLead]') }
   }
   revalidatePath('/management/leads')
   return {}

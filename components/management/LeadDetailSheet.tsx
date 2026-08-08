@@ -23,16 +23,15 @@ import {
 } from '@/components/ui/select'
 import { LeadKindBadge, LeadStatusBadge } from '@/components/management/badges'
 import { ConvertLeadSheet } from '@/components/management/ConvertLeadSheet'
-import { assignLead, getLeadResumeUrl, updateLeadStatus } from '@/app/management/leads/actions'
+import { getLeadResumeUrl, updateLeadStatus } from '@/app/management/leads/actions'
 import { LEAD_SERVICE_INTEREST_LABELS_FULL } from '@/lib/validators/lead'
 import { LEAD_STATUSES, LEAD_STATUS_LABELS } from '@/types/app'
-import type { Employee, JobApplicationDetails, LeadWithAssignee } from '@/types/app'
+import type { JobApplicationDetails, LeadWithConverted } from '@/types/app'
 
 interface LeadDetailSheetProps {
-  lead: LeadWithAssignee | null
+  lead: LeadWithConverted | null
   open: boolean
   onOpenChange: (open: boolean) => void
-  assignees: Employee[]
 }
 
 /**
@@ -46,10 +45,9 @@ interface LeadDetailSheetProps {
  * for a service_inquiry that hasn't been converted yet; once converted, this
  * shows a link to the resulting account instead.
  */
-export function LeadDetailSheet({ lead, open, onOpenChange, assignees }: LeadDetailSheetProps) {
+export function LeadDetailSheet({ lead, open, onOpenChange }: LeadDetailSheetProps) {
   const router = useRouter()
   const [statusPending, startStatus] = useTransition()
-  const [assignPending, startAssign] = useTransition()
   const [resumePending, startResume] = useTransition()
   const [convertOpen, setConvertOpen] = useState(false)
 
@@ -69,17 +67,6 @@ export function LeadDetailSheet({ lead, open, onOpenChange, assignees }: LeadDet
       const res = await updateLeadStatus(leadId, next)
       if (res.error) {
         toast.error('Could not update status', { description: res.error })
-        return
-      }
-      router.refresh()
-    })
-  }
-
-  function handleAssigneeChange(next: string) {
-    startAssign(async () => {
-      const res = await assignLead(leadId, next === 'none' ? null : next)
-      if (res.error) {
-        toast.error('Could not assign lead', { description: res.error })
         return
       }
       router.refresh()
@@ -229,30 +216,6 @@ export function LeadDetailSheet({ lead, open, onOpenChange, assignees }: LeadDet
                 {LEAD_STATUSES.map((s) => (
                   <SelectItem key={s} value={s}>
                     {LEAD_STATUS_LABELS[s]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Assignee */}
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
-              Assigned to
-            </p>
-            <Select
-              value={lead.assigned_to ?? 'none'}
-              onValueChange={handleAssigneeChange}
-              disabled={assignPending}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Unassigned" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Unassigned</SelectItem>
-                {assignees.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>
-                    {a.name}
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -223,12 +223,13 @@ leads (
   message text,
   source text DEFAULT 'website',
   details jsonb,                -- kind-specific extras (e.g. job position, resume path)
-  assigned_to uuid FK → employees,
   converted_account_id uuid FK → accounts,  -- set when a lead becomes an account
   created_at, updated_at
 )
 -- RLS: anon role INSERT only (public form, no reads); owner/lead SELECT+UPDATE;
 -- crew/accountant no access. Realtime-enabled for the management new-lead toast.
+-- assigned_to (FK → employees) DROPPED (migration 20260807090000_drop_leads_assigned_to.sql)
+-- — the Leads inbox has no per-lead assignment step; owners triage inline.
 
 -- Owner-editable copy for the fixed public marketing pages (app/(public)/*). The
 -- owners must be able to change every word, phone number, email, and social link

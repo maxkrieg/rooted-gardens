@@ -16,10 +16,10 @@ import { PropertyForm } from '@/components/management/PropertyForm'
 import { convertLeadToAccount } from '@/app/management/leads/actions'
 import { leadToAccountDefaults, leadToPropertyDefaults } from '@/lib/utils/leads'
 import type { AccountFormValues } from '@/lib/validators/account'
-import type { LeadWithAssignee } from '@/types/app'
+import type { LeadWithConverted } from '@/types/app'
 
 interface ConvertLeadSheetProps {
-  lead: LeadWithAssignee
+  lead: LeadWithConverted
   open: boolean
   onOpenChange: (open: boolean) => void
 }

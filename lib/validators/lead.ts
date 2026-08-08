@@ -109,13 +109,10 @@ export const LEAD_SERVICE_INTEREST_LABELS_FULL: Record<LeadServiceInterest, stri
 }
 
 /**
- * Staff-side schemas (task 9.8) — siblings of the public form schemas above,
- * not extensions of them: `inquiryFormSchema`/`jobApplicationFormSchema` are
- * visitor input for creating a lead; these validate an owner/lead triaging one
- * that already exists, a completely different shape (a bare status or a
- * nullable assignee id, not a form's worth of contact fields).
+ * Staff-side schema (task 9.8) — a sibling of the public form schemas above,
+ * not an extension of them: `inquiryFormSchema`/`jobApplicationFormSchema` are
+ * visitor input for creating a lead; this validates an owner/lead triaging
+ * one that already exists, a completely different shape (a bare status, not
+ * a form's worth of contact fields).
  */
 export const leadStatusSchema = z.enum(LEAD_STATUSES)
-
-/** `null` clears `leads.assigned_to` (unassign); otherwise a uuid string. */
-export const leadAssigneeSchema = z.uuid().nullable()

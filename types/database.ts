@@ -308,7 +308,6 @@ export type Database = {
       leads: {
         Row: {
           address: string | null
-          assigned_to: string | null
           converted_account_id: string | null
           created_at: string
           details: Json | null
@@ -325,7 +324,6 @@ export type Database = {
         }
         Insert: {
           address?: string | null
-          assigned_to?: string | null
           converted_account_id?: string | null
           created_at?: string
           details?: Json | null
@@ -342,7 +340,6 @@ export type Database = {
         }
         Update: {
           address?: string | null
-          assigned_to?: string | null
           converted_account_id?: string | null
           created_at?: string
           details?: Json | null
@@ -358,13 +355,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "leads_assigned_to_fkey"
-            columns: ["assigned_to"]
-            isOneToOne: false
-            referencedRelation: "employees"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "leads_converted_account_id_fkey"
             columns: ["converted_account_id"]

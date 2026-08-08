@@ -32,11 +32,10 @@ import {
   LEAD_STATUSES,
   LEAD_STATUS_LABELS,
 } from '@/types/app'
-import type { Employee, LeadKind, LeadStatus, LeadWithAssignee } from '@/types/app'
+import type { LeadKind, LeadStatus, LeadWithConverted } from '@/types/app'
 
 interface LeadsInboxProps {
-  leads: LeadWithAssignee[]
-  assignees: Employee[]
+  leads: LeadWithConverted[]
   /** From the `?lead=` deep link (e.g. the 9.7 toast's "View" action) — opens
    *  that lead's sheet on load. */
   initialLeadId?: string
@@ -49,7 +48,7 @@ interface LeadsInboxProps {
  * shareable), a table on desktop and cards on phone, and a detail Sheet
  * rather than a route (there's no /management/leads/[id] page).
  */
-export function LeadsInbox({ leads, assignees, initialLeadId }: LeadsInboxProps) {
+export function LeadsInbox({ leads, initialLeadId }: LeadsInboxProps) {
   const [search, setSearch] = useState('')
   const [kindFilter, setKindFilter] = useState<LeadKind | 'all'>('all')
   const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all')
@@ -182,14 +181,13 @@ export function LeadsInbox({ leads, assignees, initialLeadId }: LeadsInboxProps)
               <TableHead className="font-semibold text-foreground">Name</TableHead>
               <TableHead className="font-semibold text-foreground">Kind</TableHead>
               <TableHead className="font-semibold text-foreground">Interest</TableHead>
-              <TableHead className="font-semibold text-foreground">Status</TableHead>
-              <TableHead className="font-semibold text-foreground pr-5">Assigned</TableHead>
+              <TableHead className="font-semibold text-foreground pr-5">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={6} className="p-0">
+                <TableCell colSpan={5} className="p-0">
                   {emptyState}
                 </TableCell>
               </TableRow>
@@ -212,11 +210,8 @@ export function LeadsInbox({ leads, assignees, initialLeadId }: LeadsInboxProps)
                   <TableCell className="text-sm text-muted-foreground">
                     {leadInterestOrPosition(lead) ?? '—'}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="pr-5">
                     <LeadStatusBadge status={lead.status} />
-                  </TableCell>
-                  <TableCell className="pr-5 text-sm text-muted-foreground">
-                    {lead.assigned?.name ?? <span className="italic">Unassigned</span>}
                   </TableCell>
                 </TableRow>
               ))
@@ -238,7 +233,6 @@ export function LeadsInbox({ leads, assignees, initialLeadId }: LeadsInboxProps)
         lead={selectedLead}
         open={sheetOpen}
         onOpenChange={handleSheetOpenChange}
-        assignees={assignees}
       />
     </>
   )

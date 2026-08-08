@@ -2,14 +2,14 @@ import { format, parseISO } from 'date-fns'
 import { LEAD_SERVICE_INTEREST_LABELS_FULL } from '@/lib/validators/lead'
 import type { AccountFormValues } from '@/lib/validators/account'
 import type { PropertyFormValues } from '@/lib/validators/property'
-import type { JobApplicationDetails, LeadWithAssignee } from '@/types/app'
+import type { JobApplicationDetails, LeadWithConverted } from '@/types/app'
 
 /**
  * The one-line "what are they after" summary shown in both the leads table
  * and LeadCard: a job application's position, or a service inquiry's
  * service_interest label. Shared so the two renderings can't drift.
  */
-export function leadInterestOrPosition(lead: LeadWithAssignee): string | null {
+export function leadInterestOrPosition(lead: LeadWithConverted): string | null {
   if (lead.kind === 'job_application') {
     return (lead.details as JobApplicationDetails | null)?.position ?? null
   }
@@ -31,7 +31,7 @@ export function leadInterestOrPosition(lead: LeadWithAssignee): string | null {
  * belongs on the property, via leadToPropertyDefaults below), not the
  * account's structured billing/mailing address.
  */
-export function leadToAccountDefaults(lead: LeadWithAssignee): Partial<AccountFormValues> {
+export function leadToAccountDefaults(lead: LeadWithConverted): Partial<AccountFormValues> {
   const interest = leadInterestOrPosition(lead)
   const receivedOn = format(parseISO(lead.created_at), 'MMM d, yyyy')
   const notesLines = [
@@ -56,7 +56,7 @@ export function leadToAccountDefaults(lead: LeadWithAssignee): Partial<AccountFo
  * Frequency is left at the form's own 'weekly' default — a lead's message
  * gives no reliable signal for it.
  */
-export function leadToPropertyDefaults(lead: LeadWithAssignee): Partial<PropertyFormValues> {
+export function leadToPropertyDefaults(lead: LeadWithConverted): Partial<PropertyFormValues> {
   return {
     address: lead.address ?? '',
   }

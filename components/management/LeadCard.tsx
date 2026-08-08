@@ -3,14 +3,14 @@ import { Calendar, Mail, Phone } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { LeadKindBadge, LeadStatusBadge } from '@/components/management/badges'
 import { leadInterestOrPosition } from '@/lib/utils/leads'
-import type { LeadWithAssignee } from '@/types/app'
+import type { LeadWithConverted } from '@/types/app'
 
 /**
  * Mobile card for the leads inbox (task 9.8) — structural port of
  * AccountCard.tsx. Takes `onClick` rather than wrapping in a `<Link>`: lead
  * detail is a Sheet (LeadDetailSheet), not its own route.
  */
-export function LeadCard({ lead, onClick }: { lead: LeadWithAssignee; onClick: () => void }) {
+export function LeadCard({ lead, onClick }: { lead: LeadWithConverted; onClick: () => void }) {
   const interestOrPosition = leadInterestOrPosition(lead)
 
   return (
@@ -52,10 +52,6 @@ export function LeadCard({ lead, onClick }: { lead: LeadWithAssignee; onClick: (
               {format(parseISO(lead.created_at), 'EEE MMM d')}
             </span>
           </div>
-
-          {lead.assigned && (
-            <p className="mt-2 text-xs text-muted-foreground">Assigned to {lead.assigned.name}</p>
-          )}
         </CardContent>
       </Card>
     </button>

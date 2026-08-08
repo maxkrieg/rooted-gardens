@@ -182,12 +182,12 @@ export type VisitCrewWithEmployee = VisitCrew & {
   employee: Employee
 }
 
-/** A lead joined to its assignee and (once converted, task 9.9) the account
- *  it became — both null until set. Embedded via the real FK constraint
- *  names (`leads_assigned_to_fkey` / `leads_converted_account_id_fkey`), not
- *  bare joins, since `leads` FKs to both `employees` and `accounts`. */
-export type LeadWithAssignee = Lead & {
-  assigned: Pick<Employee, 'id' | 'name'> | null
+/** A lead joined to the account it became, once converted (task 9.9) — null
+ *  until set. Embedded via the real FK constraint name
+ *  (`leads_converted_account_id_fkey`) for clarity, even though `leads` now
+ *  has only the one FK (the `assigned_to` → `employees` FK was dropped —
+ *  migration 20260807090000_drop_leads_assigned_to.sql). */
+export type LeadWithConverted = Lead & {
   converted?: Pick<Account, 'id' | 'name'> | null
 }
 
