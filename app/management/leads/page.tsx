@@ -34,7 +34,9 @@ export default async function LeadsPage({
   const [leadsRes, assigneesRes] = await Promise.all([
     supabase
       .from('leads')
-      .select('*, assigned:employees!leads_assigned_to_fkey(id, name)')
+      .select(
+        '*, assigned:employees!leads_assigned_to_fkey(id, name), converted:accounts!leads_converted_account_id_fkey(id, name)',
+      )
       .order('created_at', { ascending: false }),
     // Candidate assignees for the picker — same "leads" access as the inbox
     // itself, so the field can only ever be assigned to someone who can

@@ -4,30 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { accountFormSchema, type AccountFormValues } from '@/lib/validators/account'
 import { syncCustomer, type SyncCustomerResult } from '@/lib/quickbooks/sync'
+import { buildAccountPayload } from '@/lib/utils/accounts'
 import { toUserMessage } from '@/lib/errors'
-
-/** Shared helper — builds the DB insert/update payload from validated form values. */
-function buildPayload(data: AccountFormValues) {
-  return {
-    name: data.name,
-    contact_name: data.contact_name?.trim() || null,
-    email: data.email?.trim() || null,
-    phone: data.phone?.trim() || null,
-    billing_address_line1: data.billing_address_line1?.trim() || null,
-    billing_address_line2: data.billing_address_line2?.trim() || null,
-    billing_city: data.billing_city?.trim() || null,
-    billing_state: data.billing_state?.trim() || null,
-    billing_zip: data.billing_zip?.trim() || null,
-    billing_type: data.billing_type,
-    status: data.status,
-    notes: data.notes?.trim() || null,
-    qbo_customer_id: data.qbo_customer_id?.trim() || null,
-    // Null out billing fields that don't apply to the chosen type
-    price_per_visit: data.billing_type === 'per_visit' ? (data.price_per_visit ?? null) : null,
-    contract_rate: data.billing_type === 'contract' ? (data.contract_rate ?? null) : null,
-    contract_period: data.billing_type === 'contract' ? (data.contract_period ?? null) : null,
-  }
-}
 
 /**
  * Create a new account.
@@ -46,7 +24,7 @@ export async function createAccount(
   }
 
   const supabase = await createClient()
-  const { error } = await supabase.from('accounts').insert(buildPayload(parsed.data))
+  const { error } = await supabase.from('accounts').insert(buildAccountPayload(parsed.data))
 
   if (error) {
     return { error: toUserMessage(error, 'Could not create the account.', '[createAccount]') }
@@ -75,7 +53,7 @@ export async function updateAccount(
   const supabase = await createClient()
   const { error } = await supabase
     .from('accounts')
-    .update(buildPayload(parsed.data))
+    .update(buildAccountPayload(parsed.data))
     .eq('id', id)
 
   if (error) {

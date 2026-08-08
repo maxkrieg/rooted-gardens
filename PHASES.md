@@ -1884,13 +1884,84 @@ External / human items (they stay `[~]` until a person finishes them). Confirm e
   pass before shipping, along with seeding sample leads by hand (`supabase db query
   --linked`) since this project's cloud-only workflow doesn't auto-load `seed.sql`.
 
-- [ ] **9.9 — Convert lead → account**
+- [x] **9.9 — Convert lead → account**
   *Depends on: 9.8, 2.3, 2.5*
   On a `service_inquiry` lead, a "Convert to Account" action creates an `accounts` row
   (`status='prospective'`, pre-filled name / contact / email / phone) **+ a `property`** from
   the lead's address, sets `leads.status='won'` and `leads.converted_account_id`, and links
   back. Reuse `AccountForm` (2.3) and `PropertyForm` (2.5) pre-filled from the lead rather
   than building new forms.
+
+  **Built**, per the plan above, as a two-step wizard (`components/management/ConvertLeadSheet.tsx`)
+  opened from `LeadDetailSheet`'s new "Convert to Account" button (service_inquiry leads only):
+  step 1 is `AccountForm`, step 2 is `PropertyForm` (skippable) — both reused unmodified in
+  shape, not rebuilt. Finishing either step routes to the new account's detail page.
+  - **Forms gained create-mode prefill without touching edit mode.** Both forms key
+    `isEdit` off their entity prop (`account` / `property`), so passing a synthetic entity to
+    prefill would have flipped them into an update against a nonexistent id. Instead each
+    gained a narrow `defaults?: Partial<...FormValues>` prop, spread into the existing
+    create-branch `defaultValues`; `AccountForm` also gained `onCreate?: (values) =>
+    Promise<{ error? }>`, used in place of `createAccount` so the convert flow can capture
+    the new account's id (`createAccount` itself returns none). Both props are optional and
+    change no existing call site's behavior.
+  - **`buildPayload` moved out of `app/management/accounts/actions.ts`** to
+    `lib/utils/accounts.ts` as `buildAccountPayload` — every export in a `'use server'` file
+    must be an async Server Action, so the payload builder couldn't stay there and also be
+    imported by the new `convertLeadToAccount`. `createAccount`/`updateAccount` now import it;
+    no logic changed.
+  - **`convertLeadToAccount`** (`app/management/leads/actions.ts`) follows that file's
+    existing conventions exactly: `requireLeadAccess()` → `accountFormSchema.safeParse` →
+    RLS-respecting `createClient()` → `toUserMessage` → `revalidatePath`. Re-reads the lead
+    server-side (`kind`, `converted_account_id`) before writing, rather than trusting the
+    client's state, so a stale sheet or a double-click can't create a second account for an
+    already-converted lead — mirrors `getLeadResumeUrl`'s "re-read from the DB" posture.
+    Inserts the account with `.select('id').single()` (unlike `createAccount`), then updates
+    the lead (`status='won', converted_account_id`). supabase-js has no cross-table
+    transaction, so per the plan's "sequential writes + guards" decision (no RPC, no
+    migration): if the lead update fails after the account insert succeeds, the account is
+    **not** rolled back — it's returned via `accountId` with a `warning` string so nothing is
+    silently lost; `ConvertLeadSheet` surfaces it as a toast and still advances to step 2.
+  - **`leadToAccountDefaults`/`leadToPropertyDefaults`** (`lib/utils/leads.ts`, next to
+    `leadInterestOrPosition`) do the lead→form-values mapping so it can't drift between the
+    two steps. Per the plan's decision, prefill is `status='prospective'`,
+    `billing_type='as_needed'` — a website prospect hasn't been quoted, and
+    `accountFormSchema` requires a price for `per_visit`, which would otherwise block
+    conversion until the owner invents a number. `notes` carries a provenance line (received
+    date + service interest, via `leadInterestOrPosition`) plus the inquiry message. The
+    account's structured billing-address fields are left blank on purpose — `lead.address` is
+    the *service* address and belongs on the property, not the billing block.
+  - **Converted-state display**: `LeadDetailSheet` now shows the Convert button only for
+    `service_interest = 'service_inquiry'` leads without a `converted_account_id`; once
+    converted, the same slot renders a link to `/management/accounts/<id>` reading "Converted
+    to <name>". `app/management/leads/page.tsx`'s query gained a second embed —
+    `converted:accounts!leads_converted_account_id_fkey(id, name)` — verified against the
+    linked project that this is in fact the FK's real constraint name (`pg_constraint` on
+    `public.leads`), same reasoning as the existing `assigned` embed (`leads` FKs to two
+    tables, so an unqualified join is ambiguous). `LeadWithAssignee.converted` is optional
+    (`?:`) rather than required, since nothing else in the app constructs a `LeadWithAssignee`
+    literal and a stricter type bought nothing.
+  - **`ConvertLeadSheet` is a sibling `<Sheet>`, not nested inside `LeadDetailSheet`'s.**
+    Both are independent Radix Dialog roots rendered side-by-side in a fragment; nesting the
+    second sheet's JSX inside the first's `<SheetContent>` would work today but ties two
+    unrelated dialogs' lifecycles together for no reason. Closing `ConvertLeadSheet` triggers
+    `router.refresh()` so `LeadDetailSheet` (whose `selectedLead` is derived from the parent
+    `LeadsInbox`'s `leads` prop by id, per 9.8) re-renders with the fresh `status='won'` /
+    `converted_account_id` immediately, without needing new client-side state plumbing.
+
+  Verified: `npm run build` / `typecheck` / `typecheck:sw` / `lint` all clean (only the same
+  pre-existing unrelated `VisitLogger.tsx` finding as 9.5–9.8, untouched). No migration —
+  `leads.converted_account_id` and the `leads_update` / `accounts_insert` / `properties_insert`
+  RLS policies were all already in place from 9.1/2.1/2.5; no `types/database.ts` regen.
+  Exercised the real insert/update/insert sequence `convertLeadToAccount` performs (seed a
+  `service_inquiry` lead → insert the account with the exact prefill payload → update the
+  lead with `status='won'` + `converted_account_id` → insert the property from the lead's
+  address) directly against the linked dev project via `supabase db query --linked`; all
+  three writes landed correctly and the FK link resolved. Confirmed the `leads_converted_
+  account_id_fkey` constraint name against `pg_constraint`. All test rows (`leads`,
+  `accounts`, `properties`) deleted afterward. Browser-based UI verification (the two-step
+  sheet flow, Skip button, converted-link render, role gating) was not run per standing
+  guidance not to drive Chrome MCP for UI changes unless asked — worth a manual pass before
+  shipping.
 
 ### ✅ Verifying Phase 9 — Public Site & Lead Intake
 

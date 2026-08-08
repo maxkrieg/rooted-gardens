@@ -30,11 +30,18 @@ import type { Account } from '@/types/app'
 interface AccountFormProps {
   /** Called on successful save — used by the parent Sheet to close itself. */
   onSuccess: () => void
-  /** Optional: prefill the form for edit mode (task 2.4) or lead→account (9.9). */
+  /** Prefill the form for edit mode (task 2.4). Presence flips isEdit=true. */
   account?: Account
+  /** Create-mode prefill (lead→account, 9.9) — does NOT flip the form into
+   *  edit mode the way `account` does. Merged over the plain-create defaults. */
+  defaults?: Partial<AccountFormValues>
+  /** Create-mode override for the submit handler (lead→account, 9.9), used in
+   *  place of createAccount so the caller can capture the new account's id
+   *  and link it back to the lead. Ignored in edit mode. */
+  onCreate?: (values: AccountFormValues) => Promise<{ error?: string }>
 }
 
-export function AccountForm({ onSuccess, account }: AccountFormProps) {
+export function AccountForm({ onSuccess, account, defaults, onCreate }: AccountFormProps) {
   const isEdit = Boolean(account)
 
   const form = useForm<AccountFormValues>({
@@ -75,6 +82,7 @@ export function AccountForm({ onSuccess, account }: AccountFormProps) {
           status: 'active' as const,
           notes: '',
           qbo_customer_id: '',
+          ...defaults,
         },
   })
 
@@ -84,7 +92,7 @@ export function AccountForm({ onSuccess, account }: AccountFormProps) {
   async function onSubmit(values: AccountFormValues) {
     const res = isEdit && account
       ? await updateAccount(account.id, values)
-      : await createAccount(values)
+      : await (onCreate ?? createAccount)(values)
 
     if (res.error) {
       toast.error(isEdit ? 'Could not update account' : 'Could not create account', {

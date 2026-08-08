@@ -1,9 +1,10 @@
 'use client'
 
-import { useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
-import { Download, Mail, MapPin, Phone } from 'lucide-react'
+import { CheckCircle2, Download, Mail, MapPin, Phone, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -21,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { LeadKindBadge, LeadStatusBadge } from '@/components/management/badges'
+import { ConvertLeadSheet } from '@/components/management/ConvertLeadSheet'
 import { assignLead, getLeadResumeUrl, updateLeadStatus } from '@/app/management/leads/actions'
 import { LEAD_SERVICE_INTEREST_LABELS_FULL } from '@/lib/validators/lead'
 import { LEAD_STATUSES, LEAD_STATUS_LABELS } from '@/types/app'
@@ -40,13 +42,16 @@ interface LeadDetailSheetProps {
  * Sheet's own close animation has content to animate away, matching every
  * other sheet in the app.
  *
- * No "Convert to Account" action here — that's task 9.9, not built yet.
+ * "Convert to Account" (task 9.9) opens ConvertLeadSheet on top of this one
+ * for a service_inquiry that hasn't been converted yet; once converted, this
+ * shows a link to the resulting account instead.
  */
 export function LeadDetailSheet({ lead, open, onOpenChange, assignees }: LeadDetailSheetProps) {
   const router = useRouter()
   const [statusPending, startStatus] = useTransition()
   const [assignPending, startAssign] = useTransition()
   const [resumePending, startResume] = useTransition()
+  const [convertOpen, setConvertOpen] = useState(false)
 
   if (!lead) return null
 
@@ -93,6 +98,7 @@ export function LeadDetailSheet({ lead, open, onOpenChange, assignees }: LeadDet
   }
 
   return (
+    <>
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-md bg-card flex flex-col gap-0 p-0">
         <SheetHeader className="px-6 pt-6 pb-4 border-b border-border shrink-0">
@@ -181,6 +187,35 @@ export function LeadDetailSheet({ lead, open, onOpenChange, assignees }: LeadDet
             </Button>
           )}
 
+          {/* Convert to account (service inquiries only) */}
+          {lead.kind === 'service_inquiry' && (
+            <div>
+              {lead.converted_account_id ? (
+                <>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+                    Converted
+                  </p>
+                  <Link
+                    href={`/management/accounts/${lead.converted_account_id}`}
+                    className="flex items-center gap-2 text-sm text-primary hover:underline"
+                  >
+                    <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
+                    {lead.converted ? `Converted to ${lead.converted.name}` : 'View converted account'}
+                  </Link>
+                </>
+              ) : (
+                <Button
+                  type="button"
+                  className="gap-2"
+                  onClick={() => setConvertOpen(true)}
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Convert to Account
+                </Button>
+              )}
+            </div>
+          )}
+
           {/* Status */}
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
@@ -226,5 +261,15 @@ export function LeadDetailSheet({ lead, open, onOpenChange, assignees }: LeadDet
         </div>
       </SheetContent>
     </Sheet>
+
+    <ConvertLeadSheet
+      lead={lead}
+      open={convertOpen}
+      onOpenChange={(next) => {
+        setConvertOpen(next)
+        if (!next) router.refresh()
+      }}
+    />
+    </>
   )
 }

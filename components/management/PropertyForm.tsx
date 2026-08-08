@@ -37,9 +37,12 @@ interface PropertyFormProps {
   onSuccess: () => void
   /** Prefill for edit mode. Omit for create mode. */
   property?: Property
+  /** Create-mode prefill (lead→account, 9.9) — does NOT flip the form into
+   *  edit mode the way `property` does. Merged over the plain-create defaults. */
+  defaults?: Partial<PropertyFormValues>
 }
 
-export function PropertyForm({ accountId, onSuccess, property }: PropertyFormProps) {
+export function PropertyForm({ accountId, onSuccess, property, defaults }: PropertyFormProps) {
   const isEdit = Boolean(property)
 
   const form = useForm<PropertyFormValues>({
@@ -58,6 +61,7 @@ export function PropertyForm({ accountId, onSuccess, property }: PropertyFormPro
           parking_notes: '',
           access_notes: '',
           crew_notes: '',
+          ...defaults,
         },
   })
 
