@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { EmptyState } from '@/components/states/EmptyState'
 import { RouteGroupSheet } from '@/components/management/RouteGroupSheet'
 import { PropertyAssignmentSheet } from '@/components/management/PropertyAssignmentSheet'
-import { deleteRouteGroup, moveRouteGroup } from '@/app/management/route-groups/actions'
+import { deleteRouteGroup, moveRouteGroup } from '@/app/management/routes/actions'
 import type { RouteGroup, PropertyWithAccount } from '@/types/app'
 
 interface RouteGroupCardProps {

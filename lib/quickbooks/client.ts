@@ -64,7 +64,7 @@ export async function exchangeCodeForTokens(callbackUrl: string): Promise<Stored
  * Select-then-insert-or-update against `integrations` — there's no unique
  * constraint on `service`, so no `onConflict` upsert shortcut (same
  * pre-check-then-write convention as assignProperty in
- * app/management/route-groups/actions.ts). Caller supplies the Supabase
+ * app/management/routes/actions.ts). Caller supplies the Supabase
  * client: the OAuth callback passes the normal RLS client (owner-gated write,
  * defense-in-depth alongside its own explicit role check); the token-refresh
  * path below passes the service client.

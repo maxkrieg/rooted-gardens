@@ -36,7 +36,7 @@ const NAV_ITEMS = [
   { href: '/management/schedule', label: 'Schedule', icon: CalendarDays },
   { href: '/management/accounts', label: 'Accounts', icon: Users },
   { href: '/management/leads', label: 'Leads', icon: Inbox, roles: ['owner', 'lead'] },
-  { href: '/management/route-groups', label: 'Routes', icon: Route },
+  { href: '/management/routes', label: 'Routes', icon: Route },
   { href: '/management/billing', label: 'Billing', icon: Receipt },
   { href: '/management/reports', label: 'Reports', icon: BarChart3 },
   { href: '/management/fleet', label: 'Fleet', icon: Truck },

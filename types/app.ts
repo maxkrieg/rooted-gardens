@@ -19,7 +19,7 @@ export type SiteContentRow = Tables<'site_content'>
 export type SiteCollectionItemRow = Tables<'site_collection_items'>
 
 // A property enriched with its account name and current route group — used by
-// the route-groups management page and its Assign Properties sheet.
+// the routes management page and its Assign Properties sheet.
 export interface PropertyWithAccount extends Property {
   accountName: string
   /** The route group this property currently belongs to, if any — null means

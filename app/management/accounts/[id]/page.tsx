@@ -286,7 +286,7 @@ async function DetailsTab({
                       {routeGroupByPropertyId.get(property.id)?.name ?? 'Unassigned'}
                     </span>
                     <Link
-                      href="/management/route-groups"
+                      href="/management/routes"
                       className="inline-flex items-center gap-1 text-xs text-[--primary] hover:underline shrink-0"
                     >
                       Manage

@@ -6,7 +6,7 @@ import { routeGroupFormSchema, type RouteGroupFormValues } from '@/lib/validator
 import { toUserMessage } from '@/lib/errors'
 
 function revalidate() {
-  revalidatePath('/management/route-groups')
+  revalidatePath('/management/routes')
 }
 
 // ─── Route group CRUD ────────────────────────────────────────────────────────

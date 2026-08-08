@@ -255,7 +255,7 @@ export async function deleteCollectionItem(
 /**
  * Move a collection item up or down by swapping `sort_order` with its
  * neighbor — verbatim port of `moveRouteGroup`
- * (app/management/route-groups/actions.ts), scoped by `collection`.
+ * (app/management/routes/actions.ts), scoped by `collection`.
  */
 export async function moveCollectionItem(
   values: MoveCollectionItemValues,

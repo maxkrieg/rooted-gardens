@@ -7,11 +7,11 @@ import { ErrorState } from '@/components/states/ErrorState'
 import type { Property, PropertyWithAccount, RouteGroup } from '@/types/app'
 
 /**
- * Route Groups management page.
+ * Routes management page.
  * Server Component — fetches route_groups, property_route_groups, and properties
  * in three targeted queries (the same merge-in-JS pattern as the accounts page).
  */
-export default async function RouteGroupsPage() {
+export default async function RoutesPage() {
   const supabase = await createClient()
 
   // ── 1. Route groups ordered by sort_order ────────────────────────────────
@@ -22,7 +22,7 @@ export default async function RouteGroupsPage() {
     .order('name', { ascending: true })
 
   if (groupsError) {
-    console.error('[route-groups] groups', groupsError)
+    console.error('[routes] groups', groupsError)
     return (
       <ErrorState
         title="Route groups didn't load."
@@ -68,7 +68,7 @@ export default async function RouteGroupsPage() {
   // Load-bearing: without either, every group renders "No properties assigned
   // yet" — a confident lie about the routes. Fail the page instead.
   if (assignmentsError || propertiesError) {
-    console.error('[route-groups] assignments/properties', assignmentsError ?? propertiesError)
+    console.error('[routes] assignments/properties', assignmentsError ?? propertiesError)
     return (
       <ErrorState
         title="Route assignments didn't load."
@@ -96,7 +96,7 @@ export default async function RouteGroupsPage() {
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Route className="h-5 w-5 text-primary shrink-0" />
-          <h1 className="font-display text-2xl font-semibold text-foreground">Route Groups</h1>
+          <h1 className="font-display text-2xl font-semibold text-foreground">Routes</h1>
         </div>
         <RouteGroupSheet />
       </div>

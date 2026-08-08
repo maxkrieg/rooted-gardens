@@ -13,7 +13,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet'
-import { assignProperty, unassignProperty } from '@/app/management/route-groups/actions'
+import { assignProperty, unassignProperty } from '@/app/management/routes/actions'
 import type { PropertyWithAccount } from '@/types/app'
 
 interface PropertyAssignmentSheetProps {
