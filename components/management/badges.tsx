@@ -6,6 +6,7 @@
 import { AlertTriangle, Receipt } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import type {
+  Account,
   AccountStatus,
   BillingType,
   EmployeeRole,
@@ -14,6 +15,7 @@ import type {
   InvoiceStatus,
   LeadKind,
   LeadStatus,
+  Property,
   VehicleStatus,
   VisitStatus,
 } from '@/types/app'
@@ -21,6 +23,7 @@ import { LEAD_KIND_LABELS, LEAD_STATUS_LABELS } from '@/types/app'
 import type { ServiceDueState } from '@/lib/utils/fleet'
 import { serviceDueState } from '@/lib/utils/fleet'
 import type { QboConnectionStatus } from '@/lib/quickbooks/client'
+import { formatAccountPrice } from '@/lib/utils/accounts'
 
 // ─── Account status ──────────────────────────────────────────────────────────
 
@@ -81,6 +84,26 @@ export function FrequencyBadge({ frequency }: { frequency: string }) {
       {meta.label}
     </Badge>
   )
+}
+
+// ─── Account price / billing-type meta ────────────────────────────────────────
+
+// Price text already names the billing type ("$125.00 / visit", "$800.00 /
+// monthly"), so the billing badge would be redundant whenever there's a flat
+// price to show. It only earns its place as a fallback for `as_needed`
+// accounts, which have no price — and even then, suppressed when the
+// property's own frequency badge already reads "As Needed," so the schedule
+// grid and mobile list never show the same label twice on one row. Shared by
+// both so their fallback rules can't drift apart.
+export function AccountPriceMeta({ account, property }: { account: Account; property: Property }) {
+  const price = formatAccountPrice(account)
+  if (price !== '—') {
+    return <span className="text-[11px] tabular-nums text-muted-foreground">{price}</span>
+  }
+  if (account.billing_type === 'as_needed' && property.frequency === 'as_needed') {
+    return null
+  }
+  return <BillingTypeBadge billingType={account.billing_type} />
 }
 
 // ─── Visit status ─────────────────────────────────────────────────────────────

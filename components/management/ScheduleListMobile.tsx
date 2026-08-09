@@ -16,8 +16,15 @@ import { groupRowsByAccount } from '@/lib/utils/schedule'
 import { syncVisitUrlParam } from '@/lib/utils/visit-url'
 import { formatAccountPrice } from '@/lib/utils/accounts'
 import { Button } from '@/components/ui/button'
-import { VisitStatusBadge, FrequencyBadge, BillingTypeBadge, InvoiceStatusBadge } from '@/components/management/badges'
+import {
+  AccountPriceMeta,
+  VisitStatusBadge,
+  FrequencyBadge,
+  BillingTypeBadge,
+  InvoiceStatusBadge,
+} from '@/components/management/badges'
 import type {
+  Account,
   Employee,
   EmployeeRole,
   RouteGroup,
@@ -96,20 +103,174 @@ export function ScheduleListMobile({
   if (!week || week.routeGroups.length === 0) {
     return <ScheduleEmptyState filtered={filtered} />
   }
+  const currentWeek = week
+
+  // Renders one stop button. Shared by both label shapes so the right-side
+  // status/crew/on-site content can never drift between them:
+  //   - `merged` — the ~99% case: one account with one property. Account
+  //     name, address, and frequency/price all live in this one button.
+  //   - `nested` — a property row under a multi-property account header.
+  //     Only these carry the sage rail — it means "a site of the account
+  //     above," not "this is a property row."
+  function renderStopRow(
+    account: Account,
+    row: SchedulePropertyRow,
+    variant: 'merged' | 'nested',
+    showTopBorder: boolean,
+  ) {
+    const isNested = variant === 'nested'
+    const cellKey = `${row.property.id}-${currentWeek.weekStart}`
+    const isCreating = creatingKey === cellKey
+    // Merge live realtime overlay with server-fetched visit timing
+    const overlay = row.visit ? visitTimings.get(row.visit.id) : undefined
+    const effectiveStartedAt =
+      overlay !== undefined ? overlay.started_at : (row.visit?.started_at ?? null)
+    const inProgress = row.visit
+      ? isVisitInProgress({
+          started_at: effectiveStartedAt,
+          ended_at: overlay !== undefined ? overlay.ended_at : (row.visit?.ended_at ?? null),
+        })
+      : false
+    // Once a visit is completed, show who actually did the work rather than
+    // who was planned — falls back to assigned crew if no completion crew
+    // was recorded.
+    const assigned = row.visit
+      ? row.visit.visit_crew
+          .filter((vc) => vc.relation === 'assigned' && vc.employee)
+          .map((vc) => vc.employee!)
+      : []
+    const completed = row.visit
+      ? row.visit.visit_crew
+          .filter((vc) => vc.relation === 'completed' && vc.employee)
+          .map((vc) => vc.employee!)
+      : []
+    const displayCrew = row.visit?.status === 'completed' && completed.length > 0 ? completed : assigned
+    const displayedCrew = displayCrew.slice(0, 2)
+    const overflow = displayCrew.length - 2
+
+    return (
+      <button
+        key={row.property.id}
+        type="button"
+        disabled={isCreating}
+        onClick={() => handleRowClick(row, row.visit)}
+        className={cn(
+          'w-full text-left py-3 min-h-[56px]',
+          'flex items-center justify-between gap-3',
+          isNested ? 'border-l-2 border-l-primary/25 pl-7 pr-4' : 'px-5',
+          showTopBorder && 'border-t border-border/50',
+          'hover:bg-accent/20 active:bg-accent/30 transition-colors',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+          isCreating && 'opacity-50 cursor-wait',
+        )}
+      >
+        {/* Left: identity */}
+        <div className="flex flex-col gap-0.5 min-w-0">
+          {!isNested && (
+            <span className="font-display text-[15px] font-semibold leading-snug text-foreground truncate">
+              {account.name}
+            </span>
+          )}
+          <span className="text-[13px] leading-snug text-muted-foreground truncate">
+            {row.property.address}
+          </span>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            <FrequencyBadge frequency={row.property.frequency} />
+            {!isNested && <AccountPriceMeta account={account} property={row.property} />}
+          </div>
+        </div>
+
+        {/* Right: on-site indicator or crew + status */}
+        <div className="flex items-center gap-2 shrink-0">
+          {inProgress && effectiveStartedAt ? (
+            <div className="flex items-center gap-1.5 rounded-full bg-[var(--clay)]/10 border border-[var(--clay)]/30 px-2.5 py-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--clay)] animate-pulse shrink-0" />
+              <span className="text-[11px] font-semibold text-[var(--clay)]">On site</span>
+              <span className="text-[11px] text-[var(--clay)]/70 tabular-nums">
+                {formatElapsed(effectiveStartedAt)}
+              </span>
+            </div>
+          ) : (
+            <>
+              {displayedCrew.length > 0 && (
+                <div className="flex gap-0.5">
+                  {displayedCrew.map((emp) => (
+                    <span key={emp.id} className="text-[10px] bg-muted/60 rounded px-1 leading-5">
+                      {emp.name.split(' ')[0]}
+                    </span>
+                  ))}
+                  {overflow > 0 && (
+                    <span className="text-[10px] text-muted-foreground leading-5">+{overflow}</span>
+                  )}
+                </div>
+              )}
+
+              {row.visit?.crew_instruction && (
+                <FilePen className="w-4 h-4 text-[var(--clay)] shrink-0" />
+              )}
+
+              {row.visit ? (
+                <div className="flex flex-col items-end gap-1">
+                  <VisitStatusBadge status={row.visit.status} missed={isVisitMissed(row.visit)} />
+                  {row.visit.status === 'completed' && row.visit.invoice && (
+                    <InvoiceStatusBadge status={row.visit.invoice.status} withIcon />
+                  )}
+                </div>
+              ) : (
+                <span className="text-xs text-muted-foreground/50">
+                  {isCreating ? '…' : '+ Schedule'}
+                </span>
+              )}
+            </>
+          )}
+        </div>
+      </button>
+    )
+  }
+
+  // Multi-property account header — its own row above the nested, railed
+  // property rows. ~99% of accounts skip this entirely (see renderStopRow's
+  // `merged` variant).
+  function AccountHeaderRow({
+    account,
+    propertyCount,
+    showTopBorder,
+  }: {
+    account: Account
+    propertyCount: number
+    showTopBorder: boolean
+  }) {
+    const price = formatAccountPrice(account)
+    return (
+      <div className={cn('px-5 pt-2.5 pb-1.5', showTopBorder && 'border-t border-border/60')}>
+        <div className="font-display text-[15px] font-semibold leading-snug text-foreground truncate">
+          {account.name}
+        </div>
+        <div className="mt-0.5 flex items-center gap-2">
+          {price !== '—' ? (
+            <span className="text-[11px] tabular-nums text-muted-foreground">{price}</span>
+          ) : (
+            <BillingTypeBadge billingType={account.billing_type} />
+          )}
+          <span className="text-[11px] text-muted-foreground ml-auto shrink-0">{propertyCount} sites</span>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <>
       <Link
-        href={`/crew/schedule?week=${week.weekStart}`}
+        href={`/crew/schedule?week=${currentWeek.weekStart}`}
         className="inline-flex items-center gap-1 mb-4 text-sm text-muted-foreground tabular-nums hover:text-foreground hover:underline"
       >
-        {format(parseISO(week.weekStart), 'MMM d')} –{' '}
-        {format(addDays(parseISO(week.weekStart), 6), 'MMM d')}
+        {format(parseISO(currentWeek.weekStart), 'MMM d')} –{' '}
+        {format(addDays(parseISO(currentWeek.weekStart), 6), 'MMM d')}
         <ChevronRight className="h-3.5 w-3.5" />
       </Link>
 
       <div className="space-y-4">
-        {week.routeGroups.map(({ routeGroup, rows }) => (
+        {currentWeek.routeGroups.map(({ routeGroup, rows }) => (
           <div
             key={routeGroup.id}
             className="rounded-xl border border-border bg-card shadow-warm overflow-hidden"
@@ -137,139 +298,17 @@ export function ScheduleListMobile({
 
             {/* Properties, nested by account */}
             <div>
-              {groupRowsByAccount(rows).map(({ account, rows: acctRows }, acctIdx) => (
-                <div key={account.id}>
-                  {/* Account header — subordinate to the route-group header above:
-                      a thin rule (no fill) with the account name in Fraunces, breaking
-                      from the route header's all-caps sans, plus the billing rate. */}
-                  <div
-                    className={cn(
-                      'flex items-baseline gap-2 px-5 pt-2.5 pb-1.5',
-                      acctIdx > 0 && 'border-t border-border/60',
-                    )}
-                  >
-                    <span className="font-display text-sm text-foreground truncate min-w-0">
-                      {account.name}
-                    </span>
-                    <span className="text-xs tabular-nums text-muted-foreground shrink-0">
-                      {formatAccountPrice(account)}
-                    </span>
-                    <BillingTypeBadge billingType={account.billing_type} />
+              {groupRowsByAccount(rows).map(({ account, rows: acctRows }, acctIdx) => {
+                if (acctRows.length === 1) {
+                  return renderStopRow(account, acctRows[0], 'merged', acctIdx > 0)
+                }
+                return (
+                  <div key={account.id}>
+                    <AccountHeaderRow account={account} propertyCount={acctRows.length} showTopBorder={acctIdx > 0} />
+                    {acctRows.map((row, rowIdx) => renderStopRow(account, row, 'nested', rowIdx > 0))}
                   </div>
-
-                  {acctRows.map((row, rowIdx) => {
-                    const cellKey = `${row.property.id}-${week.weekStart}`
-                    const isCreating = creatingKey === cellKey
-                    // Merge live realtime overlay with server-fetched visit timing
-                    const overlay = row.visit ? visitTimings.get(row.visit.id) : undefined
-                    const effectiveStartedAt =
-                      overlay !== undefined ? overlay.started_at : (row.visit?.started_at ?? null)
-                    const effectiveEndedAt =
-                      overlay !== undefined ? overlay.ended_at : (row.visit?.ended_at ?? null)
-                    const inProgress = row.visit
-                      ? isVisitInProgress({ started_at: effectiveStartedAt, ended_at: effectiveEndedAt })
-                      : false
-                    // Once a visit is completed, show who actually did the work rather
-                    // than who was planned — falls back to assigned crew if no
-                    // completion crew was recorded.
-                    const assigned = row.visit
-                      ? row.visit.visit_crew
-                          .filter((vc) => vc.relation === 'assigned' && vc.employee)
-                          .map((vc) => vc.employee!)
-                      : []
-                    const completed = row.visit
-                      ? row.visit.visit_crew
-                          .filter((vc) => vc.relation === 'completed' && vc.employee)
-                          .map((vc) => vc.employee!)
-                      : []
-                    const displayCrew =
-                      row.visit?.status === 'completed' && completed.length > 0 ? completed : assigned
-                    const displayedCrew = displayCrew.slice(0, 2)
-                    const overflow = displayCrew.length - 2
-
-                    return (
-                      <button
-                        key={row.property.id}
-                        type="button"
-                        disabled={isCreating}
-                        onClick={() => handleRowClick(row, row.visit)}
-                        className={cn(
-                          'w-full text-left pl-7 pr-4 py-3 min-h-[56px]',
-                          'flex items-center justify-between gap-3',
-                          'border-l-2 border-l-primary/25',
-                          rowIdx > 0 && 'border-t border-border/50',
-                          'hover:bg-accent/20 active:bg-accent/30 transition-colors',
-                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
-                          isCreating && 'opacity-50 cursor-wait',
-                        )}
-                      >
-                        {/* Left: address + frequency */}
-                        <div className="flex flex-col gap-1 min-w-0">
-                          <span className="text-sm font-medium text-foreground leading-tight truncate">
-                            {row.property.address}
-                          </span>
-                          <FrequencyBadge frequency={row.property.frequency} />
-                        </div>
-
-                        {/* Right: on-site indicator or crew + status */}
-                        <div className="flex items-center gap-2 shrink-0">
-                          {inProgress && effectiveStartedAt ? (
-                            <div className="flex items-center gap-1.5 rounded-full bg-[var(--clay)]/10 border border-[var(--clay)]/30 px-2.5 py-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-[var(--clay)] animate-pulse shrink-0" />
-                              <span className="text-[11px] font-semibold text-[var(--clay)]">
-                                On site
-                              </span>
-                              <span className="text-[11px] text-[var(--clay)]/70 tabular-nums">
-                                {formatElapsed(effectiveStartedAt)}
-                              </span>
-                            </div>
-                          ) : (
-                            <>
-                              {displayedCrew.length > 0 && (
-                                <div className="flex gap-0.5">
-                                  {displayedCrew.map((emp) => (
-                                    <span
-                                      key={emp.id}
-                                      className="text-[10px] bg-muted/60 rounded px-1 leading-5"
-                                    >
-                                      {emp.name.split(' ')[0]}
-                                    </span>
-                                  ))}
-                                  {overflow > 0 && (
-                                    <span className="text-[10px] text-muted-foreground leading-5">
-                                      +{overflow}
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-
-                              {row.visit?.crew_instruction && (
-                                <FilePen className="w-4 h-4 text-[var(--clay)] shrink-0" />
-                              )}
-
-                              {row.visit ? (
-                                <div className="flex flex-col items-end gap-1">
-                                  <VisitStatusBadge
-                                    status={row.visit.status}
-                                    missed={isVisitMissed(row.visit)}
-                                  />
-                                  {row.visit.status === 'completed' && row.visit.invoice && (
-                                    <InvoiceStatusBadge status={row.visit.invoice.status} withIcon />
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="text-xs text-muted-foreground/50">
-                                  {isCreating ? '…' : '+ Schedule'}
-                                </span>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         ))}

@@ -17,16 +17,23 @@ import { isVisitInProgress, isVisitMissed, formatElapsed } from '@/lib/utils/vis
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { FilePen } from 'lucide-react'
-import { FrequencyBadge, BillingTypeBadge, InvoiceStatusBadge } from '@/components/management/badges'
+import { AccountPriceMeta, FrequencyBadge, BillingTypeBadge, InvoiceStatusBadge } from '@/components/management/badges'
 import type {
+  Account,
   Employee,
   EmployeeRole,
+  Property,
   RouteGroup,
   ScheduleWeek,
   SchedulePropertyRow,
   Vehicle,
   VisitWithCrew,
 } from '@/types/app'
+
+// Shared width for the sticky label column — kept in one place so the header
+// `<th>`, the merged/nested label cells, and the pinned route-group banner
+// below can never drift out of sync.
+const LABEL_COL_WIDTH = 'w-[260px] min-w-[260px]'
 
 interface ScheduleGridProps {
   weeks: ScheduleWeek[]
@@ -109,6 +116,32 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
     }
   }
 
+  function renderWeekCell(row: SchedulePropertyRow, week: ScheduleWeek) {
+    const visit = visitMap.get(row.property.id)?.get(week.weekStart) ?? null
+    const cellKey = `${row.property.id}-${week.weekStart}`
+    // Merge live realtime overlay with server-fetched visit timing
+    const overlay = visit ? visitTimings.get(visit.id) : undefined
+    const effectiveStartedAt = overlay !== undefined ? overlay.started_at : (visit?.started_at ?? null)
+    const effectiveEndedAt = overlay !== undefined ? overlay.ended_at : (visit?.ended_at ?? null)
+    const inProgress = visit
+      ? isVisitInProgress({ started_at: effectiveStartedAt, ended_at: effectiveEndedAt })
+      : false
+    const missed = visit ? isVisitMissed(visit) && !inProgress : false
+    return (
+      <td key={week.weekStart} className="px-2 py-2 align-top">
+        <ScheduleCell
+          visit={visit}
+          inProgress={inProgress}
+          missed={missed}
+          startedAt={effectiveStartedAt}
+          isCreating={creatingKey === cellKey}
+          onClick={() => handleCellClick(row, week.weekStart, visit)}
+          onKeyDown={(e) => handleCellKeyDown(e, row, week.weekStart, visit)}
+        />
+      </td>
+    )
+  }
+
   if (weeks.length === 0 || weeks.every((w) => w.routeGroups.length === 0)) {
     return <ScheduleEmptyState filtered={filtered} />
   }
@@ -122,7 +155,12 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
           <table className="min-w-full border-collapse">
             <thead className="sticky top-0 z-20 bg-card border-b border-border">
               <tr>
-                <th className="sticky left-0 z-30 bg-card border-r border-border px-4 py-3 text-left min-w-[220px]">
+                <th
+                  className={cn(
+                    'sticky left-0 z-30 bg-card px-4 py-3 text-left shadow-[inset_-1px_0_0_0_var(--border)]',
+                    LABEL_COL_WIDTH,
+                  )}
+                >
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
                     Property
                   </span>
@@ -167,15 +205,17 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
                 <tr key={`rg-${routeGroup.id}`}>
                   <td
                     colSpan={1 + weeks.length}
-                    className="bg-secondary text-secondary-foreground text-xs font-semibold uppercase tracking-widest px-4 py-2 border-b border-border"
+                    className="bg-secondary text-secondary-foreground text-xs font-semibold uppercase tracking-widest py-2 border-b border-border"
                   >
                     <div className="flex items-center justify-between">
-                      <span>{routeGroup.name}</span>
+                      <span className={cn('sticky left-0 px-4', LABEL_COL_WIDTH)}>
+                        {routeGroup.name}
+                      </span>
                       {canEdit && (
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="px-2 text-xs font-medium text-secondary-foreground/70 hover:text-foreground hover:bg-secondary-foreground/10 normal-case tracking-normal"
+                          className="mr-4 px-2 text-xs font-medium text-secondary-foreground/70 hover:text-foreground hover:bg-secondary-foreground/10 normal-case tracking-normal shrink-0"
                           onClick={(e) => {
                             e.stopPropagation()
                             setAssignGroup(routeGroup)
@@ -188,66 +228,40 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
                     </div>
                   </td>
                 </tr>,
-                ...groupRowsByAccount(rows).flatMap(({ account, rows: acctRows }) => [
-                  <tr key={`${routeGroup.id}-acct-${account.id}`}>
-                    <td
-                      colSpan={1 + weeks.length}
-                      className="pl-6 pr-4 pt-3 pb-1.5 border-t border-border/70"
-                    >
-                      <div className="flex items-baseline gap-2">
-                        <span className="font-display text-sm text-foreground truncate">
-                          {account.name}
-                        </span>
-                        <span className="text-xs tabular-nums text-muted-foreground shrink-0">
-                          {formatAccountPrice(account)}
-                        </span>
-                        <BillingTypeBadge billingType={account.billing_type} />
-                      </div>
-                    </td>
-                  </tr>,
-                  ...acctRows.map((row) => (
-                    <tr
-                      key={`${routeGroup.id}-${row.property.id}`}
-                      className="group border-b border-border/50 hover:bg-accent/20 transition-colors"
-                    >
-                      <td className="sticky left-0 bg-card z-10 border-r border-border border-l-2 border-l-primary/25 pl-8 pr-4 py-3 min-w-[220px]">
-                        <span className="font-medium text-foreground text-sm leading-tight truncate max-w-[140px] block">
-                          {row.property.address}
-                        </span>
-                        <div className="mt-0.5">
-                          <FrequencyBadge frequency={row.property.frequency} />
-                        </div>
-                      </td>
-                      {weeks.map((week) => {
-                        const visit = visitMap.get(row.property.id)?.get(week.weekStart) ?? null
-                        const cellKey = `${row.property.id}-${week.weekStart}`
-                        // Merge live realtime overlay with server-fetched visit timing
-                        const overlay = visit ? visitTimings.get(visit.id) : undefined
-                        const effectiveStartedAt =
-                          overlay !== undefined ? overlay.started_at : (visit?.started_at ?? null)
-                        const effectiveEndedAt =
-                          overlay !== undefined ? overlay.ended_at : (visit?.ended_at ?? null)
-                        const inProgress = visit
-                          ? isVisitInProgress({ started_at: effectiveStartedAt, ended_at: effectiveEndedAt })
-                          : false
-                        const missed = visit ? isVisitMissed(visit) && !inProgress : false
-                        return (
-                          <td key={week.weekStart} className="px-2 py-2 align-top">
-                            <ScheduleCell
-                              visit={visit}
-                              inProgress={inProgress}
-                              missed={missed}
-                              startedAt={effectiveStartedAt}
-                              isCreating={creatingKey === cellKey}
-                              onClick={() => handleCellClick(row, week.weekStart, visit)}
-                              onKeyDown={(e) => handleCellKeyDown(e, row, week.weekStart, visit)}
-                            />
-                          </td>
-                        )
-                      })}
-                    </tr>
-                  )),
-                ]),
+                ...groupRowsByAccount(rows).flatMap(({ account, rows: acctRows }) => {
+                  // ~99% of accounts have exactly one property — merge the account
+                  // identity and its single site into one label cell instead of a
+                  // separate spanning header row. Only accounts with multiple sites
+                  // get a real header row + indented, railed property rows below it.
+                  if (acctRows.length === 1) {
+                    const row = acctRows[0]
+                    return [
+                      <tr
+                        key={`${routeGroup.id}-${row.property.id}`}
+                        className="group border-b border-border/50 hover:bg-accent/20 transition-colors"
+                      >
+                        <PropertyLabelCell account={account} property={row.property} variant="merged" />
+                        {weeks.map((week) => renderWeekCell(row, week))}
+                      </tr>,
+                    ]
+                  }
+
+                  return [
+                    <tr key={`${routeGroup.id}-acct-${account.id}`} className="border-b border-border/50">
+                      <AccountHeaderLabelCell account={account} propertyCount={acctRows.length} />
+                      <td colSpan={weeks.length} className="bg-card" />
+                    </tr>,
+                    ...acctRows.map((row) => (
+                      <tr
+                        key={`${routeGroup.id}-${row.property.id}`}
+                        className="group border-b border-border/50 hover:bg-accent/20 transition-colors"
+                      >
+                        <PropertyLabelCell account={account} property={row.property} variant="nested" />
+                        {weeks.map((week) => renderWeekCell(row, week))}
+                      </tr>
+                    )),
+                  ]
+                }),
               ])}
             </tbody>
           </table>
@@ -275,6 +289,75 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
         />
       )}
     </>
+  )
+}
+
+// ─── Label column cells ────────────────────────────────────────────────────
+//
+// Three shapes share one sticky, fixed-width column so its right edge and
+// hover highlight stay continuous no matter which shape a given row uses:
+//   - `merged`  — the ~99% case: one account with one property. Account name,
+//                 full address, and frequency/price all live in a single cell.
+//   - `nested`  — a property row under a multi-property account header. Only
+//                 these carry the sage rail — it means "a site of the account
+//                 above," not "this is a property row."
+//   - the multi-property account header itself (`AccountHeaderLabelCell`).
+
+function PropertyLabelCell({
+  account,
+  property,
+  variant,
+}: {
+  account: Account
+  property: Property
+  variant: 'merged' | 'nested'
+}) {
+  const isNested = variant === 'nested'
+  return (
+    <td
+      className={cn(
+        'sticky left-0 z-10 bg-card group-hover:bg-accent/20 shadow-[inset_-1px_0_0_0_var(--border)] py-3 align-top transition-colors',
+        LABEL_COL_WIDTH,
+        isNested ? 'border-l-2 border-l-primary/25 pl-8 pr-4' : 'px-4',
+      )}
+    >
+      {!isNested && (
+        <div className="font-display text-[15px] font-semibold leading-snug text-foreground">
+          {account.name}
+        </div>
+      )}
+      <div className={cn('text-[13px] leading-snug text-muted-foreground', !isNested && 'mt-0.5')}>
+        {property.address}
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+        <FrequencyBadge frequency={property.frequency} />
+        {!isNested && <AccountPriceMeta account={account} property={property} />}
+      </div>
+    </td>
+  )
+}
+
+function AccountHeaderLabelCell({ account, propertyCount }: { account: Account; propertyCount: number }) {
+  const price = formatAccountPrice(account)
+  return (
+    <td
+      className={cn(
+        'sticky left-0 z-10 bg-card shadow-[inset_-1px_0_0_0_var(--border)] px-4 pt-3 pb-1.5 align-top',
+        LABEL_COL_WIDTH,
+      )}
+    >
+      <div className="font-display text-[15px] font-semibold leading-snug text-foreground truncate">
+        {account.name}
+      </div>
+      <div className="mt-0.5 flex items-center gap-2">
+        {price !== '—' ? (
+          <span className="text-[11px] tabular-nums text-muted-foreground">{price}</span>
+        ) : (
+          <BillingTypeBadge billingType={account.billing_type} />
+        )}
+        <span className="text-[11px] text-muted-foreground ml-auto shrink-0">{propertyCount} sites</span>
+      </div>
+    </td>
   )
 }
 
