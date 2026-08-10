@@ -39,11 +39,32 @@ export default async function ManagementLayout({
     initialNewLeadCount = count ?? 0
   }
 
+  // Starting count for the Routes sidebar badge — every property with no
+  // property_route_groups row. property_route_groups_property_idx guarantees
+  // at most one row per property, so unrouted = properties − routed, two
+  // cheap head counts instead of an anti-join. The Routes nav item has no
+  // `roles` restriction, so owner/lead/accountant all see it.
+  let initialUnroutedCount = 0
+  if (role === 'owner' || role === 'lead' || role === 'accountant') {
+    const [propertiesCount, routedCount] = await Promise.all([
+      supabase.from('properties').select('id', { count: 'exact', head: true }),
+      supabase.from('property_route_groups').select('property_id', { count: 'exact', head: true }),
+    ])
+    if (propertiesCount.error) console.error('[management/layout] properties count', propertiesCount.error)
+    if (routedCount.error) console.error('[management/layout] routed count', routedCount.error)
+    initialUnroutedCount = Math.max((propertiesCount.count ?? 0) - (routedCount.count ?? 0), 0)
+  }
+
   return (
     // dvh, not vh — iOS Safari's collapsing URL bar makes 100vh taller than the
     // visible viewport, which left a sliver of dead space at the bottom.
     <div className="min-h-[100dvh] bg-background">
-      <ManagementNav userEmail={user?.email} role={role} initialNewLeadCount={initialNewLeadCount} />
+      <ManagementNav
+        userEmail={user?.email}
+        role={role}
+        initialNewLeadCount={initialNewLeadCount}
+        initialUnroutedCount={initialUnroutedCount}
+      />
 
       {/* Main content area:
           - Mobile: offset below the fixed top header, whose own height already

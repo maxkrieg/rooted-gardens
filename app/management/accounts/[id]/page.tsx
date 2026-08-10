@@ -6,6 +6,7 @@ import {
   ArrowRight,
   Mail,
   Phone,
+  TriangleAlert,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -279,20 +280,35 @@ async function DetailsTab({
                     <PropertySheet accountId={account.id} property={property} />
                   </div>
 
-                  {/* Route group */}
-                  <div className="flex items-center gap-2 text-sm mb-3">
-                    <span className="text-muted-foreground">Route group: </span>
-                    <span className="font-medium text-foreground">
-                      {routeGroupByPropertyId.get(property.id)?.name ?? 'Unassigned'}
-                    </span>
-                    <Link
-                      href="/management/routes"
-                      className="inline-flex items-center gap-1 text-xs text-[--primary] hover:underline shrink-0"
-                    >
-                      Manage
-                      <ArrowRight className="h-3 w-3" />
-                    </Link>
-                  </div>
+                  {/* Route group — unrouted means this property is skipped on
+                      the schedule entirely, so it gets the clay "needs
+                      attention" treatment instead of a plain "Unassigned". */}
+                  {(() => {
+                    const routeGroup = routeGroupByPropertyId.get(property.id)
+                    return (
+                      <div className="flex items-center gap-2 text-sm mb-3">
+                        {!routeGroup && (
+                          <TriangleAlert className="h-3.5 w-3.5 text-[var(--clay)] shrink-0" />
+                        )}
+                        <span className="text-muted-foreground">Route group: </span>
+                        <span
+                          className={cn(
+                            'font-medium',
+                            routeGroup ? 'text-foreground' : 'text-[var(--clay)]'
+                          )}
+                        >
+                          {routeGroup?.name ?? 'Not on a route'}
+                        </span>
+                        <Link
+                          href="/management/routes"
+                          className="inline-flex items-center gap-1 text-xs text-[--primary] hover:underline shrink-0"
+                        >
+                          {routeGroup ? 'Manage' : 'Put on a route'}
+                          <ArrowRight className="h-3 w-3" />
+                        </Link>
+                      </div>
+                    )
+                  })()}
 
                   {/* Notes */}
                   {(property.crew_notes || property.access_notes || property.parking_notes) && (

@@ -22,7 +22,10 @@ import { ErrorState, StaleNotice } from '@/components/states/ErrorState'
 import type { SchedulePropertyRow } from '@/types/app'
 
 function rowMatches(row: SchedulePropertyRow, filters: ScheduleFilters): boolean {
-  if (filters.routeGroup !== 'all' && row.routeGroup.id !== filters.routeGroup) return false
+  // routeGroup is nullable on the type (the management "ungrouped" bucket),
+  // but crew never receives ungrouped rows — useWeekSchedule doesn't pass
+  // any. Optional chaining is just the type-safe form of that guarantee.
+  if (filters.routeGroup !== 'all' && row.routeGroup?.id !== filters.routeGroup) return false
 
   if (filters.crew !== 'all') {
     // Either relation counts: crew are routinely added to a visit only via the

@@ -52,12 +52,19 @@ export type ScheduleAssignment = {
  * Assembles the route group → property → visit grid for a single week.
  * Pure (no I/O) so it can be reused by both the management Server Action
  * (getScheduleForWeek) and the crew client hook (useWeekSchedule).
+ *
+ * `ungroupedProperties` is optional and defaults to empty — the crew caller
+ * never passes it (crew self-organize off route groups, so an unrouted
+ * property has nothing to show them), while the management Server Action
+ * supplies every property with no property_route_groups row so they aren't
+ * silently dropped from the schedule.
  */
 export function buildScheduleWeek(
   weekStart: string,
   routeGroups: RouteGroup[],
   assignments: ScheduleAssignment[],
-  visits: VisitWithCrew[]
+  visits: VisitWithCrew[],
+  ungroupedProperties: Array<Property & { account: Account }> = []
 ): ScheduleWeek {
   // Build visit lookup by property_id
   const visitByPropertyId = new Map<string, VisitWithCrew>()
@@ -89,7 +96,18 @@ export function buildScheduleWeek(
     return { routeGroup, rows }
   })
 
-  return { weekStart, routeGroups: scheduleRouteGroups }
+  const ungrouped: SchedulePropertyRow[] = ungroupedProperties.map((property) => {
+    const account = property.account as Account
+
+    return {
+      property: { ...property, account: undefined } as unknown as Property,
+      account,
+      routeGroup: null,
+      visit: visitByPropertyId.get(property.id) ?? null,
+    }
+  })
+
+  return { weekStart, routeGroups: scheduleRouteGroups, ungrouped }
 }
 
 /**
@@ -140,6 +158,11 @@ export function findVisitInWeeks(
         if (row.visit?.id === visitId) {
           return { row, weekStart: week.weekStart }
         }
+      }
+    }
+    for (const row of week.ungrouped) {
+      if (row.visit?.id === visitId) {
+        return { row, weekStart: week.weekStart }
       }
     }
   }

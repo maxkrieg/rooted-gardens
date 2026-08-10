@@ -71,6 +71,10 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
           if (row.visit) map.get(row.property.id)!.set(week.weekStart, row.visit)
         }
       }
+      for (const row of week.ungrouped) {
+        if (!map.has(row.property.id)) map.set(row.property.id, new Map())
+        if (row.visit) map.get(row.property.id)!.set(week.weekStart, row.visit)
+      }
     }
     return map
   }, [weeks])
@@ -142,7 +146,44 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
     )
   }
 
-  if (weeks.length === 0 || weeks.every((w) => w.routeGroups.length === 0)) {
+  // Renders one account's rows within either a route group or the ungrouped
+  // bucket — shared so the "Not on a route" section gets the exact same
+  // merged/nested account-clustering treatment as a real route group.
+  function renderPropertyRows(keyPrefix: string, account: Account, acctRows: SchedulePropertyRow[]) {
+    if (acctRows.length === 1) {
+      const row = acctRows[0]
+      return [
+        <tr
+          key={`${keyPrefix}-${row.property.id}`}
+          className="group border-b border-border/50 hover:bg-accent/20 transition-colors"
+        >
+          <PropertyLabelCell account={account} property={row.property} variant="merged" />
+          {weeks.map((week) => renderWeekCell(row, week))}
+        </tr>,
+      ]
+    }
+
+    return [
+      <tr key={`${keyPrefix}-acct-${account.id}`} className="border-b border-border/50">
+        <AccountHeaderLabelCell account={account} propertyCount={acctRows.length} />
+        <td colSpan={weeks.length} className="bg-card" />
+      </tr>,
+      ...acctRows.map((row) => (
+        <tr
+          key={`${keyPrefix}-${row.property.id}`}
+          className="group border-b border-border/50 hover:bg-accent/20 transition-colors"
+        >
+          <PropertyLabelCell account={account} property={row.property} variant="nested" />
+          {weeks.map((week) => renderWeekCell(row, week))}
+        </tr>
+      )),
+    ]
+  }
+
+  if (
+    weeks.length === 0 ||
+    weeks.every((w) => w.routeGroups.length === 0 && w.ungrouped.length === 0)
+  ) {
     return <ScheduleEmptyState filtered={filtered} />
   }
 
@@ -201,68 +242,71 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
               </tr>
             </thead>
             <tbody>
-              {structure.routeGroups.flatMap(({ routeGroup, rows }) => [
-                <tr key={`rg-${routeGroup.id}`}>
-                  <td
-                    colSpan={1 + weeks.length}
-                    className="bg-secondary text-secondary-foreground text-xs font-semibold uppercase tracking-widest py-2 border-b border-border"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className={cn('sticky left-0 px-4', LABEL_COL_WIDTH)}>
-                        {routeGroup.name}
-                      </span>
-                      {canEdit && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="mr-4 px-2 text-xs font-medium text-secondary-foreground/70 hover:text-foreground hover:bg-secondary-foreground/10 normal-case tracking-normal shrink-0"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setAssignGroup(routeGroup)
-                            setAssignOpen(true)
-                          }}
-                        >
-                          Assign Route
-                        </Button>
-                      )}
-                    </div>
-                  </td>
-                </tr>,
-                ...groupRowsByAccount(rows).flatMap(({ account, rows: acctRows }) => {
+              {[
+                ...structure.routeGroups.flatMap(({ routeGroup, rows }) => [
+                  <tr key={`rg-${routeGroup.id}`}>
+                    <td
+                      colSpan={1 + weeks.length}
+                      className="bg-secondary text-secondary-foreground text-xs font-semibold uppercase tracking-widest py-2 border-b border-border"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className={cn('sticky left-0 px-4', LABEL_COL_WIDTH)}>
+                          {routeGroup.name}
+                        </span>
+                        {canEdit && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="mr-4 px-2 text-xs font-medium text-secondary-foreground/70 hover:text-foreground hover:bg-secondary-foreground/10 normal-case tracking-normal shrink-0"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setAssignGroup(routeGroup)
+                              setAssignOpen(true)
+                            }}
+                          >
+                            Assign Route
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>,
                   // ~99% of accounts have exactly one property — merge the account
                   // identity and its single site into one label cell instead of a
                   // separate spanning header row. Only accounts with multiple sites
                   // get a real header row + indented, railed property rows below it.
-                  if (acctRows.length === 1) {
-                    const row = acctRows[0]
-                    return [
-                      <tr
-                        key={`${routeGroup.id}-${row.property.id}`}
-                        className="group border-b border-border/50 hover:bg-accent/20 transition-colors"
-                      >
-                        <PropertyLabelCell account={account} property={row.property} variant="merged" />
-                        {weeks.map((week) => renderWeekCell(row, week))}
+                  ...groupRowsByAccount(rows).flatMap(({ account, rows: acctRows }) =>
+                    renderPropertyRows(routeGroup.id, account, acctRows)
+                  ),
+                ]),
+                // "Not on a route" — properties with no property_route_groups row.
+                // Rendered last, in clay, with a link back to Routes to fix it;
+                // these used to be silently dropped from the schedule entirely.
+                ...(structure.ungrouped.length > 0
+                  ? [
+                      <tr key="ungrouped-header">
+                        <td
+                          colSpan={1 + weeks.length}
+                          className="bg-[var(--clay)]/10 text-[var(--clay)] text-xs font-semibold uppercase tracking-widest py-2 border-b border-border"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className={cn('sticky left-0 px-4', LABEL_COL_WIDTH)}>
+                              Not on a route · {structure.ungrouped.length}
+                            </span>
+                            <Link
+                              href="/management/routes"
+                              className="mr-4 px-2 text-xs font-medium normal-case tracking-normal text-[var(--clay)]/80 hover:text-[var(--clay)] shrink-0"
+                            >
+                              Put on a route →
+                            </Link>
+                          </div>
+                        </td>
                       </tr>,
+                      ...groupRowsByAccount(structure.ungrouped).flatMap(({ account, rows: acctRows }) =>
+                        renderPropertyRows('ungrouped', account, acctRows)
+                      ),
                     ]
-                  }
-
-                  return [
-                    <tr key={`${routeGroup.id}-acct-${account.id}`} className="border-b border-border/50">
-                      <AccountHeaderLabelCell account={account} propertyCount={acctRows.length} />
-                      <td colSpan={weeks.length} className="bg-card" />
-                    </tr>,
-                    ...acctRows.map((row) => (
-                      <tr
-                        key={`${routeGroup.id}-${row.property.id}`}
-                        className="group border-b border-border/50 hover:bg-accent/20 transition-colors"
-                      >
-                        <PropertyLabelCell account={account} property={row.property} variant="nested" />
-                        {weeks.map((week) => renderWeekCell(row, week))}
-                      </tr>
-                    )),
-                  ]
-                }),
-              ])}
+                  : []),
+              ]}
             </tbody>
           </table>
         </div>

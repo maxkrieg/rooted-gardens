@@ -100,7 +100,7 @@ export function ScheduleListMobile({
     }
   }
 
-  if (!week || week.routeGroups.length === 0) {
+  if (!week || (week.routeGroups.length === 0 && week.ungrouped.length === 0)) {
     return <ScheduleEmptyState filtered={filtered} />
   }
   const currentWeek = week
@@ -312,6 +312,37 @@ export function ScheduleListMobile({
             </div>
           </div>
         ))}
+
+        {currentWeek.ungrouped.length > 0 && (
+          <div className="rounded-xl border border-[var(--clay)]/30 bg-card shadow-warm overflow-hidden">
+            {/* "Not on a route" — properties with no property_route_groups row.
+                These used to be silently dropped from the schedule entirely. */}
+            <div className="bg-[var(--clay)]/10 text-[var(--clay)] flex items-center justify-between px-4 py-2.5 border-b border-[var(--clay)]/30">
+              <span className="text-xs font-semibold uppercase tracking-widest">
+                Not on a route · {currentWeek.ungrouped.length}
+              </span>
+              <Link
+                href="/management/routes"
+                className="px-2 text-xs font-medium normal-case tracking-normal text-[var(--clay)]/80 hover:text-[var(--clay)]"
+              >
+                Put on a route →
+              </Link>
+            </div>
+            <div>
+              {groupRowsByAccount(currentWeek.ungrouped).map(({ account, rows: acctRows }, acctIdx) => {
+                if (acctRows.length === 1) {
+                  return renderStopRow(account, acctRows[0], 'merged', acctIdx > 0)
+                }
+                return (
+                  <div key={account.id}>
+                    <AccountHeaderRow account={account} propertyCount={acctRows.length} showTopBorder={acctIdx > 0} />
+                    {acctRows.map((row, rowIdx) => renderStopRow(account, row, 'nested', rowIdx > 0))}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {sheetRow && (

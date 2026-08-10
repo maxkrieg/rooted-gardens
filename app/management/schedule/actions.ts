@@ -3,13 +3,13 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { buildScheduleWeek, type ScheduleAssignment } from '@/lib/utils/schedule'
-import type { RouteGroup, ScheduleWeek, VisitWithCrew } from '@/types/app'
+import type { Account, Property, RouteGroup, ScheduleWeek, VisitWithCrew } from '@/types/app'
 import { toUserMessage } from '@/lib/errors'
 
 export async function getScheduleForWeek(weekStart: string): Promise<ScheduleWeek> {
   const supabase = await createClient()
 
-  const [routeGroupsResult, assignmentsResult, visitsResult] = await Promise.all([
+  const [routeGroupsResult, assignmentsResult, visitsResult, propertiesResult] = await Promise.all([
     supabase.from('route_groups').select('*').order('sort_order', { ascending: true }),
     supabase.from('property_route_groups').select(`
       property_id,
@@ -24,12 +24,17 @@ export async function getScheduleForWeek(weekStart: string): Promise<ScheduleWee
       .from('visits')
       .select(`*, visit_crew(*, employee:employees(*)), invoice:invoices(status, qbo_invoice_id)`)
       .eq('week_start', weekStart),
+    // Every property, so ones with no property_route_groups row can be
+    // surfaced as the schedule's "Not on a route" bucket instead of being
+    // silently dropped (buildScheduleWeek used to only iterate route groups).
+    supabase.from('properties').select('*, account:accounts(*)'),
   ])
 
   // Throw rather than return: the page fetches four weeks in parallel and a
   // partial window would be a misleading schedule, so management/error.tsx
   // catches it. Sanitized first — Next surfaces the message verbatim in dev.
-  const readError = routeGroupsResult.error ?? assignmentsResult.error ?? visitsResult.error
+  const readError =
+    routeGroupsResult.error ?? assignmentsResult.error ?? visitsResult.error ?? propertiesResult.error
   if (readError) {
     throw new Error(
       toUserMessage(readError, "The schedule didn't load.", '[getScheduleForWeek]'),
@@ -39,8 +44,14 @@ export async function getScheduleForWeek(weekStart: string): Promise<ScheduleWee
   const routeGroups = routeGroupsResult.data as RouteGroup[]
   const assignments = (assignmentsResult.data ?? []) as unknown as ScheduleAssignment[]
   const visits = (visitsResult.data ?? []) as unknown as VisitWithCrew[]
+  const allProperties = (propertiesResult.data ?? []) as unknown as Array<
+    Property & { account: Account }
+  >
 
-  return buildScheduleWeek(weekStart, routeGroups, assignments, visits)
+  const assignedPropertyIds = new Set(assignments.map((a) => a.property_id))
+  const ungroupedProperties = allProperties.filter((p) => !assignedPropertyIds.has(p.id))
+
+  return buildScheduleWeek(weekStart, routeGroups, assignments, visits, ungroupedProperties)
 }
 
 export async function createVisit(

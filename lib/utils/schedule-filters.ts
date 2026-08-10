@@ -137,7 +137,9 @@ export function filterScheduleWeeks(
   // when a filter emptied it, never when it simply has no properties yet.
   if (!hasActiveScheduleFilters(filters)) return weeks
 
-  // Structural pass — identical across every week.
+  // Structural pass — identical across every week. A route-group filter other
+  // than 'all' excludes the ungrouped bucket outright (it isn't in any
+  // route); an account filter still applies to it.
   const structural = weeks.map((week) => ({
     weekStart: week.weekStart,
     routeGroups: week.routeGroups
@@ -148,6 +150,12 @@ export function filterScheduleWeeks(
           (row) => filters.account === 'all' || row.account.id === filters.account
         ),
       })),
+    ungrouped:
+      filters.routeGroup === 'all'
+        ? week.ungrouped.filter(
+            (row) => filters.account === 'all' || row.account.id === filters.account
+          )
+        : [],
   }))
 
   const needsVisitPass = filters.crew !== 'all' || filters.status !== 'all'
@@ -166,6 +174,9 @@ export function filterScheduleWeeks(
         if (matchesVisitFilters(row, filters)) keep.add(row.property.id)
       }
     }
+    for (const row of week.ungrouped) {
+      if (matchesVisitFilters(row, filters)) keep.add(row.property.id)
+    }
   }
 
   return structural.map((week) => ({
@@ -176,5 +187,6 @@ export function filterScheduleWeeks(
         rows: g.rows.filter((row) => keep.has(row.property.id)),
       }))
       .filter((g) => g.rows.length > 0),
+    ungrouped: week.ungrouped.filter((row) => keep.has(row.property.id)),
   }))
 }

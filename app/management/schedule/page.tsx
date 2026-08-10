@@ -48,7 +48,10 @@ export default async function SchedulePage({
   // which fetches sessions client-side (avoids server-prop sync anti-pattern).
   // Derived from the unfiltered weeks so the realtime overlay stays complete.
   const visitIds = weeks
-    .flatMap((w) => w.routeGroups.flatMap((rg) => rg.rows.map((r) => r.visit?.id)))
+    .flatMap((w) => [
+      ...w.routeGroups.flatMap((rg) => rg.rows.map((r) => r.visit?.id)),
+      ...w.ungrouped.map((r) => r.visit?.id),
+    ])
     .filter((id): id is string => Boolean(id))
 
   const cookieStore = await cookies()
@@ -66,7 +69,12 @@ export default async function SchedulePage({
   // Filter options come from the unfiltered window, so they never collapse as
   // filters narrow the view.
   const routeGroupOptions = weeks[0]?.routeGroups.map((g) => g.routeGroup) ?? []
-  const accountOptions = dedupeAccounts(weeks.flatMap((w) => w.routeGroups.flatMap((g) => g.rows.map((r) => r.account))))
+  const accountOptions = dedupeAccounts(
+    weeks.flatMap((w) => [
+      ...w.routeGroups.flatMap((g) => g.rows.map((r) => r.account)),
+      ...w.ungrouped.map((r) => r.account),
+    ])
+  )
 
   // Desktop grid keeps a row that matches in any of the 4 weeks; the phone list
   // shows one week, so it matches against that week alone.

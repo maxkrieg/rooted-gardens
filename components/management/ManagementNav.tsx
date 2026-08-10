@@ -48,22 +48,51 @@ const SIDEBAR_LOGO_CLASSES =
 
 type NavItem = (typeof NAV_ITEMS)[number]
 
+/** Per-item aria-label for a nav badge — screen readers need the "what" a
+ *  bare number can't carry (bare "3" is meaningless without it). */
+function navBadgeLabel(href: string, count: number): string {
+  if (href === '/management/leads') return `${count} new lead${count === 1 ? '' : 's'}`
+  if (href === '/management/routes') return `${count} propert${count === 1 ? 'y' : 'ies'} not on a route`
+  return `${count}`
+}
+
+/** Combines every nav badge into the mobile hamburger's one alert dot — the
+ *  drawer is closed by default, so this is the only always-visible summary. */
+function mobileMenuAlertLabel(newLeadCount: number, unroutedCount: number): string | null {
+  const parts: string[] = []
+  if (newLeadCount > 0) parts.push(`${newLeadCount} new lead${newLeadCount === 1 ? '' : 's'}`)
+  if (unroutedCount > 0) {
+    parts.push(`${unroutedCount} propert${unroutedCount === 1 ? 'y' : 'ies'} not on a route`)
+  }
+  return parts.length > 0 ? parts.join(', ') : null
+}
+
 interface NavLinksProps {
   pathname: string
   items: NavItem[]
   onNavigate?: () => void
-  /** Live count of status='new' leads (task 9.7) — rendered as a pill on the
-   *  Leads item only. 0/undefined renders no badge. */
-  newLeadCount?: number
+  /** Live per-item counts (new leads, unrouted properties, …), keyed by href.
+   *  Rendered as a pill on that item; a missing/zero entry renders no badge. */
+  counts?: Record<string, number>
 }
 
-function NavLinks({ pathname, items, onNavigate, newLeadCount = 0 }: NavLinksProps) {
+function NavLinks({ pathname, items, onNavigate, counts = {} }: NavLinksProps) {
   return (
     <nav className="flex-1 overflow-y-auto py-3 px-2">
       <ul className="space-y-0.5">
         {items.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(href + '/')
-          const badge = href === '/management/leads' && newLeadCount > 0 ? newLeadCount : null
+          const rawCount = counts[href] ?? 0
+          const badge = rawCount > 0 ? rawCount : null
+          const badgeLabel = badge === null ? '' : navBadgeLabel(href, badge)
+          // Routes gets the clay "needs attention" tone (same hue as the
+          // Unrouted panel) rather than the neutral primary-green "new item"
+          // pill Leads uses — a property not on a route is a gap to close,
+          // not just something new to look at.
+          const badgeToneClass =
+            href === '/management/routes'
+              ? 'bg-[var(--clay)] text-white'
+              : 'bg-primary text-primary-foreground'
           return (
             <li key={href}>
               <Link
@@ -83,8 +112,11 @@ function NavLinks({ pathname, items, onNavigate, newLeadCount = 0 }: NavLinksPro
                 <span className="flex-1">{label}</span>
                 {badge !== null && (
                   <span
-                    className="ml-auto shrink-0 rounded-full bg-primary px-1.5 min-w-5 text-center text-[11px] font-semibold text-primary-foreground tabular-nums"
-                    aria-label={`${badge} new lead${badge === 1 ? '' : 's'}`}
+                    className={cn(
+                      'ml-auto shrink-0 rounded-full px-1.5 min-w-5 text-center text-[11px] font-semibold tabular-nums',
+                      badgeToneClass,
+                    )}
+                    aria-label={badgeLabel}
                   >
                     {badge > 9 ? '9+' : badge}
                   </span>
@@ -132,15 +164,30 @@ interface ManagementNavProps {
    *  a flash of "0" while the realtime effect's first count query is in
    *  flight. See app/management/layout.tsx. */
   initialNewLeadCount?: number
+  /** Server-fetched starting count of properties with no property_route_groups
+   *  row — same "avoid a 0-flash" purpose as initialNewLeadCount, for the
+   *  Routes badge. See app/management/layout.tsx. */
+  initialUnroutedCount?: number
 }
 
-export function ManagementNav({ userEmail, role, initialNewLeadCount = 0 }: ManagementNavProps) {
+export function ManagementNav({
+  userEmail,
+  role,
+  initialNewLeadCount = 0,
+  initialUnroutedCount = 0,
+}: ManagementNavProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [newLeadCount, setNewLeadCount] = useState(initialNewLeadCount)
+  const [unroutedCount, setUnroutedCount] = useState(initialUnroutedCount)
   const lastToastAt = useRef<number>(0)
+
+  const navCounts = {
+    '/management/leads': newLeadCount,
+    '/management/routes': unroutedCount,
+  }
 
   // Role-gated items (Leads = owner/lead, Team = owner-only) are hidden from
   // everyone else.
@@ -211,6 +258,37 @@ export function ManagementNav({ userEmail, role, initialNewLeadCount = 0 }: Mana
     }
   }, [role, router])
 
+  // Unrouted-property notification (the Routes page's UnroutedPanel gap made
+  // visible in the nav). Same shape as the leads effect above: re-query the
+  // live count on every relevant change rather than track a local delta, and
+  // for the same reason — a Server Action's revalidatePath('/management/routes')
+  // doesn't reach this sidebar. Two tables can change the count: assigning or
+  // unassigning a property (property_route_groups) and adding/removing a
+  // property outright (properties). The Routes nav item has no `roles`
+  // restriction, so this runs for every management role that reaches this
+  // component (owner/lead/accountant — crew never mount it, see proxy.ts).
+  useEffect(() => {
+    const supabase = createClient()
+
+    async function refreshCount() {
+      const [propertiesCount, routedCount] = await Promise.all([
+        supabase.from('properties').select('id', { count: 'exact', head: true }),
+        supabase.from('property_route_groups').select('property_id', { count: 'exact', head: true }),
+      ])
+      setUnroutedCount(Math.max((propertiesCount.count ?? 0) - (routedCount.count ?? 0), 0))
+    }
+
+    const channel = supabase
+      .channel('management_unrouted_properties')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'property_route_groups' }, refreshCount)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'properties' }, refreshCount)
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
+
   async function handleLogout() {
     const supabase = createClient()
     await supabase.auth.signOut()
@@ -242,7 +320,7 @@ export function ManagementNav({ userEmail, role, initialNewLeadCount = 0 }: Mana
             </kbd>
           </button>
         </div>
-        <NavLinks pathname={pathname} items={navItems} newLeadCount={newLeadCount} />
+        <NavLinks pathname={pathname} items={navItems} counts={navCounts} />
         <SidebarFooter userEmail={userEmail} onLogout={handleLogout} />
       </aside>
 
@@ -258,16 +336,17 @@ export function ManagementNav({ userEmail, role, initialNewLeadCount = 0 }: Mana
           className="relative shrink-0 -ml-1.5"
           onClick={() => setMobileOpen(true)}
           aria-label={
-            newLeadCount > 0
-              ? `Open navigation menu — ${newLeadCount} new lead${newLeadCount === 1 ? '' : 's'}`
+            mobileMenuAlertLabel(newLeadCount, unroutedCount)
+              ? `Open navigation menu — ${mobileMenuAlertLabel(newLeadCount, unroutedCount)}`
               : 'Open navigation menu'
           }
         >
           <Menu className="h-5 w-5" />
           {/* The drawer is closed by default, so a badge only inside it is
               invisible on a phone — the owners' primary device. This dot is
-              the mobile-header-visible half of the same 9.7 count. */}
-          {newLeadCount > 0 && (
+              the mobile-header-visible summary of every nav badge combined
+              (new leads + unrouted properties). */}
+          {(newLeadCount > 0 || unroutedCount > 0) && (
             <span
               aria-hidden
               className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary ring-2 ring-card"
@@ -310,7 +389,7 @@ export function ManagementNav({ userEmail, role, initialNewLeadCount = 0 }: Mana
             pathname={pathname}
             items={navItems}
             onNavigate={() => setMobileOpen(false)}
-            newLeadCount={newLeadCount}
+            counts={navCounts}
           />
           <SidebarFooter userEmail={userEmail} onLogout={handleLogout} />
         </SheetContent>

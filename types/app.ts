@@ -246,7 +246,8 @@ export type RouteGroupWithProperties = RouteGroup & {
 export type SchedulePropertyRow = {
   property: Property
   account: Account
-  routeGroup: RouteGroup
+  /** null = the property isn't on any route group ("ungrouped" bucket below). */
+  routeGroup: RouteGroup | null
   visit: VisitWithCrew | null
 }
 
@@ -256,6 +257,14 @@ export type ScheduleWeek = {
     routeGroup: RouteGroup
     rows: SchedulePropertyRow[]
   }>
+  /**
+   * Properties with no property_route_groups row — invisible on the schedule
+   * until this bucket existed (buildScheduleWeek used to only iterate route
+   * groups, so an unrouted property, and any visit on it, was silently
+   * dropped). Always present here, even when empty, unlike route group rows
+   * which are omitted entirely when a group has none.
+   */
+  ungrouped: SchedulePropertyRow[]
 }
 
 // ─── Photos ───────────────────────────────────────────────────────────────────

@@ -1,7 +1,8 @@
-import { Route } from 'lucide-react'
+import { Route, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { RouteGroupCard } from '@/components/management/RouteGroupCard'
 import { RouteGroupSheet } from '@/components/management/RouteGroupSheet'
+import { UnroutedPanel } from '@/components/management/UnroutedPanel'
 import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
 import type { Property, PropertyWithAccount, RouteGroup } from '@/types/app'
@@ -88,6 +89,9 @@ export default async function RoutesPage() {
     }
   })
 
+  const unrouted = allProperties.filter((p) => !p.currentRouteGroup)
+  const routedCount = allProperties.length - unrouted.length
+
   // ── Render ────────────────────────────────────────────────────────────
 
   return (
@@ -101,10 +105,25 @@ export default async function RoutesPage() {
         <RouteGroupSheet />
       </div>
 
-      <p className="text-sm text-muted-foreground -mt-2">
-        Geographic clusters that organize properties into daily crew routes.
-        Each property belongs to one route group at a time.
-      </p>
+      <div className="-mt-2 space-y-0.5">
+        {allProperties.length > 0 &&
+          (unrouted.length === 0 ? (
+            <p className="flex items-center gap-1.5 text-sm font-medium text-[--sap]">
+              <Check className="h-4 w-4 shrink-0" />
+              Every property is on a route.
+            </p>
+          ) : (
+            <p className="text-sm font-medium text-foreground">
+              {routedCount} of {allProperties.length} properties are on a route.
+            </p>
+          ))}
+        <p className="text-sm text-muted-foreground">
+          Geographic clusters that organize properties into daily crew routes.
+          Each property belongs to one route group at a time.
+        </p>
+      </div>
+
+      <UnroutedPanel properties={unrouted} routeGroups={routeGroups} />
 
       {/* Route group cards */}
       {routeGroups.length === 0 ? (

@@ -2,11 +2,18 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { routeGroupFormSchema, type RouteGroupFormValues } from '@/lib/validators/routeGroup'
+import {
+  routeGroupFormSchema,
+  bulkAssignPropertiesSchema,
+  type RouteGroupFormValues,
+} from '@/lib/validators/routeGroup'
 import { toUserMessage } from '@/lib/errors'
 
 function revalidate() {
   revalidatePath('/management/routes')
+  // Route membership changes what the schedule renders (the ungrouped
+  // bucket, or which route group a property's row falls under).
+  revalidatePath('/management/schedule')
 }
 
 // ─── Route group CRUD ────────────────────────────────────────────────────────
@@ -157,6 +164,41 @@ export async function assignProperty(
 
   if (error) {
     return { error: toUserMessage(error, 'Could not assign the property.', '[assignProperty]') }
+  }
+
+  revalidate()
+  return {}
+}
+
+/**
+ * Assign several properties to a route group at once — the Unrouted panel's
+ * "N selected → Put on a route" bulk action. Same upsert/onConflict shape as
+ * assignProperty, one row per id, so it also moves any of the ids that were
+ * already assigned elsewhere.
+ */
+export async function assignProperties(
+  propertyIds: string[],
+  routeGroupId: string,
+): Promise<{ error?: string }> {
+  const parsed = bulkAssignPropertiesSchema.safeParse({ propertyIds, routeGroupId })
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Invalid selection' }
+  }
+
+  const supabase = await createClient()
+
+  const rows = parsed.data.propertyIds.map((propertyId) => ({
+    property_id: propertyId,
+    route_group_id: parsed.data.routeGroupId,
+    sort_order: 0,
+  }))
+
+  const { error } = await supabase
+    .from('property_route_groups')
+    .upsert(rows, { onConflict: 'property_id' })
+
+  if (error) {
+    return { error: toUserMessage(error, 'Could not assign the properties.', '[assignProperties]') }
   }
 
   revalidate()
