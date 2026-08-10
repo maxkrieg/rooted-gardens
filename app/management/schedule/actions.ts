@@ -48,6 +48,33 @@ export async function getScheduleForWeek(weekStart: string): Promise<ScheduleWee
     Property & { account: Account }
   >
 
+  // Completion-log photo counts (type='visit', matching VisitLogger's upload —
+  // 'plan' and 'how_to' photos aren't logged during a stop and shouldn't light
+  // up the grid's Photos indicator). Only completed visits carry a status a
+  // crew photo would attach to, but querying by visit id here is cheap and
+  // keeps this independent of status.
+  const completedVisitIds = visits.filter((v) => v.status === 'completed').map((v) => v.id)
+  if (completedVisitIds.length > 0) {
+    const { data: photoRows, error: photosError } = await supabase
+      .from('photos')
+      .select('visit_id')
+      .eq('type', 'visit')
+      .in('visit_id', completedVisitIds)
+    if (photosError) {
+      throw new Error(
+        toUserMessage(photosError, "The schedule didn't load.", '[getScheduleForWeek]'),
+      )
+    }
+    const countByVisitId = new Map<string, number>()
+    for (const row of photoRows ?? []) {
+      if (!row.visit_id) continue
+      countByVisitId.set(row.visit_id, (countByVisitId.get(row.visit_id) ?? 0) + 1)
+    }
+    for (const visit of visits) {
+      visit.photo_count = countByVisitId.get(visit.id) ?? 0
+    }
+  }
+
   const assignedPropertyIds = new Set(assignments.map((a) => a.property_id))
   const ungroupedProperties = allProperties.filter((p) => !assignedPropertyIds.has(p.id))
 

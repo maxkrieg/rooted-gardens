@@ -16,7 +16,7 @@ import { useVisitTimings } from '@/components/management/SessionsProvider'
 import { isVisitInProgress, isVisitMissed, formatElapsed } from '@/lib/utils/visits'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { FilePen } from 'lucide-react'
+import { FilePen, Camera } from 'lucide-react'
 import { AccountPriceMeta, FrequencyBadge, BillingTypeBadge, InvoiceStatusBadge } from '@/components/management/badges'
 import type {
   Account,
@@ -528,8 +528,27 @@ function ScheduleCell({
             </span>
           </div>
           {visit.status === 'completed' && visit.ended_at && (
-            <span className="text-[11px] opacity-80 tabular-nums">
-              {format(parseISO(visit.ended_at), 'MMM d')}
+            <span className="flex items-center gap-1">
+              <span className="text-[11px] opacity-80 tabular-nums">
+                {format(parseISO(visit.ended_at), 'MMM d')}
+              </span>
+              {Boolean(visit.photo_count) && (
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span
+                        className="inline-flex items-center gap-0.5 opacity-70"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Camera className="w-3 h-3" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      {visit.photo_count === 1 ? '1 photo' : `${visit.photo_count} photos`}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
             </span>
           )}
           {visit.status === 'completed' && visit.invoice && (

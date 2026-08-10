@@ -212,10 +212,14 @@ export type VisitInvoiceInfo = Pick<Invoice, 'status' | 'qbo_invoice_id'>
 /** Visit with crew assignment/completion rows and the associated employees.
  *  `invoice` is optional: only queries that embed it (schedule grid, account
  *  recent-visits) populate it; it's null for uninvoiced visits or under RLS for
- *  roles that can't read invoices. */
+ *  roles that can't read invoices.
+ *  `photo_count` is likewise optional: only the schedule grid query attaches
+ *  it (count of completion-log photos, i.e. `photos.type = 'visit'`, for the
+ *  Photos indicator on completed cells) — undefined elsewhere. */
 export type VisitWithCrew = Visit & {
   visit_crew: VisitCrewWithEmployee[]
   invoice?: VisitInvoiceInfo | null
+  photo_count?: number
 }
 
 /** Full visit: property, account, crew, and vehicle. */
