@@ -210,7 +210,7 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
           style={{ maxHeight: 'calc(100dvh - var(--schedule-sticky-h, 0px) - 6.5rem)' }}
         >
           <table className="min-w-full border-collapse">
-            <thead className="sticky top-0 z-20 bg-card border-b border-border">
+            <thead className="sticky top-0 z-20 bg-card border-b border-border shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)]">
               <tr>
                 <th
                   className={cn(

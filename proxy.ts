@@ -88,7 +88,9 @@ export async function proxy(request: NextRequest) {
 
   // Authenticated user on the login page → their dashboard home.
   // Clear the role cookie so a previously-cached role from another user can't carry over.
-  if (user && pathname === '/login') {
+  // Exempt ?error= — that's the dead-end the no-role branch below redirects to;
+  // redirecting away from it would recreate the loop it exists to break.
+  if (user && pathname === '/login' && !request.nextUrl.searchParams.has('error')) {
     const url = request.nextUrl.clone()
     url.pathname = '/management/dashboard'
     const response = NextResponse.redirect(url)
@@ -134,10 +136,16 @@ export async function proxy(request: NextRequest) {
       }
     }
 
-    // No employee record linked to this auth user — deny access to all protected routes.
+    // No employee record linked to this auth user — deny access to all protected
+    // routes. Terminal, not a bounce: a plain /login redirect would hit the
+    // "authenticated user on login" branch above and get sent right back to
+    // /management/dashboard, which re-enters this same check — an infinite
+    // redirect loop whenever SUPABASE_SERVICE_ROLE_KEY is unset or the auth
+    // user has no employees row. ?error= is what that branch exempts.
     if (!role) {
       const url = request.nextUrl.clone()
       url.pathname = '/login'
+      url.search = '?error=no-employee-record'
       const response = NextResponse.redirect(url)
       response.cookies.delete(ROLE_COOKIE)
       return response
@@ -180,9 +188,14 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     // Run on all routes except Next.js internals and static assets.
+    // `_next/` (not just `_next/static|_next/image`) excludes every internal
+    // request — RSC payloads, HMR-adjacent fetches, etc. — from paying a
+    // Supabase getUser() round-trip; those still ran the proxy before and were
+    // measured contributing to a Turbopack dev-server livelock (900%+ CPU).
+    // Session refresh still happens on ordinary page navigations, which match.
     // `serwist` and `manifest.json` are excluded so the service-worker and
     // manifest fetches don't each pay for a Supabase getUser() round-trip —
     // and so the worker can never be redirected to /login.
-    '/((?!_next/static|_next/image|favicon.ico|serwist/|manifest.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/|favicon.ico|serwist/|manifest.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

@@ -30,8 +30,15 @@ function LoginForm({
   // `?detail=` used to carry the raw GoTrue message straight into the page; the
   // callback no longer sends it. An expired or already-used link is by far the
   // most common cause, so name it rather than saying "sign-in failed".
+  // `no-employee-record` is a distinct case from proxy.ts: the sign-in itself
+  // worked, but there's no `employees` row for this auth user — requesting a
+  // new magic link would just loop back here, so say that instead.
   const [error, setError] = useState<string | null>(
-    params.error ? 'That sign-in link didn’t work. It may have expired — request a new one below.' : null
+    params.error === 'no-employee-record'
+      ? 'You’re signed in, but this account isn’t set up as a team member yet. Ask an owner to add you.'
+      : params.error
+        ? 'That sign-in link didn’t work. It may have expired — request a new one below.'
+        : null
   )
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {

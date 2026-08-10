@@ -808,6 +808,12 @@ CRON_SECRET=                    # Vercel Cron sends this as `Authorization: Bear
 
 # App
 NEXT_PUBLIC_APP_URL=            # https://yourapp.vercel.app
+NEXT_PUBLIC_ENABLE_SW=          # '1' to register the service worker in dev (see
+                                 # components/ServiceWorkerRegistration.tsx). Unset
+                                 # in dev, the worker double-fetches every changing
+                                 # Turbopack chunk via defaultCache's
+                                 # StaleWhileRevalidate — found feeding a dev-server
+                                 # CPU livelock. Always on in production regardless.
 ```
 
 ---
