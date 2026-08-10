@@ -13,6 +13,7 @@ import { ScheduleGrid } from '@/components/management/ScheduleGrid'
 import { ScheduleListMobile } from '@/components/management/ScheduleListMobile'
 import { ScheduleNav } from '@/components/management/ScheduleNav'
 import { ScheduleFilterBar } from '@/components/management/ScheduleFilterBar'
+import { ScheduleStickyBar } from '@/components/management/ScheduleStickyBar'
 import { SessionsProvider } from '@/components/management/SessionsProvider'
 import { DeepLinkedVisitSheet } from '@/components/management/DeepLinkedVisitSheet'
 import type { Account, EmployeeRole } from '@/types/app'
@@ -86,24 +87,24 @@ export default async function SchedulePage({
     // No p-4 lg:p-6 here — the management layout already applies it, and
     // doubling it up cost every page 32px of usable width on a phone.
     <div>
-      {/* Wraps rather than overflows: at 375px the title plus the nav
-          (three 44px buttons + label, plus the conditional "Today" button)
-          doesn't fit on one line. */}
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 mb-4">
-        <h1 className="min-w-0 truncate font-display text-2xl font-semibold text-foreground">
-          Schedule
-        </h1>
-        <ScheduleNav windowStart={format(base, 'yyyy-MM-dd')} filters={filters} />
-      </div>
-      <div className="mb-6">
-        <ScheduleFilterBar
-          filters={filters}
-          week={format(base, 'yyyy-MM-dd')}
-          routeGroups={routeGroupOptions}
-          accounts={accountOptions}
-          employees={employees}
-        />
-      </div>
+      <h1 className="mb-3 min-w-0 truncate font-display text-2xl font-semibold text-foreground">
+        Schedule
+      </h1>
+      {/* Sticky filters + week nav: pinned to the top of the viewport on
+          scroll so a long route-group list never loses this context. Wraps
+          rather than overflows: at 375px the two don't fit on one line. */}
+      <ScheduleStickyBar>
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <ScheduleFilterBar
+            filters={filters}
+            week={format(base, 'yyyy-MM-dd')}
+            routeGroups={routeGroupOptions}
+            accounts={accountOptions}
+            employees={employees}
+          />
+          <ScheduleNav windowStart={format(base, 'yyyy-MM-dd')} filters={filters} />
+        </div>
+      </ScheduleStickyBar>
       <SessionsProvider visitIds={visitIds}>
         <div className="hidden lg:block">
           <ScheduleGrid

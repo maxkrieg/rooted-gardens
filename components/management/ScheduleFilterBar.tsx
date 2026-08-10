@@ -72,7 +72,7 @@ export function ScheduleFilterBar({
     router.push(`/management/schedule?${params.toString()}`)
   }
 
-  const controlClass = 'h-10 w-[calc(50%-0.25rem)] sm:w-44'
+  const controlClass = 'h-9 w-[calc(50%-0.25rem)] sm:w-40'
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -179,7 +179,7 @@ export function ScheduleFilterBar({
         <Button
           variant="ghost"
           size="sm"
-          className="h-10 px-3 text-muted-foreground"
+          className="h-9 px-3 text-muted-foreground"
           onClick={() => router.push(`/management/schedule?week=${week}`)}
         >
           <X className="mr-1 h-4 w-4" />

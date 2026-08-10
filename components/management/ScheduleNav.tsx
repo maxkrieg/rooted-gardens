@@ -52,7 +52,7 @@ export function ScheduleNav({ windowStart, filters }: ScheduleNavProps) {
         <Button
           variant="outline"
           size="sm"
-          className="text-xs"
+          className="h-9 text-xs"
           onClick={() => goToWeek(format(currentWeekStart, 'yyyy-MM-dd'))}
         >
           Today
@@ -62,6 +62,7 @@ export function ScheduleNav({ windowStart, filters }: ScheduleNavProps) {
       <Button
         variant="outline"
         size="icon"
+        className="h-9 w-9"
         onClick={() => navigate(-1)}
         aria-label="Previous week"
       >
@@ -80,6 +81,7 @@ export function ScheduleNav({ windowStart, filters }: ScheduleNavProps) {
       <Button
         variant="outline"
         size="icon"
+        className="h-9 w-9"
         onClick={() => navigate(1)}
         aria-label="Next week"
       >
@@ -88,7 +90,7 @@ export function ScheduleNav({ windowStart, filters }: ScheduleNavProps) {
 
       <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
         <PopoverTrigger asChild>
-          <Button variant="outline" size="icon" aria-label="Open calendar">
+          <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Open calendar">
             <CalendarIcon className="h-4 w-4" />
           </Button>
         </PopoverTrigger>

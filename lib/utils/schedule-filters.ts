@@ -1,14 +1,9 @@
-import { isVisitMissed } from '@/lib/utils/visits'
 import type { ScheduleWeek, SchedulePropertyRow, VisitWithCrew } from '@/types/app'
 
 /**
  * The management schedule's filter state. Lives in the URL (`?routeGroup=&account=
  * &crew=&status=`) alongside `?week=`, so a filtered view is shareable and survives
  * week navigation and refresh.
- *
- * Kept in its own module rather than `lib/utils/schedule.ts` because the status
- * filter needs `isVisitMissed`, and `lib/utils/visits.ts` already imports
- * `getWeekStart` from `schedule.ts` — folding this in would create a cycle.
  */
 export type ScheduleFilterValues = {
   /** 'all' | a route_groups.id */
@@ -29,16 +24,13 @@ export const EMPTY_SCHEDULE_FILTERS: ScheduleFilterValues = {
 }
 
 /**
- * Status options. Two of these aren't `visits.status` values: `unscheduled` (no visit
- * row for that week — the empty "+" cells) and `missed` (a still-scheduled visit whose
- * week has passed, which the grid already labels "Missed"). Scheduled excludes missed
- * so the two partition cleanly and match what's rendered on screen.
+ * Status options. `unscheduled` isn't a `visits.status` value — it's the empty
+ * "+" cells (no visit row for that week).
  */
 export const SCHEDULE_STATUS_FILTERS = [
   'all',
   'unscheduled',
   'scheduled',
-  'missed',
   'completed',
   'skipped',
 ] as const
@@ -49,7 +41,6 @@ export const SCHEDULE_STATUS_FILTER_LABELS: Record<ScheduleStatusFilter, string>
   all: 'All statuses',
   unscheduled: 'Unscheduled',
   scheduled: 'Scheduled',
-  missed: 'Missed',
   completed: 'Completed',
   skipped: 'Skipped',
 }
@@ -107,9 +98,6 @@ function matchesCrew(visit: VisitWithCrew | null, employeeId: string): boolean {
 function matchesStatus(visit: VisitWithCrew | null, status: string): boolean {
   if (status === 'unscheduled') return visit === null
   if (!visit) return false
-  const missed = isVisitMissed(visit)
-  if (status === 'missed') return missed
-  if (status === 'scheduled') return visit.status === 'scheduled' && !missed
   return visit.status === status
 }
 

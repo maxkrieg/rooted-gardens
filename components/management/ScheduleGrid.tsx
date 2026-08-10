@@ -13,7 +13,7 @@ import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
 import { ScheduleEmptyState } from '@/components/management/ScheduleEmptyState'
 import { useVisitTimings } from '@/components/management/SessionsProvider'
-import { isVisitInProgress, isVisitMissed, formatElapsed } from '@/lib/utils/visits'
+import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { FilePen, Camera } from 'lucide-react'
@@ -130,13 +130,13 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
     const inProgress = visit
       ? isVisitInProgress({ started_at: effectiveStartedAt, ended_at: effectiveEndedAt })
       : false
-    const missed = visit ? isVisitMissed(visit) && !inProgress : false
+    // week.weekStart and currentWeekStart are both 'yyyy-MM-dd', so this sorts lexicographically.
+    const isPastWeek = week.weekStart < currentWeekStart
     return (
-      <td key={week.weekStart} className="px-2 py-2 align-top">
+      <td key={week.weekStart} className={cn('px-2 py-2 align-top', isPastWeek && 'bg-foreground/[0.04]')}>
         <ScheduleCell
           visit={visit}
           inProgress={inProgress}
-          missed={missed}
           startedAt={effectiveStartedAt}
           isCreating={creatingKey === cellKey}
           onClick={() => handleCellClick(row, week.weekStart, visit)}
@@ -191,14 +191,30 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
 
   return (
     <>
-      <div className="rounded-xl border border-border overflow-hidden bg-card shadow-warm">
-        <div className="overflow-x-auto">
+      <div className="rounded-xl border border-border overflow-clip bg-card shadow-warm">
+        {/* A bounded, internally-scrolling pane rather than relying on page
+            scroll — CSS won't allow a horizontally-scrollable ancestor (needed
+            for narrow viewports) to also host a <thead> that's sticky to the
+            *page* (any ancestor with overflow-x set becomes a scroll container
+            on both axes, which hijacks position:sticky's reference frame away
+            from the real viewport). Giving this div its own bounded height +
+            overflow-auto sidesteps that entirely: it's a genuine scroll
+            container, so `sticky top-0` on the header works as the ordinary,
+            well-supported case. Height caps at the viewport minus the sticky
+            filter bar above it (--schedule-sticky-h, published by
+            ScheduleStickyBar) and a fixed allowance for the title/padding
+            above that and breathing room below; shorter schedules just don't
+            reach the cap and never show a scrollbar. */}
+        <div
+          className="overflow-auto"
+          style={{ maxHeight: 'calc(100dvh - var(--schedule-sticky-h, 0px) - 6.5rem)' }}
+        >
           <table className="min-w-full border-collapse">
             <thead className="sticky top-0 z-20 bg-card border-b border-border">
               <tr>
                 <th
                   className={cn(
-                    'sticky left-0 z-30 bg-card px-4 py-3 text-left shadow-[inset_-1px_0_0_0_var(--border)]',
+                    'sticky left-0 z-30 bg-card px-4 py-2 text-left shadow-[inset_-1px_0_0_0_var(--border)]',
                     LABEL_COL_WIDTH,
                   )}
                 >
@@ -208,13 +224,15 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
                 </th>
                 {weeks.map((week) => {
                   const isCurrent = week.weekStart === currentWeekStart
+                  const isPastWeek = week.weekStart < currentWeekStart
                   const start = parseISO(week.weekStart)
                   return (
                     <th
                       key={week.weekStart}
                       className={cn(
-                        'min-w-[160px] px-3 py-3 text-center',
-                        isCurrent ? 'text-primary' : 'text-muted-foreground'
+                        'min-w-[160px] px-3 py-2 text-center',
+                        isCurrent ? 'text-primary' : 'text-muted-foreground',
+                        isPastWeek && 'bg-foreground/[0.04]'
                       )}
                     >
                       <Link
@@ -408,7 +426,6 @@ function AccountHeaderLabelCell({ account, propertyCount }: { account: Account; 
 function ScheduleCell({
   visit,
   inProgress,
-  missed,
   startedAt,
   isCreating,
   onClick,
@@ -416,7 +433,6 @@ function ScheduleCell({
 }: {
   visit: VisitWithCrew | null
   inProgress: boolean
-  missed: boolean
   startedAt: string | null
   isCreating: boolean
   onClick: () => void
@@ -479,7 +495,7 @@ function ScheduleCell({
       className={cn(
         base,
         'relative',
-        missed ? 'status-missed' : `status-${visit.status}`,
+        `status-${visit.status}`,
         'cursor-pointer hover:brightness-95',
       )}
     >
@@ -524,7 +540,7 @@ function ScheduleCell({
           <div className="flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />
             <span className="text-[11px] font-semibold uppercase tracking-wider leading-tight">
-              {missed ? 'Missed' : visit.status}
+              {visit.status}
             </span>
           </div>
           {visit.status === 'completed' && visit.ended_at && (

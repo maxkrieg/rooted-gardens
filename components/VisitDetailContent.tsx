@@ -42,7 +42,7 @@ import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { useActiveVehicles } from '@/hooks/crew/useActiveVehicles'
 import { useUpdateVisitVehicle } from '@/hooks/crew/useUpdateVisitVehicle'
 import { useRevertVisitToScheduled } from '@/hooks/crew/useRevertVisitToScheduled'
-import { isVisitInProgress, isVisitMissed, formatElapsed } from '@/lib/utils/visits'
+import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
@@ -148,7 +148,6 @@ export function VisitDetailContent({
   const isFinalVisit = visit.status === 'completed' || visit.status === 'skipped'
 
   const inProgress = isVisitInProgress({ started_at: visit.started_at, ended_at: visit.ended_at })
-  const missed = isVisitMissed(visit) && !inProgress
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(property.address)}`
   // The Property Notes card used to be gated on having at least one note. It now
   // always hosts the property Photos section, so it always has something to show
@@ -261,7 +260,7 @@ export function VisitDetailContent({
 
       {/* Status row — read-only display, shown to everyone */}
       <div className="flex items-center gap-3">
-        {!canManage && <VisitStatusBadge status={visit.status} missed={missed} />}
+        {!canManage && <VisitStatusBadge status={visit.status} />}
         {inProgress && visit.started_at && (
           <div className="flex items-center gap-1.5" style={{ color: 'var(--clay)' }}>
             <span className="relative flex h-2 w-2 shrink-0">
@@ -281,10 +280,7 @@ export function VisitDetailContent({
       {/* Status control — owner/lead only; hidden for crew, read-only (badge above) for accountant */}
       {canManage && (
         <div className="space-y-1.5">
-          <div className="flex items-center gap-2">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</p>
-            {missed && <VisitStatusBadge status="scheduled" missed />}
-          </div>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</p>
           <Select value={visit.status} onValueChange={(v) => handleStatusSelect(v as VisitStatus)}>
             <SelectTrigger>
               <SelectValue />

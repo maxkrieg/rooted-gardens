@@ -11,7 +11,7 @@ import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
 import { ScheduleEmptyState } from '@/components/management/ScheduleEmptyState'
 import { useVisitTimings } from '@/components/management/SessionsProvider'
-import { isVisitInProgress, isVisitMissed, formatElapsed } from '@/lib/utils/visits'
+import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
 import { groupRowsByAccount } from '@/lib/utils/schedule'
 import { syncVisitUrlParam } from '@/lib/utils/visit-url'
 import { formatAccountPrice } from '@/lib/utils/accounts'
@@ -211,7 +211,7 @@ export function ScheduleListMobile({
 
               {row.visit ? (
                 <div className="flex flex-col items-end gap-1">
-                  <VisitStatusBadge status={row.visit.status} missed={isVisitMissed(row.visit)} />
+                  <VisitStatusBadge status={row.visit.status} />
                   {row.visit.status === 'completed' && row.visit.invoice && (
                     <InvoiceStatusBadge status={row.visit.invoice.status} withIcon />
                   )}
