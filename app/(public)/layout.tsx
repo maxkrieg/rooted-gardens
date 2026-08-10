@@ -32,22 +32,43 @@ async function hasAuthCookie(): Promise<boolean> {
   return store.getAll().some((c) => c.name.includes('-auth-token'))
 }
 
-async function resolveCanEdit(): Promise<boolean> {
-  if (!(await hasAuthCookie())) return false
+// Mirrors proxy.ts's ROLE_HOME — where a signed-in employee lands inside the
+// app. Kept as its own small copy here rather than importing proxy.ts (which
+// runs in the Edge runtime) into this Node.js layout.
+const STAFF_HOME: Record<string, string> = {
+  owner: '/management/dashboard',
+  lead: '/management/dashboard',
+  accountant: '/management/billing',
+  crew: '/crew/schedule',
+}
+
+/**
+ * Resolves who's viewing the public site: `canEdit` gates the owner-only
+ * inline WYSIWYG editor (task 9.2.5); `staffHome` is non-null for *any*
+ * signed-in employee (owner/lead/crew/accountant) and points the header's
+ * "Staff log in" link at their actual landing page instead, once they're
+ * already signed in.
+ */
+async function resolveViewer(): Promise<{ canEdit: boolean; staffHome: string | null }> {
+  if (!(await hasAuthCookie())) return { canEdit: false, staffHome: null }
 
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user) return false
+  if (!user) return { canEdit: false, staffHome: null }
 
   const { data: employee } = await supabase
     .from('employees')
     .select('role')
     .eq('user_id', user.id)
     .single()
+  if (!employee) return { canEdit: false, staffHome: null }
 
-  return employee?.role === 'owner'
+  return {
+    canEdit: employee.role === 'owner',
+    staffHome: STAFF_HOME[employee.role] ?? null,
+  }
 }
 
 /**
@@ -57,12 +78,12 @@ async function resolveCanEdit(): Promise<boolean> {
  * owner-only edit affordances without each one re-deriving it.
  */
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
-  const canEdit = await resolveCanEdit()
+  const { canEdit, staffHome } = await resolveViewer()
 
   return (
     <EditModeProvider canEdit={canEdit}>
       <div className="min-h-[100dvh] bg-background flex flex-col">
-        <PublicHeader />
+        <PublicHeader staffHome={staffHome} />
         <main className="flex-1">{children}</main>
         <PublicFooter />
       </div>

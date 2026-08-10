@@ -40,7 +40,7 @@ function EditToggle({ className }: { className?: string }) {
  * active-link and mobile-drawer idiom of `components/management/ManagementNav.tsx`,
  * but there's no role gating — every link here is reachable signed-out.
  */
-export function PublicHeader() {
+export function PublicHeader({ staffHome }: { staffHome: string | null }) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
 
@@ -76,9 +76,15 @@ export function PublicHeader() {
 
         <div className="ml-auto hidden md:flex items-center gap-3">
           <EditToggle />
-          <Link href="/login" className="text-xs text-muted-foreground hover:text-foreground">
-            Staff log in
-          </Link>
+          {staffHome ? (
+            <Link href={staffHome} className="text-xs text-muted-foreground hover:text-foreground">
+              Open the app
+            </Link>
+          ) : (
+            <Link href="/login" className="text-xs text-muted-foreground hover:text-foreground">
+              Staff log in
+            </Link>
+          )}
           <Button asChild size="sm">
             <Link href="/contact">Get started</Link>
           </Button>
@@ -133,11 +139,11 @@ export function PublicHeader() {
               </Link>
             </Button>
             <Link
-              href="/login"
+              href={staffHome ?? '/login'}
               onClick={() => setOpen(false)}
               className="block text-center text-xs text-muted-foreground hover:text-foreground"
             >
-              Staff log in
+              {staffHome ? 'Open the app' : 'Staff log in'}
             </Link>
           </div>
         </SheetContent>
