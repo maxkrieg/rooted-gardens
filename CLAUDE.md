@@ -778,6 +778,16 @@ were always designed as in-app only, and they are built and working.)
 - Keep schedule-related logic in `lib/utils/schedule.ts`
 - Keep QBO sync logic in `lib/quickbooks/sync.ts` — never inline it
 - **Check trio:** `npm run build` · `npm run typecheck` · `npm run lint` — use `npm run typecheck` (not `npx tsc --noEmit`) for type checking. `app/sw.ts` is excluded from the main typecheck (webworker lib) — run `npm run typecheck:sw` when touching it; `npm run build` also fails if it's broken, since `createSerwistRoute` compiles it at build time.
+- **Migrations before 2026-08-07 are squashed.** `supabase/migrations/` starts at
+  `20260807090000_baseline_schema.sql`, a single schema-only dump of the dev project (plus
+  hand-carried Storage buckets/policies and `site_content`/`site_collection_items` seed
+  rows) — this is what a fresh (prod) project is provisioned from. The 32 original
+  incremental migration files are preserved, unmodified, at `supabase/migrations_archive/`
+  purely as history — several are referenced by filename elsewhere in this doc (e.g.
+  `20260630130000_drop_service_zones`, `20260723000000_drop_time_entries`). The dev
+  project's own migration history was reconciled to match (`supabase migration repair
+  --linked --status reverted <31 old versions>`) so `supabase migration list --linked`
+  shows only the one baseline row on both sides.
 
 ---
 
