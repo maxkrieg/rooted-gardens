@@ -27,6 +27,7 @@ const TYPE_LABELS: Record<QueuedMutation['type'], string> = {
   photo_caption: 'Photo caption',
   job_start: 'Start time',
   job_stop: 'Stop time',
+  job_discard: 'Discarded start time',
   skip: 'Skipped stop',
 }
 

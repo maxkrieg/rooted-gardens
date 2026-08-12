@@ -11,6 +11,7 @@ export type MutationType =
   | 'photo_caption'
   | 'job_start'
   | 'job_stop'
+  | 'job_discard'
   | 'skip'
 
 /** 'failed' mutations are excluded from flushes, so a poisoned one stops burning

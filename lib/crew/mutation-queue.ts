@@ -27,6 +27,12 @@ export interface JobStopPayload {
   endedAt: string
 }
 
+/** Undoes an in-progress Start — clears started_at. Offered only while in
+ *  progress, so ended_at is already null; start is the only column to undo. */
+export interface JobDiscardPayload {
+  visitId: string
+}
+
 export interface PhotoPayload {
   visitId: string
   propertyId: string
@@ -55,6 +61,7 @@ type MutationPayload =
   | { type: 'completion'; payload: CompletionPayload }
   | { type: 'job_start'; payload: JobStartPayload }
   | { type: 'job_stop'; payload: JobStopPayload }
+  | { type: 'job_discard'; payload: JobDiscardPayload }
   | { type: 'photo'; payload: PhotoPayload }
   | { type: 'photo_caption'; payload: PhotoCaptionPayload }
   | { type: 'skip'; payload: SkipPayload }
@@ -203,6 +210,17 @@ export async function flushMutationQueue(): Promise<FlushResult> {
           await supabase
             .from('visits')
             .update({ ended_at: p.endedAt })
+            .eq('id', p.visitId)
+            .throwOnError()
+          break
+        }
+        case 'job_discard': {
+          const p = mutation.payload as JobDiscardPayload
+          // Clear the on-site clock. Only offered while in progress, so
+          // ended_at is already null — started_at is the only column to undo.
+          await supabase
+            .from('visits')
+            .update({ started_at: null })
             .eq('id', p.visitId)
             .throwOnError()
           break

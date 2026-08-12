@@ -83,6 +83,9 @@ export function useCrewRealtimeSync(employeeId: string | undefined) {
         () => {
           queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
           queryClient.invalidateQueries({ queryKey: ['crew-today-stops', employeeId] })
+          // Also refresh any open stop detail (e.g. another crew member's Start
+          // or Discard) — prefix match so it catches whichever visitId is open.
+          queryClient.invalidateQueries({ queryKey: ['stop-detail'] })
         }
       )
       .subscribe()

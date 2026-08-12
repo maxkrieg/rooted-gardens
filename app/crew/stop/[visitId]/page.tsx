@@ -5,10 +5,11 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useQueryClient } from '@tanstack/react-query'
 import { addDays, format, parseISO } from 'date-fns'
-import { ArrowLeft, CalendarDays, Play, Flag, SkipForward, Check } from 'lucide-react'
+import { toast } from 'sonner'
+import { ArrowLeft, CalendarDays, Play, Flag, SkipForward, Check, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { VisitDetailContent } from '@/components/VisitDetailContent'
-import { useStopDetail } from '@/hooks/crew/useStopDetail'
+import { useStopDetail, type StopDetail } from '@/hooks/crew/useStopDetail'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { VisitLogger } from '@/components/crew/VisitLogger'
 import { SkipSheet } from '@/components/crew/SkipSheet'
@@ -51,6 +52,7 @@ export default function StopDetailPage() {
   const { data: employee } = useCurrentEmployee()
   const [completionOpen, setCompletionOpen] = useState(false)
   const [skipOpen, setSkipOpen] = useState(false)
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
 
   // A stop is routinely a cold entry point — the PWA launching straight into it,
   // a shared link, or a jump from the management visit sheet — and in those
@@ -76,6 +78,9 @@ export default function StopDetailPage() {
   const visitStartedAt = stop?.visit.started_at ?? optimisticStartedAt ?? null
   const visitEndedAt = stop?.visit.ended_at ?? null
   const inProgress = isVisitInProgress({ started_at: visitStartedAt, ended_at: visitEndedAt })
+  // Note: confirmDiscard is only read inside the `inProgress` branch below, so a
+  // stale `true` left over from a prior session never renders once inProgress
+  // goes false — no effect needed to reset it.
 
   if (isLoading && !stop) return <LoadingSkeleton />
 
@@ -124,7 +129,25 @@ export default function StopDetailPage() {
     const startedAt = new Date().toISOString()
     setOptimisticStartedAt(startedAt)
     await enqueueMutation('job_start', { visitId, startedAt }, stop?.property.address)
-    await flushMutationQueue()
+    const result = await flushMutationQueue()
+    if (result.failed > 0) toast.error('Could not start the timer. Try again.')
+    queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
+    queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
+  }
+
+  async function handleDiscard() {
+    if (!employee?.id || !inProgress) return
+    setConfirmDiscard(false)
+    // Clear the optimistic start too — visitStartedAt falls back to it, so
+    // leaving it set would resurrect the timer the instant the server row
+    // comes back with started_at: null.
+    setOptimisticStartedAt(null)
+    queryClient.setQueryData<StopDetail | null>(['stop-detail', visitId], (old) =>
+      old ? { ...old, visit: { ...old.visit, started_at: null } } : old
+    )
+    await enqueueMutation('job_discard', { visitId }, stop?.property.address)
+    const result = await flushMutationQueue()
+    if (result.failed > 0) toast.error('Could not discard the start time. Try again.')
     queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
     queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
   }
@@ -180,19 +203,55 @@ export default function StopDetailPage() {
         className="fixed inset-x-0 z-40 bg-background/95 backdrop-blur border-t border-[--border] px-4 pt-2 pb-2"
         style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }}
       >
+        {/* On-site line — stays visible above the button row once Start has been
+            tapped, independent of whether the Discard cell is mid-confirm. */}
+        {inProgress && visitStartedAt && (
+          <div className="flex items-center gap-1.5 pb-2" style={{ color: 'var(--clay)' }}>
+            <span className="relative flex h-2 w-2 shrink-0">
+              <span
+                className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                style={{ backgroundColor: 'var(--clay)' }}
+              />
+              <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: 'var(--clay)' }} />
+            </span>
+            <span className="text-xs font-semibold uppercase tracking-wide">
+              On site · {formatElapsed(visitStartedAt)}
+            </span>
+          </div>
+        )}
+
         <div className="flex items-stretch gap-2">
-          {/* Start — flips to a non-clickable running timer once started */}
-          {inProgress && visitStartedAt ? (
-            <div
-              className="flex-1 flex flex-col items-center justify-center gap-0.5 rounded-lg border min-h-[60px] py-2"
-              style={{ borderColor: 'var(--clay)', color: 'var(--clay)' }}
-              aria-label="Visit in progress"
-            >
-              <span className="font-display text-lg font-semibold leading-none tabular-nums">
-                {formatElapsed(visitStartedAt)}
-              </span>
-              <span className="text-[10px] font-semibold uppercase tracking-wide">On site</span>
-            </div>
+          {/* Start — flips to Discard once started, with an inline confirm step */}
+          {inProgress ? (
+            confirmDiscard ? (
+              <div className="flex-1 flex flex-col gap-1 min-h-[60px]">
+                <button
+                  type="button"
+                  className="flex-1 rounded-lg border text-xs font-semibold uppercase tracking-wide transition-colors active:bg-accent/10"
+                  style={{ borderColor: 'var(--clay)', color: 'var(--clay)' }}
+                  onClick={handleDiscard}
+                >
+                  Confirm
+                </button>
+                <button
+                  type="button"
+                  className="flex-1 rounded-lg border border-[--border] bg-card text-xs font-medium text-muted-foreground active:bg-accent/40 transition-colors"
+                  onClick={() => setConfirmDiscard(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="flex-1 flex flex-col items-center justify-center gap-1 rounded-lg border min-h-[60px] py-2 active:bg-accent/10 transition-colors"
+                style={{ borderColor: 'var(--clay)', color: 'var(--clay)' }}
+                onClick={() => setConfirmDiscard(true)}
+              >
+                <RotateCcw className="h-5 w-5" />
+                <span className="text-xs font-medium">Discard</span>
+              </button>
+            )
           ) : (
             <button
               type="button"
