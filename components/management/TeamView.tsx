@@ -1,8 +1,16 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Users } from 'lucide-react'
+import { Plus, Search, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Sheet,
   SheetContent,
@@ -13,10 +21,27 @@ import {
 import { EmptyState } from '@/components/states/EmptyState'
 import { EmployeeCard } from '@/components/management/EmployeeCard'
 import { EmployeeForm } from '@/components/management/EmployeeForm'
+import { SERVICE_SIDE_LABELS } from '@/lib/utils/team'
 import type { Employee } from '@/types/app'
 
 export function TeamView({ employees }: { employees: Employee[] }) {
   const [newOpen, setNewOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [sideFilter, setSideFilter] = useState<'all' | 'lawn' | 'garden'>('all')
+
+  // Client-side filtering — same convention as AccountsTable (short lists at
+  // this company's scale, no need for URL state).
+  const filtered = employees.filter((e) => {
+    const matchesSearch = search === '' || e.name.toLowerCase().includes(search.toLowerCase())
+    const matchesSide =
+      sideFilter === 'all' || e.side === sideFilter || e.side === 'both'
+    return matchesSearch && matchesSide
+  })
+
+  function clearFilters() {
+    setSearch('')
+    setSideFilter('all')
+  }
 
   return (
     <div className="max-w-5xl mx-auto space-y-8">
@@ -46,11 +71,60 @@ export function TeamView({ employees }: { employees: Employee[] }) {
           className="rounded-2xl border border-dashed border-border"
         />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {employees.map((e) => (
-            <EmployeeCard key={e.id} employee={e} />
-          ))}
-        </div>
+        <>
+          {/* Filter bar */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1 min-w-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                placeholder="Search team…"
+                aria-label="Search team"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 h-10"
+              />
+            </div>
+
+            <Select
+              value={sideFilter}
+              onValueChange={(v) => setSideFilter(v as 'all' | 'lawn' | 'garden')}
+            >
+              <SelectTrigger className="h-10 w-full sm:w-40">
+                <SelectValue placeholder="Side" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All sides</SelectItem>
+                <SelectItem value="lawn">{SERVICE_SIDE_LABELS.lawn}</SelectItem>
+                <SelectItem value="garden">{SERVICE_SIDE_LABELS.garden}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Results count */}
+          <p className="text-sm text-muted-foreground">
+            {filtered.length} {filtered.length === 1 ? 'person' : 'people'}
+          </p>
+
+          {filtered.length === 0 ? (
+            <EmptyState
+              variant="pruned"
+              title="No one matches your filters"
+              hint="Widen the search, or clear the filters to see everyone."
+              action={
+                <Button variant="outline" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              }
+              className="rounded-2xl border border-dashed border-border"
+            />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filtered.map((e) => (
+                <EmployeeCard key={e.id} employee={e} />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* New employee sheet */}
