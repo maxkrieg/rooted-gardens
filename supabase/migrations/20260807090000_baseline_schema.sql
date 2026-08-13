@@ -918,7 +918,7 @@ ON storage.objects FOR INSERT
 TO authenticated
 WITH CHECK (
   bucket_id = 'photos'
-  AND get_my_role() IN ('owner', 'lead', 'crew')
+  AND "public"."get_my_role"() IN ('owner', 'lead', 'crew')
 );
 
 -- All authenticated staff can view photos (owners, leads, crew, accountants)
@@ -933,7 +933,7 @@ ON storage.objects FOR DELETE
 TO authenticated
 USING (
   bucket_id = 'photos'
-  AND get_my_role() IN ('owner', 'lead')
+  AND "public"."get_my_role"() IN ('owner', 'lead')
 );
 
 -- site-media — public (not signed-URL, unlike `photos`): marketing images
@@ -958,7 +958,7 @@ ON storage.objects FOR INSERT
 TO authenticated
 WITH CHECK (
   bucket_id = 'site-media'
-  AND get_my_role() = 'owner'
+  AND "public"."get_my_role"() = 'owner'
 );
 
 CREATE POLICY "owners can update site media"
@@ -966,7 +966,7 @@ ON storage.objects FOR UPDATE
 TO authenticated
 USING (
   bucket_id = 'site-media'
-  AND get_my_role() = 'owner'
+  AND "public"."get_my_role"() = 'owner'
 );
 
 CREATE POLICY "owners can delete site media"
@@ -974,7 +974,7 @@ ON storage.objects FOR DELETE
 TO authenticated
 USING (
   bucket_id = 'site-media'
-  AND get_my_role() = 'owner'
+  AND "public"."get_my_role"() = 'owner'
 );
 
 -- resumes — private (PII), job application uploads (Task 9.6). The
@@ -1000,7 +1000,7 @@ ON CONFLICT (id) DO NOTHING;
 CREATE POLICY "owners and leads can read resumes"
 ON storage.objects FOR SELECT
 TO authenticated
-USING (bucket_id = 'resumes' AND get_my_role() IN ('owner', 'lead'));
+USING (bucket_id = 'resumes' AND "public"."get_my_role"() IN ('owner', 'lead'));
 
 
 -- =================================================================
