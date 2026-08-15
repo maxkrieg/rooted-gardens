@@ -775,6 +775,14 @@ were always designed as in-app only, and they are built and working.)
   (offline support) — see Data Architecture above
 - All Supabase queries go through typed client — run `supabase gen types typescript`
   after schema changes and commit `types/database.ts`
+- **Two Supabase projects now exist**: dev `obbbvohmcaneehzxuuyo` (what `.env.local` points
+  at) and prod `lrhjvbtqqgkwvinxqyec` (live at `rooted-gardens.vercel.app`). Vercel
+  auto-deploys `main`, so **merging is deploying** — prod's schema must be migrated *before*
+  schema-dependent code reaches `main`, and destructive changes invert that order
+  (expand/contract). Full sequence: **"Making a schema change (dev → prod)" in
+  `docs/DEPLOYMENT.md`**. Note `supabase link` is a file in the checkout
+  (`supabase/.temp/project-ref`), shared by every terminal — always confirm which project
+  you're pointed at before `db push --linked`.
 - Keep schedule-related logic in `lib/utils/schedule.ts`
 - Keep QBO sync logic in `lib/quickbooks/sync.ts` — never inline it
 - **Check trio:** `npm run build` · `npm run typecheck` · `npm run lint` — use `npm run typecheck` (not `npx tsc --noEmit`) for type checking. `app/sw.ts` is excluded from the main typecheck (webworker lib) — run `npm run typecheck:sw` when touching it; `npm run build` also fails if it's broken, since `createSerwistRoute` compiles it at build time.

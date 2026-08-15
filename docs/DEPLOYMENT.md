@@ -251,24 +251,61 @@ CLAUDE.md) — don't set them.
 > Env var changes only take effect on a **new deployment**. After adding or changing one,
 > redeploy.
 
-### Database migrations (ongoing, after this first deploy)
+### Making a schema change (dev → prod)
 
-Migrations live in `supabase/migrations/` and are applied to the **linked** Supabase Cloud
-project — this project does **not** use local Docker / `db reset`:
+Migrations live in `supabase/migrations/` and are applied to whichever project the CLI is
+**linked** to — this project does **not** use local Docker / `db reset`.
 
-```bash
-supabase db push --linked
-supabase gen types typescript --linked > types/database.ts   # regenerate + commit
-```
+**Ordering is the whole game.** Vercel auto-deploys `main`, so a push to `main` puts new code
+in front of real users within a minute or two. Production's schema has to be ready for that
+code *before* it ships — a merge is a deploy, not a staging step.
 
-Always regenerate and commit `types/database.ts` after a schema change, then run the check
-trio: `npm run build` · `npm run typecheck` · `npm run lint`. Remember `supabase link` is
-global on your machine — check `supabase projects list` / re-link if you're not sure which
-project (dev or prod) you're currently pointed at before pushing.
+Project refs: dev `obbbvohmcaneehzxuuyo` · prod `lrhjvbtqqgkwvinxqyec`.
 
-Some migrations are destructive (drop columns/tables) — they're written to run in a single
-transaction with a safety check, so a failed backfill rolls back cleanly. Review the row
-counts after a data-migrating push.
+1. **Write the migration** as a new timestamped file in `supabase/migrations/`. Never edit an
+   already-applied migration — both projects record what they've run, and a changed file
+   won't re-apply.
+2. **Apply to dev and regenerate types:**
+   ```bash
+   supabase link --project-ref obbbvohmcaneehzxuuyo
+   supabase db push --linked
+   supabase gen types typescript --linked > types/database.ts
+   ```
+3. **Build against it locally** — the check trio (`npm run build` · `npm run typecheck` ·
+   `npm run lint`) plus a click-through of whatever you changed. `types/database.ts` is
+   generated from dev, so a type error here usually means the migration isn't what you meant.
+4. **Commit** the migration and the regenerated `types/database.ts` together, on a branch.
+   They must never land separately — the types describe the schema the code assumes.
+5. **Apply to prod *before* merging** (for additive changes — see the asymmetry below):
+   ```bash
+   supabase link --project-ref lrhjvbtqqgkwvinxqyec
+   supabase migration list --linked   # confirm you're where you think you are
+   supabase db push --linked
+   ```
+6. **Merge to `main`.** Vercel deploys code that now matches prod's schema.
+7. **Re-link to dev** (`supabase link --project-ref obbbvohmcaneehzxuuyo`) so the next
+   absent-minded `db push --linked` can't hit production. The link is a file in the checkout,
+   not shell state — see step 12 of Part 1.
+
+#### Additive vs. destructive — the order flips
+
+- **Additive** (new table, new nullable column, new index): migrate **prod first, then
+  deploy**. Currently-running code simply ignores the new object, so there's no broken
+  window.
+- **Destructive** (drop or rename a column, tighten a constraint): the code running in prod
+  *right now* still references the old shape, so dropping first breaks it instantly. Deploy
+  code that no longer touches the column **first**, then apply the drop in a follow-up
+  migration — expand/contract, across two deploys.
+
+A rename is a drop plus an add. Treat it as destructive: add the new column, deploy code
+writing to both, backfill, deploy code reading only the new one, then drop the old.
+
+Destructive migrations in this repo are written to run in a single transaction with a safety
+check, so a failed backfill rolls back cleanly. Review row counts after any data-migrating
+push — against prod especially, where there's no `db reset` to fall back on.
+
+> No staging environment exists. Dev is where you catch mistakes; prod has real data and no
+> undo. Take a backup (Supabase → Database → Backups) before anything destructive.
 
 ### Invoice-status cron + `CRON_SECRET`
 
