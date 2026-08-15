@@ -302,12 +302,16 @@ export function ManagementNav({
     <>
       {/* Desktop sidebar — fixed, visible on lg+ */}
       <aside className="hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:left-0 lg:w-56 bg-card border-r border-border z-40">
-        <div className={SIDEBAR_LOGO_CLASSES}>
+        <Link
+          href="/"
+          title="Visit the public Rooted Gardens site"
+          className={SIDEBAR_LOGO_CLASSES}
+        >
           <Leaf className="h-5 w-5 text-primary shrink-0" />
           <span className="font-display text-[1.1rem] font-semibold text-foreground tracking-tight leading-tight">
             Rooted Gardens
           </span>
-        </div>
+        </Link>
         <div className="px-3 pt-3 pb-1">
           <button
             onClick={() => setPaletteOpen(true)}
@@ -379,12 +383,17 @@ export function ManagementNav({
           className="p-0 w-64 bg-card flex flex-col gap-0 border-r border-border"
         >
           <SheetTitle className="sr-only">Navigation</SheetTitle>
-          <div className={SIDEBAR_LOGO_CLASSES}>
+          <Link
+            href="/"
+            title="Visit the public Rooted Gardens site"
+            className={SIDEBAR_LOGO_CLASSES}
+            onClick={() => setMobileOpen(false)}
+          >
             <Leaf className="h-5 w-5 text-primary shrink-0" />
             <span className="font-display text-[1.1rem] font-semibold text-foreground tracking-tight leading-tight">
               Rooted Gardens
             </span>
-          </div>
+          </Link>
           <NavLinks
             pathname={pathname}
             items={navItems}
