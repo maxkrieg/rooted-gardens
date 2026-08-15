@@ -286,11 +286,40 @@ For **local** testing, put `CRON_SECRET=<value>` in `.env.local` and curl
 portal — it's passed straight to the OAuth client, never derived from the request host, so
 a Vercel preview URL will not work unless separately registered.
 
-**Switching sandbox → production QBO**, when ready: register a production app in the Intuit
-developer portal, set `QBO_ENVIRONMENT=production` and swap in the production
-`QBO_CLIENT_ID`/`QBO_CLIENT_SECRET`, register the same `/api/quickbooks/callback` redirect
-URI under the production app, redeploy, then have the owner reconnect from the Billing page
-(the sandbox connection in `integrations` doesn't carry over).
+Your Intuit developer app is **not** tied to any particular QuickBooks company. The company
+is chosen at OAuth time by whoever completes the consent screen — `exchangeCodeForTokens`
+reads the `realmId` off that response (and throws if Intuit omits it) and stores it in
+`integrations`. So you own the app; the Rooted Gardens owner authorizes it against *their*
+company by clicking **Connect QuickBooks** while signed into QBO.
+
+#### Switching sandbox → production QBO
+
+Do these in order — step 1 has lead time and gates the rest.
+
+1. **Get production keys from Intuit.** Sandbox keys are issued instantly; production keys
+   are gated behind completing the app's profile in the developer portal (host domain,
+   launch URL, privacy policy URL, EULA/terms URL). Lighter than full app-store publishing
+   for a private internal app like this one, but not instant — check the portal for the
+   current requirements and start early.
+2. **Register the redirect URI under the production keys.** Sandbox and production keep
+   *separate* redirect-URI allow-lists, so `https://<app>.vercel.app/api/quickbooks/callback`
+   does not carry over — add it again.
+3. **Create the service item in the real company.** `getServiceItemId()`
+   (`lib/quickbooks/invoice.ts`) looks up a Product/Service by name and **throws** if it's
+   missing — it deliberately never auto-creates one, since that would require choosing an
+   Income account, which is the accountant's decision. Sandbox companies ship with a
+   `Services` item; a real company may not. Either have them create a Product/Service named
+   `Services`, or set `QBO_SERVICE_ITEM_NAME` to match an item they already use.
+4. **Update the env vars in Vercel and redeploy:**
+   - `QBO_ENVIRONMENT` → `production` (must be exactly that string — `qboEnvironment()`
+     treats any other value as sandbox, so a typo silently keeps you on the sandbox API)
+   - `QBO_CLIENT_ID` / `QBO_CLIENT_SECRET` → the production credentials
+   - `QBO_REDIRECT_URI` → unchanged
+5. **Have the owner reconnect from the Billing page.** This is required, not automatic.
+   `upsertIntegrationTokens` matches the row by `service = 'quickbooks'` and updates it in
+   place (no duplicate row), but the sandbox tokens and sandbox `realm_id` sit there until
+   someone reconnects — until then the app presents sandbox tokens to the production API and
+   every push fails.
 
 ---
 
