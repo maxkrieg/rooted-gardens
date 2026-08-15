@@ -18,7 +18,7 @@ baseline migration — no dev/test rows.
 
 ## Part 1 — First deploy (do this once, in order)
 
-### 1. Pre-flight
+### 1. Pre-flight ✅
 
 - Ship from `main` — it's the GitHub repo's default branch, so Vercel's import in step 5
   will target it automatically.
@@ -26,7 +26,7 @@ baseline migration — no dev/test rows.
 - Confirm the Supabase CLI is available: `supabase --version`. A Vercel CLI isn't required —
   this runbook uses the Vercel dashboard.
 
-### 2. Create the production Supabase project
+### 2. Create the production Supabase project ✅
 
 1. [supabase.com/dashboard](https://supabase.com/dashboard) → New Project.
 2. Region: pick one close to Norwich, VT (e.g. `us-east-1`).
@@ -37,7 +37,7 @@ baseline migration — no dev/test rows.
    - `anon` / `public` key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `service_role` / `secret` key → `SUPABASE_SERVICE_ROLE_KEY` (never expose client-side)
 
-### 3. Apply the schema
+### 3. Apply the schema ✅
 
 This project's workflow is **cloud-only** — no local Docker, no `supabase db reset`. All
 migrations live in `supabase/migrations/`, currently a single squashed baseline file
@@ -64,7 +64,7 @@ supabase db push --linked
 **Verify:** in the Supabase dashboard, Table Editor shows 16 tables with RLS enabled on
 each; Storage shows `photos`, `site-media`, `resumes`; `site_content` has ~45 rows.
 
-### 4. Configure Supabase Auth URLs
+### 4. Configure Supabase Auth URLs ✅
 
 `supabase/config.toml`'s `[auth]` block (`site_url = "http://localhost:3000"`) is **local
 CLI config only** — `supabase db push` does not touch Auth settings. You don't know the
@@ -75,7 +75,7 @@ Vercel URL yet, so:
 - Come back and set the real values in step 7, once the Vercel URL exists. Don't skip that
   return trip — until it's done, every magic-link email will redirect to the placeholder.
 
-### 5. Import the repo into Vercel
+### 5. Import the repo into Vercel ✅
 
 1. [vercel.com/new](https://vercel.com/new) → import `maxkrieg/rooted-gardens`. Framework
    preset (Next.js) is auto-detected, and Production Branch defaults to `main` (the repo's
@@ -83,7 +83,7 @@ Vercel URL yet, so:
 2. Node version: leave on Vercel's default (the repo pins no `engines`/`.nvmrc`; developed
    against Node 22, which is Vercel's current default).
 
-### 6. Set environment variables
+### 6. Set environment variables ✅
 
 Project Settings → Environment Variables, scope **Production** (Preview optional — see the
 QBO/Auth caveats in Part 4 before relying on it). Three of these are read **at build time**,
@@ -106,7 +106,7 @@ not just at runtime — missing them doesn't error the build, it silently breaks
 `NEXT_PUBLIC_ENABLE_SW` (dev-only flag; the service worker is always on in production
 regardless).
 
-### 7. Deploy, then backfill the URL-dependent vars
+### 7. Deploy, then backfill the URL-dependent vars ✅
 
 1. Trigger the deploy (push to `main`, or "Redeploy" in the dashboard once the branch/env
    vars above are set).
@@ -119,7 +119,7 @@ regardless).
 
 **Verify:** visiting the deployed root URL loads the public marketing home page.
 
-### 8. Bootstrap the first owner
+### 8. Bootstrap the first owner ✅
 
 There is no signup flow and no trigger on `auth.users` — every path that creates an
 `employees` row already requires an existing owner (`requireOwner()` in
@@ -177,7 +177,7 @@ Vercel automatically attaches `Authorization: Bearer <CRON_SECRET>` to its own i
    Correct header → `200 {"ok":true,...}` or `{"ok":false,"error":"QuickBooks not connected"}`
    (also 200 — expected before step 9). No/wrong header → `401`.
 
-### 11. Re-upload the gardens hero image
+### 11. Re-upload the gardens hero image ✅
 
 The baseline migration's seeded `site_content` row for `gardens.hero_image` points at
 `site-media/gardens-hero_image/de94b204-....jpg` — a file that lives only in the **dev**
