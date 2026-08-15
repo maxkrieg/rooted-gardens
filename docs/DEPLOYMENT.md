@@ -190,9 +190,13 @@ project's Storage bucket; migrations don't carry blobs. Until it's replaced, the
 page falls back to no hero image (not a broken link). Fix it as the owner: `/gardens` →
 Edit mode → upload a new hero image through the in-app editor.
 
-### 12. Point the CLI back at dev
+### 12. Point the CLI back at dev ✅
 
-`supabase link` is global state on your machine, not per-repo. Now that prod is set up:
+`supabase link` is **not** session state — it's a file at `supabase/.temp/project-ref`
+(gitignored), so every terminal working in this checkout shares it. Left pointed at prod, a
+`supabase db push --linked` from any shell would hit production. Note this is independent of
+what the app talks to: the dev server reads `NEXT_PUBLIC_SUPABASE_URL` from `.env.local` and
+never consults the CLI link. Now that prod is set up:
 ```bash
 supabase link --project-ref obbbvohmcaneehzxuuyo
 ```
