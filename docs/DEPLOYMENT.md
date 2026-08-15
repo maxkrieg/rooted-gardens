@@ -164,7 +164,7 @@ draft invoice in the QBO sandbox company.
 > their real books yet — worth saying out loud before any demo. See "Switching sandbox →
 > production QBO" in Part 3 when it's time to go live.
 
-### 10. Verify the cron
+### 10. Verify the cron ✅
 
 `vercel.json` already declares the daily job:
 ```json
