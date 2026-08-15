@@ -149,7 +149,7 @@ very first owner has to be created by hand:
 **Verify:** the invited owner can sign in and reach `/management/dashboard`; `/management/team`
 shows them with role `owner`.
 
-### 9. Connect QuickBooks (sandbox)
+### 9. Connect QuickBooks (sandbox) ✅
 
 1. In the [Intuit Developer Portal](https://developer.intuit.com/), on your sandbox app,
    register the redirect URI exactly as set in step 7:
@@ -158,6 +158,11 @@ shows them with role `owner`.
 
 **Verify:** billing page shows QuickBooks connected; pushing a visit to invoice creates a
 draft invoice in the QBO sandbox company.
+
+> **Prod billing currently pushes to the QBO *sandbox*, not real QuickBooks.** That's
+> intentional at this stage, but it means nothing the owners do on the Billing page reaches
+> their real books yet — worth saying out loud before any demo. See "Switching sandbox →
+> production QBO" in Part 3 when it's time to go live.
 
 ### 10. Verify the cron
 
@@ -291,6 +296,28 @@ is chosen at OAuth time by whoever completes the consent screen — `exchangeCod
 reads the `realmId` off that response (and throws if Intuit omits it) and stores it in
 `integrations`. So you own the app; the Rooted Gardens owner authorizes it against *their*
 company by clicking **Connect QuickBooks** while signed into QBO.
+
+#### How dev and prod relate
+
+Two independent layers — worth keeping straight, because only one of them is shared:
+
+- **Tokens are per-environment, never shared.** Local dev talks to the dev Supabase project
+  and prod to the prod project, so each has its own `integrations` row. Connecting or
+  disconnecting one has no effect on the other, and local only has a QBO connection at all
+  if someone ran the OAuth flow against `localhost` — otherwise local pushes fail with
+  "QuickBooks is not connected."
+- **The Intuit app is shared.** Both environments use the same client ID/secret, with two
+  redirect URIs registered against it (`http://localhost:3000/...` and
+  `https://<app>.vercel.app/...`). A sandbox account normally has a single company, so if
+  both environments are connected they're usually pointed at the *same* sandbox company —
+  meaning invoices pushed from local dev and from prod land side by side in one place.
+  Compare `integrations.realm_id` across the two Supabase projects to confirm.
+
+> ⚠️ **Keep `.env.local` on `QBO_ENVIRONMENT=sandbox` permanently.** Once prod is switched to
+> production QBO, `QBO_ENVIRONMENT` plus the client ID/secret are the only things separating
+> test pushes from real ones. If production credentials ever land in `.env.local`, an
+> ordinary local test would create **real invoices in the client's real QuickBooks**. Only
+> Vercel's Production environment should ever hold production QBO credentials.
 
 #### Switching sandbox → production QBO
 
