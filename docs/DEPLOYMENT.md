@@ -127,16 +127,24 @@ There is no signup flow and no trigger on `auth.users` — every path that creat
 very first owner has to be created by hand:
 
 1. Supabase dashboard → Authentication → Users → **Invite user**, with the owner's real
-   email. This sends them a Supabase-hosted invite/magic link (see the auth-email caveat in
-   Part 4 before inviting a large group).
-2. Once they exist in `auth.users`, open the SQL editor and run:
+   email. This creates the `auth.users` row, which is all we need from it (see the
+   auth-email caveat in Part 4 before inviting a large group).
+2. Copy that user's UUID, then open the SQL editor and run:
    ```sql
    insert into employees (user_id, name, email, role, side, active)
    values ('<auth-user-uuid-from-step-1>', 'Owner Name', 'owner@example.com', 'owner', 'both', true);
    ```
-3. That person logs in via the normal `/login` magic-link flow and lands on
-   `/management/dashboard`. From here, invite everyone else through **Team →
-   Invite** in-app — no more manual SQL needed.
+3. Have that person sign in at **`/login`** on the deployed site — enter their email and
+   click the fresh magic link. From here, invite everyone else through **Team → Invite
+   to App** in-app; no more manual SQL needed.
+
+> **Do the `employees` insert *before* they sign in, and have them sign in via `/login`
+> rather than clicking the dashboard's invite link.** The dashboard invite redirects to the
+> project's Site URL (`/`), which is a public marketing page with nothing that can consume
+> auth params, so the sign-in is silently dropped and the link is spent. `/login` uses
+> `signInWithOtp` (PKCE `?code=`), which `/auth/callback` exchanges server-side. If they do
+> click the dashboard link first, it's recoverable — just request a fresh link from
+> `/login`.
 
 **Verify:** the invited owner can sign in and reach `/management/dashboard`; `/management/team`
 shows them with role `owner`.

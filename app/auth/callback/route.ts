@@ -38,6 +38,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/login?error=auth_failed', request.url))
   }
 
-  console.error('[auth/callback] no code param in request:', request.url)
-  return NextResponse.redirect(new URL('/login?error=auth_failed', request.url))
+  // No `?code=` — this is the implicit flow, not PKCE. Admin-generated links
+  // (`auth.admin.inviteUserByEmail`, used by the Team page's "Invite to App")
+  // have no browser-side code verifier, so GoTrue returns the session in the URL
+  // *fragment* instead: `#access_token=…&refresh_token=…&type=invite`. A fragment
+  // is never sent to the server, so this handler structurally cannot read it —
+  // hand off to a client page that can. The fragment rides along through the
+  // redirect on its own (the browser preserves it when the Location has none).
+  const confirmUrl = new URL('/auth/confirm', request.url)
+  confirmUrl.searchParams.set('next', next)
+  return NextResponse.redirect(confirmUrl)
 }
