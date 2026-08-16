@@ -1,10 +1,10 @@
 # Invoicing
 
-How Rooted Gardens turns completed visits into QuickBooks invoices, and how the three
-billing types (`per_visit`, `contract`, `as_needed`) are each handled differently.
+How Rooted Gardens turns completed visits into QuickBooks invoices, and how the two
+billing types (`per_visit`, `contract`) are each handled differently.
 See `CLAUDE.md` for the full schema; this doc is about the *billing logic*, not the schema.
 
-## The three billing types
+## The two billing types
 
 An account's `billing_type` decides how its visits turn into money. It's set once per
 account (`accounts.billing_type`) and never mixed within an account.
@@ -15,6 +15,10 @@ completed, uninvoiced visit is its own line item. If an account has 3 uninvoiced
 when the accountant pushes to QuickBooks, the resulting invoice has 3 lines, each at
 `price_per_visit`.
 
+In practice the accountant runs this **monthly**, so a month's completed visits are swept
+onto a single invoice. That cadence is a habit of the billing workflow, not a rule enforced
+by the app — the Queue will happily push whatever is uninvoiced whenever it's run.
+
 ### `contract`
 Commercial or large properties billed a flat periodic rate (`accounts.contract_rate`,
 `accounts.contract_period` — `monthly` or `seasonal`) regardless of how many visits actually
@@ -23,11 +27,16 @@ contract accounts are invoiced **ad hoc from the Billing page's "Contracts" tab*
 from the Queue (see "Ad-hoc contract invoicing" below) — a visit-completion-driven queue
 is the wrong trigger for a flat periodic fee.
 
-### `as_needed`
-Quoted per engagement, no stored rate. The app **never** auto-invoices these — pushing an
-`as_needed` account's visits fails with an explicit "invoice manually" error. There is no
-sensible default price to charge, so this is a deliberate dead end rather than a silent $0
-invoice.
+### Retired: `as_needed`
+There used to be a third type, `as_needed` — quoted per engagement, no stored rate. It was
+removed: it described a *visit cadence* rather than a billing arrangement (and that cadence
+already lives on `properties.frequency`, which keeps its own `as_needed` value), and it was a
+dead end here, since the app refused to auto-invoice it.
+
+Removal was code-only — `BILLING_TYPES` in `types/app.ts` now has two values, but no migration
+was run, so `accounts.billing_type`'s CHECK still permits the old value. The "no billable
+rate — invoice it manually" guards in `pushInvoicesToQuickBooks` and `pushAccountInvoice`
+therefore stay as backstops against a legacy row, rather than being deleted.
 
 ## The invoice queue → push flow (`per_visit` only)
 
@@ -174,5 +183,5 @@ owners (QBO has **sent** it to the customer), as opposed to merely having been p
   made in QuickBooks, and nothing read back feeds into invoice creation or pricing).
 - **Render its own invoice UI.** QuickBooks is the system of record for how an invoice
   actually looks to the client; this app only pushes the data and links out to it.
-- **Auto-invoice `as_needed` accounts**, or auto-create a missing QBO Item/Income account —
-  both are judgment calls left to the accountant.
+- **Auto-invoice an account with no billable rate**, or auto-create a missing QBO Item/Income
+  account — both are judgment calls left to the accountant.

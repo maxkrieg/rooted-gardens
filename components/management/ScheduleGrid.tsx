@@ -393,7 +393,7 @@ function PropertyLabelCell({
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-1.5">
         <FrequencyBadge frequency={property.frequency} />
-        {!isNested && <AccountPriceMeta account={account} property={property} />}
+        {!isNested && <AccountPriceMeta account={account} />}
       </div>
     </td>
   )

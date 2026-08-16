@@ -30,7 +30,14 @@ export interface PropertyWithAccount extends Property {
 
 // ─── Domain constants ─────────────────────────────────────────────────────────
 
-export const BILLING_TYPES = ['per_visit', 'contract', 'as_needed'] as const
+// Two billing types only. 'as_needed' was removed — it described a visit cadence,
+// not a billing arrangement, and that cadence already lives on
+// properties.frequency (which keeps its own 'as_needed' value — different concept,
+// don't conflate them). Per-visit accounts are invoiced monthly by the accountant,
+// sweeping the prior month's completed visits onto one invoice; contract accounts
+// bill a flat rate per period. The DB CHECK still permits 'as_needed' for legacy
+// rows, so code that reads billing_type keeps its defensive fallbacks.
+export const BILLING_TYPES = ['per_visit', 'contract'] as const
 export type BillingType = (typeof BILLING_TYPES)[number]
 
 export const ACCOUNT_STATUSES = ['active', 'inactive', 'prospective'] as const

@@ -147,7 +147,6 @@ export function AccountsTable({ accounts }: AccountsTableProps) {
             <SelectItem value="all">All billing types</SelectItem>
             <SelectItem value="per_visit">Per Visit</SelectItem>
             <SelectItem value="contract">Contract</SelectItem>
-            <SelectItem value="as_needed">As Needed</SelectItem>
           </SelectContent>
         </Select>
       </div>

@@ -23,13 +23,20 @@ export function leadInterestOrPosition(lead: LeadWithConverted): string | null {
 
 /**
  * Prefill for AccountForm when converting a service_inquiry lead to an
- * account (task 9.9). `status`/`billing_type` default to 'prospective' /
- * 'as_needed' — a website prospect hasn't been quoted yet, and
- * accountFormSchema requires a price for 'per_visit', which would block
- * conversion before the owner has a number to enter. Billing address fields
- * are left blank on purpose: `lead.address` is the *service* address (it
- * belongs on the property, via leadToPropertyDefaults below), not the
- * account's structured billing/mailing address.
+ * account (task 9.9). `status` defaults to 'prospective'; `billing_type` to
+ * 'per_visit', which covers virtually every website inquiry (contract is for
+ * negotiated commercial work that doesn't arrive through the public form).
+ *
+ * This deliberately leaves `price_per_visit` unset, so accountFormSchema's
+ * refine makes it a required field the owner must fill in to convert. That is
+ * the intended gate: an account with no rate can't be invoiced by the billing
+ * queue, so a lead shouldn't be able to become one silently. (This prefill used
+ * to be 'as_needed' purely to dodge that requirement; that billing type has
+ * been removed.)
+ *
+ * Billing address fields are left blank on purpose: `lead.address` is the
+ * *service* address (it belongs on the property, via leadToPropertyDefaults
+ * below), not the account's structured billing/mailing address.
  */
 export function leadToAccountDefaults(lead: LeadWithConverted): Partial<AccountFormValues> {
   const interest = leadInterestOrPosition(lead)
@@ -46,7 +53,7 @@ export function leadToAccountDefaults(lead: LeadWithConverted): Partial<AccountF
     email: lead.email ?? '',
     phone: lead.phone ?? '',
     status: 'prospective',
-    billing_type: 'as_needed',
+    billing_type: 'per_visit',
     notes: notesLines.join('\n'),
   }
 }

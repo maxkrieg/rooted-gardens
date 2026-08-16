@@ -276,10 +276,12 @@ export function AccountForm({ onSuccess, account, defaults, onCreate }: AccountF
                   onValueChange={field.onChange}
                   className="flex flex-col gap-2 pt-1"
                 >
+                  {/* Describe how the work is priced, not how often it's billed —
+                      per-visit accounts are swept onto one monthly invoice by the
+                      accountant, so a per-option cadence would be misleading. */}
                   {[
-                    { value: 'per_visit', label: 'Per Visit', description: 'One invoice per completed visit' },
-                    { value: 'contract', label: 'Contract', description: 'Flat periodic rate' },
-                    { value: 'as_needed', label: 'As Needed', description: 'Quoted per engagement' },
+                    { value: 'per_visit', label: 'Per Visit', description: 'Set price for each visit' },
+                    { value: 'contract', label: 'Contract', description: 'Flat rate per period, however many visits happen' },
                   ].map((opt) => (
                     <label
                       key={opt.value}

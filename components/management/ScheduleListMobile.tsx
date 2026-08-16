@@ -176,7 +176,7 @@ export function ScheduleListMobile({
           </span>
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             <FrequencyBadge frequency={row.property.frequency} />
-            {!isNested && <AccountPriceMeta account={account} property={row.property} />}
+            {!isNested && <AccountPriceMeta account={account} />}
           </div>
         </div>
 

@@ -15,7 +15,6 @@ import type {
   InvoiceStatus,
   LeadKind,
   LeadStatus,
-  Property,
   VehicleStatus,
   VisitStatus,
 } from '@/types/app'
@@ -50,13 +49,15 @@ export function AccountStatusBadge({ status }: { status: string }) {
 const BILLING_TYPE_META: Record<BillingType, { label: string; className: string }> = {
   per_visit: { label: 'Per Visit', className: 'billing-per_visit' },
   contract:  { label: 'Contract',  className: 'billing-contract' },
-  as_needed: { label: 'As Needed', className: 'billing-as_needed' },
 }
 
 export function BillingTypeBadge({ billingType }: { billingType: string }) {
+  // billingType is the raw DB string, and the CHECK constraint still permits the
+  // retired 'as_needed' value, so an unrecognised type renders neutrally rather
+  // than blank. `.billing-unknown` is the muted stone treatment that value used.
   const meta = BILLING_TYPE_META[billingType as BillingType] ?? {
     label: billingType,
-    className: 'billing-as_needed',
+    className: 'billing-unknown',
   }
   return (
     <Badge variant="outline" className={`border-transparent uppercase tracking-wide text-[10px] font-semibold ${meta.className}`}>
@@ -90,18 +91,14 @@ export function FrequencyBadge({ frequency }: { frequency: string }) {
 
 // Price text already names the billing type ("$125.00 / visit", "$800.00 /
 // monthly"), so the billing badge would be redundant whenever there's a flat
-// price to show. It only earns its place as a fallback for `as_needed`
-// accounts, which have no price — and even then, suppressed when the
-// property's own frequency badge already reads "As Needed," so the schedule
-// grid and mobile list never show the same label twice on one row. Shared by
-// both so their fallback rules can't drift apart.
-export function AccountPriceMeta({ account, property }: { account: Account; property: Property }) {
+// price to show. It only earns its place as a fallback for an account with no
+// price set at all — a per_visit account missing its rate, or a legacy row
+// still carrying the retired 'as_needed' type. Shared by the schedule grid and
+// the mobile list so their fallback rules can't drift apart.
+export function AccountPriceMeta({ account }: { account: Account }) {
   const price = formatAccountPrice(account)
   if (price !== '—') {
     return <span className="text-[11px] tabular-nums text-muted-foreground">{price}</span>
-  }
-  if (account.billing_type === 'as_needed' && property.frequency === 'as_needed') {
-    return null
   }
   return <BillingTypeBadge billingType={account.billing_type} />
 }

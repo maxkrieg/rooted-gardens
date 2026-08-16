@@ -191,8 +191,11 @@ accounts (
   contact_name text,
   email text,
   phone text,
-  billing_type text NOT NULL   -- 'per_visit' | 'contract' | 'as_needed'
+  billing_type text NOT NULL   -- app writes only 'per_visit' | 'contract'
     CHECK (billing_type IN ('per_visit', 'contract', 'as_needed')),
+    -- NOTE: 'as_needed' was RETIRED as a billing type (see "Billing Types" below).
+    -- The CHECK still permits it deliberately — no migration was run — so read
+    -- paths keep a fallback, but nothing in the app ever writes it.
   price_per_visit numeric(8,2), -- only for per_visit accounts
   contract_rate numeric(8,2),   -- only for contract accounts
   contract_period text,         -- 'monthly' | 'seasonal' (for contract accounts)
@@ -466,8 +469,10 @@ invoices (
   id uuid PK,
   qbo_invoice_id text NOT NULL UNIQUE,  -- the QBO Invoice.Id
   account_id uuid FK → accounts,
-  billing_type text NOT NULL            -- denormalized snapshot: 'per_visit' | 'contract' | 'as_needed'
+  billing_type text NOT NULL            -- denormalized snapshot: 'per_visit' | 'contract'
     CHECK (billing_type IN ('per_visit', 'contract', 'as_needed')),
+    -- 'as_needed' retired but still permitted by the CHECK (see accounts above);
+    -- this is a point-in-time snapshot, so historical rows keep whatever was true.
   amount numeric(8,2) NOT NULL,         -- invoice total
   period_label text,                    -- contract only (period being billed)
   period_start date,                    -- contract only
@@ -520,11 +525,28 @@ users to their employee record.
 ## Key Domain Concepts
 
 ### Billing Types
-Two fundamentally different account types — never conflate them:
+**Exactly two**, and they are fundamentally different — never conflate them:
 
-- **`per_visit`** — residential, one price per completed visit. Each visit = one QBO invoice line. Price stored on `accounts.price_per_visit`.
-- **`contract`** — commercial or large properties. Flat periodic rate regardless of how many visits occurred. Invoice is periodic (monthly/seasonal), not per-visit. Price stored on `accounts.contract_rate`.
-- **`as_needed`** — quoted per engagement, no set schedule.
+- **`per_visit`** — residential, a set price for each completed visit. Each visit = one QBO
+  invoice line. Price stored on `accounts.price_per_visit` and **required** by
+  `accountFormSchema` — an account with no rate can't be invoiced by the queue.
+  **Billing cadence:** the accountant invoices these **monthly**, sweeping the prior month's
+  completed visits onto one invoice. Cadence is a property of the billing *workflow*, not of
+  the billing type, so don't surface it in the account form's type captions.
+- **`contract`** — commercial or large properties. Flat periodic rate regardless of how many
+  visits occurred. Invoiced per period (monthly/seasonal), not per visit. Price stored on
+  `accounts.contract_rate`. This is the one type not swept up monthly.
+
+> **`as_needed` was retired as a billing type.** It described a *visit cadence*, not a billing
+> arrangement — and that cadence already lives on `properties.frequency`, which keeps its own
+> `'as_needed'` value. **These are different concepts; don't let a find-and-replace merge
+> them.** `as_needed` accounts were also a dead end: the billing queue refused to invoice them.
+> Removal was **code-only** — `BILLING_TYPES` in `types/app.ts` is the source of truth and now
+> has two values, but no migration was run, so the DB CHECK still accepts the old value and
+> read paths (`BillingTypeBadge`'s `.billing-unknown` fallback, the `pushInvoicesToQuickBooks`
+> guard, `pushAccountInvoice`'s trailing `else`, the reports `.neq`) keep defensive fallbacks
+> for a legacy row. Lead conversion prefills `per_visit`, so the owner must enter a price to
+> convert.
 
 ### Archiving (deleting accounts & properties)
 "Delete" in the UI is a **soft delete**: `accounts.is_archived` / `properties.is_archived`.

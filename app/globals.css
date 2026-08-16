@@ -209,7 +209,10 @@
     background-color: #e4ecf2;
     color: #3f6e97;
   }
-  .billing-as_needed {
+  /* Fallback for a billing_type the app doesn't recognise. The DB CHECK still
+     permits the retired 'as_needed' value, so a legacy row renders in warm
+     stone rather than unstyled. */
+  .billing-unknown {
     background-color: #ede9df;
     color: #6e665a;
   }

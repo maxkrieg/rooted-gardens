@@ -232,8 +232,11 @@ export interface AdherenceReport {
  * company's season shifts — but it does mean the denominator moves, so the
  * window is always stated in the card subtitle.
  *
- * `as_needed` properties and accounts are excluded outright: with no
- * contracted cadence there is no expectation to fall short of.
+ * `as_needed` *properties* are excluded outright: with no contracted cadence
+ * there is no expectation to fall short of (expectedVisitsForFrequency returns
+ * null for them). The matching billing-type filter below is now only a guard
+ * against legacy rows — 'as_needed' was retired as a billing type, but the DB
+ * CHECK still permits it.
  */
 export async function getFrequencyAdherence(year: number): Promise<AdherenceReport> {
   const supabase = await createClient()
@@ -259,6 +262,7 @@ export async function getFrequencyAdherence(year: number): Promise<AdherenceRepo
       .eq('status', 'active')
       .eq('is_archived', false)
       .eq('properties.is_archived', false)
+      // Legacy guard only — the app no longer writes this billing type.
       .neq('billing_type', 'as_needed'),
   ])
 

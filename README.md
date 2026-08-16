@@ -89,8 +89,10 @@ proxy.ts                 root request proxy — auth + role gating (Next 16; was
 
 ## Domain model
 
-- **Accounts** are billing entities. Three billing types, never conflated: `per_visit`
-  (residential, one price per completed visit), `contract` (flat periodic rate), and `as_needed`.
+- **Accounts** are billing entities. Two billing types, never conflated: `per_visit`
+  (residential, a set price for each completed visit, swept onto one monthly invoice by the
+  accountant) and `contract` (flat periodic rate, invoiced per period). A third type,
+  `as_needed`, was retired — it described a visit cadence, which lives on `properties.frequency`.
 - **Properties** are the unit of scheduling; each carries a single `frequency`. (The old
   multi-work-area `service_zones` concept was dropped.)
 - **Visits** are the core operational record — one row per `(property, week_start)`, where

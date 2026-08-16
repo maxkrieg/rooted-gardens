@@ -59,16 +59,17 @@ interface InvoiceLine {
  * amount explicitly from price_per_visit/contract_rate, so it never needs an
  * item's own default price the way manual QBO data entry does.
  *
- * as_needed accounts have no stored rate to bill against, so they error here
- * rather than being silently skipped — the caller (actions.ts) already
- * filters these out before calling this function, so this is a defensive
- * backstop, not the primary skip point.
+ * An account whose billing_type is neither per_visit nor contract has no rate to
+ * bill against, so it errors here rather than being silently skipped. The app
+ * only writes those two types, but the DB CHECK still permits the retired
+ * 'as_needed' value, and the caller (actions.ts) already filters such rows out —
+ * so this is a defensive backstop, not the primary skip point.
  *
  * `options.amountOverride` lets a caller bill a contract account something
  * other than its stored `contract_rate` — used by the Contracts tab's ad-hoc
  * invoicing (createContractInvoice) so an owner can invoice a one-off amount
  * without changing the account's standing rate. Only meaningful for
- * `contract`; ignored for `per_visit`/`as_needed`.
+ * `contract`; ignored for `per_visit`.
  */
 export async function pushAccountInvoice(
   qbo: QuickBooks,
@@ -117,7 +118,8 @@ export async function pushAccountInvoice(
       },
     ]
   } else {
-    return { error: 'as_needed accounts have no set rate — invoice manually' }
+    // Unrecognised billing_type — see the backstop note in the docblock above.
+    return { error: 'This account has no billable rate — invoice it manually' }
   }
 
   try {

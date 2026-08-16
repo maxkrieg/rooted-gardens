@@ -19,10 +19,11 @@ import type { Account, Invoice, InvoiceWithVisits, VisitWithLocation } from '@/t
  * (`WHERE status='completed' AND invoice_id IS NULL`). Ordered oldest-first
  * — the oldest unbilled work is the most overdue/actionable.
  *
- * Restricted to `per_visit` accounts. `contract` accounts are billed a flat
- * rate per period regardless of visit count (Contracts tab / createContractInvoice),
- * and `as_needed` accounts have no stored rate to auto-price a queue push against
- * — both are the wrong fit for a visit-completion-driven queue (see docs/INVOICING.md).
+ * Restricted to `per_visit` accounts — the ones priced by the visit, which the
+ * accountant sweeps into one invoice per month. `contract` accounts are billed a
+ * flat rate per period regardless of visit count (Contracts tab /
+ * createContractInvoice), so they're the wrong fit for a visit-completion-driven
+ * queue (see docs/INVOICING.md).
  */
 /**
  * Billing reads used to return `[]` on failure, which the accountant reads as
@@ -122,12 +123,16 @@ export async function pushInvoicesToQuickBooks(visitIds: string[]): Promise<Push
   const results: PushResult[] = []
 
   for (const group of groups) {
-    if (group.account.billing_type === 'as_needed') {
+    // Defensive backstop. The queue only ever loads per_visit accounts, and the
+    // app can no longer create any other type here — but the DB CHECK still
+    // permits the retired 'as_needed' value, so a legacy row is refused with a
+    // clear message instead of being priced off a null rate.
+    if (group.account.billing_type !== 'per_visit' && group.account.billing_type !== 'contract') {
       results.push({
         accountId: group.account.id,
         accountName: group.account.name,
         success: false,
-        error: 'as_needed accounts have no set rate — invoice manually',
+        error: 'This account has no per-visit rate — invoice it manually',
       })
       continue
     }
