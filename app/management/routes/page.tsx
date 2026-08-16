@@ -64,6 +64,7 @@ export default async function RoutesPage() {
   const { data: propertiesData, error: propertiesError } = await supabase
     .from('properties')
     .select('*, accounts(name)')
+    .eq('is_archived', false)
     .order('address', { ascending: true })
 
   // Load-bearing: without either, every group renders "No properties assigned

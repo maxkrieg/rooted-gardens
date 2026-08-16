@@ -76,3 +76,47 @@ export async function updateProperty(
   revalidateAccount(accountId)
   return {}
 }
+
+/**
+ * Archive (soft-delete) a single property.
+ *
+ * Kept as a row rather than deleted because visits and photos FK back here with
+ * NO ACTION — see archiveAccount in ./actions.ts for the full rationale. Owner-only,
+ * enforced by the enforce_owner_only_archive trigger.
+ */
+export async function archiveProperty(
+  id: string,
+  accountId: string,
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+
+  // Drop the route-group assignment first — see archiveAccount in ./actions.ts: the
+  // join table carries no history, and a leftover row under-counts the "unrouted
+  // properties" nav badge, which is (properties − property_route_groups).
+  const { error: assignmentError } = await supabase
+    .from('property_route_groups')
+    .delete()
+    .eq('property_id', id)
+
+  if (assignmentError) {
+    return {
+      error: toUserMessage(
+        assignmentError,
+        "Could not clear the property's route assignment.",
+        '[archiveProperty]',
+      ),
+    }
+  }
+
+  const { error } = await supabase.from('properties').update({ is_archived: true }).eq('id', id)
+
+  if (error) {
+    return { error: toUserMessage(error, 'Could not delete the property.', '[archiveProperty]') }
+  }
+
+  revalidateAccount(accountId)
+  // An archived property leaves the route board and the schedule grid.
+  revalidatePath('/management/routes')
+  revalidatePath('/management/schedule')
+  return {}
+}

@@ -24,15 +24,21 @@ export function useWeekSchedule(weekStart: Date) {
 
       const [routeGroupsResult, assignmentsResult, visitsResult] = await Promise.all([
         supabase.from('route_groups').select('*').order('sort_order', { ascending: true }),
-        supabase.from('property_route_groups').select(`
+        // !inner + is_archived keeps soft-deleted properties off crew phones.
+        supabase
+          .from('property_route_groups')
+          .select(
+            `
           property_id,
           route_group_id,
           sort_order,
-          property:properties(
+          property:properties!inner(
             *,
             account:accounts(*)
           )
-        `),
+        `,
+          )
+          .eq('property.is_archived', false),
         supabase
           .from('visits')
           .select(`*, visit_crew(*, employee:employees(*))`)

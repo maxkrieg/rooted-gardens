@@ -16,22 +16,29 @@ export default async function DashboardPage() {
   const [visitsResult, equipmentResult, vehiclesResult, inProgressResult] = await Promise.all([
     supabase
       .from('visits')
+      // !inner + is_archived: this is the current week's work, not history, so a
+      // deleted property must drop off here exactly as it drops off the schedule
+      // grid. (visits.property_id is NOT NULL, so !inner never loses a visit.)
+      // Account/property history elsewhere — billing, the account detail page —
+      // stays unfiltered so past visits keep rendering their names.
       .select(`
         *,
-        property:properties(*),
+        property:properties!inner(*),
         account:accounts(*),
         visit_crew(*, employee:employees(*))
       `)
-      .eq('week_start', weekStart),
+      .eq('week_start', weekStart)
+      .eq('property.is_archived', false),
     supabase.from('equipment').select('*').eq('status', 'maintenance').order('name'),
     supabase.from('vehicles').select('*').eq('status', 'maintenance').order('name'),
     supabase
       .from('visits')
       .select(
-        'id, started_at, property:properties(address), visit_crew(relation, employee:employees(name))',
+        'id, started_at, property:properties!inner(address), visit_crew(relation, employee:employees(name))',
       )
       .not('started_at', 'is', null)
-      .is('ended_at', null),
+      .is('ended_at', null)
+      .eq('property.is_archived', false),
   ])
 
   // Fail per section, not per page — one dead query shouldn't blank the rest.

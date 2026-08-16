@@ -32,6 +32,8 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     supabase
       .from('accounts')
       .select('id, name, contact_name, status, properties(address)')
+      .eq('is_archived', false)
+      .eq('properties.is_archived', false)
       .then(({ data }) => {
         if (!data) return
         setAccounts(

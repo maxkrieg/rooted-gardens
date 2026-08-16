@@ -47,7 +47,7 @@ export default async function ManagementLayout({
   let initialUnroutedCount = 0
   if (role === 'owner' || role === 'lead' || role === 'accountant') {
     const [propertiesCount, routedCount] = await Promise.all([
-      supabase.from('properties').select('id', { count: 'exact', head: true }),
+      supabase.from('properties').select('id', { count: 'exact', head: true }).eq('is_archived', false),
       supabase.from('property_route_groups').select('property_id', { count: 'exact', head: true }),
     ])
     if (propertiesCount.error) console.error('[management/layout] properties count', propertiesCount.error)

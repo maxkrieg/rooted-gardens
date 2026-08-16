@@ -11,15 +11,23 @@ export async function getScheduleForWeek(weekStart: string): Promise<ScheduleWee
 
   const [routeGroupsResult, assignmentsResult, visitsResult, propertiesResult] = await Promise.all([
     supabase.from('route_groups').select('*').order('sort_order', { ascending: true }),
-    supabase.from('property_route_groups').select(`
+    // !inner + the is_archived filter so a soft-deleted property can't reach the
+    // grid. archiveProperty/archiveAccount already clear the assignment row, so this
+    // is belt-and-braces for a property archived directly in SQL.
+    supabase
+      .from('property_route_groups')
+      .select(
+        `
       property_id,
       route_group_id,
       sort_order,
-      property:properties(
+      property:properties!inner(
         *,
         account:accounts(*)
       )
-    `),
+    `,
+      )
+      .eq('property.is_archived', false),
     supabase
       .from('visits')
       .select(`*, visit_crew(*, employee:employees(*)), invoice:invoices(status, qbo_invoice_id)`)
@@ -27,7 +35,7 @@ export async function getScheduleForWeek(weekStart: string): Promise<ScheduleWee
     // Every property, so ones with no property_route_groups row can be
     // surfaced as the schedule's "Not on a route" bucket instead of being
     // silently dropped (buildScheduleWeek used to only iterate route groups).
-    supabase.from('properties').select('*, account:accounts(*)'),
+    supabase.from('properties').select('*, account:accounts(*)').eq('is_archived', false),
   ])
 
   // Throw rather than return: the page fetches four weeks in parallel and a

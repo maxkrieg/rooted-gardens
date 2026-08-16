@@ -12,9 +12,13 @@ export default async function AccountsPage() {
 
   // ── 1. Accounts + embedded property count ────────────────────────────────
   // PostgREST returns properties as [{ count: N }] per row.
+  // Archived accounts are soft-deleted, and the embedded count is filtered too so a
+  // deleted property doesn't inflate the number on the card.
   const { data: accountsData, error: accountsError } = await supabase
     .from('accounts')
     .select('*, properties(count)')
+    .eq('is_archived', false)
+    .eq('properties.is_archived', false)
     .order('name')
 
   if (accountsError) {

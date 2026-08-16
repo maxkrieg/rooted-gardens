@@ -257,6 +257,8 @@ export async function getFrequencyAdherence(year: number): Promise<AdherenceRepo
       .from('accounts')
       .select('id, name, billing_type, properties(id, frequency)')
       .eq('status', 'active')
+      .eq('is_archived', false)
+      .eq('properties.is_archived', false)
       .neq('billing_type', 'as_needed'),
   ])
 

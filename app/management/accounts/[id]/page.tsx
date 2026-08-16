@@ -14,6 +14,8 @@ import {
   BillingTypeBadge,
 } from '@/components/management/badges'
 import { EditAccountSheet } from '@/components/management/EditAccountSheet'
+import { DeleteAccountButton } from '@/components/management/DeleteAccountButton'
+import { DeletePropertyButton } from '@/components/management/DeletePropertyButton'
 import { PropertySheet } from '@/components/management/PropertySheet'
 import { PropertyPhotoGallery } from '@/components/management/PropertyPhotoGallery'
 import { QboLinkStatus } from '@/components/management/QboLinkStatus'
@@ -52,7 +54,15 @@ export default async function AccountDetailPage({ params, searchParams }: Props)
   const supabase = await createClient()
 
   // ── 1. Account + properties ────────────────────────────────────────────────
-  const accountResult = await supabase.from('accounts').select('*, properties(*)').eq('id', id).single()
+  // Archived (soft-deleted) accounts 404 rather than render, and archived properties
+  // are filtered out of the embed.
+  const accountResult = await supabase
+    .from('accounts')
+    .select('*, properties(*)')
+    .eq('id', id)
+    .eq('is_archived', false)
+    .eq('properties.is_archived', false)
+    .single()
 
   if (accountResult.error || !accountResult.data) {
     notFound()
@@ -97,7 +107,18 @@ export default async function AccountDetailPage({ params, searchParams }: Props)
             <BillingTypeBadge billingType={account.billing_type} />
           </div>
         </div>
-        <EditAccountSheet account={account} />
+        <div className="flex items-center gap-1 shrink-0">
+          <EditAccountSheet account={account} />
+          {/* Deleting an account takes its properties with it, so it's owner-only —
+              narrower than editing, which leads can do. */}
+          {role === 'owner' && (
+            <DeleteAccountButton
+              accountId={account.id}
+              accountName={account.name}
+              propertyCount={account.properties.length}
+            />
+          )}
+        </div>
       </div>
 
       {/* ── Tab strip (same pattern as the billing page) ────────────────────── */}
@@ -277,7 +298,16 @@ async function DetailsTab({
                         <FrequencyBadge frequency={property.frequency} />
                       </div>
                     </div>
-                    <PropertySheet accountId={account.id} property={property} />
+                    <div className="flex items-center gap-1 shrink-0">
+                      <PropertySheet accountId={account.id} property={property} />
+                      {role === 'owner' && (
+                        <DeletePropertyButton
+                          propertyId={property.id}
+                          accountId={account.id}
+                          address={property.address}
+                        />
+                      )}
+                    </div>
                   </div>
 
                   {/* Route group — unrouted means this property is skipped on

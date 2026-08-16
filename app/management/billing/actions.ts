@@ -333,6 +333,7 @@ export async function getContractAccountsOverview(): Promise<
     .select('*')
     .eq('billing_type', 'contract')
     .eq('status', 'active')
+    .eq('is_archived', false)
     .order('name')
 
   if (accountsError || !accounts) {

@@ -53,6 +53,7 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
+          is_archived: boolean
           name: string
           notes: string | null
           phone: string | null
@@ -74,6 +75,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          is_archived?: boolean
           name: string
           notes?: string | null
           phone?: string | null
@@ -95,6 +97,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          is_archived?: boolean
           name?: string
           notes?: string | null
           phone?: string | null
@@ -479,6 +482,7 @@ export type Database = {
           crew_notes: string | null
           frequency: string
           id: string
+          is_archived: boolean
           lat: number | null
           lng: number | null
           parking_notes: string | null
@@ -492,6 +496,7 @@ export type Database = {
           crew_notes?: string | null
           frequency?: string
           id?: string
+          is_archived?: boolean
           lat?: number | null
           lng?: number | null
           parking_notes?: string | null
@@ -505,6 +510,7 @@ export type Database = {
           crew_notes?: string | null
           frequency?: string
           id?: string
+          is_archived?: boolean
           lat?: number | null
           lng?: number | null
           parking_notes?: string | null

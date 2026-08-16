@@ -272,7 +272,7 @@ export function ManagementNav({
 
     async function refreshCount() {
       const [propertiesCount, routedCount] = await Promise.all([
-        supabase.from('properties').select('id', { count: 'exact', head: true }),
+        supabase.from('properties').select('id', { count: 'exact', head: true }).eq('is_archived', false),
         supabase.from('property_route_groups').select('property_id', { count: 'exact', head: true }),
       ])
       setUnroutedCount(Math.max((propertiesCount.count ?? 0) - (routedCount.count ?? 0), 0))

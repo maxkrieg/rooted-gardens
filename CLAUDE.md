@@ -198,6 +198,7 @@ accounts (
   contract_period text,         -- 'monthly' | 'seasonal' (for contract accounts)
   status text DEFAULT 'active'  -- 'active' | 'inactive' | 'prospective'
     CHECK (status IN ('active', 'inactive', 'prospective')),
+  is_archived boolean NOT NULL DEFAULT false,  -- soft delete; see "Archiving" below
   qbo_customer_id text,         -- QuickBooks customer ID
   notes text,
   created_at, updated_at
@@ -289,6 +290,7 @@ properties (
   parking_notes text,
   access_notes text,          -- gate codes, key location, etc.
   crew_notes text,            -- standing instructions for all visits
+  is_archived boolean NOT NULL DEFAULT false,  -- soft delete; see "Archiving" below
   created_at, updated_at
 )
 -- service_zones DROPPED (migration 20260630130000_drop_service_zones). A property no
@@ -523,6 +525,35 @@ Two fundamentally different account types — never conflate them:
 - **`per_visit`** — residential, one price per completed visit. Each visit = one QBO invoice line. Price stored on `accounts.price_per_visit`.
 - **`contract`** — commercial or large properties. Flat periodic rate regardless of how many visits occurred. Invoice is periodic (monthly/seasonal), not per-visit. Price stored on `accounts.contract_rate`.
 - **`as_needed`** — quoted per engagement, no set schedule.
+
+### Archiving (deleting accounts & properties)
+"Delete" in the UI is a **soft delete**: `accounts.is_archived` / `properties.is_archived`.
+Never hard-DELETE either — `visits`, `invoices`, `photos` and `leads.converted_account_id`
+all FK back with NO ACTION, so a real delete is either rejected by Postgres or takes billing
+history with it. Archiving keeps the row so past visits and invoices still render their
+account name and property address.
+- Archiving an account archives **all of its properties** (`archiveAccount` in
+  `app/management/accounts/actions.ts`); a single property archives alone (`archiveProperty`
+  in `property-actions.ts`). Both also delete the property's `property_route_groups` rows —
+  that join table carries no history, and a leftover row under-counts the "unrouted" nav
+  badge, which is `properties − property_route_groups`.
+- **Owner-only**, narrower than editing (owner/lead). Enforced by the
+  `enforce_owner_only_archive` BEFORE UPDATE trigger on both tables, not by RLS (RLS can't
+  gate one column). `is_archived` is also in the `enforce_accountant_account_columns` guard
+  list — **any new `accounts` column must be added there or accountants can write it.**
+- **Where to filter:** *enumeration* points filter (`.eq('is_archived', false)`) — account
+  list & detail, ⌘K palette, routes page, unrouted counts, schedule grid, crew week schedule,
+  contract-billing overview, reports, and the dashboard (current week + in-progress, which
+  are live ops, not history). *FK-embed lookups do NOT filter* — billing/invoice queries, the
+  account detail visit history, `useStopDetail` — so historical records keep their labels.
+  Uninvoiced completed visits deliberately **stay in the Billing Queue** after archiving, so
+  final work still gets billed.
+- `is_archived` is deliberately separate from `status` (`active|inactive|prospective`), which
+  is a sales/lifecycle axis: a prospective account can be archived, and folding the two would
+  destroy the prior status and expose "archived" as an unguarded value in the account form's
+  status dropdown.
+- No restore UI by design. Un-archive with SQL:
+  `UPDATE properties SET is_archived = false WHERE account_id = '…';` then the account.
 
 ### Properties & Frequency
 A `property` is the unit of scheduling — there is no sub-property work-area concept.
