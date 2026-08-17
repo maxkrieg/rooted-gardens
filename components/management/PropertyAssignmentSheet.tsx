@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Map as MapIcon, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -59,16 +60,57 @@ function groupByAccount(properties: PropertyWithAccount[]): AccountGroup[] {
  * filter toggle, so an unrouted property doesn't require knowing a toggle
  * exists. The Routes page's UnroutedPanel is now the primary place to catch
  * these company-wide; this sheet's job is curating one route at a time.
+ *
+ * Toggling is deliberately NOT gated on the server round-trip. A switch that
+ * can only move once `revalidatePath` re-renders this dynamic page will sit
+ * there looking broken whenever that refresh is slow or never propagates —
+ * the owner clicks, nothing happens, and the write has actually landed. So we
+ * keep a local `overrides` layer (what the user asked for) over the server
+ * prop, and our own `inFlight` set for disabled state rather than the
+ * transition's pending flag, which can stay stuck true and wedge the list.
  */
 export function PropertyAssignmentSheet({
   routeGroupId,
   routeGroupName,
   allProperties,
 }: PropertyAssignmentSheetProps) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [pending, startTransition] = useTransition()
+  // Pending flag deliberately discarded — see the note above. Same idiom as
+  // ScheduleGrid's `creatingKey`: track busy state per row ourselves.
+  const [, startTransition] = useTransition()
   const [reassignTarget, setReassignTarget] = useState<PropertyWithAccount | null>(null)
   const [query, setQuery] = useState('')
+  // propertyId → assigned-to-this-route, as the user last asked for it.
+  // Absent = defer to the server prop. Held for the life of the open sheet and
+  // reset on close; clearing on action-resolve would race the props catching
+  // up and visibly flick the switch back.
+  const [overrides, setOverrides] = useState<Map<string, boolean>>(new Map())
+  const [inFlight, setInFlight] = useState<Set<string>>(new Set())
+
+  /**
+   * Which route group each property should render under right now — the local
+   * override if the user has touched it, otherwise the server prop. Overridden
+   * -off means unrouted rather than "back to its old group": unassigning only
+   * ever happens from *this* route, and assigning *moves* a property here (one
+   * route group per property, enforced by property_route_groups_property_idx),
+   * so a mid-flight property is never in two sections at once.
+   */
+  const effectiveGroupIds = useMemo(() => {
+    const map = new Map<string, string | null>()
+    for (const property of allProperties) {
+      const override = overrides.get(property.id)
+      map.set(
+        property.id,
+        override === undefined
+          ? property.currentRouteGroup?.id ?? null
+          : override
+            ? routeGroupId
+            : null
+      )
+    }
+    return map
+  }, [allProperties, overrides, routeGroupId])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -83,12 +125,13 @@ export function PropertyAssignmentSheet({
     const notOnARoute: PropertyWithAccount[] = []
     const inOtherRoutes: PropertyWithAccount[] = []
     for (const property of filtered) {
-      if (property.currentRouteGroup?.id === routeGroupId) inThisRoute.push(property)
-      else if (!property.currentRouteGroup) notOnARoute.push(property)
+      const groupId = effectiveGroupIds.get(property.id) ?? null
+      if (groupId === routeGroupId) inThisRoute.push(property)
+      else if (groupId === null) notOnARoute.push(property)
       else inOtherRoutes.push(property)
     }
     return { inThisRoute, notOnARoute, inOtherRoutes }
-  }, [filtered, routeGroupId])
+  }, [filtered, routeGroupId, effectiveGroupIds])
 
   const sections: Array<{
     key: string
@@ -101,20 +144,68 @@ export function PropertyAssignmentSheet({
     { key: 'elsewhere', label: 'In other routes', properties: inOtherRoutes, dot: null },
   ]
 
-  function doToggle(propertyId: string, isAssignedHere: boolean) {
-    startTransition(async () => {
-      const res = isAssignedHere
-        ? await unassignProperty(propertyId, routeGroupId)
-        : await assignProperty(propertyId, routeGroupId)
+  function setOverride(propertyId: string, assignedHere: boolean) {
+    setOverrides((prev) => new Map(prev).set(propertyId, assignedHere))
+  }
 
-      if (res.error) {
-        toast.error('Could not update assignment', { description: res.error })
+  // Rollback drops the override rather than writing the previous boolean back:
+  // for a failed *move*, "not assigned here" would render as unrouted, losing
+  // the route group the property is in fact still in. The server prop is the
+  // pre-click truth, so defer to it.
+  function clearOverride(propertyId: string) {
+    setOverrides((prev) => {
+      const next = new Map(prev)
+      next.delete(propertyId)
+      return next
+    })
+  }
+
+  function clearInFlight(propertyId: string) {
+    setInFlight((prev) => {
+      const next = new Set(prev)
+      next.delete(propertyId)
+      return next
+    })
+  }
+
+  function doToggle(propertyId: string, isAssignedHere: boolean) {
+    // Flip the switch first — the user's intent is the truth until the server
+    // says otherwise.
+    setOverride(propertyId, !isAssignedHere)
+    setInFlight((prev) => new Set(prev).add(propertyId))
+
+    startTransition(async () => {
+      try {
+        const res = isAssignedHere
+          ? await unassignProperty(propertyId, routeGroupId)
+          : await assignProperty(propertyId, routeGroupId)
+
+        if (res.error) {
+          clearOverride(propertyId) // roll back the optimistic flip
+          toast.error('Could not update assignment', { description: res.error })
+          return
+        }
+
+        // revalidatePath only marks the cache stale; this is what actually
+        // repaints the route group card behind the sheet.
+        router.refresh()
+      } catch {
+        // A *thrown* failure (network drop mid-action) never reaches the
+        // `res.error` branch. Without this the row would stay flipped and
+        // wedged in-flight, silently — the very bug being fixed.
+        clearOverride(propertyId)
+        toast.error('Could not update assignment', {
+          description: 'The change did not reach the server. Check your connection and try again.',
+        })
+      } finally {
+        clearInFlight(propertyId)
       }
     })
   }
 
   function handleToggle(property: PropertyWithAccount, isAssignedHere: boolean) {
-    const isLocked = !!property.currentRouteGroup && property.currentRouteGroup.id !== routeGroupId
+    const groupId = effectiveGroupIds.get(property.id) ?? null
+    const isLocked = groupId !== null && groupId !== routeGroupId
     if (isLocked) {
       setReassignTarget(property)
       return
@@ -129,7 +220,8 @@ export function PropertyAssignmentSheet({
   }
 
   function renderPropertyRow(property: PropertyWithAccount, inline: boolean) {
-    const isAssignedHere = property.currentRouteGroup?.id === routeGroupId
+    const groupId = effectiveGroupIds.get(property.id) ?? null
+    const isAssignedHere = groupId === routeGroupId
     const addressClass = inline
       ? 'text-sm text-[--primary] hover:underline truncate block'
       : 'text-sm font-medium text-[--primary] hover:underline truncate block'
@@ -154,7 +246,7 @@ export function PropertyAssignmentSheet({
           >
             {property.address}
           </Link>
-          {property.currentRouteGroup && property.currentRouteGroup.id !== routeGroupId && (
+          {property.currentRouteGroup && groupId === property.currentRouteGroup.id && groupId !== routeGroupId && (
             <p className="text-[11px] text-muted-foreground/80 truncate">
               Currently in {property.currentRouteGroup.name}
             </p>
@@ -162,7 +254,7 @@ export function PropertyAssignmentSheet({
         </div>
         <Switch
           checked={isAssignedHere}
-          disabled={pending}
+          disabled={inFlight.has(property.id)}
           onCheckedChange={() => handleToggle(property, isAssignedHere)}
           aria-label={isAssignedHere ? 'Remove from group' : 'Add to group'}
           className="shrink-0"
@@ -183,7 +275,18 @@ export function PropertyAssignmentSheet({
         Manage properties
       </Button>
 
-      <Sheet open={open} onOpenChange={setOpen}>
+      <Sheet
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next)
+          // Re-sync from fresh server props on the next open rather than
+          // carrying a stale local view of the assignments forward.
+          if (!next) {
+            setOverrides(new Map())
+            setReassignTarget(null)
+          }
+        }}
+      >
         <SheetContent
           side="right"
           className="w-full sm:max-w-md bg-card flex flex-col gap-0 p-0"
@@ -268,14 +371,13 @@ export function PropertyAssignmentSheet({
                   . Adding it here will remove it from that route group.
                 </p>
                 <div className="mt-4 flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setReassignTarget(null)}
-                    disabled={pending}
-                  >
+                  <Button variant="outline" onClick={() => setReassignTarget(null)}>
                     Cancel
                   </Button>
-                  <Button onClick={confirmReassign} disabled={pending}>
+                  <Button
+                    onClick={confirmReassign}
+                    disabled={inFlight.has(reassignTarget.id)}
+                  >
                     Move property
                   </Button>
                 </div>

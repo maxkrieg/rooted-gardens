@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -21,20 +22,42 @@ interface UnroutedPanelProps {
  * toggle, unlike the old "Unassigned only" switch buried in each route
  * group's Assign Properties sheet. Returns null when there's nothing to
  * stage; the page renders the sage "all routed" tally in that case instead.
+ *
+ * Like the assignment sheet, this does NOT wait on the server round-trip to
+ * update: a routed row leaves the list as soon as its write succeeds, and busy
+ * state is tracked per row in `inFlight` rather than via the transition's
+ * pending flag (which gated every row at once and could stay stuck true).
  */
 export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
+  const router = useRouter()
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [pending, startTransition] = useTransition()
+  // Pending flag deliberately discarded — busy state is per row, below.
+  const [, startTransition] = useTransition()
+  const [inFlight, setInFlight] = useState<Set<string>>(new Set())
+  // Locally confirmed as routed — hides the row immediately instead of waiting
+  // for the page to re-render.
+  const [routed, setRouted] = useState<Set<string>>(new Set())
+
+  // Fresh props are authoritative, so drop the local hiding whenever the server
+  // sends a new list (React's sanctioned "adjust state during render" pattern —
+  // an effect here would just cause a second render pass).
+  const [propsSnapshot, setPropsSnapshot] = useState(properties)
+  if (propsSnapshot !== properties) {
+    setPropsSnapshot(properties)
+    if (routed.size > 0) setRouted(new Set())
+  }
 
   const sorted = useMemo(
     () =>
-      [...properties].sort(
-        (a, b) => a.accountName.localeCompare(b.accountName) || a.address.localeCompare(b.address)
-      ),
-    [properties]
+      [...properties]
+        .filter((p) => !routed.has(p.id))
+        .sort(
+          (a, b) => a.accountName.localeCompare(b.accountName) || a.address.localeCompare(b.address)
+        ),
+    [properties, routed]
   )
 
-  if (properties.length === 0) return null
+  if (sorted.length === 0) return null
 
   function toggle(propertyId: string) {
     setSelected((prev) => {
@@ -57,32 +80,89 @@ export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
     return routeGroups.find((rg) => rg.id === routeGroupId)?.name ?? 'the route'
   }
 
+  function markInFlight(ids: string[], busy: boolean) {
+    setInFlight((prev) => {
+      const next = new Set(prev)
+      for (const id of ids) {
+        if (busy) next.add(id)
+        else next.delete(id)
+      }
+      return next
+    })
+  }
+
+  function markRouted(ids: string[], isRouted: boolean) {
+    setRouted((prev) => {
+      const next = new Set(prev)
+      for (const id of ids) {
+        if (isRouted) next.add(id)
+        else next.delete(id)
+      }
+      return next
+    })
+  }
+
+  function deselect(ids: string[]) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      for (const id of ids) next.delete(id)
+      return next
+    })
+  }
+
+  // Putting the rows back is what "Undo" means here, so it has to clear the
+  // local hiding as well as reverse the write.
+  function undoAssign(ids: string[], routeGroupId: string) {
+    markInFlight(ids, true)
+    startTransition(async () => {
+      try {
+        const results = await Promise.all(ids.map((id) => unassignProperty(id, routeGroupId)))
+        const failed = results.find((r) => r.error)
+        if (failed) {
+          toast.error('Could not undo', { description: failed.error })
+          return
+        }
+        markRouted(ids, false)
+        router.refresh()
+      } catch {
+        toast.error('Could not undo', {
+          description: 'The change did not reach the server. Check your connection and try again.',
+        })
+      } finally {
+        markInFlight(ids, false)
+      }
+    })
+  }
+
   function handleAssignSingle(property: PropertyWithAccount, routeGroupId: string) {
     const name = routeGroupName(routeGroupId)
+    markInFlight([property.id], true)
     startTransition(async () => {
-      const res = await assignProperty(property.id, routeGroupId)
-      if (res.error) {
-        toast.error('Could not assign the property', { description: res.error })
-        return
-      }
-      setSelected((prev) => {
-        const next = new Set(prev)
-        next.delete(property.id)
-        return next
-      })
-      toast.success(`${property.address} added to ${name}.`, {
-        action: {
-          label: 'Undo',
-          onClick: () => {
-            startTransition(async () => {
-              const undoRes = await unassignProperty(property.id, routeGroupId)
-              if (undoRes.error) {
-                toast.error('Could not undo', { description: undoRes.error })
-              }
-            })
+      try {
+        const res = await assignProperty(property.id, routeGroupId)
+        if (res.error) {
+          toast.error('Could not assign the property', { description: res.error })
+          return
+        }
+        deselect([property.id])
+        markRouted([property.id], true)
+        // revalidatePath only marks the cache stale — this repaints the page.
+        router.refresh()
+        toast.success(`${property.address} added to ${name}.`, {
+          action: {
+            label: 'Undo',
+            onClick: () => undoAssign([property.id], routeGroupId),
           },
-        },
-      })
+        })
+      } catch {
+        // A thrown failure never reaches the `res.error` branch; without this
+        // the row would stay disabled forever with no explanation.
+        toast.error('Could not assign the property', {
+          description: 'The change did not reach the server. Check your connection and try again.',
+        })
+      } finally {
+        markInFlight([property.id], false)
+      }
     })
   }
 
@@ -90,23 +170,30 @@ export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
     const ids = [...selected]
     if (ids.length === 0) return
     const name = routeGroupName(routeGroupId)
+    markInFlight(ids, true)
     startTransition(async () => {
-      const res = await assignProperties(ids, routeGroupId)
-      if (res.error) {
-        toast.error('Could not assign the properties', { description: res.error })
-        return
-      }
-      setSelected(new Set())
-      toast.success(`${ids.length} propert${ids.length === 1 ? 'y' : 'ies'} added to ${name}.`, {
-        action: {
-          label: 'Undo',
-          onClick: () => {
-            startTransition(async () => {
-              await Promise.all(ids.map((id) => unassignProperty(id, routeGroupId)))
-            })
+      try {
+        const res = await assignProperties(ids, routeGroupId)
+        if (res.error) {
+          toast.error('Could not assign the properties', { description: res.error })
+          return
+        }
+        deselect(ids)
+        markRouted(ids, true)
+        router.refresh()
+        toast.success(`${ids.length} propert${ids.length === 1 ? 'y' : 'ies'} added to ${name}.`, {
+          action: {
+            label: 'Undo',
+            onClick: () => undoAssign(ids, routeGroupId),
           },
-        },
-      })
+        })
+      } catch {
+        toast.error('Could not assign the properties', {
+          description: 'The change did not reach the server. Check your connection and try again.',
+        })
+      } finally {
+        markInFlight(ids, false)
+      }
     })
   }
 
@@ -125,7 +212,7 @@ export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
           </div>
         </div>
         <span className="font-display text-2xl font-semibold text-foreground tabular-nums shrink-0">
-          {properties.length}
+          {sorted.length}
         </span>
       </div>
 
@@ -190,7 +277,7 @@ export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
                 </div>
                 <RoutePicker
                   routeGroups={routeGroups}
-                  disabled={pending}
+                  disabled={inFlight.has(property.id)}
                   onSelect={(routeGroupId) => handleAssignSingle(property, routeGroupId)}
                   className="shrink-0"
                 />
@@ -205,7 +292,7 @@ export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
               </span>
               <RoutePicker
                 routeGroups={routeGroups}
-                disabled={pending}
+                disabled={[...selected].some((id) => inFlight.has(id))}
                 onSelect={handleAssignBulk}
               />
             </div>
