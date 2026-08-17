@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Mail, Pencil, Phone, Smartphone } from 'lucide-react'
+import { Mail, Pencil, Phone, Send, Smartphone } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -15,17 +15,39 @@ import {
 } from '@/components/ui/sheet'
 import { EmployeeRoleBadge } from '@/components/management/badges'
 import { EmployeeForm } from '@/components/management/EmployeeForm'
-import { inviteEmployee, setEmployeeSmsOptIn } from '@/app/management/team/actions'
+import {
+  inviteEmployee,
+  resendEmployeeInvite,
+  setEmployeeSmsOptIn,
+} from '@/app/management/team/actions'
 import { SERVICE_SIDE_LABELS } from '@/lib/utils/team'
 import { cn } from '@/lib/utils'
-import type { Employee } from '@/types/app'
+import type { AppAccessStatus, Employee } from '@/types/app'
 
-export function EmployeeCard({ employee }: { employee: Employee }) {
+const ACCESS_LABELS: Record<AppAccessStatus, string> = {
+  none: 'No app access',
+  invited: 'Invited — not signed in',
+  active: 'Has app access',
+}
+
+export function EmployeeCard({
+  employee,
+  accessStatus,
+}: {
+  employee: Employee
+  accessStatus: AppAccessStatus
+}) {
   const [editOpen, setEditOpen] = useState(false)
   const [invitePending, startInvite] = useTransition()
   const [smsPending, startSms] = useTransition()
+  // Plain state, not useTransition: resending writes nothing, so there is no
+  // revalidate to wait on, and the button should free up the moment the email is
+  // away.
+  const [resending, setResending] = useState(false)
 
-  const hasAppAccess = Boolean(employee.user_id)
+  // 'invited' still counts as linked — the auth user exists, so the recoverable
+  // action is a resend, never a second invite.
+  const hasAppAccess = accessStatus !== 'none'
   const smsOptIn = !employee.sms_opt_out
 
   function handleInvite() {
@@ -37,6 +59,19 @@ export function EmployeeCard({ employee }: { employee: Employee }) {
         toast.success('Invite sent', { description: `Magic link sent to ${employee.email}` })
       }
     })
+  }
+
+  async function handleResend() {
+    setResending(true)
+    const res = await resendEmployeeInvite(employee.id)
+    setResending(false)
+    if (res.error) {
+      toast.error('Could not send the link', { description: res.error })
+    } else {
+      toast.success('Sign-in link sent', {
+        description: `${employee.email} — good for 1 hour, one use only.`,
+      })
+    }
   }
 
   function handleSmsToggle(next: boolean) {
@@ -87,19 +122,37 @@ export function EmployeeCard({ employee }: { employee: Employee }) {
 
         {/* App access */}
         <div className="flex items-center justify-between gap-2 pt-1">
-          <span className="flex items-center gap-1.5 text-xs">
+          <span className="flex items-center gap-1.5 text-xs min-w-0">
             <span
               className={cn(
                 'h-1.5 w-1.5 rounded-full shrink-0',
-                hasAppAccess ? 'bg-primary' : 'bg-muted-foreground/40',
+                accessStatus === 'active' && 'bg-primary',
+                accessStatus === 'invited' && 'bg-[var(--ochre)]',
+                accessStatus === 'none' && 'bg-muted-foreground/40',
               )}
               aria-hidden
             />
-            <span className={hasAppAccess ? 'text-foreground' : 'text-muted-foreground'}>
-              {hasAppAccess ? 'Has app access' : 'No app access'}
+            <span
+              className={cn(
+                'truncate',
+                accessStatus === 'active' ? 'text-foreground' : 'text-muted-foreground',
+              )}
+            >
+              {ACCESS_LABELS[accessStatus]}
             </span>
           </span>
-          {!hasAppAccess && (
+          {hasAppAccess ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5"
+              disabled={!employee.email || resending}
+              onClick={handleResend}
+            >
+              <Send className="h-3.5 w-3.5" aria-hidden />
+              {resending ? 'Sending…' : 'Resend Link'}
+            </Button>
+          ) : (
             <Button
               variant="outline"
               size="sm"

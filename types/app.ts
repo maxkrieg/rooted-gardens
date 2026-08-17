@@ -163,6 +163,17 @@ export type JobApplicationDetails = {
 
 // ─── Joined / composite types ─────────────────────────────────────────────────
 
+/**
+ * How far an employee actually got into the app — `employees.user_id` alone only
+ * proves an invite was *sent*, since inviteEmployee links the auth user the
+ * moment the email goes out. Resolved against auth.users; see
+ * lib/team/app-access.ts.
+ *   'none'    — never invited (no user_id)
+ *   'invited' — invite sent, never signed in (link may have expired)
+ *   'active'  — has signed in at least once
+ */
+export type AppAccessStatus = 'none' | 'invited' | 'active'
+
 /** Employee record joined to its auth.users identity (user_id is always set). */
 export type EmployeeWithUser = Employee & {
   user_id: string

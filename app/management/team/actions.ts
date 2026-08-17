@@ -2,6 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
+// Cookie-less anon client, used only by resendEmployeeInvite — see the note there
+// on why the @supabase/ssr client can't send that email.
+import { createClient as createAnonClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { employeeFormSchema, type EmployeeFormValues } from '@/lib/validators/employee'
@@ -184,5 +187,66 @@ export async function inviteEmployee(id: string): Promise<{ error?: string }> {
   }
 
   revalidatePath('/management/team')
+  return {}
+}
+
+/**
+ * Re-send a sign-in link to an employee who already has app access.
+ *
+ * inviteUserByEmail works exactly once — it *creates* the auth user, so a second
+ * call for the same address fails ("already been registered"). After the first
+ * invite the recoverable action is a plain magic link, which is the same
+ * one-time token the login page issues; the invite was only ever an
+ * owner-triggered version of it. Both expire on the project's Email OTP
+ * Expiration setting (1 hour by default), so an employee who misses the window
+ * just needs another link — this can be run as many times as it takes.
+ *
+ * Sent through a bare supabase-js client rather than lib/supabase/server.ts:
+ * @supabase/ssr forces flowType 'pkce', which would stash a code verifier in the
+ * *owner's* cookies, leaving the employee's browser unable to complete the
+ * exchange. supabase-js defaults to the implicit flow, which returns the session
+ * in the URL fragment — the same shape invite links already arrive in, and
+ * already handled by /auth/callback → /auth/confirm.
+ */
+export async function resendEmployeeInvite(id: string): Promise<{ error?: string }> {
+  const auth = await requireOwner()
+  if (auth.error) return { error: auth.error }
+
+  const supabase = await createClient()
+  const { data: employee, error: fetchErr } = await supabase
+    .from('employees')
+    .select('id, email, user_id')
+    .eq('id', id)
+    .single()
+  if (fetchErr || !employee) return { error: 'Employee not found' }
+  if (!employee.email) return { error: 'Add an email address before sending a link' }
+  if (!employee.user_id) return { error: 'Use “Invite to App” first — they have no login yet' }
+
+  const origin = await resolveOrigin()
+  const mailer = createAnonClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  )
+  const { error } = await mailer.auth.signInWithOtp({
+    email: employee.email,
+    options: {
+      emailRedirectTo: `${origin}/auth/callback`,
+      // A stale or mistyped address must never mint a second auth user that no
+      // employees row points at.
+      shouldCreateUser: false,
+    },
+  })
+  if (error) {
+    return {
+      error: toUserMessage(
+        error,
+        'Could not send the sign-in link. Try again in a minute.',
+        '[resendEmployeeInvite]',
+      ),
+    }
+  }
+
+  // Nothing was written — no revalidatePath.
   return {}
 }

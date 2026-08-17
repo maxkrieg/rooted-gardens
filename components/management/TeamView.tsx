@@ -22,9 +22,15 @@ import { EmptyState } from '@/components/states/EmptyState'
 import { EmployeeCard } from '@/components/management/EmployeeCard'
 import { EmployeeForm } from '@/components/management/EmployeeForm'
 import { SERVICE_SIDE_LABELS } from '@/lib/utils/team'
-import type { Employee } from '@/types/app'
+import type { AppAccessStatus, Employee } from '@/types/app'
 
-export function TeamView({ employees }: { employees: Employee[] }) {
+export function TeamView({
+  employees,
+  accessStatuses,
+}: {
+  employees: Employee[]
+  accessStatuses: Record<string, AppAccessStatus>
+}) {
   const [newOpen, setNewOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [sideFilter, setSideFilter] = useState<'all' | 'lawn' | 'garden'>('all')
@@ -120,7 +126,11 @@ export function TeamView({ employees }: { employees: Employee[] }) {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filtered.map((e) => (
-                <EmployeeCard key={e.id} employee={e} />
+                <EmployeeCard
+                  key={e.id}
+                  employee={e}
+                  accessStatus={accessStatuses[e.id] ?? (e.user_id ? 'active' : 'none')}
+                />
               ))}
             </div>
           )}

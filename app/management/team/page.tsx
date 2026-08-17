@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getAppAccessStatuses } from '@/lib/team/app-access'
 import { TeamView } from '@/components/management/TeamView'
 import { ErrorState } from '@/components/states/ErrorState'
 import type { Employee } from '@/types/app'
@@ -42,5 +43,8 @@ export default async function TeamPage() {
     )
   }
 
-  return <TeamView employees={(employees ?? []) as Employee[]} />
+  const roster = (employees ?? []) as Employee[]
+  const accessStatuses = await getAppAccessStatuses(roster)
+
+  return <TeamView employees={roster} accessStatuses={accessStatuses} />
 }
