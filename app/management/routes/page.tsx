@@ -139,7 +139,14 @@ export default async function RoutesPage() {
         <div className="space-y-4 pb-8">
           {routeGroups.map((group, idx) => {
             const assignedIds = assignmentMap.get(group.id) ?? new Set<string>()
-            const assignedProperties = allProperties.filter((p) => assignedIds.has(p.id))
+            // Account-then-address, so a card groups an account's sites together
+            // the way the schedule grid does (same comparator as UnroutedPanel).
+            const assignedProperties = allProperties
+              .filter((p) => assignedIds.has(p.id))
+              .sort(
+                (a, b) =>
+                  a.accountName.localeCompare(b.accountName) || a.address.localeCompare(b.address)
+              )
 
             return (
               <RouteGroupCard

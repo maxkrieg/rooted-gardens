@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { EmptyState } from '@/components/states/EmptyState'
+import { FrequencyBadge } from '@/components/management/badges'
 import { RouteGroupSheet } from '@/components/management/RouteGroupSheet'
 import { PropertyAssignmentSheet } from '@/components/management/PropertyAssignmentSheet'
 import { deleteRouteGroup, moveRouteGroup } from '@/app/management/routes/actions'
@@ -137,14 +138,25 @@ export function RouteGroupCard({
             className="mb-3"
           />
         ) : (
-          <ul className="space-y-1 mb-3">
+          <ul className="space-y-2.5 mb-3">
             {assignedProperties.map((property) => (
-              <li key={property.id} className="flex items-start gap-2 text-sm">
-                <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-                <span className="text-foreground truncate">{property.address}</span>
-                <span className="text-muted-foreground truncate text-xs ml-1 mt-px">
-                  {property.accountName}
-                </span>
+              <li key={property.id} className="flex items-start gap-2">
+                <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-1" />
+                {/* Account first, address below — mirrors the schedule grid's
+                    label column so owners can toggle between the two pages. */}
+                <div className="min-w-0 flex-1">
+                  <div className="font-display text-[15px] font-semibold leading-snug text-foreground truncate">
+                    {property.accountName}
+                  </div>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-[13px] leading-snug text-muted-foreground truncate">
+                      {property.address}
+                    </span>
+                    <span className="shrink-0">
+                      <FrequencyBadge frequency={property.frequency} />
+                    </span>
+                  </div>
+                </div>
               </li>
             ))}
           </ul>

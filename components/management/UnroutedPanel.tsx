@@ -173,14 +173,20 @@ export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
                   onCheckedChange={() => toggle(property.id)}
                   aria-label={`Select ${property.address}`}
                 />
+                {/* Account first, address below — same identity block as the
+                    route group cards and the schedule grid's label column. */}
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-medium text-foreground font-display truncate">
+                  <p className="font-display text-[15px] font-semibold leading-snug text-foreground truncate">
+                    {property.accountName}
+                  </p>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-[13px] leading-snug text-muted-foreground truncate">
                       {property.address}
-                    </p>
-                    <FrequencyBadge frequency={property.frequency} />
+                    </span>
+                    <span className="shrink-0">
+                      <FrequencyBadge frequency={property.frequency} />
+                    </span>
                   </div>
-                  <p className="text-xs text-muted-foreground truncate">{property.accountName}</p>
                 </div>
                 <RoutePicker
                   routeGroups={routeGroups}
