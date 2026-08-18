@@ -39,6 +39,22 @@ export function visitVersion(v: { updated_at?: string | null }): number | null {
 }
 
 /**
+ * The version an optimistic cache write should carry so the live overlay accepts
+ * it right away instead of waiting for the confirming refetch.
+ *
+ * One millisecond past the row it replaces — deliberately NOT `Date.now()`. A
+ * device running fast would stamp a version the real server write can't beat,
+ * and the overlay would then reject genuine later updates for the length of the
+ * skew. Anchoring to the row being replaced is monotonic against server time and
+ * cannot overshoot: the server's own updated_at, written seconds later, is
+ * always larger, so the truth reclaims the cell as soon as it lands.
+ */
+export function nextVisitVersion(current: string | null | undefined): string {
+  const ms = visitVersion({ updated_at: current })
+  return new Date((ms ?? Date.now()) + 1).toISOString()
+}
+
+/**
  * Layer a live overlay over a server-rendered visit.
  *
  * Guarded by `updated_at` rather than applied unconditionally: a dropped

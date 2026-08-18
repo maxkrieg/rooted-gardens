@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
+import { nextVisitVersion } from '@/lib/utils/visits'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
 
 /**
@@ -33,7 +34,19 @@ export function useRevertVisitToScheduled(visitId: string) {
       const previous = queryClient.getQueryData<StopDetail | null>(['stop-detail', visitId])
 
       queryClient.setQueryData<StopDetail | null>(['stop-detail', visitId], (old) =>
-        old ? { ...old, visit: { ...old.visit, status: 'scheduled', skip_reason: null } } : old
+        old
+          ? {
+              ...old,
+              visit: {
+                ...old.visit,
+                status: 'scheduled',
+                skip_reason: null,
+                // Beat the row this replaces so the management grid's live
+                // overlay takes it now rather than on the confirming refetch.
+                updated_at: nextVisitVersion(old.visit.updated_at),
+              },
+            }
+          : old
       )
 
       return { previous }

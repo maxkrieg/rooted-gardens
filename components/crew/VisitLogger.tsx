@@ -20,6 +20,7 @@ import { enqueueMutation, flushMutationQueue } from '@/lib/crew/mutation-queue'
 import { useActiveEmployees } from '@/hooks/crew/useActiveEmployees'
 import { createClient } from '@/lib/supabase/client'
 import { MAX_PHOTO_BYTES, ALLOWED_PHOTO_TYPES } from '@/lib/utils/photos'
+import { nextVisitVersion } from '@/lib/utils/visits'
 import { PhotoLightbox, type LightboxPhoto } from '@/components/PhotoLightbox'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
 
@@ -401,6 +402,9 @@ export function VisitLogger({
           // Set the visit's timing; ended_at clears the "On site" indicator immediately
           started_at: startedAtISO,
           ended_at: endedAt,
+          // Beat the row this replaces so the management grid's live overlay
+          // takes it now rather than on the confirming refetch.
+          updated_at: nextVisitVersion(old.visit.updated_at),
         },
       }
     })

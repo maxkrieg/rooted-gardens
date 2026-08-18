@@ -13,6 +13,7 @@ import {
   SheetFooter,
 } from '@/components/ui/sheet'
 import { enqueueMutation, flushMutationQueue } from '@/lib/crew/mutation-queue'
+import { nextVisitVersion } from '@/lib/utils/visits'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
 
 interface SkipSheetProps {
@@ -87,6 +88,9 @@ export function SkipSheet({
           status: 'skipped',
           skip_reason: skipReason.trim() || null,
           ...(inProgress ? { ended_at: endedAt } : {}),
+          // Beat the row this replaces so the management grid's live overlay
+          // takes it now rather than on the confirming refetch.
+          updated_at: nextVisitVersion(old.visit.updated_at),
         },
       }
     })
