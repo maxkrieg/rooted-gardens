@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { addDays, format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
 import { ChevronRight, FilePen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createVisit } from '@/app/management/schedule/actions'
+import { toUserMessage } from '@/lib/errors'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
 import { ScheduleEmptyState } from '@/components/management/ScheduleEmptyState'
@@ -69,7 +70,11 @@ export function ScheduleListMobile({
   const [sheetRow, setSheetRow] = useState<SchedulePropertyRow | null>(null)
   const [sheetWeek, setSheetWeek] = useState('')
   const [creatingKey, setCreatingKey] = useState<string | null>(null)
-  const [, startTransition] = useTransition()
+  // Visits created in this session, keyed by row. Layered *under* the server
+  // props in renderStopRow so a just-scheduled row paints immediately instead of
+  // waiting on revalidatePath — and never cleared, since clearing it would race
+  // the props catching up (the routes-page freeze, commit f4e09e3).
+  const [createdVisits, setCreatedVisits] = useState<Map<string, VisitWithCrew>>(new Map())
 
   const [assignOpen, setAssignOpen] = useState(false)
   const [assignGroup, setAssignGroup] = useState<RouteGroup | null>(null)
@@ -79,24 +84,50 @@ export function ScheduleListMobile({
     if (!next) syncVisitUrlParam(null)
   }
 
+  function openSheet(row: SchedulePropertyRow, visit: VisitWithCrew, weekStart: string) {
+    setSheetRow({ ...row, visit })
+    setSheetWeek(weekStart)
+    setSheetOpen(true)
+    // The phone list renders a single week — that IS the window start.
+    syncVisitUrlParam(visit.id, weekStart)
+  }
+
+  /**
+   * Tapping an unscheduled row both schedules it and opens the drawer — one tap
+   * instead of two on a phone, where the owner is almost always about to set
+   * crew or an instruction. Not wrapped in startTransition: the drawer state
+   * must be urgent, or it queues behind the revalidated RSC tree and reads as a
+   * frozen row.
+   */
+  async function scheduleRow(row: SchedulePropertyRow, weekStart: string) {
+    const cellKey = `${row.property.id}-${weekStart}`
+    setCreatingKey(cellKey)
+    try {
+      const res = await createVisit(row.property.id, weekStart, row.account.id)
+      if (res.error || !res.visit) {
+        toast.error('Failed to create visit', { description: res.error })
+        return
+      }
+      const visit = res.visit
+      setCreatedVisits((prev) => new Map(prev).set(cellKey, visit))
+      openSheet(row, visit, weekStart)
+    } catch (err) {
+      // A thrown failure (dropped connection mid-action) never reaches the
+      // res.error branch, and would leave the row stuck on its placeholder.
+      toast.error('Failed to create visit', {
+        description: toUserMessage(err, 'Could not add the stop.', '[ScheduleListMobile.scheduleRow]'),
+      })
+    } finally {
+      setCreatingKey(null)
+    }
+  }
+
   function handleRowClick(row: SchedulePropertyRow, visit: VisitWithCrew | null) {
     if (!week) return
     if (visit) {
-      setSheetRow({ ...row, visit })
-      setSheetWeek(week.weekStart)
-      setSheetOpen(true)
-      // The phone list renders a single week — that IS the window start.
-      syncVisitUrlParam(visit.id, week.weekStart)
+      openSheet(row, visit, week.weekStart)
     } else {
-      const cellKey = `${row.property.id}-${week.weekStart}`
-      setCreatingKey(cellKey)
-      startTransition(async () => {
-        const res = await createVisit(row.property.id, week.weekStart, row.account.id)
-        setCreatingKey(null)
-        if (res.error) {
-          toast.error('Failed to create visit', { description: res.error })
-        }
-      })
+      void scheduleRow(row, week.weekStart)
     }
   }
 
@@ -121,30 +152,33 @@ export function ScheduleListMobile({
     const isNested = variant === 'nested'
     const cellKey = `${row.property.id}-${currentWeek.weekStart}`
     const isCreating = creatingKey === cellKey
+    // Server data wins once the revalidated render lands; the local map only
+    // covers the gap between the insert and that render.
+    const visit = row.visit ?? createdVisits.get(cellKey) ?? null
     // Merge live realtime overlay with server-fetched visit timing
-    const overlay = row.visit ? visitTimings.get(row.visit.id) : undefined
+    const overlay = visit ? visitTimings.get(visit.id) : undefined
     const effectiveStartedAt =
-      overlay !== undefined ? overlay.started_at : (row.visit?.started_at ?? null)
-    const inProgress = row.visit
+      overlay !== undefined ? overlay.started_at : (visit?.started_at ?? null)
+    const inProgress = visit
       ? isVisitInProgress({
           started_at: effectiveStartedAt,
-          ended_at: overlay !== undefined ? overlay.ended_at : (row.visit?.ended_at ?? null),
+          ended_at: overlay !== undefined ? overlay.ended_at : (visit?.ended_at ?? null),
         })
       : false
     // Once a visit is completed, show who actually did the work rather than
     // who was planned — falls back to assigned crew if no completion crew
     // was recorded.
-    const assigned = row.visit
-      ? row.visit.visit_crew
+    const assigned = visit
+      ? visit.visit_crew
           .filter((vc) => vc.relation === 'assigned' && vc.employee)
           .map((vc) => vc.employee!)
       : []
-    const completed = row.visit
-      ? row.visit.visit_crew
+    const completed = visit
+      ? visit.visit_crew
           .filter((vc) => vc.relation === 'completed' && vc.employee)
           .map((vc) => vc.employee!)
       : []
-    const displayCrew = row.visit?.status === 'completed' && completed.length > 0 ? completed : assigned
+    const displayCrew = visit?.status === 'completed' && completed.length > 0 ? completed : assigned
     const displayedCrew = displayCrew.slice(0, 2)
     const overflow = displayCrew.length - 2
 
@@ -153,7 +187,7 @@ export function ScheduleListMobile({
         key={row.property.id}
         type="button"
         disabled={isCreating}
-        onClick={() => handleRowClick(row, row.visit)}
+        onClick={() => handleRowClick(row, visit)}
         className={cn(
           'w-full text-left py-3 min-h-[56px]',
           'flex items-center justify-between gap-3',
@@ -205,15 +239,15 @@ export function ScheduleListMobile({
                 </div>
               )}
 
-              {row.visit?.crew_instruction && (
+              {visit?.crew_instruction && (
                 <FilePen className="w-4 h-4 text-[var(--clay)] shrink-0" />
               )}
 
-              {row.visit ? (
+              {visit ? (
                 <div className="flex flex-col items-end gap-1">
-                  <VisitStatusBadge status={row.visit.status} />
-                  {row.visit.status === 'completed' && row.visit.invoice && (
-                    <InvoiceStatusBadge status={row.visit.invoice.status} withIcon />
+                  <VisitStatusBadge status={visit.status} />
+                  {visit.status === 'completed' && visit.invoice && (
+                    <InvoiceStatusBadge status={visit.invoice.status} withIcon />
                   )}
                 </div>
               ) : (

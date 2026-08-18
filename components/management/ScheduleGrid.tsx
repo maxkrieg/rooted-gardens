@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { addDays, format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
@@ -9,6 +9,7 @@ import { getWeekStart, groupRowsByAccount } from '@/lib/utils/schedule'
 import { syncVisitUrlParam } from '@/lib/utils/visit-url'
 import { formatAccountPrice } from '@/lib/utils/accounts'
 import { createVisit } from '@/app/management/schedule/actions'
+import { toUserMessage } from '@/lib/errors'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
 import { ScheduleEmptyState } from '@/components/management/ScheduleEmptyState'
@@ -56,7 +57,11 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
   const [sheetRow, setSheetRow] = useState<SchedulePropertyRow | null>(null)
   const [sheetWeek, setSheetWeek] = useState('')
   const [creatingKey, setCreatingKey] = useState<string | null>(null)
-  const [, startTransition] = useTransition()
+  // Visits created in this session, keyed by cell. Layered *under* the server
+  // props in renderWeekCell so a just-scheduled cell paints immediately instead
+  // of waiting on revalidatePath — and never cleared, since clearing it would
+  // race the props catching up (the routes-page freeze, commit f4e09e3).
+  const [createdVisits, setCreatedVisits] = useState<Map<string, VisitWithCrew>>(new Map())
 
   const [assignOpen, setAssignOpen] = useState(false)
   const [assignGroup, setAssignGroup] = useState<RouteGroup | null>(null)
@@ -79,23 +84,56 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
     return map
   }, [weeks])
 
+  function openSheet(row: SchedulePropertyRow, visit: VisitWithCrew, weekStart: string) {
+    setSheetRow({ ...row, visit })
+    setSheetWeek(weekStart)
+    setSheetOpen(true)
+    // weeks[0] is the leftmost rendered column — the window the server built.
+    syncVisitUrlParam(visit.id, weeks[0]?.weekStart)
+  }
+
+  /**
+   * Schedule an empty cell. `openDrawer` is true for a click — the owner almost
+   * always wants to set crew or an instruction next, so opening straight away
+   * saves a second tap on a small target. The `S` shortcut passes false to keep
+   * a fast path for filling a week without a drawer each time.
+   *
+   * Deliberately not wrapped in startTransition: the drawer state must be an
+   * urgent update, or it queues behind the revalidated RSC tree and reads as a
+   * frozen cell.
+   */
+  async function scheduleCell(
+    row: SchedulePropertyRow,
+    weekStart: string,
+    { openDrawer }: { openDrawer: boolean },
+  ) {
+    const cellKey = `${row.property.id}-${weekStart}`
+    setCreatingKey(cellKey)
+    try {
+      const res = await createVisit(row.property.id, weekStart, row.account.id)
+      if (res.error || !res.visit) {
+        toast.error('Failed to create visit', { description: res.error })
+        return
+      }
+      const visit = res.visit
+      setCreatedVisits((prev) => new Map(prev).set(cellKey, visit))
+      if (openDrawer) openSheet(row, visit, weekStart)
+    } catch (err) {
+      // A thrown failure (dropped connection mid-action) never reaches the
+      // res.error branch, and would leave the cell stuck on its placeholder.
+      toast.error('Failed to create visit', {
+        description: toUserMessage(err, 'Could not add the stop.', '[ScheduleGrid.scheduleCell]'),
+      })
+    } finally {
+      setCreatingKey(null)
+    }
+  }
+
   function handleCellClick(row: SchedulePropertyRow, weekStart: string, visit: VisitWithCrew | null) {
     if (visit) {
-      setSheetRow({ ...row, visit })
-      setSheetWeek(weekStart)
-      setSheetOpen(true)
-      // weeks[0] is the leftmost rendered column — the window the server built.
-      syncVisitUrlParam(visit.id, weeks[0]?.weekStart)
+      openSheet(row, visit, weekStart)
     } else {
-      const cellKey = `${row.property.id}-${weekStart}`
-      setCreatingKey(cellKey)
-      startTransition(async () => {
-        const res = await createVisit(row.property.id, weekStart, row.account.id)
-        setCreatingKey(null)
-        if (res.error) {
-          toast.error('Failed to create visit', { description: res.error })
-        }
-      })
+      void scheduleCell(row, weekStart, { openDrawer: true })
     }
   }
 
@@ -110,9 +148,11 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
     weekStart: string,
     visit: VisitWithCrew | null,
   ) {
+    // Schedule without opening the drawer — the fast path for filling several
+    // cells in a row. A click (or Enter/Space, below) opens it.
     if ((e.key === 's' || e.key === 'S') && !visit) {
       e.preventDefault()
-      handleCellClick(row, weekStart, null)
+      void scheduleCell(row, weekStart, { openDrawer: false })
     }
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
@@ -121,8 +161,11 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
   }
 
   function renderWeekCell(row: SchedulePropertyRow, week: ScheduleWeek) {
-    const visit = visitMap.get(row.property.id)?.get(week.weekStart) ?? null
     const cellKey = `${row.property.id}-${week.weekStart}`
+    // Server data wins once the revalidated render lands; the local map only
+    // covers the gap between the insert and that render.
+    const visit =
+      visitMap.get(row.property.id)?.get(week.weekStart) ?? createdVisits.get(cellKey) ?? null
     // Merge live realtime overlay with server-fetched visit timing
     const overlay = visit ? visitTimings.get(visit.id) : undefined
     const effectiveStartedAt = overlay !== undefined ? overlay.started_at : (visit?.started_at ?? null)

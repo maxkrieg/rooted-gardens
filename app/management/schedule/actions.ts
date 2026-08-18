@@ -89,26 +89,38 @@ export async function getScheduleForWeek(weekStart: string): Promise<ScheduleWee
   return buildScheduleWeek(weekStart, routeGroups, assignments, visits, ungroupedProperties)
 }
 
+/**
+ * Schedule a property for a week. Returns the created row so the caller can open
+ * the visit drawer on it straight away, rather than waiting for revalidatePath's
+ * render to make the cell clickable a second time. The select mirrors the visits
+ * query in getScheduleForWeek above so the result is VisitWithCrew-shaped —
+ * visit_crew comes back `[]` and invoice `null` on a fresh row, which is what
+ * VisitDetailSheet's normalizeRow expects (it walks visit_crew unguarded).
+ */
 export async function createVisit(
   propertyId: string,
   weekStart: string,
   accountId: string,
-): Promise<{ error?: string }> {
+): Promise<{ error?: string; visit?: VisitWithCrew }> {
   const supabase = await createClient()
 
-  const { error } = await supabase.from('visits').insert({
-    account_id: accountId,
-    property_id: propertyId,
-    week_start: weekStart,
-    status: 'scheduled',
-  })
+  const { data, error } = await supabase
+    .from('visits')
+    .insert({
+      account_id: accountId,
+      property_id: propertyId,
+      week_start: weekStart,
+      status: 'scheduled',
+    })
+    .select(`*, visit_crew(*, employee:employees(*)), invoice:invoices(status, qbo_invoice_id)`)
+    .single()
 
   if (error) {
     return { error: toUserMessage(error, 'Could not add the stop.', '[createVisit]') }
   }
 
   revalidatePath('/management/schedule')
-  return {}
+  return { visit: data as unknown as VisitWithCrew }
 }
 
 export async function bulkAssignRoute(
