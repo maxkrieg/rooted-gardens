@@ -44,6 +44,14 @@ const persister = createAsyncStoragePersister({
   key: 'rq-v1',
 })
 
+/**
+ * Bump whenever a persisted query's *shape* changes, not just its data — a
+ * restored entry written by an older bundle is otherwise indistinguishable from
+ * a fresh one. `stop-detail` gaining `visit.updated_at` is the case in hand:
+ * entries missing it made version comparison undecidable downstream.
+ */
+const CACHE_BUSTER = 'stop-detail-updated-at'
+
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
     () =>
@@ -66,7 +74,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <PersistQueryClientProvider
       client={queryClient}
-      persistOptions={{ persister, maxAge: 1000 * 60 * 60 * 24 }}
+      persistOptions={{ persister, maxAge: 1000 * 60 * 60 * 24, buster: CACHE_BUSTER }}
     >
       {/* Inside the query provider so the fallback's retry can reach the cache. */}
       <ErrorBoundary>{children}</ErrorBoundary>

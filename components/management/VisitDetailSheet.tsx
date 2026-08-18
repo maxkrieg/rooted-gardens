@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { addDays, format, parseISO } from 'date-fns'
@@ -19,9 +19,9 @@ import { VisitDetailContent } from '@/components/VisitDetailContent'
 import { VisitLogger } from '@/components/crew/VisitLogger'
 import { SkipSheet } from '@/components/crew/SkipSheet'
 import { useStopDetail, type StopDetail } from '@/hooks/crew/useStopDetail'
-import { useVisitTimings } from '@/components/management/SessionsProvider'
+import { useApplyVisitOverlay, useVisitOverlays } from '@/components/management/SessionsProvider'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
-import { isVisitInProgress } from '@/lib/utils/visits'
+import { isVisitInProgress, mergeVisitOverlay } from '@/lib/utils/visits'
 import type { EmployeeRole, SchedulePropertyRow } from '@/types/app'
 
 // routeGroup is never read in this component — callers without route-group context
@@ -63,6 +63,7 @@ function normalizeRow(row: VisitDetailRow): StopDetail | undefined {
       completion_note: v.completion_note,
       skip_reason: v.skip_reason,
       vehicle_id: v.vehicle_id,
+      updated_at: v.updated_at,
     },
     // Populated from the schedule/account embed when present, so the invoice
     // badge shows immediately; useStopDetail's refetch backfills it otherwise.
@@ -94,15 +95,37 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart, role }: V
 
   const { data: raw } = useStopDetail(visitId, { initialData })
 
-  // Merge the live realtime timing overlay (management-only concern — the grid's
-  // SessionsProvider) over the query result before handing data to the shared content.
-  const visitTimings = useVisitTimings()
+  // Merge the live overlay (management-only concern — the grid's SessionsProvider)
+  // over the query result before handing data to the shared content.
+  const visitOverlays = useVisitOverlays()
+  const applyVisitOverlay = useApplyVisitOverlay()
   const data = useMemo(() => {
     if (!raw) return raw
-    const overlay = visitTimings.get(raw.visitId)
-    if (overlay === undefined) return raw
-    return { ...raw, visit: { ...raw.visit, started_at: overlay.started_at, ended_at: overlay.ended_at } }
-  }, [raw, visitTimings])
+    const merged = mergeVisitOverlay(raw.visit, visitOverlays)
+    return merged === raw.visit ? raw : { ...raw, visit: merged }
+  }, [raw, visitOverlays])
+
+  // Push what the drawer knows back into the grid's overlay. Status writes here
+  // are direct-client (no Server Action, no revalidatePath) and the close-time
+  // router.refresh() has proven unreliable, so this is what actually repaints the
+  // cell behind the sheet — including the revert-to-scheduled path, which never
+  // closes the drawer at all.
+  //
+  // The optimistic cache write that lands first carries the *old* updated_at, so
+  // mergeVisitOverlay rejects it; the refetch forced by the mutation's
+  // invalidateQueries then arrives with the server's real updated_at and wins.
+  // Deliberately not synthesizing a client timestamp — a fast client clock would
+  // pin the overlay and start rejecting genuine later updates.
+  //
+  // Pushes `raw`, never `data`: `data` is the overlay already merged back in, so
+  // feeding it here is a cycle by construction — every push mints a new merged
+  // object that re-fires this effect. React Query's structural sharing keeps
+  // `raw.visit` referentially stable until its contents actually change.
+  const visitForOverlay = raw?.visit
+  useEffect(() => {
+    if (!visitForOverlay) return
+    applyVisitOverlay(visitForOverlay)
+  }, [visitForOverlay, applyVisitOverlay])
 
   const [completionOpen, setCompletionOpen] = useState(false)
   const [skipOpen, setSkipOpen] = useState(false)
@@ -125,8 +148,14 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart, role }: V
     // Radix overlays portaled to <body>, so the inner close reaches this one as
     // an outside interaction, arriving just after the lightbox has unmounted.
     if (!next && (photoViewerOpen || Date.now() - photoClosedAt.current < 500)) return
-    onOpenChange(next)
+    // Refresh BEFORE onOpenChange: the parent's close handler runs
+    // syncVisitUrlParam(null) → history.replaceState, which Next turns into a
+    // router action of its own. Dispatched after it, the refresh can be
+    // discarded by that restore — the suspected reason a status change didn't
+    // repaint the grid on close. The live overlay above is what the repaint
+    // actually relies on now; this just reconciles with server data.
     if (!next) router.refresh()
+    onOpenChange(next)
   }
 
   if (!data) return null

@@ -11,8 +11,8 @@ import { toUserMessage } from '@/lib/errors'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
 import { ScheduleEmptyState } from '@/components/management/ScheduleEmptyState'
-import { useVisitTimings } from '@/components/management/SessionsProvider'
-import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
+import { useVisitOverlays } from '@/components/management/SessionsProvider'
+import { isVisitInProgress, formatElapsed, mergeVisitOverlay } from '@/lib/utils/visits'
 import { groupRowsByAccount } from '@/lib/utils/schedule'
 import { syncVisitUrlParam } from '@/lib/utils/visit-url'
 import { formatAccountPrice } from '@/lib/utils/accounts'
@@ -57,7 +57,7 @@ export function ScheduleListMobile({
   role,
   filtered,
 }: ScheduleListMobileProps) {
-  const visitTimings = useVisitTimings()
+  const visitOverlays = useVisitOverlays()
 
   // Tick elapsed time every 30s
   const [, setTick] = useState(0)
@@ -154,17 +154,13 @@ export function ScheduleListMobile({
     const isCreating = creatingKey === cellKey
     // Server data wins once the revalidated render lands; the local map only
     // covers the gap between the insert and that render.
-    const visit = row.visit ?? createdVisits.get(cellKey) ?? null
-    // Merge live realtime overlay with server-fetched visit timing
-    const overlay = visit ? visitTimings.get(visit.id) : undefined
-    const effectiveStartedAt =
-      overlay !== undefined ? overlay.started_at : (visit?.started_at ?? null)
-    const inProgress = visit
-      ? isVisitInProgress({
-          started_at: effectiveStartedAt,
-          ended_at: overlay !== undefined ? overlay.ended_at : (visit?.ended_at ?? null),
-        })
-      : false
+    const base = row.visit ?? createdVisits.get(cellKey) ?? null
+    // Layer the live overlay (realtime UPDATEs + the drawer's own writes) over
+    // the server row, so status, timing, and the instruction flag all repaint
+    // without waiting on a server render.
+    const visit = base ? mergeVisitOverlay(base, visitOverlays) : null
+    const effectiveStartedAt = visit?.started_at ?? null
+    const inProgress = visit ? isVisitInProgress(visit) : false
     // Once a visit is completed, show who actually did the work rather than
     // who was planned — falls back to assigned crew if no completion crew
     // was recorded.

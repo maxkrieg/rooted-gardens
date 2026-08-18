@@ -17,6 +17,9 @@ export type StopDetail = {
     completion_note: string | null
     skip_reason: string | null
     vehicle_id: string | null
+    /** Version marker — lets the management drawer push this row into the
+     *  schedule's live overlay with a comparable timestamp (mergeVisitOverlay). */
+    updated_at: string
   }
   // The invoice this visit was billed on, if any (null when uninvoiced, or under
   // RLS for roles that can't read invoices — e.g. crew). Only surfaced in the
@@ -67,7 +70,7 @@ export function useStopDetail(visitId: string | undefined, options?: { initialDa
         .from('visits')
         .select(`
           id, status, crew_instruction, week_start, started_at, ended_at,
-          service_types, completion_note, skip_reason, vehicle_id,
+          service_types, completion_note, skip_reason, vehicle_id, updated_at,
           invoice:invoices(status, qbo_invoice_id),
           property:properties!inner(
             id, address, frequency, crew_notes, access_notes, parking_notes
@@ -108,6 +111,7 @@ export function useStopDetail(visitId: string | undefined, options?: { initialDa
           completion_note: data.completion_note,
           skip_reason: data.skip_reason,
           vehicle_id: data.vehicle_id,
+          updated_at: data.updated_at,
         },
         invoice: (data.invoice as unknown as VisitInvoiceInfo | null) ?? null,
         property,

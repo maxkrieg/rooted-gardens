@@ -13,8 +13,8 @@ import { toUserMessage } from '@/lib/errors'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
 import { ScheduleEmptyState } from '@/components/management/ScheduleEmptyState'
-import { useVisitTimings } from '@/components/management/SessionsProvider'
-import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
+import { useVisitOverlays } from '@/components/management/SessionsProvider'
+import { isVisitInProgress, formatElapsed, mergeVisitOverlay } from '@/lib/utils/visits'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { FilePen, Camera } from 'lucide-react'
@@ -51,7 +51,7 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
     () => format(getWeekStart(new Date()), 'yyyy-MM-dd'),
     []
   )
-  const visitTimings = useVisitTimings()
+  const visitOverlays = useVisitOverlays()
 
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sheetRow, setSheetRow] = useState<SchedulePropertyRow | null>(null)
@@ -164,15 +164,13 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
     const cellKey = `${row.property.id}-${week.weekStart}`
     // Server data wins once the revalidated render lands; the local map only
     // covers the gap between the insert and that render.
-    const visit =
+    const base =
       visitMap.get(row.property.id)?.get(week.weekStart) ?? createdVisits.get(cellKey) ?? null
-    // Merge live realtime overlay with server-fetched visit timing
-    const overlay = visit ? visitTimings.get(visit.id) : undefined
-    const effectiveStartedAt = overlay !== undefined ? overlay.started_at : (visit?.started_at ?? null)
-    const effectiveEndedAt = overlay !== undefined ? overlay.ended_at : (visit?.ended_at ?? null)
-    const inProgress = visit
-      ? isVisitInProgress({ started_at: effectiveStartedAt, ended_at: effectiveEndedAt })
-      : false
+    // Layer the live overlay (realtime UPDATEs + the drawer's own writes) over
+    // the server row, so status, timing, and the instruction flag all repaint
+    // without waiting on a server render.
+    const visit = base ? mergeVisitOverlay(base, visitOverlays) : null
+    const inProgress = visit ? isVisitInProgress(visit) : false
     // week.weekStart and currentWeekStart are both 'yyyy-MM-dd', so this sorts lexicographically.
     const isPastWeek = week.weekStart < currentWeekStart
     return (
@@ -180,7 +178,7 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
         <ScheduleCell
           visit={visit}
           inProgress={inProgress}
-          startedAt={effectiveStartedAt}
+          startedAt={visit?.started_at ?? null}
           isCreating={creatingKey === cellKey}
           onClick={() => handleCellClick(row, week.weekStart, visit)}
           onKeyDown={(e) => handleCellKeyDown(e, row, week.weekStart, visit)}
