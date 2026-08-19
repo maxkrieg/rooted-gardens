@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Offline · Rooted Gardens</title>
+    <style>
+      :root {
+        --background: #f6f3ea;
+        --foreground: #2b2a24;
+        --card: #fcfaf4;
+        --muted-foreground: #6e665a;
+        --border: #e4ddcf;
+        --primary: #4a7c59;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --background: #1c1a15;
+          --foreground: #ece7da;
+          --card: #24211b;
+          --muted-foreground: #a89e8c;
+          --border: #353026;
+          --primary: #6b9a78;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        background: var(--background);
+        color: var(--foreground);
+        font-family: ui-sans-serif, system-ui, sans-serif;
+      }
+      .card {
+        width: 100%;
+        max-width: 24rem;
+        padding: 2rem 1.5rem;
+        text-align: center;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 1rem;
+        box-shadow:
+          0 1px 2px rgba(43, 42, 36, 0.04),
+          0 6px 16px -4px rgba(43, 42, 36, 0.08);
+      }
+      .leaf {
+        font-size: 2rem;
+        line-height: 1;
+        margin-bottom: 0.75rem;
+      }
+      h1 {
+        margin: 0 0 0.5rem;
+        font-family: ui-serif, Georgia, serif;
+        font-size: 1.25rem;
+        font-weight: 600;
+      }
+      p {
+        margin: 0 0 1.5rem;
+        font-size: 0.875rem;
+        line-height: 1.5;
+        color: var(--muted-foreground);
+      }
+      button {
+        width: 100%;
+        min-height: 2.75rem;
+        padding: 0 1rem;
+        font: inherit;
+        font-weight: 600;
+        color: #f4f1e8;
+        background: var(--primary);
+        border: 0;
+        border-radius: 0.5rem;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <div class="leaf" aria-hidden="true">🌿</div>
+      <h1>No connection</h1>
+      <p>
+        This page hasn't been opened on this device yet, so there's nothing saved to show.
+        Pages you've already visited still work offline.
+      </p>
+      <button type="button" onclick="window.location.reload()">Try again</button>
+    </main>
+  </body>
+</html>

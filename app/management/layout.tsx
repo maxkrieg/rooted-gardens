@@ -1,5 +1,22 @@
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { ManagementNav } from '@/components/management/ManagementNav'
+import { ManagementShell } from '@/components/management/ManagementShell'
+import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration'
+
+/**
+ * Its own manifest, so installing from a management page yields the management
+ * app (browsers use the manifest of the page being installed). Kept off the root
+ * layout so anonymous marketing visitors still aren't offered an install.
+ */
+export const metadata: Metadata = {
+  manifest: '/manifest-management.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Rooted Gardens',
+  },
+}
 
 export default async function ManagementLayout({
   children,
@@ -59,6 +76,7 @@ export default async function ManagementLayout({
     // dvh, not vh — iOS Safari's collapsing URL bar makes 100vh taller than the
     // visible viewport, which left a sliver of dead space at the bottom.
     <div className="min-h-[100dvh] bg-background">
+      <ServiceWorkerRegistration />
       <ManagementNav
         userEmail={user?.email}
         role={role}
@@ -71,7 +89,10 @@ export default async function ManagementLayout({
             absorbs the safe-area inset (see ManagementNav) — match it here too.
           - Desktop: offset right of the fixed sidebar (w-56 = ml-56), no top padding */}
       <main className="lg:ml-56 pt-[calc(3.5rem+env(safe-area-inset-top,0px))] lg:pt-0 min-h-[100dvh]">
-        <div className="p-4 lg:p-6 h-full">{children}</div>
+        {/* Banner inside main so it doesn't fight the fixed mobile header. */}
+        <ManagementShell>
+          <div className="p-4 lg:p-6 h-full">{children}</div>
+        </ManagementShell>
       </main>
     </div>
   )

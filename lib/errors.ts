@@ -62,7 +62,7 @@ const AUTH_MESSAGE_PATTERNS: [RegExp, string][] = [
 ]
 
 /** Network-layer failures, which have no code at all — only a message. */
-function isNetworkError(err: unknown): boolean {
+export function isNetworkError(err: unknown): boolean {
   if (err instanceof TypeError && /fetch|network/i.test(err.message)) return true
   if (err instanceof DOMException && err.name === 'AbortError') return true
   const coded = asCodedError(err)

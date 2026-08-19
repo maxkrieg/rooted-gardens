@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { getQueueCounts, flushMutationQueue } from '@/lib/crew/mutation-queue'
+import { getQueueCounts, flushMutationQueue, subscribeToQueue } from '@/lib/crew/mutation-queue'
 
 /**
  * Connectivity + offline-queue state for the crew shell. `failedCount` is what
@@ -45,10 +45,13 @@ export function useOfflineStatus() {
       refreshCount()
     }
 
+    // The queue changes without any window event — enqueue, flush, park, retry.
+    const unsubscribe = subscribeToQueue(refreshCount)
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
     return () => {
       cancelled = true
+      unsubscribe()
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
     }

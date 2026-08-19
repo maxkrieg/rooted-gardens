@@ -7,6 +7,9 @@ import { useIsStandalone } from '@/hooks/use-media-query'
 
 const DISMISSED_KEY = 'rg-install-dismissed'
 
+/** Crew and management install as separate apps, so they dismiss separately. */
+export const MANAGEMENT_DISMISSED_KEY = 'rg-install-dismissed-management'
+
 /**
  * The `beforeinstallprompt` event, which TypeScript's DOM lib doesn't ship
  * because it isn't in any standard — it's Chromium-only.
@@ -46,7 +49,7 @@ function useIsIosSafari(): boolean {
  * into a one-tap install, while iOS Safari requires the user to go through the
  * Share sheet, so all we can do is tell them how. Dismissal sticks.
  */
-export function InstallPrompt() {
+export function InstallPrompt({ dismissKey = DISMISSED_KEY }: { dismissKey?: string } = {}) {
   const isStandalone = useIsStandalone()
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null)
   const showIosHint = useIsIosSafari()
@@ -56,7 +59,7 @@ export function InstallPrompt() {
   // this reads — there's no window where a stale `dismissed` could show
   // through, so reading localStorage here can't desync hydration.
   const [dismissed, setDismissed] = useState(
-    () => typeof window !== 'undefined' && window.localStorage.getItem(DISMISSED_KEY) === '1',
+    () => typeof window !== 'undefined' && window.localStorage.getItem(dismissKey) === '1',
   )
 
   useEffect(() => {
@@ -78,7 +81,7 @@ export function InstallPrompt() {
   }, [])
 
   const dismiss = () => {
-    window.localStorage.setItem(DISMISSED_KEY, '1')
+    window.localStorage.setItem(dismissKey, '1')
     setDismissed(true)
   }
 

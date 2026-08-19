@@ -68,7 +68,9 @@ export function OfflineBanner() {
             style={{ backgroundColor: 'var(--ochre)' }}
             aria-hidden
           />
-          You&rsquo;re offline &middot; changes will sync when connected
+          {pendingCount > 0
+            ? `You're offline · ${pendingCount} ${pendingCount === 1 ? 'change' : 'changes'} will sync when connected`
+            : "You're offline · changes will sync when connected"}
         </>
       ) : (
         <>

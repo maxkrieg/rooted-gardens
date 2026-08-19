@@ -3,11 +3,15 @@ import { NextResponse, type NextRequest } from 'next/server'
 import type { Database } from '@/types/database'
 import { formatRoleCookie, parseRoleCookie } from '@/lib/utils/role-cookie'
 import { PUBLIC_ROUTES } from '@/lib/content/routes'
+import { isNetworkError } from '@/lib/errors'
 
 type EmployeeRole = 'owner' | 'lead' | 'crew' | 'accountant'
 
 const ROLE_COOKIE = 'rg-role'
-const ROLE_COOKIE_MAX_AGE = 60 * 60 // 1 hour
+// 12h, not 1h: past expiry a cached management page renders with no role and
+// silently falls back to 'crew' (read-only). Cost is that a role change takes up
+// to a workday to apply; signing out clears it immediately.
+const ROLE_COOKIE_MAX_AGE = 60 * 60 * 12
 
 // Routes accessible per role
 const MANAGEMENT_ROLES: EmployeeRole[] = ['owner', 'lead', 'accountant']
@@ -69,16 +73,22 @@ export async function proxy(request: NextRequest) {
     }
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
 
   const isManagement = pathname.startsWith('/management')
   const isCrew = pathname.startsWith('/crew')
   const isProtected = isManagement || isCrew
 
+  // Owners work from the field on weak signal, where getUser() returns a null
+  // user rather than throwing. Treat an unreachable auth server as "keep going"
+  // — signing someone out onto a login page they also can't load is worse.
+  const authUnreachable =
+    !user &&
+    (isNetworkError(authError) ||
+      (authError instanceof Error && authError.name === 'AuthRetryableFetchError'))
+
   // Unauthenticated user on a protected route → login, clear stale role cookie
-  if (isProtected && !user) {
+  if (isProtected && !user && !authUnreachable) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     const response = NextResponse.redirect(url)
@@ -196,6 +206,6 @@ export const config = {
     // `serwist` and `manifest.json` are excluded so the service-worker and
     // manifest fetches don't each pay for a Supabase getUser() round-trip —
     // and so the worker can never be redirected to /login.
-    '/((?!_next/|favicon.ico|serwist/|manifest.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/|favicon.ico|serwist/|manifest[\\w-]*\\.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

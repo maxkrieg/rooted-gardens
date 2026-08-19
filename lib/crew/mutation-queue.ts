@@ -73,6 +73,22 @@ type MutationPayload =
  */
 export const MAX_ATTEMPTS = 5
 
+/**
+ * Queue-change subscribers. Without this the banner only recounts on mount and
+ * on online/offline, so a mutation queued mid-session is invisible and the
+ * "Syncing N changes…" state can never render.
+ */
+const queueListeners = new Set<() => void>()
+
+export function subscribeToQueue(listener: () => void): () => void {
+  queueListeners.add(listener)
+  return () => queueListeners.delete(listener)
+}
+
+function notifyQueueChanged(): void {
+  for (const listener of queueListeners) listener()
+}
+
 export async function enqueueMutation(
   type: MutationType,
   payload: MutationPayload['payload'],
@@ -89,6 +105,7 @@ export async function enqueueMutation(
     label,
   }
   await db.add('mutations', mutation)
+  notifyQueueChanged()
 }
 
 /** Mutations still awaiting sync. Excludes parked ('failed') ones. */
@@ -127,12 +144,14 @@ export async function getPendingCount(): Promise<number> {
 export async function markMutationDone(id: string): Promise<void> {
   const db = await getDB()
   await db.delete('mutations', id)
+  notifyQueueChanged()
 }
 
 /** Discard a parked mutation the crew member has decided to give up on. */
 export async function discardMutation(id: string): Promise<void> {
   const db = await getDB()
   await db.delete('mutations', id)
+  notifyQueueChanged()
 }
 
 /** Move a parked mutation back into the queue for one more run of attempts. */
@@ -146,6 +165,7 @@ export async function retryMutation(id: string): Promise<void> {
     status: 'pending',
     lastError: undefined,
   })
+  notifyQueueChanged()
 }
 
 /** Records a failed attempt; parks the mutation past MAX_ATTEMPTS. Returns
@@ -160,6 +180,7 @@ async function recordFailure(mutation: QueuedMutation, err: unknown): Promise<bo
     status: parked ? 'failed' : 'pending',
     lastError: toUserMessage(err, 'It could not be saved.', `[mutation-queue:${mutation.type}]`),
   })
+  notifyQueueChanged()
   return parked
 }
 
