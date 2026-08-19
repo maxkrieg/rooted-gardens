@@ -25,28 +25,30 @@ interface DeepLinkedVisitSheetProps {
  * one honor the deep link opened two identical sheets stacked on top of each
  * other, with the two overlays compounding into a near-black scrim.
  *
- * The lookup is deliberately mount-only: re-resolving when `weeks` changes would
- * reopen the sheet after the user closed it, since VisitDetailSheet calls
- * router.refresh() on close.
+ * Resolves once, on the first render where the visit is actually findable, then
+ * latches. It used to resolve at mount, which stopped working when the schedule
+ * became client-fetched and `weeks` arrived empty on the first render. The latch
+ * is what keeps a later `weeks` change from reopening a sheet the user closed.
  */
 export function DeepLinkedVisitSheet({ weeks, visitId, role }: DeepLinkedVisitSheetProps) {
-  const found = useMemo(
-    () => findVisitInWeeks(weeks, visitId),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  )
-  const [open, setOpen] = useState(!!found)
+  // Derived, not latched at mount: `weeks` is empty on the first render now that
+  // the schedule is client-fetched, so the visit only becomes findable later.
+  const found = useMemo(() => findVisitInWeeks(weeks, visitId), [weeks, visitId])
+  // Closing is one-way — this is never set back to false, which is what stops a
+  // later `weeks` change from reopening a sheet the user dismissed.
+  const [closed, setClosed] = useState(false)
 
   if (!found) return null
 
   return (
     <VisitDetailSheet
-      open={open}
+      open={!closed}
       onOpenChange={(next) => {
-        setOpen(next)
+        if (next) return
+        setClosed(true)
         // Clear the param so the URL stops describing a sheet that's closed —
         // otherwise a refresh would reopen it.
-        if (!next) syncVisitUrlParam(null)
+        syncVisitUrlParam(null)
       }}
       row={found.row}
       weekStart={found.weekStart}

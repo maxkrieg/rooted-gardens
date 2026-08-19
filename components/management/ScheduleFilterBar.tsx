@@ -1,7 +1,6 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Check, ChevronsUpDown, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -25,35 +24,32 @@ import {
   SCHEDULE_STATUS_FILTERS,
   SCHEDULE_STATUS_FILTER_LABELS,
   hasActiveScheduleFilters,
-  scheduleFilterParams,
+  parseScheduleFilters,
   type ScheduleFilterValues,
 } from '@/lib/utils/schedule-filters'
 import type { Account, Employee, RouteGroup } from '@/types/app'
 
 interface ScheduleFilterBarProps {
   filters: ScheduleFilterValues
-  /** The window's first Monday — preserved on every filter change. */
-  week: string
   routeGroups: RouteGroup[]
   accounts: Account[]
   employees: Employee[]
+  onChange: (filters: ScheduleFilterValues) => void
 }
 
 /**
  * Route group / account / crew / status filters for the management schedule.
- * State lives in the URL rather than component state, so a filtered view is
- * shareable and survives week navigation — the same approach as the billing
- * History tab's filters. Sizing is phone-first: 2-up on a narrow screen,
- * a single row from `sm` up.
+ * State is owned by ScheduleView and mirrored into the URL, so a filtered view
+ * stays shareable without a server round-trip on every change. Sizing is
+ * phone-first: 2-up on a narrow screen, a single row from `sm` up.
  */
 export function ScheduleFilterBar({
   filters,
-  week,
   routeGroups,
   accounts,
   employees,
+  onChange,
 }: ScheduleFilterBarProps) {
-  const router = useRouter()
   const [accountOpen, setAccountOpen] = useState(false)
 
   // Accountants never work visits, so they're not crew-filter candidates.
@@ -67,9 +63,10 @@ export function ScheduleFilterBar({
       ? 'All accounts'
       : (accounts.find((a) => a.id === filters.account)?.name ?? 'All accounts')
 
+  // Client state, not a router push: filtering was a full RSC round-trip, which
+  // can't work offline. ScheduleView syncs the URL so a view stays shareable.
   function apply(next: Partial<ScheduleFilterValues>) {
-    const params = scheduleFilterParams({ ...filters, ...next }, week)
-    router.push(`/management/schedule?${params.toString()}`)
+    onChange({ ...filters, ...next })
   }
 
   const controlClass = 'h-9 w-[calc(50%-0.25rem)] sm:w-40'
@@ -180,7 +177,7 @@ export function ScheduleFilterBar({
           variant="ghost"
           size="sm"
           className="h-9 px-3 text-muted-foreground"
-          onClick={() => router.push(`/management/schedule?week=${week}`)}
+          onClick={() => onChange(parseScheduleFilters({}))}
         >
           <X className="mr-1 h-4 w-4" />
           Clear

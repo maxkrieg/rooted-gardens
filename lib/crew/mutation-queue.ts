@@ -57,7 +57,38 @@ export interface SkipPayload {
   endedAt?: string
 }
 
-type MutationPayload =
+/** Schedule a property for a week. `id` is minted on the device so the drawer can
+ *  open on the new visit offline, and so a replay upserts instead of duplicating. */
+export interface CreateVisitPayload {
+  id: string
+  accountId: string
+  propertyId: string
+  weekStart: string
+}
+
+export interface AssignCrewPayload {
+  visitId: string
+  employeeId: string
+  action: 'add' | 'remove'
+}
+
+export interface SetVehiclePayload {
+  visitId: string
+  vehicleId: string | null
+}
+
+export interface CrewInstructionPayload {
+  visitId: string
+  instruction: string | null
+}
+
+/** Revert skipped/completed → scheduled. Clears skip_reason only; completion
+ *  fields are left as-is, matching the online hook it replaces. */
+export interface RevertStatusPayload {
+  visitId: string
+}
+
+export type MutationPayload =
   | { type: 'completion'; payload: CompletionPayload }
   | { type: 'job_start'; payload: JobStartPayload }
   | { type: 'job_stop'; payload: JobStopPayload }
@@ -65,6 +96,11 @@ type MutationPayload =
   | { type: 'photo'; payload: PhotoPayload }
   | { type: 'photo_caption'; payload: PhotoCaptionPayload }
   | { type: 'skip'; payload: SkipPayload }
+  | { type: 'create_visit'; payload: CreateVisitPayload }
+  | { type: 'assign_crew'; payload: AssignCrewPayload }
+  | { type: 'set_vehicle'; payload: SetVehiclePayload }
+  | { type: 'crew_instruction'; payload: CrewInstructionPayload }
+  | { type: 'revert_status'; payload: RevertStatusPayload }
 
 /**
  * Retries before a mutation is parked as 'failed'. `attempts` used to be
@@ -89,9 +125,11 @@ function notifyQueueChanged(): void {
   for (const listener of queueListeners) listener()
 }
 
-export async function enqueueMutation(
-  type: MutationType,
-  payload: MutationPayload['payload'],
+/** Generic over the discriminated union so a payload can't be paired with the
+ *  wrong type — the flat signature let `enqueueMutation('skip', jobStart)` pass. */
+export async function enqueueMutation<T extends MutationPayload['type']>(
+  type: T,
+  payload: Extract<MutationPayload, { type: T }>['payload'],
   label?: string,
 ): Promise<void> {
   const db = await getDB()
@@ -327,8 +365,79 @@ export async function flushMutationQueue(): Promise<FlushResult> {
             .throwOnError()
           break
         }
+        case 'create_visit': {
+          const p = mutation.payload as CreateVisitPayload
+          // Upsert, not insert: markMutationDone runs after the write, so a crash
+          // between them replays this. (property_id, week_start) is UNIQUE.
+          await supabase
+            .from('visits')
+            .upsert(
+              {
+                id: p.id,
+                account_id: p.accountId,
+                property_id: p.propertyId,
+                week_start: p.weekStart,
+                status: 'scheduled',
+              },
+              { onConflict: 'property_id,week_start', ignoreDuplicates: true },
+            )
+            .throwOnError()
+          break
+        }
+        case 'assign_crew': {
+          const p = mutation.payload as AssignCrewPayload
+          if (p.action === 'add') {
+            // ignoreDuplicates so a replay doesn't park on the composite PK.
+            await supabase
+              .from('visit_crew')
+              .upsert(
+                { visit_id: p.visitId, employee_id: p.employeeId, relation: 'assigned' },
+                { onConflict: 'visit_id,employee_id,relation', ignoreDuplicates: true },
+              )
+              .throwOnError()
+          } else {
+            await supabase
+              .from('visit_crew')
+              .delete()
+              .eq('visit_id', p.visitId)
+              .eq('employee_id', p.employeeId)
+              .eq('relation', 'assigned')
+              .throwOnError()
+          }
+          break
+        }
+        case 'set_vehicle': {
+          const p = mutation.payload as SetVehiclePayload
+          await supabase
+            .from('visits')
+            .update({ vehicle_id: p.vehicleId })
+            .eq('id', p.visitId)
+            .throwOnError()
+          break
+        }
+        case 'crew_instruction': {
+          const p = mutation.payload as CrewInstructionPayload
+          await supabase
+            .from('visits')
+            .update({ crew_instruction: p.instruction })
+            .eq('id', p.visitId)
+            .throwOnError()
+          break
+        }
+        case 'revert_status': {
+          const p = mutation.payload as RevertStatusPayload
+          await supabase
+            .from('visits')
+            .update({ status: 'scheduled', skip_reason: null })
+            .eq('id', p.visitId)
+            .throwOnError()
+          break
+        }
         default:
-          console.warn('[mutation-queue] unknown mutation type:', (mutation as QueuedMutation).type)
+          // Throw, don't warn-and-continue: falling through marked an unknown type
+          // as synced and deleted it, so a queue written by a newer bundle and
+          // flushed by an older one lost the write silently.
+          throw new Error(`Unknown mutation type: ${(mutation as QueuedMutation).type}`)
       }
       await markMutationDone(mutation.id)
       synced++

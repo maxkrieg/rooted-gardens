@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/sheet'
 import { enqueueMutation, flushMutationQueue } from '@/lib/crew/mutation-queue'
 import { nextVisitVersion } from '@/lib/utils/visits'
+import { patchScheduleVisit } from '@/hooks/useManagementSchedule'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
 
 interface SkipSheetProps {
@@ -78,6 +79,15 @@ export function SkipSheet({
 
     queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
     queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
+    queryClient.invalidateQueries({ queryKey: ['schedule-visits'] })
+
+    patchScheduleVisit(queryClient, visitId, (visit) => ({
+      ...visit,
+      status: 'skipped',
+      skip_reason: skipReason.trim() || null,
+      ...(inProgress ? { ended_at: endedAt } : {}),
+      updated_at: nextVisitVersion(visit.updated_at),
+    }))
 
     queryClient.setQueryData<StopDetail | null>(['stop-detail', visitId], (old) => {
       if (!old) return old

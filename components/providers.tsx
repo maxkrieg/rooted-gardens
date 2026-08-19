@@ -50,7 +50,26 @@ const persister = createAsyncStoragePersister({
  * a fresh one. `stop-detail` gaining `visit.updated_at` is the case in hand:
  * entries missing it made version comparison undecidable downstream.
  */
-const CACHE_BUSTER = 'stop-detail-updated-at'
+const CACHE_BUSTER = 'management-schedule-client'
+
+/**
+ * Allowlist, not a denylist: persistence is otherwise all-or-nothing, so any new
+ * query would silently land in IndexedDB on a personal phone. Only what's needed
+ * in the field belongs here — billing, team, and leads deliberately don't.
+ */
+const PERSISTED_QUERY_KEYS = new Set([
+  'schedule-reference',
+  'schedule-visits',
+  'crew-week-schedule',
+  'crew-today-stops',
+  'crew-history-stops',
+  'stop-detail',
+  'current-employee',
+  'active-employees',
+  'active-vehicles',
+  'property-photos',
+  'property-visit-history',
+])
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -74,7 +93,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <PersistQueryClientProvider
       client={queryClient}
-      persistOptions={{ persister, maxAge: 1000 * 60 * 60 * 24, buster: CACHE_BUSTER }}
+      persistOptions={{
+        persister,
+        maxAge: 1000 * 60 * 60 * 24,
+        buster: CACHE_BUSTER,
+        dehydrateOptions: {
+          shouldDehydrateQuery: (query) =>
+            typeof query.queryKey[0] === 'string' && PERSISTED_QUERY_KEYS.has(query.queryKey[0]),
+        },
+      }}
     >
       {/* Inside the query provider so the fallback's retry can reach the cache. */}
       <ErrorBoundary>{children}</ErrorBoundary>

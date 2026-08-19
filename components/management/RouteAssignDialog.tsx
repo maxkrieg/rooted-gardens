@@ -63,6 +63,15 @@ export function RouteAssignDialog({
   })
 
   async function onSubmit(values: RouteAssignValues) {
+    // Deliberately not queued: this clears every assigned crew row for the route
+    // then re-inserts, so a replay would clobber per-visit edits made meanwhile.
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      toast.error('Assigning a route needs a connection', {
+        description: 'Connect and try again — single stops can still be edited offline.',
+      })
+      return
+    }
+
     const res = await bulkAssignRoute(
       routeGroup.id,
       values.week_start,

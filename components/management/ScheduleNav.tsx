@@ -1,23 +1,22 @@
 'use client'
 
 import React, { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { format, parseISO, addWeeks, addDays, isBefore, isAfter } from 'date-fns'
 import { ChevronLeft, ChevronRight, CalendarIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
 import { getWeekStart } from '@/lib/utils/schedule'
-import { scheduleFilterParams, type ScheduleFilterValues } from '@/lib/utils/schedule-filters'
 
 interface ScheduleNavProps {
   windowStart: string // ISO date — first Monday of the 4-week window
-  /** Carried through every navigation so changing week never drops the filters. */
-  filters: ScheduleFilterValues
+  /** Client state, not a router push — a navigation here is a network
+   *  round-trip, and owners page between weeks from the field. Filters are no
+   *  longer carried here; ScheduleView owns both and syncs the URL. */
+  onWeekChange: (weekStart: string) => void
 }
 
-export function ScheduleNav({ windowStart, filters }: ScheduleNavProps) {
-  const router = useRouter()
+export function ScheduleNav({ windowStart, onWeekChange }: ScheduleNavProps) {
   const [calendarOpen, setCalendarOpen] = useState(false)
 
   const windowStartDate = parseISO(windowStart)
@@ -29,8 +28,7 @@ export function ScheduleNav({ windowStart, filters }: ScheduleNavProps) {
     !isAfter(currentWeekStart, windowEndDate)
 
   function goToWeek(weekStart: string) {
-    const params = scheduleFilterParams(filters, weekStart)
-    router.push(`/management/schedule?${params.toString()}`)
+    onWeekChange(weekStart)
   }
 
   function navigate(weeks: number) {

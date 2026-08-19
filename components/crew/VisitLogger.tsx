@@ -18,6 +18,8 @@ import { ServiceTypeSelector } from '@/components/crew/ServiceTypeSelector'
 import { CrewMultiSelect } from '@/components/crew/CrewMultiSelect'
 import { enqueueMutation, flushMutationQueue } from '@/lib/crew/mutation-queue'
 import { useActiveEmployees } from '@/hooks/crew/useActiveEmployees'
+import { patchScheduleVisit } from '@/hooks/useManagementSchedule'
+import type { VisitCrewWithEmployee } from '@/types/app'
 import { createClient } from '@/lib/supabase/client'
 import { MAX_PHOTO_BYTES, ALLOWED_PHOTO_TYPES } from '@/lib/utils/photos'
 import { nextVisitVersion } from '@/lib/utils/visits'
@@ -388,6 +390,34 @@ export function VisitLogger({
     // and the week schedule so its in-progress pulse clears on completion.
     queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
     queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
+    queryClient.invalidateQueries({ queryKey: ['schedule-visits'] })
+
+    // The grid shows completed-by crew once a visit is done, and visit_crew rows
+    // reach it through no other cache write.
+    patchScheduleVisit(queryClient, visitId, (visit) => ({
+      ...visit,
+      status: 'completed',
+      service_types: serviceTypes,
+      started_at: startedAtISO,
+      ended_at: endedAt,
+      skip_reason: null,
+      updated_at: nextVisitVersion(visit.updated_at),
+      visit_crew: [
+        ...visit.visit_crew.filter((vc) => vc.relation !== 'completed'),
+        // Names from the full roster, not assignedCrew — someone can complete a
+        // visit they were never assigned to.
+        ...presentIds.map(
+          (employeeId) =>
+            ({
+              visit_id: visitId,
+              employee_id: employeeId,
+              relation: 'completed',
+              created_at: new Date().toISOString(),
+              employee: activeEmployees.find((e) => e.id === employeeId) ?? null,
+            }) as VisitCrewWithEmployee,
+        ),
+      ],
+    }))
 
     queryClient.setQueryData<StopDetail | null>(['stop-detail', visitId], (old) => {
       if (!old) return old

@@ -1,8 +1,10 @@
 'use client'
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { createClient } from '@/lib/supabase/client'
+import { enqueueMutation, flushMutationQueue } from '@/lib/crew/mutation-queue'
+import { patchScheduleVisit } from '@/hooks/useManagementSchedule'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
+import type { VisitCrewWithEmployee } from '@/types/app'
 
 export type ReassignCrewInput = {
   employeeId: string
@@ -11,44 +13,50 @@ export type ReassignCrewInput = {
 }
 
 /**
- * Add or remove an `assigned` crew member on a visit. Online-required by design
- * (NOT routed through the offline mutation queue): reassignment is a coordination
- * action — the newly assigned crew need to see it to act on it — so queuing it
- * offline would risk silent conflicts. Optimistically updates the stop-detail
- * cache and invalidates the week schedule on settle.
+ * Add or remove an `assigned` crew member on a visit.
+ *
+ * Was online-only, on the reasoning that reassignment is a coordination action
+ * the newly assigned crew must see to act on, so queuing it risked silent
+ * conflicts. That held while only crew were offline; owners are now phone-primary
+ * in the field, where a refused write is worse than a delayed one.
  */
 export function useReassignCrew(visitId: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async ({ employeeId, action }: ReassignCrewInput) => {
-      if (typeof navigator !== 'undefined' && !navigator.onLine) {
-        throw new Error('offline')
-      }
-
-      const supabase = createClient()
-
-      if (action === 'add') {
-        const { error } = await supabase.from('visit_crew').insert({
-          visit_id: visitId,
-          employee_id: employeeId,
-          relation: 'assigned',
-        })
-        if (error) throw error
-      } else {
-        const { error } = await supabase
-          .from('visit_crew')
-          .delete()
-          .eq('visit_id', visitId)
-          .eq('employee_id', employeeId)
-          .eq('relation', 'assigned')
-        if (error) throw error
-      }
+      await enqueueMutation('assign_crew', { visitId, employeeId, action })
+      const result = await flushMutationQueue()
+      if (result.failed > 0) throw new Error('Change did not save')
     },
 
     onMutate: async ({ employeeId, name, action }) => {
       await queryClient.cancelQueries({ queryKey: ['stop-detail', visitId] })
       const previous = queryClient.getQueryData<StopDetail | null>(['stop-detail', visitId])
+
+      // The grid reads visit_crew, which no other cache write reaches.
+      patchScheduleVisit(queryClient, visitId, (visit) => ({
+        ...visit,
+        visit_crew:
+          action === 'add'
+            ? visit.visit_crew.some(
+                (vc) => vc.employee_id === employeeId && vc.relation === 'assigned',
+              )
+              ? visit.visit_crew
+              : [
+                  ...visit.visit_crew,
+                  {
+                    visit_id: visitId,
+                    employee_id: employeeId,
+                    relation: 'assigned',
+                    created_at: new Date().toISOString(),
+                    employee: { id: employeeId, name },
+                  } as VisitCrewWithEmployee,
+                ]
+            : visit.visit_crew.filter(
+                (vc) => !(vc.employee_id === employeeId && vc.relation === 'assigned'),
+              ),
+      }))
 
       queryClient.setQueryData<StopDetail | null>(['stop-detail', visitId], (old) => {
         if (!old) return old
@@ -74,6 +82,7 @@ export function useReassignCrew(visitId: string) {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
       queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
+      queryClient.invalidateQueries({ queryKey: ['schedule-visits'] })
     },
   })
 }

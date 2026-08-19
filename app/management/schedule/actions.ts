@@ -2,127 +2,14 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { buildScheduleWeek, type ScheduleAssignment } from '@/lib/utils/schedule'
-import type { Account, Property, RouteGroup, ScheduleWeek, VisitWithCrew } from '@/types/app'
 import { toUserMessage } from '@/lib/errors'
 
-export async function getScheduleForWeek(weekStart: string): Promise<ScheduleWeek> {
-  const supabase = await createClient()
-
-  const [routeGroupsResult, assignmentsResult, visitsResult, propertiesResult] = await Promise.all([
-    supabase.from('route_groups').select('*').order('sort_order', { ascending: true }),
-    // !inner + the is_archived filter so a soft-deleted property can't reach the
-    // grid. archiveProperty/archiveAccount already clear the assignment row, so this
-    // is belt-and-braces for a property archived directly in SQL.
-    supabase
-      .from('property_route_groups')
-      .select(
-        `
-      property_id,
-      route_group_id,
-      sort_order,
-      property:properties!inner(
-        *,
-        account:accounts(*)
-      )
-    `,
-      )
-      .eq('property.is_archived', false),
-    supabase
-      .from('visits')
-      .select(`*, visit_crew(*, employee:employees(*)), invoice:invoices(status, qbo_invoice_id)`)
-      .eq('week_start', weekStart),
-    // Every property, so ones with no property_route_groups row can be
-    // surfaced as the schedule's "Not on a route" bucket instead of being
-    // silently dropped (buildScheduleWeek used to only iterate route groups).
-    supabase.from('properties').select('*, account:accounts(*)').eq('is_archived', false),
-  ])
-
-  // Throw rather than return: the page fetches four weeks in parallel and a
-  // partial window would be a misleading schedule, so management/error.tsx
-  // catches it. Sanitized first — Next surfaces the message verbatim in dev.
-  const readError =
-    routeGroupsResult.error ?? assignmentsResult.error ?? visitsResult.error ?? propertiesResult.error
-  if (readError) {
-    throw new Error(
-      toUserMessage(readError, "The schedule didn't load.", '[getScheduleForWeek]'),
-    )
-  }
-
-  const routeGroups = routeGroupsResult.data as RouteGroup[]
-  const assignments = (assignmentsResult.data ?? []) as unknown as ScheduleAssignment[]
-  const visits = (visitsResult.data ?? []) as unknown as VisitWithCrew[]
-  const allProperties = (propertiesResult.data ?? []) as unknown as Array<
-    Property & { account: Account }
-  >
-
-  // Completion-log photo counts (type='visit', matching VisitLogger's upload —
-  // 'plan' and 'how_to' photos aren't logged during a stop and shouldn't light
-  // up the grid's Photos indicator). Only completed visits carry a status a
-  // crew photo would attach to, but querying by visit id here is cheap and
-  // keeps this independent of status.
-  const completedVisitIds = visits.filter((v) => v.status === 'completed').map((v) => v.id)
-  if (completedVisitIds.length > 0) {
-    const { data: photoRows, error: photosError } = await supabase
-      .from('photos')
-      .select('visit_id')
-      .eq('type', 'visit')
-      .in('visit_id', completedVisitIds)
-    if (photosError) {
-      throw new Error(
-        toUserMessage(photosError, "The schedule didn't load.", '[getScheduleForWeek]'),
-      )
-    }
-    const countByVisitId = new Map<string, number>()
-    for (const row of photoRows ?? []) {
-      if (!row.visit_id) continue
-      countByVisitId.set(row.visit_id, (countByVisitId.get(row.visit_id) ?? 0) + 1)
-    }
-    for (const visit of visits) {
-      visit.photo_count = countByVisitId.get(visit.id) ?? 0
-    }
-  }
-
-  const assignedPropertyIds = new Set(assignments.map((a) => a.property_id))
-  const ungroupedProperties = allProperties.filter((p) => !assignedPropertyIds.has(p.id))
-
-  return buildScheduleWeek(weekStart, routeGroups, assignments, visits, ungroupedProperties)
-}
-
 /**
- * Schedule a property for a week. Returns the created row so the caller can open
- * the visit drawer on it straight away, rather than waiting for revalidatePath's
- * render to make the cell clickable a second time. The select mirrors the visits
- * query in getScheduleForWeek above so the result is VisitWithCrew-shaped —
- * visit_crew comes back `[]` and invoice `null` on a fresh row, which is what
- * VisitDetailSheet's normalizeRow expects (it walks visit_crew unguarded).
+ * The last Server Action on this page. getScheduleForWeek and createVisit moved
+ * client-side (hooks/useManagementSchedule, hooks/useCreateVisit) so the schedule
+ * works offline; this one stays server-side because its delete-then-insert can't
+ * be replayed safely from the queue.
  */
-export async function createVisit(
-  propertyId: string,
-  weekStart: string,
-  accountId: string,
-): Promise<{ error?: string; visit?: VisitWithCrew }> {
-  const supabase = await createClient()
-
-  const { data, error } = await supabase
-    .from('visits')
-    .insert({
-      account_id: accountId,
-      property_id: propertyId,
-      week_start: weekStart,
-      status: 'scheduled',
-    })
-    .select(`*, visit_crew(*, employee:employees(*)), invoice:invoices(status, qbo_invoice_id)`)
-    .single()
-
-  if (error) {
-    return { error: toUserMessage(error, 'Could not add the stop.', '[createVisit]') }
-  }
-
-  revalidatePath('/management/schedule')
-  return { visit: data as unknown as VisitWithCrew }
-}
-
 export async function bulkAssignRoute(
   routeGroupId: string,
   weekStart: string,

@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 import { getWeekStart, groupRowsByAccount } from '@/lib/utils/schedule'
 import { syncVisitUrlParam } from '@/lib/utils/visit-url'
 import { formatAccountPrice } from '@/lib/utils/accounts'
-import { createVisit } from '@/app/management/schedule/actions'
+import { useCreateVisit } from '@/hooks/useCreateVisit'
 import { toUserMessage } from '@/lib/errors'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
@@ -52,6 +52,7 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
     []
   )
   const visitOverlays = useVisitOverlays()
+  const createVisit = useCreateVisit()
 
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sheetRow, setSheetRow] = useState<SchedulePropertyRow | null>(null)
@@ -110,12 +111,7 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
     const cellKey = `${row.property.id}-${weekStart}`
     setCreatingKey(cellKey)
     try {
-      const res = await createVisit(row.property.id, weekStart, row.account.id)
-      if (res.error || !res.visit) {
-        toast.error('Failed to create visit', { description: res.error })
-        return
-      }
-      const visit = res.visit
+      const visit = await createVisit(row, weekStart)
       setCreatedVisits((prev) => new Map(prev).set(cellKey, visit))
       if (openDrawer) openSheet(row, visit, weekStart)
     } catch (err) {

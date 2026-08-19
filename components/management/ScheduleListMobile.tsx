@@ -6,7 +6,7 @@ import { addDays, format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
 import { ChevronRight, FilePen } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { createVisit } from '@/app/management/schedule/actions'
+import { useCreateVisit } from '@/hooks/useCreateVisit'
 import { toUserMessage } from '@/lib/errors'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
@@ -58,6 +58,7 @@ export function ScheduleListMobile({
   filtered,
 }: ScheduleListMobileProps) {
   const visitOverlays = useVisitOverlays()
+  const createVisit = useCreateVisit()
 
   // Tick elapsed time every 30s
   const [, setTick] = useState(0)
@@ -103,12 +104,7 @@ export function ScheduleListMobile({
     const cellKey = `${row.property.id}-${weekStart}`
     setCreatingKey(cellKey)
     try {
-      const res = await createVisit(row.property.id, weekStart, row.account.id)
-      if (res.error || !res.visit) {
-        toast.error('Failed to create visit', { description: res.error })
-        return
-      }
-      const visit = res.visit
+      const visit = await createVisit(row, weekStart)
       setCreatedVisits((prev) => new Map(prev).set(cellKey, visit))
       openSheet(row, visit, weekStart)
     } catch (err) {

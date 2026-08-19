@@ -1,30 +1,24 @@
 'use client'
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { createClient } from '@/lib/supabase/client'
+import { enqueueMutation, flushMutationQueue } from '@/lib/crew/mutation-queue'
+import { nextVisitVersion } from '@/lib/utils/visits'
+import { patchScheduleVisit } from '@/hooks/useManagementSchedule'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
 
 /**
- * Update a visit's crew instruction (the "orange cell"). Direct-client,
- * online-only, shared by CrewInstructionSheet on both surfaces — mirrors
- * useReassignCrew's pattern. Optimistically updates the stop-detail cache.
+ * Update a visit's crew instruction (the "orange cell"). Queued so an owner can
+ * write one from the field; shared by CrewInstructionSheet on both surfaces.
  */
 export function useUpdateCrewInstruction(visitId: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async (instruction: string) => {
-      if (typeof navigator !== 'undefined' && !navigator.onLine) {
-        throw new Error('offline')
-      }
-
-      const supabase = createClient()
       const trimmed = instruction.trim() || null
-      const { error } = await supabase
-        .from('visits')
-        .update({ crew_instruction: trimmed })
-        .eq('id', visitId)
-      if (error) throw error
+      await enqueueMutation('crew_instruction', { visitId, instruction: trimmed })
+      const result = await flushMutationQueue()
+      if (result.failed > 0) throw new Error('Change did not save')
       return trimmed
     },
 
@@ -33,8 +27,23 @@ export function useUpdateCrewInstruction(visitId: string) {
       const previous = queryClient.getQueryData<StopDetail | null>(['stop-detail', visitId])
       const trimmed = instruction.trim() || null
 
+      patchScheduleVisit(queryClient, visitId, (visit) => ({
+        ...visit,
+        crew_instruction: trimmed,
+        updated_at: nextVisitVersion(visit.updated_at),
+      }))
+
       queryClient.setQueryData<StopDetail | null>(['stop-detail', visitId], (old) =>
-        old ? { ...old, visit: { ...old.visit, crew_instruction: trimmed } } : old
+        old
+          ? {
+              ...old,
+              visit: {
+                ...old.visit,
+                crew_instruction: trimmed,
+                updated_at: nextVisitVersion(old.visit.updated_at),
+              },
+            }
+          : old
       )
 
       return { previous }
@@ -49,6 +58,7 @@ export function useUpdateCrewInstruction(visitId: string) {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
       queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
+      queryClient.invalidateQueries({ queryKey: ['schedule-visits'] })
     },
   })
 }

@@ -5,6 +5,8 @@ const DB_NAME = 'rooted-crew'
 // parked instead of retried forever.
 const DB_VERSION = 2
 
+// Management schedule types (create_visit…revert_status) were added when owners
+// went phone-primary in the field; `payload` is untyped here, so no DB_VERSION bump.
 export type MutationType =
   | 'completion'
   | 'photo'
@@ -13,6 +15,11 @@ export type MutationType =
   | 'job_stop'
   | 'job_discard'
   | 'skip'
+  | 'create_visit'
+  | 'assign_crew'
+  | 'set_vehicle'
+  | 'crew_instruction'
+  | 'revert_status'
 
 /** 'failed' mutations are excluded from flushes, so a poisoned one stops burning
  *  a request on every app open, and surfaced so lost work can't stay invisible. */

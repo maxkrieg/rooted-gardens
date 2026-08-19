@@ -1,37 +1,38 @@
 'use client'
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { createClient } from '@/lib/supabase/client'
+import { enqueueMutation, flushMutationQueue } from '@/lib/crew/mutation-queue'
 import { nextVisitVersion } from '@/lib/utils/visits'
+import { patchScheduleVisit } from '@/hooks/useManagementSchedule'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
 
 /**
  * Revert a skipped or completed visit back to `scheduled`. Clears only
  * `skip_reason` — mirrors the old `unskipVisit` Server Action's minimal
  * behavior; completion fields (service_types/completion_note/ended_at) are
- * intentionally left as-is if reverting from `completed`. Direct-client,
- * online-only, shared by both surfaces — mirrors useReassignCrew's pattern.
+ * intentionally left as-is if reverting from `completed`. Queued so it works in
+ * the field; shared by both surfaces.
  */
 export function useRevertVisitToScheduled(visitId: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async () => {
-      if (typeof navigator !== 'undefined' && !navigator.onLine) {
-        throw new Error('offline')
-      }
-
-      const supabase = createClient()
-      const { error } = await supabase
-        .from('visits')
-        .update({ status: 'scheduled', skip_reason: null })
-        .eq('id', visitId)
-      if (error) throw error
+      await enqueueMutation('revert_status', { visitId })
+      const result = await flushMutationQueue()
+      if (result.failed > 0) throw new Error('Change did not save')
     },
 
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: ['stop-detail', visitId] })
       const previous = queryClient.getQueryData<StopDetail | null>(['stop-detail', visitId])
+
+      patchScheduleVisit(queryClient, visitId, (visit) => ({
+        ...visit,
+        status: 'scheduled',
+        skip_reason: null,
+        updated_at: nextVisitVersion(visit.updated_at),
+      }))
 
       queryClient.setQueryData<StopDetail | null>(['stop-detail', visitId], (old) =>
         old
@@ -61,6 +62,7 @@ export function useRevertVisitToScheduled(visitId: string) {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
       queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
+      queryClient.invalidateQueries({ queryKey: ['schedule-visits'] })
     },
   })
 }
