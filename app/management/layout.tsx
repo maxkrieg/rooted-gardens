@@ -42,47 +42,17 @@ export default async function ManagementLayout({
     role = employee?.role ?? null
   }
 
-  // Starting count for the Leads sidebar badge (task 9.7) — the nav's realtime
-  // effect re-queries this on every `leads` event, but a server-fetched
-  // starting value avoids a flash of "0" on first paint. Non-fatal: leads
-  // RLS only admits owner/lead, so this is a no-op (and logged) for anyone else.
-  let initialNewLeadCount = 0
-  if (role === 'owner' || role === 'lead') {
-    const { count, error } = await supabase
-      .from('leads')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'new')
-    if (error) console.error('[management/layout] new-lead count', error)
-    initialNewLeadCount = count ?? 0
-  }
-
-  // Starting count for the Routes sidebar badge — every property with no
-  // property_route_groups row. property_route_groups_property_idx guarantees
-  // at most one row per property, so unrouted = properties − routed, two
-  // cheap head counts instead of an anti-join. The Routes nav item has no
-  // `roles` restriction, so owner/lead/accountant all see it.
-  let initialUnroutedCount = 0
-  if (role === 'owner' || role === 'lead' || role === 'accountant') {
-    const [propertiesCount, routedCount] = await Promise.all([
-      supabase.from('properties').select('id', { count: 'exact', head: true }).eq('is_archived', false),
-      supabase.from('property_route_groups').select('property_id', { count: 'exact', head: true }),
-    ])
-    if (propertiesCount.error) console.error('[management/layout] properties count', propertiesCount.error)
-    if (routedCount.error) console.error('[management/layout] routed count', routedCount.error)
-    initialUnroutedCount = Math.max((propertiesCount.count ?? 0) - (routedCount.count ?? 0), 0)
-  }
+  // The sidebar badge counts used to be fetched here — three more round-trips on
+  // every navigation, purely to avoid a flash of "0" before the nav's own client
+  // query landed. They're React Query now (hooks/useNavCounts.ts), where the
+  // persisted cache holds the last value across navigations and offline.
 
   return (
     // dvh, not vh — iOS Safari's collapsing URL bar makes 100vh taller than the
     // visible viewport, which left a sliver of dead space at the bottom.
     <div className="min-h-[100dvh] bg-background">
       <ServiceWorkerRegistration />
-      <ManagementNav
-        userEmail={user?.email}
-        role={role}
-        initialNewLeadCount={initialNewLeadCount}
-        initialUnroutedCount={initialUnroutedCount}
-      />
+      <ManagementNav userEmail={user?.email} role={role} />
 
       {/* Main content area:
           - Mobile: offset below the fixed top header, whose own height already

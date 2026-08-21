@@ -74,6 +74,7 @@ export function PropertyForm({ accountId, onSuccess, property, defaults }: Prope
   const isSubmitting = form.formState.isSubmitting
 
   const updateNotes = useUpdatePropertyNotes(accountId)
+  const refreshAccounts = useRefreshAccounts()
 
   async function onSubmit(values: PropertyFormValues) {
     // A notes-only edit goes through the offline queue — that's the correction an
@@ -112,6 +113,7 @@ export function PropertyForm({ accountId, onSuccess, property, defaults }: Prope
     }
 
     toast.success(isEdit ? 'Property updated' : 'Property added')
+    refreshAccounts(accountId)
     if (!isEdit) form.reset()
     onSuccess()
   }

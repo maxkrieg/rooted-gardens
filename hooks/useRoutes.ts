@@ -4,6 +4,7 @@ import { useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { fetchRoutesData } from '@/lib/routes/fetch'
 import { scheduleReferenceKey } from '@/hooks/useManagementSchedule'
+import { navUnroutedCountKey } from '@/hooks/useNavCounts'
 
 export const routesDataKey = ['routes-data'] as const
 
@@ -36,5 +37,7 @@ export function useRefreshRoutes() {
   return useCallback(() => {
     queryClient.invalidateQueries({ queryKey: routesDataKey })
     queryClient.invalidateQueries({ queryKey: scheduleReferenceKey })
+    // The sidebar's unrouted badge has no realtime path — see useNavCounts.
+    queryClient.invalidateQueries({ queryKey: navUnroutedCountKey })
   }, [queryClient])
 }

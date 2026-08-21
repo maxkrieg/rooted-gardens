@@ -20,7 +20,13 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { CommandPalette } from '@/components/management/CommandPalette'
+import { useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
+import {
+  navLeadCountKey,
+  useNewLeadCount,
+  useUnroutedCount,
+} from '@/hooks/useNavCounts'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -160,28 +166,16 @@ function SidebarFooter({ userEmail, onLogout }: SidebarFooterProps) {
 interface ManagementNavProps {
   userEmail?: string | null
   role?: string | null
-  /** Server-fetched starting count of status='new' leads (task 9.7) — avoids
-   *  a flash of "0" while the realtime effect's first count query is in
-   *  flight. See app/management/layout.tsx. */
-  initialNewLeadCount?: number
-  /** Server-fetched starting count of properties with no property_route_groups
-   *  row — same "avoid a 0-flash" purpose as initialNewLeadCount, for the
-   *  Routes badge. See app/management/layout.tsx. */
-  initialUnroutedCount?: number
 }
 
-export function ManagementNav({
-  userEmail,
-  role,
-  initialNewLeadCount = 0,
-  initialUnroutedCount = 0,
-}: ManagementNavProps) {
+export function ManagementNav({ userEmail, role }: ManagementNavProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
-  const [newLeadCount, setNewLeadCount] = useState(initialNewLeadCount)
-  const [unroutedCount, setUnroutedCount] = useState(initialUnroutedCount)
+  const queryClient = useQueryClient()
+  const { data: newLeadCount = 0 } = useNewLeadCount(role)
+  const { data: unroutedCount = 0 } = useUnroutedCount()
   const lastToastAt = useRef<number>(0)
 
   const navCounts = {
@@ -205,25 +199,17 @@ export function ManagementNav({
   }, [])
 
   // New-lead notification (task 9.7, in-app half only — see CLAUDE.md on the
-  // 8.2 SMS deferral). Owned here rather than a dedicated provider: this is
-  // the one management client component mounted on every route, and the
-  // badge is its only consumer. Re-queries the live count on every event
-  // rather than incrementing a local counter, so it stays correct when
-  // another owner/lead triages a lead from their own session — a Server
-  // Action's revalidatePath('/management/leads') doesn't reach this sidebar,
-  // which lives in the layout, not the page.
+  // 8.2 SMS deferral). This channel stays here rather than moving to
+  // useNavCounts because it also raises the toast; splitting it would open a
+  // second subscription on the same table. It invalidates the count rather than
+  // tracking a delta, so it stays correct when another owner triages a lead.
   useEffect(() => {
     if (role !== 'owner' && role !== 'lead') return
 
     const supabase = createClient()
 
-    async function refreshCount() {
-      const { count } = await supabase
-        .from('leads')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'new')
-      setNewLeadCount(count ?? 0)
-    }
+    const refreshCount = () =>
+      queryClient.invalidateQueries({ queryKey: navLeadCountKey })
 
     const channel = supabase
       .channel('management_leads')
@@ -256,38 +242,7 @@ export function ManagementNav({
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [role, router])
-
-  // Unrouted-property notification (the Routes page's UnroutedPanel gap made
-  // visible in the nav). Same shape as the leads effect above: re-query the
-  // live count on every relevant change rather than track a local delta, and
-  // for the same reason — a Server Action's revalidatePath('/management/routes')
-  // doesn't reach this sidebar. Two tables can change the count: assigning or
-  // unassigning a property (property_route_groups) and adding/removing a
-  // property outright (properties). The Routes nav item has no `roles`
-  // restriction, so this runs for every management role that reaches this
-  // component (owner/lead/accountant — crew never mount it, see proxy.ts).
-  useEffect(() => {
-    const supabase = createClient()
-
-    async function refreshCount() {
-      const [propertiesCount, routedCount] = await Promise.all([
-        supabase.from('properties').select('id', { count: 'exact', head: true }).eq('is_archived', false),
-        supabase.from('property_route_groups').select('property_id', { count: 'exact', head: true }),
-      ])
-      setUnroutedCount(Math.max((propertiesCount.count ?? 0) - (routedCount.count ?? 0), 0))
-    }
-
-    const channel = supabase
-      .channel('management_unrouted_properties')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'property_route_groups' }, refreshCount)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'properties' }, refreshCount)
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [])
+  }, [role, router, queryClient])
 
   async function handleLogout() {
     const supabase = createClient()

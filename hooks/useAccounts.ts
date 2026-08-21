@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { enqueueMutation, flushMutationQueue } from '@/lib/crew/mutation-queue'
+import { navUnroutedCountKey } from '@/hooks/useNavCounts'
 import { signPhotoUrls } from '@/lib/utils/photos'
 import {
   fetchAccountDetail,
@@ -57,6 +58,9 @@ export function useRefreshAccounts() {
       queryClient.invalidateQueries({
         queryKey: accountId ? accountPhotosKey(accountId) : ['account-photos'],
       })
+      // Adding or archiving a property moves the sidebar's unrouted count, which
+      // has no realtime path of its own — see useNavCounts.
+      queryClient.invalidateQueries({ queryKey: navUnroutedCountKey })
     },
     [queryClient],
   )
