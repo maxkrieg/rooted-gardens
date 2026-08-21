@@ -1,7 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { WifiOff } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useIsOnline } from '@/hooks/use-hydrated'
 import { formatElapsed } from '@/lib/utils/visits'
 
 type InProgressVisit = {
@@ -11,13 +14,37 @@ type InProgressVisit = {
   visit_crew: Array<{ relation: string; employee: { name: string } | null }>
 }
 
-interface CrewsOnSitePanelProps {
-  initialVisits: InProgressVisit[]
-}
+const IN_PROGRESS_SELECT =
+  'id, started_at, property:properties!inner(address), visit_crew(relation, employee:employees(name))'
 
-export function CrewsOnSitePanel({ initialVisits }: CrewsOnSitePanelProps) {
-  const [visits, setVisits] = useState<InProgressVisit[]>(initialVisits)
+const inProgressKey = ['crews-on-site'] as const
+
+/**
+ * Who is on site right now. Deliberately NOT cached offline: a frozen list with
+ * a pulsing dot and a timer that keeps counting for a crew who stopped an hour
+ * ago is worse than saying we don't know.
+ */
+export function CrewsOnSitePanel() {
+  const isOnline = useIsOnline()
+  const queryClient = useQueryClient()
   const [, setTick] = useState(0)
+
+  const { data: visits = [] } = useQuery({
+    queryKey: inProgressKey,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('visits')
+        .select(IN_PROGRESS_SELECT)
+        .not('started_at', 'is', null)
+        .is('ended_at', null)
+        .eq('property.is_archived', false)
+      if (error) throw error
+      return (data ?? []) as unknown as InProgressVisit[]
+    },
+    enabled: isOnline,
+    staleTime: 30_000,
+  })
 
   // Tick elapsed time every 30s
   useEffect(() => {
@@ -26,6 +53,7 @@ export function CrewsOnSitePanel({ initialVisits }: CrewsOnSitePanelProps) {
   }, [])
 
   useEffect(() => {
+    if (!isOnline) return
     const supabase = createClient()
 
     const channel = supabase
@@ -41,26 +69,26 @@ export function CrewsOnSitePanel({ initialVisits }: CrewsOnSitePanelProps) {
           }
 
           if (ended_at !== null || started_at === null) {
-            // No longer in progress — remove
-            setVisits((prev) => prev.filter((v) => v.id !== id))
+            queryClient.setQueryData<InProgressVisit[]>(inProgressKey, (prev) =>
+              (prev ?? []).filter((v) => v.id !== id),
+            )
             return
           }
 
-          // Visit is in progress — fetch full details and upsert
+          // Keep the archived-property filter the list query applies — without
+          // it, realtime could re-add a visit the list deliberately excludes.
           const { data } = await supabase
             .from('visits')
-            .select(
-              'id, started_at, property:properties(address), visit_crew(relation, employee:employees(name))',
-            )
+            .select(IN_PROGRESS_SELECT)
             .eq('id', id)
-            .single()
-
+            .eq('property.is_archived', false)
+            .maybeSingle()
           if (!data) return
 
-          setVisits((prev) => {
-            const filtered = prev.filter((v) => v.id !== id)
-            return [...filtered, data as unknown as InProgressVisit]
-          })
+          queryClient.setQueryData<InProgressVisit[]>(inProgressKey, (prev) => [
+            ...(prev ?? []).filter((v) => v.id !== id),
+            data as unknown as InProgressVisit,
+          ])
         },
       )
       .subscribe()
@@ -68,7 +96,23 @@ export function CrewsOnSitePanel({ initialVisits }: CrewsOnSitePanelProps) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [])
+  }, [isOnline, queryClient])
+
+  if (!isOnline) {
+    return (
+      <section>
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
+          Crews on site now
+        </h2>
+        <div className="rounded-xl border border-dashed border-border px-4 py-3 flex items-center gap-2">
+          <WifiOff className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
+          <p className="text-sm text-muted-foreground">
+            Needs a connection — this one is live, so there&rsquo;s nothing saved to show.
+          </p>
+        </div>
+      </section>
+    )
+  }
 
   if (visits.length === 0) return null
 
@@ -94,9 +138,7 @@ export function CrewsOnSitePanel({ initialVisits }: CrewsOnSitePanelProps) {
                 <p className="text-sm font-medium text-foreground leading-tight truncate">
                   {v.property?.address ?? '—'}
                 </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {assignedNames || '—'}
-                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">{assignedNames || '—'}</p>
               </div>
               <span className="text-sm font-semibold text-[var(--clay)] tabular-nums shrink-0">
                 {formatElapsed(v.started_at)}

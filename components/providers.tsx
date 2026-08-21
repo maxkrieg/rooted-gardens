@@ -63,6 +63,7 @@ const PERSISTED_QUERY_KEYS = new Set([
   'accounts-list',
   'account-detail',
   'account-photos',
+  'fleet-issues',
   'crew-week-schedule',
   'crew-today-stops',
   'crew-history-stops',

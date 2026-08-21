@@ -19,3 +19,25 @@ export function useIsHydrated(): boolean {
     () => false,
   )
 }
+
+function subscribeToOnline(onChange: () => void) {
+  window.addEventListener('online', onChange)
+  window.addEventListener('offline', onChange)
+  return () => {
+    window.removeEventListener('online', onChange)
+    window.removeEventListener('offline', onChange)
+  }
+}
+
+/**
+ * Connectivity alone, for views that must degrade rather than show stale data.
+ * useOfflineStatus also counts the queue in IndexedDB; this doesn't. Optimistic
+ * on the server so SSR renders the connected variant.
+ */
+export function useIsOnline(): boolean {
+  return useSyncExternalStore(
+    subscribeToOnline,
+    () => navigator.onLine,
+    () => true,
+  )
+}
