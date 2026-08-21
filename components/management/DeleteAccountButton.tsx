@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/management/ConfirmDialog'
 import { archiveAccount } from '@/app/management/accounts/actions'
+import { useRefreshAccounts } from '@/hooks/useAccounts'
 
 interface DeleteAccountButtonProps {
   accountId: string
@@ -30,6 +31,7 @@ export function DeleteAccountButton({
 }: DeleteAccountButtonProps) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
+  const refreshAccounts = useRefreshAccounts()
 
   function handleDelete() {
     startTransition(async () => {
@@ -39,6 +41,7 @@ export function DeleteAccountButton({
         return
       }
       toast.success(`Deleted ${accountName}`)
+      refreshAccounts(accountId)
       router.push('/management/accounts')
     })
   }

@@ -88,6 +88,16 @@ export interface RevertStatusPayload {
   visitId: string
 }
 
+/** Narrow column patch, NOT the whole property form: updateProperty also writes
+ *  address and frequency, and replaying that would clobber an address changed
+ *  meanwhile. These three columns are safe to replay. */
+export interface PropertyNotesPayload {
+  propertyId: string
+  crewNotes: string | null
+  accessNotes: string | null
+  parkingNotes: string | null
+}
+
 export type MutationPayload =
   | { type: 'completion'; payload: CompletionPayload }
   | { type: 'job_start'; payload: JobStartPayload }
@@ -101,6 +111,7 @@ export type MutationPayload =
   | { type: 'set_vehicle'; payload: SetVehiclePayload }
   | { type: 'crew_instruction'; payload: CrewInstructionPayload }
   | { type: 'revert_status'; payload: RevertStatusPayload }
+  | { type: 'property_notes'; payload: PropertyNotesPayload }
 
 /**
  * Retries before a mutation is parked as 'failed'. `attempts` used to be
@@ -430,6 +441,19 @@ export async function flushMutationQueue(): Promise<FlushResult> {
             .from('visits')
             .update({ status: 'scheduled', skip_reason: null })
             .eq('id', p.visitId)
+            .throwOnError()
+          break
+        }
+        case 'property_notes': {
+          const p = mutation.payload as PropertyNotesPayload
+          await supabase
+            .from('properties')
+            .update({
+              crew_notes: p.crewNotes,
+              access_notes: p.accessNotes,
+              parking_notes: p.parkingNotes,
+            })
+            .eq('id', p.propertyId)
             .throwOnError()
           break
         }

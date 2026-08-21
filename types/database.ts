@@ -808,7 +808,21 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      account_last_visit: {
+        Row: {
+          account_id: string | null
+          last_visit_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visits_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       get_my_employee_id: { Args: never; Returns: string }

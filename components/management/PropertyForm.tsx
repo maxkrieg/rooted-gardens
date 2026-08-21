@@ -22,8 +22,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { createProperty, updateProperty } from '@/app/management/accounts/property-actions'
+import { useRefreshAccounts, useUpdatePropertyNotes } from '@/hooks/useAccounts'
 import { propertyFormSchema, type PropertyFormValues } from '@/lib/validators/property'
 import type { Property } from '@/types/app'
+
+/** True when only the three note fields differ from what's stored. */
+function isNotesOnlyChange(property: Property, values: PropertyFormValues): boolean {
+  return property.address === values.address.trim() && property.frequency === values.frequency
+}
 
 const FREQUENCY_LABELS: Record<PropertyFormValues['frequency'], string> = {
   weekly: 'Weekly',
@@ -67,7 +73,33 @@ export function PropertyForm({ accountId, onSuccess, property, defaults }: Prope
 
   const isSubmitting = form.formState.isSubmitting
 
+  const updateNotes = useUpdatePropertyNotes(accountId)
+
   async function onSubmit(values: PropertyFormValues) {
+    // A notes-only edit goes through the offline queue — that's the correction an
+    // owner makes standing at the property. Address/frequency changes still need
+    // the Server Action, since replaying those blindly could clobber a real edit.
+    if (isEdit && property && isNotesOnlyChange(property, values)) {
+      try {
+        await updateNotes(
+          property.id,
+          {
+            crewNotes: values.crew_notes?.trim() || null,
+            accessNotes: values.access_notes?.trim() || null,
+            parkingNotes: values.parking_notes?.trim() || null,
+          },
+          property.address,
+        )
+        toast.success('Property updated')
+        onSuccess()
+      } catch {
+        toast.error('Could not update property', {
+          description: 'Check "Changes that didn’t save" at the top of the screen.',
+        })
+      }
+      return
+    }
+
     const res = isEdit && property
       ? await updateProperty(property.id, accountId, values)
       : await createProperty(accountId, values)

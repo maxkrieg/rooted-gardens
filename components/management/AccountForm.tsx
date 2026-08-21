@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { createAccount, updateAccount } from '@/app/management/accounts/actions'
+import { useRefreshAccounts } from '@/hooks/useAccounts'
 import { accountFormSchema, type AccountFormValues } from '@/lib/validators/account'
 import type { Account } from '@/types/app'
 
@@ -88,6 +89,7 @@ export function AccountForm({ onSuccess, account, defaults, onCreate }: AccountF
 
   const billingType = useWatch({ control: form.control, name: 'billing_type' })
   const isSubmitting = form.formState.isSubmitting
+  const refreshAccounts = useRefreshAccounts()
 
   async function onSubmit(values: AccountFormValues) {
     const res = isEdit && account
@@ -102,6 +104,7 @@ export function AccountForm({ onSuccess, account, defaults, onCreate }: AccountF
     }
 
     toast.success(isEdit ? 'Account updated' : 'Account created')
+    refreshAccounts(account?.id)
     if (!isEdit) form.reset()
     onSuccess()
   }

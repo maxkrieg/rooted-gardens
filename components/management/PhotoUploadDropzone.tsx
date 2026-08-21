@@ -16,6 +16,7 @@ import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { propertyPhotoPath, validatePhotoFile } from '@/lib/utils/photos'
 import { createPropertyPhoto } from '@/app/management/accounts/photo-actions'
+import { useRefreshAccounts } from '@/hooks/useAccounts'
 
 interface PhotoUploadDropzoneProps {
   accountId: string
@@ -44,6 +45,7 @@ export function PhotoUploadDropzone({
   onUploaded,
 }: PhotoUploadDropzoneProps) {
   const router = useRouter()
+  const refreshAccounts = useRefreshAccounts()
   const fileInputRef = useRef<HTMLInputElement>(null)
   // dragenter/dragleave also fire for child elements, so a plain boolean flickers
   // as the pointer crosses them — count depth instead.
@@ -131,6 +133,7 @@ export function PhotoUploadDropzone({
       toast.success(succeeded === 1 ? 'Photo added' : `${succeeded} photos added`)
       // The action revalidates the path; refresh pulls the new RSC payload so the
       // server-rendered gallery re-renders with freshly signed URLs.
+      refreshAccounts(accountId)
       router.refresh()
       // The gallery resolves this id against the refreshed data and opens the
       // lightbox once it arrives.

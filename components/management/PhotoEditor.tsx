@@ -19,6 +19,7 @@ import {
   updatePropertyPhoto,
 } from '@/app/management/accounts/photo-actions'
 import { PHOTO_TYPES, type PhotoType } from '@/types/app'
+import { useRefreshAccounts } from '@/hooks/useAccounts'
 
 /**
  * Owner/lead controls for a single photo: caption, category, delete.
@@ -41,6 +42,7 @@ export function PhotoEditor({
   const [caption, setCaption] = useState(photo.caption ?? '')
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const refreshAccounts = useRefreshAccounts()
 
   const captionChanged = (photo.caption ?? '') !== caption
 
@@ -52,6 +54,7 @@ export function PhotoEditor({
         return
       }
       toast.success('Caption saved')
+      refreshAccounts(accountId)
       router.refresh()
     })
   }
@@ -67,6 +70,7 @@ export function PhotoEditor({
         return
       }
       toast.success(`Moved to ${photoTypeLabel(next)}`)
+      refreshAccounts(accountId)
       router.refresh()
       // A type change re-partitions the groups, so this photo's index no longer
       // means what it did. Closing is simpler and less surprising than trying to
@@ -83,6 +87,7 @@ export function PhotoEditor({
         return
       }
       toast.success('Photo deleted')
+      refreshAccounts(accountId)
       router.refresh()
       onClose()
     })

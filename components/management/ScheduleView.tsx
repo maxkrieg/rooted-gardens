@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { addWeeks, format } from 'date-fns'
-import { WifiOff } from 'lucide-react'
 import { getWeekStart, parseWeekParam } from '@/lib/utils/schedule'
 import {
   filterScheduleWeeks,
@@ -23,6 +22,7 @@ import { ScheduleStickyBar } from '@/components/management/ScheduleStickyBar'
 import { SessionsProvider } from '@/components/management/SessionsProvider'
 import { DeepLinkedVisitSheet } from '@/components/management/DeepLinkedVisitSheet'
 import { ScheduleSkeleton } from '@/components/management/ScheduleSkeleton'
+import { CachedNotice } from '@/components/states/CachedNotice'
 import { ErrorState } from '@/components/states/ErrorState'
 import type { Account, EmployeeRole } from '@/types/app'
 
@@ -140,12 +140,7 @@ export function ScheduleView({
         </div>
       </ScheduleStickyBar>
 
-      {isStale && (
-        <p className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground">
-          <WifiOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          Showing your last saved copy — changes sync when you&rsquo;re back online.
-        </p>
-      )}
+      {isStale && <CachedNotice />}
 
       <SessionsProvider visitIds={visitIds}>
         <div className="hidden lg:block">

@@ -20,6 +20,7 @@ export type MutationType =
   | 'set_vehicle'
   | 'crew_instruction'
   | 'revert_status'
+  | 'property_notes'
 
 /** 'failed' mutations are excluded from flushes, so a poisoned one stops burning
  *  a request on every app open, and surfaced so lost work can't stay invisible. */

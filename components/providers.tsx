@@ -60,6 +60,9 @@ const CACHE_BUSTER = 'management-schedule-client'
 const PERSISTED_QUERY_KEYS = new Set([
   'schedule-reference',
   'schedule-visits',
+  'accounts-list',
+  'account-detail',
+  'account-photos',
   'crew-week-schedule',
   'crew-today-stops',
   'crew-history-stops',

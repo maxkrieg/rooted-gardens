@@ -1,70 +1,9 @@
-import { createClient } from '@/lib/supabase/server'
-import { AccountsTable } from '@/components/management/AccountsTable'
-import { ErrorState } from '@/components/states/ErrorState'
-import type { Account, AccountListRow } from '@/types/app'
+import { AccountsView } from '@/components/management/AccountsView'
 
 /**
- * Server Component — fetches accounts with property counts and last-visit dates,
- * then passes the merged list to the interactive AccountsTable client component.
+ * Thin shell — the list is client-first (AccountsView) so it reads from the
+ * persisted cache when an owner looks a customer up with no signal.
  */
-export default async function AccountsPage() {
-  const supabase = await createClient()
-
-  // ── 1. Accounts + embedded property count ────────────────────────────────
-  // PostgREST returns properties as [{ count: N }] per row.
-  // Archived accounts are soft-deleted, and the embedded count is filtered too so a
-  // deleted property doesn't inflate the number on the card.
-  const { data: accountsData, error: accountsError } = await supabase
-    .from('accounts')
-    .select('*, properties(count)')
-    .eq('is_archived', false)
-    .eq('properties.is_archived', false)
-    .order('name')
-
-  if (accountsError) {
-    console.error('[accounts] list', accountsError)
-    return (
-      <ErrorState
-        title="Accounts didn't load."
-        hint="Check your connection, then try again."
-      />
-    )
-  }
-
-  // ── 2. Last visit per account (max ended_at of any completed visit) ─────
-  // Not fatal — the list is still useful without the "last visit" column.
-  const { data: visitsData, error: visitsError } = await supabase
-    .from('visits')
-    .select('account_id, ended_at')
-    .not('ended_at', 'is', null)
-    .order('ended_at', { ascending: false })
-
-  if (visitsError) console.error('[accounts] last-visit lookup', visitsError)
-
-  // Reduce to a map of account_id → most recent ended_at.
-  // Since rows are ordered DESC, the first occurrence per account is the max.
-  const lastVisitMap = new Map<string, string>()
-  for (const v of visitsData ?? []) {
-    if (v.account_id && v.ended_at && !lastVisitMap.has(v.account_id)) {
-      lastVisitMap.set(v.account_id, v.ended_at)
-    }
-  }
-
-  // ── 3. Merge into AccountListRow[] ───────────────────────────────────────
-  const rows: AccountListRow[] = (accountsData ?? []).map((row) => {
-    // properties(count) returns [{ count: N }]; cast explicitly.
-    const countArr = row.properties as unknown as { count: number }[]
-    const propertyCount = countArr?.[0]?.count ?? 0
-
-    // Destructure without the embedded relation so Account fields are clean.
-    const { properties: _omit, ...account } = row
-
-    return {
-      ...(account as Account),
-      propertyCount,
-      lastVisitDate: lastVisitMap.get(account.id) ?? null,
-    }
-  })
-
-  return <AccountsTable accounts={rows} />
+export default function AccountsPage() {
+  return <AccountsView />
 }

@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/management/ConfirmDialog'
 import { archiveProperty } from '@/app/management/accounts/property-actions'
+import { useRefreshAccounts } from '@/hooks/useAccounts'
 
 interface DeletePropertyButtonProps {
   propertyId: string
@@ -27,6 +28,7 @@ export function DeletePropertyButton({
   address,
 }: DeletePropertyButtonProps) {
   const [pending, startTransition] = useTransition()
+  const refreshAccounts = useRefreshAccounts()
 
   function handleDelete() {
     startTransition(async () => {
@@ -36,6 +38,7 @@ export function DeletePropertyButton({
         return
       }
       toast.success('Property deleted')
+      refreshAccounts(accountId)
     })
   }
 

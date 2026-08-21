@@ -5,6 +5,7 @@ import { CheckCircle2, ExternalLink, Link2Off } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { syncAccountWithQuickBooks } from '@/app/management/accounts/actions'
+import { useRefreshAccounts } from '@/hooks/useAccounts'
 import { qboCustomerUrl } from '@/lib/utils/billing'
 
 interface QboLinkStatusProps {
@@ -18,6 +19,7 @@ interface QboLinkStatusProps {
  *  the account's current name/email/phone/billing address to QBO. */
 export function QboLinkStatus({ accountId, qboCustomerId }: QboLinkStatusProps) {
   const [pending, startTransition] = useTransition()
+  const refreshAccounts = useRefreshAccounts()
 
   function handleSync() {
     startTransition(async () => {
@@ -33,6 +35,7 @@ export function QboLinkStatus({ accountId, qboCustomerId }: QboLinkStatusProps) 
       } else {
         toast.success('Linked to QuickBooks')
       }
+      refreshAccounts(accountId)
     })
   }
 
