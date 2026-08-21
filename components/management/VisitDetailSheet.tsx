@@ -140,9 +140,10 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart, role }: V
   }
   const { data: currentEmployee } = useCurrentEmployee()
 
-  // Mutations inside VisitDetailContent are direct-client (no Server Action /
-  // revalidatePath), so the server-rendered schedule grid needs an explicit
-  // refresh to pick up anything changed while the sheet was open.
+  // Only the still-server-rendered containers (billing's InvoicedHistory) need
+  // this; the schedule and account pages read React Query, which the drawer's
+  // writes patch directly. Offline it is worse than useless — the RSC fetch
+  // fails and takes the page down with it.
   function handleOpenChange(next: boolean) {
     // Dismissing the photo lightbox must not close this sheet with it — both are
     // Radix overlays portaled to <body>, so the inner close reaches this one as
@@ -150,11 +151,9 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart, role }: V
     if (!next && (photoViewerOpen || Date.now() - photoClosedAt.current < 500)) return
     // Refresh BEFORE onOpenChange: the parent's close handler runs
     // syncVisitUrlParam(null) → history.replaceState, which Next turns into a
-    // router action of its own. Dispatched after it, the refresh can be
-    // discarded by that restore — the suspected reason a status change didn't
-    // repaint the grid on close. The live overlay above is what the repaint
-    // actually relies on now; this just reconciles with server data.
-    if (!next) router.refresh()
+    // router action of its own, and a refresh dispatched after it can be
+    // discarded by that restore.
+    if (!next && navigator.onLine) router.refresh()
     onOpenChange(next)
   }
 

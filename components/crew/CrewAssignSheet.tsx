@@ -35,12 +35,12 @@ export function CrewAssignSheet({
     reassign.mutate(
       { employeeId, name, action: currentlyAssigned ? 'remove' : 'add' },
       {
-        onError: (err) => {
-          if (err instanceof Error && err.message === 'offline') {
-            toast.error('Reassigning needs a connection.')
-          } else {
-            toast.error('Could not update crew. Try again.')
-          }
+        // No offline branch: this queues now, so reaching onError means the
+        // write was tried and parked, not that there's no signal.
+        onError: () => {
+          toast.error('Could not update crew.', {
+            description: 'Check "Changes that didn’t save" at the top of the screen.',
+          })
         },
       }
     )

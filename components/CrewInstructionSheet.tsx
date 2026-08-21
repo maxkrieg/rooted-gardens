@@ -24,8 +24,7 @@ interface CrewInstructionSheetProps {
  * Focused editor for a visit's crew instruction (the "orange cell") — owner/lead
  * only. Cross-surface (used by VisitDetailContent on both management and crew),
  * mirrors the CrewAssignSheet/SkipSheet bottom-sheet pattern. Saves immediately
- * via a direct-client mutation, no offline queue (this control is new to crew,
- * so there's no prior offline behavior to preserve for it).
+ * through the offline queue, so an owner can write one from the field.
  */
 export function CrewInstructionSheet({
   visitId,
@@ -44,12 +43,12 @@ export function CrewInstructionSheet({
   function handleSave() {
     update.mutate(instruction, {
       onSuccess: () => onOpenChange(false),
-      onError: (err) => {
-        if (err instanceof Error && err.message === 'offline') {
-          toast.error('Saving the instruction needs a connection.')
-        } else {
-          toast.error('Could not save the instruction. Try again.')
-        }
+      // No offline branch: this queues now, so reaching onError means the write
+      // was tried and parked, not that there's no signal.
+      onError: () => {
+        toast.error('Could not save the instruction.', {
+          description: 'Check "Changes that didn’t save" at the top of the screen.',
+        })
       },
     })
   }

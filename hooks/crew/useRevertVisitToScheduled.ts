@@ -17,6 +17,10 @@ export function useRevertVisitToScheduled(visitId: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
+    // Runs regardless of connectivity: mutationFn writes to IndexedDB, not the
+    // network. React Query's default pauses a mutation when offline, which ran
+    // onMutate (so the UI looked saved) but never enqueued anything.
+    networkMode: 'always',
     mutationFn: async () => {
       await enqueueMutation('revert_status', { visitId })
       const result = await flushMutationQueue()

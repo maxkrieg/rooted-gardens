@@ -14,6 +14,10 @@ export function useUpdateVisitVehicle(visitId: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
+    // Runs regardless of connectivity: mutationFn writes to IndexedDB, not the
+    // network. React Query's default pauses a mutation when offline, which ran
+    // onMutate (so the UI looked saved) but never enqueued anything.
+    networkMode: 'always',
     mutationFn: async (vehicleId: string | null) => {
       await enqueueMutation('set_vehicle', { visitId, vehicleId })
       const result = await flushMutationQueue()
