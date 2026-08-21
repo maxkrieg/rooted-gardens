@@ -1,0 +1,116 @@
+'use client'
+
+import { useMemo } from 'react'
+import { Route, Check } from 'lucide-react'
+import { RouteGroupCard } from '@/components/management/RouteGroupCard'
+import { RouteGroupSheet } from '@/components/management/RouteGroupSheet'
+import { UnroutedPanel } from '@/components/management/UnroutedPanel'
+import { CachedNotice } from '@/components/states/CachedNotice'
+import { EmptyState } from '@/components/states/EmptyState'
+import { ErrorState } from '@/components/states/ErrorState'
+import { CardListSkeleton, PageHeaderSkeleton } from '@/components/states/skeletons'
+import { useRoutesData } from '@/hooks/useRoutes'
+import { useIsHydrated } from '@/hooks/use-hydrated'
+
+/** Client-first routes page — readable in the field, and every write repaints
+ *  from the cache rather than waiting on an RSC refresh. */
+export function RoutesView() {
+  const hydrated = useIsHydrated()
+  const { data, isLoading, isError, isStale, hasData } = useRoutesData()
+
+  const routeGroups = useMemo(() => data?.routeGroups ?? [], [data])
+  const allProperties = useMemo(() => data?.allProperties ?? [], [data])
+  const unrouted = useMemo(
+    () => allProperties.filter((p) => !p.currentRouteGroup),
+    [allProperties],
+  )
+
+  if (!hydrated || (isLoading && !hasData)) return <RoutesSkeleton />
+  if (isError && !hasData) {
+    return (
+      <ErrorState
+        title="Route assignments didn't load."
+        hint="Check your connection, then try again."
+      />
+    )
+  }
+
+  const routedCount = allProperties.length - unrouted.length
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Route className="h-5 w-5 text-primary shrink-0" />
+          <h1 className="font-display text-2xl font-semibold text-foreground">Routes</h1>
+        </div>
+        <RouteGroupSheet />
+      </div>
+
+      {isStale && <CachedNotice />}
+
+      <div className="-mt-2 space-y-0.5">
+        {allProperties.length > 0 &&
+          (unrouted.length === 0 ? (
+            <p className="flex items-center gap-1.5 text-sm font-medium text-[--sap]">
+              <Check className="h-4 w-4 shrink-0" />
+              Every property is on a route.
+            </p>
+          ) : (
+            <p className="text-sm font-medium text-foreground">
+              {routedCount} of {allProperties.length} properties are on a route.
+            </p>
+          ))}
+        <p className="text-sm text-muted-foreground">
+          Geographic clusters that organize properties into daily crew routes. Each property
+          belongs to one route group at a time.
+        </p>
+      </div>
+
+      <UnroutedPanel properties={unrouted} routeGroups={routeGroups} />
+
+      {routeGroups.length === 0 ? (
+        <EmptyState
+          variant="seed"
+          title="No route groups yet"
+          hint="Create one to start organizing your properties into daily crew routes."
+          action={<RouteGroupSheet />}
+        />
+      ) : (
+        <div className="space-y-4 pb-8">
+          {routeGroups.map((group, idx) => {
+            const assignedIds = new Set(data?.assignedIdsByGroup[group.id] ?? [])
+            // Account-then-address, so a card groups an account's sites together
+            // the way the schedule grid does (same comparator as UnroutedPanel).
+            const assignedProperties = allProperties
+              .filter((p) => assignedIds.has(p.id))
+              .sort(
+                (a, b) =>
+                  a.accountName.localeCompare(b.accountName) || a.address.localeCompare(b.address),
+              )
+
+            return (
+              <RouteGroupCard
+                key={group.id}
+                routeGroup={group}
+                assignedProperties={assignedProperties}
+                allProperties={allProperties}
+                isFirst={idx === 0}
+                isLast={idx === routeGroups.length - 1}
+              />
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RoutesSkeleton() {
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      <PageHeaderSkeleton />
+      <CardListSkeleton rows={5} height="h-28" />
+    </div>
+  )
+}

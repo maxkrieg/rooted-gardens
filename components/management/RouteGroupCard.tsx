@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import { Building2, ChevronUp, ChevronDown, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,8 @@ import { FrequencyBadge } from '@/components/management/badges'
 import { RouteGroupSheet } from '@/components/management/RouteGroupSheet'
 import { PropertyAssignmentSheet } from '@/components/management/PropertyAssignmentSheet'
 import { deleteRouteGroup, moveRouteGroup } from '@/app/management/routes/actions'
+import { useRefreshRoutes } from '@/hooks/useRoutes'
+import { toUserMessage } from '@/lib/errors'
 import type { RouteGroup, PropertyWithAccount } from '@/types/app'
 
 interface RouteGroupCardProps {
@@ -28,24 +30,47 @@ export function RouteGroupCard({
   isLast,
 }: RouteGroupCardProps) {
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [pending, startTransition] = useTransition()
+  // Own busy flag, not a transition's pending: a shared pending flag disabled
+  // every control on the card and could stay stuck true (see commit f4e09e3,
+  // which fixed the same shape in the assignment sheets).
+  const [busy, setBusy] = useState(false)
+  const refreshRoutes = useRefreshRoutes()
 
-  function handleMove(direction: 'up' | 'down') {
-    startTransition(async () => {
+  async function handleMove(direction: 'up' | 'down') {
+    setBusy(true)
+    try {
       const res = await moveRouteGroup(routeGroup.id, direction)
       if (res.error) toast.error('Could not reorder route group', { description: res.error })
-    })
+      else refreshRoutes()
+    } catch (err) {
+      toast.error('Could not reorder route group', {
+        description: toUserMessage(err, 'Try again.', '[RouteGroupCard.move]'),
+      })
+    } finally {
+      setBusy(false)
+    }
   }
 
-  function handleDelete() {
-    startTransition(async () => {
+  async function handleDelete() {
+    setBusy(true)
+    try {
       const res = await deleteRouteGroup(routeGroup.id)
       if (res.error) {
         toast.error('Could not delete route group', { description: res.error })
         setConfirmDelete(false)
+        return
       }
-      // On success, revalidatePath removes this card from the list
-    })
+      // Refreshing the cache is what removes this card now — revalidatePath only
+      // refreshes an RSC shell that no longer holds the list.
+      refreshRoutes()
+    } catch (err) {
+      toast.error('Could not delete route group', {
+        description: toUserMessage(err, 'Try again.', '[RouteGroupCard.delete]'),
+      })
+      setConfirmDelete(false)
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -70,7 +95,7 @@ export function RouteGroupCard({
               variant="ghost"
               size="icon"
               className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-              disabled={isFirst || pending}
+              disabled={isFirst || busy}
               onClick={() => handleMove('up')}
               aria-label="Move route group up"
             >
@@ -80,7 +105,7 @@ export function RouteGroupCard({
               variant="ghost"
               size="icon"
               className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-              disabled={isLast || pending}
+              disabled={isLast || busy}
               onClick={() => handleMove('down')}
               aria-label="Move route group down"
             >
@@ -98,10 +123,10 @@ export function RouteGroupCard({
                   variant="destructive"
                   size="sm"
                   className="text-xs px-2"
-                  disabled={pending}
+                  disabled={busy}
                   onClick={handleDelete}
                 >
-                  {pending ? 'Deleting…' : 'Confirm delete'}
+                  {busy ? 'Deleting…' : 'Confirm delete'}
                 </Button>
                 <Button
                   variant="ghost"

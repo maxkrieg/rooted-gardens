@@ -9,6 +9,7 @@ import { FrequencyBadge } from '@/components/management/badges'
 import { RoutePicker } from '@/components/management/RoutePicker'
 import { RouteGroupSheet } from '@/components/management/RouteGroupSheet'
 import { assignProperty, assignProperties, unassignProperty } from '@/app/management/routes/actions'
+import { useRefreshRoutes } from '@/hooks/useRoutes'
 import type { PropertyWithAccount, RouteGroup } from '@/types/app'
 
 interface UnroutedPanelProps {
@@ -30,6 +31,7 @@ interface UnroutedPanelProps {
  */
 export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
   const router = useRouter()
+  const refreshRoutes = useRefreshRoutes()
   const [selected, setSelected] = useState<Set<string>>(new Set())
   // Pending flag deliberately discarded — busy state is per row, below.
   const [, startTransition] = useTransition()
@@ -123,6 +125,7 @@ export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
           return
         }
         markRouted(ids, false)
+        refreshRoutes()
         router.refresh()
       } catch {
         toast.error('Could not undo', {
@@ -147,6 +150,7 @@ export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
         deselect([property.id])
         markRouted([property.id], true)
         // revalidatePath only marks the cache stale — this repaints the page.
+        refreshRoutes()
         router.refresh()
         toast.success(`${property.address} added to ${name}.`, {
           action: {
@@ -180,6 +184,7 @@ export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
         }
         deselect(ids)
         markRouted(ids, true)
+        refreshRoutes()
         router.refresh()
         toast.success(`${ids.length} propert${ids.length === 1 ? 'y' : 'ies'} added to ${name}.`, {
           action: {

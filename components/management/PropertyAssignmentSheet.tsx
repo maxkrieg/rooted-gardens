@@ -16,6 +16,7 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet'
 import { assignProperty, unassignProperty } from '@/app/management/routes/actions'
+import { useRefreshRoutes } from '@/hooks/useRoutes'
 import type { PropertyWithAccount } from '@/types/app'
 
 interface PropertyAssignmentSheetProps {
@@ -75,6 +76,7 @@ export function PropertyAssignmentSheet({
   allProperties,
 }: PropertyAssignmentSheetProps) {
   const router = useRouter()
+  const refreshRoutes = useRefreshRoutes()
   const [open, setOpen] = useState(false)
   // Pending flag deliberately discarded — see the note above. Same idiom as
   // ScheduleGrid's `creatingKey`: track busy state per row ourselves.
@@ -188,6 +190,7 @@ export function PropertyAssignmentSheet({
 
         // revalidatePath only marks the cache stale; this is what actually
         // repaints the route group card behind the sheet.
+        refreshRoutes()
         router.refresh()
       } catch {
         // A *thrown* failure (network drop mid-action) never reaches the

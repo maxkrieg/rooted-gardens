@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { createRouteGroup, updateRouteGroup } from '@/app/management/routes/actions'
+import { useRefreshRoutes } from '@/hooks/useRoutes'
 import { routeGroupFormSchema, type RouteGroupFormValues } from '@/lib/validators/routeGroup'
 import type { RouteGroup } from '@/types/app'
 
@@ -23,6 +24,7 @@ interface RouteGroupFormProps {
 }
 
 export function RouteGroupForm({ onSuccess, routeGroup }: RouteGroupFormProps) {
+  const refreshRoutes = useRefreshRoutes()
   const isEdit = Boolean(routeGroup)
 
   const form = useForm<RouteGroupFormValues>({
@@ -47,6 +49,7 @@ export function RouteGroupForm({ onSuccess, routeGroup }: RouteGroupFormProps) {
     }
 
     toast.success(isEdit ? 'Route group updated' : 'Route group created')
+    refreshRoutes()
     if (!isEdit) form.reset()
     onSuccess()
   }
