@@ -751,38 +751,75 @@ Dark theme ("soil at dusk", for dawn/dusk field use): `--background #1C1A15`, `-
 
 ---
 
-## Data Architecture: Online Management vs. Offline-Tolerant Crew
+## Data Architecture: Offline-Tolerant Everywhere Except the Desk
 
-The two halves of this app have **different data-fetching models** because they run in
-different environments. Do not apply one pattern uniformly — pick the model by route group.
+The owners confirmed (2026-08-18) that they run management **primarily from phones, on the
+road, in limited service** — laptop use is now the minority. That triggered the escape hatch
+this section used to describe, and the field-critical management routes were converted to the
+client-first model across three phases (`8918429`, `c5a7760`, `a857567`, `655ba8d`, `ec01d9d`,
+`fefd77a`, `2502e69`). The split is no longer crew-vs-management; it is **field vs desk**.
 
-### `/management/*` — phone-primary, online → Server-first
-Owners use these routes mostly on a phone (occasionally a laptop); the accountant's
-billing views are laptop. Unlike `/crew/*`, these flows **assume a working connection**
-— they are not built to be offline-tolerant.
-- **Reads:** React Server Components fetch directly with the Supabase **server** client.
-- **Writes:** **Server Actions** (form submits, status changes, scheduling, QBO push).
-- React Query is optional here — only for client-side interactivity that needs caching
-  (e.g. the schedule grid's optimistic cell updates). Default to RSC + Server Actions.
-- **Field-use caveat:** because owners are phone-primary, an owner may schedule from the
-  field on weak signal. Server-first is still the default — do NOT build a management
-  offline queue speculatively. If field connectivity becomes a real pain point, extend
-  the crew offline-queue pattern (below) to the specific management mutations that hurt.
+### Field routes — client-first + offline queue
+`/crew/*` (always was), plus `/management/schedule`, `/management/accounts`,
+`/management/accounts/[id]`, `/management/dashboard`, `/management/routes`.
+- **Reads:** client components using **React Query** over the Supabase **browser** client,
+  persisted to IndexedDB. Pages are a thin RSC shell that only reads the `rg-role` cookie
+  and renders the client view. Show cached data flagged stale (`CachedNotice`), never an
+  error over data the owner can still act on.
+- **Writes:** the **offline mutation queue** (`lib/crew/mutation-queue.ts`) for
+  field-critical mutations; Server Actions only for desk-shaped ones.
+- Pattern to copy: `lib/schedule/fetch.ts` → `hooks/useManagementSchedule.ts` →
+  `components/management/ScheduleView.tsx`.
 
-### `/crew/*` — mobile PWA, rural VT, intermittent connectivity → Client-first + offline queue
-Crew work in areas with no guaranteed signal. Server Components and Server Actions are
-network round-trips and **do not work offline**, so the crew side cannot depend on them
-for its core loop (view stops → log completion → upload photo).
-- **Reads:** **client components** using **React Query** over the Supabase **browser**
-  client. React Query's cache (persisted to IndexedDB via
-  `@tanstack/query-persist-client`) is what crew see when offline — show it as stale,
-  don't block on the network.
-- **Writes:** go through an **offline mutation queue** (IndexedDB), NOT Server Actions.
-  A completion, photo, or **job start/stop** logged offline is enqueued locally with a
-  device-captured timestamp, the UI updates optimistically, and the queue flushes to
-  Supabase when connectivity returns. The queue itself is built in Phase 4 / task 4.1.
-- **Realtime:** subscribe with the browser client (see below). Treat realtime as a
-  best-effort enhancement on top of the cache, never the source of truth.
+### Desk routes — still server-first
+`/management/billing` (the accountant is laptop-first), `/management/team`,
+`/management/fleet`, `/management/leads`, `/management/reports`. RSC reads + Server Actions,
+as before. Don't convert these without a reason.
+
+### Rules that bite if you forget them
+
+- **Converting a page to client-first breaks every Server Action that feeds it.**
+  `revalidatePath` then refreshes an RSC shell holding no data — the write lands in Postgres
+  and the screen never changes. Every such page needs a `useRefresh*` hook invalidating its
+  query keys, called from each action's success path. This has caused three separate bugs.
+- **Queued mutations need `networkMode: 'always'`.** React Query's default *pauses* a
+  mutation when offline: `onMutate` runs (so the UI looks saved) but `mutationFn` never
+  does, so nothing is enqueued. Genuinely online-only mutations keep the default.
+- **New query keys must be added to `PERSISTED_QUERY_KEYS`** (`components/providers.tsx`) or
+  they won't survive a reload. It's an allowlist so account data doesn't land in IndexedDB
+  by accident. Signed-URL keys stay off it — they expire in an hour.
+- **Queue writes must be replay-safe.** `markMutationDone` runs *after* the Supabase call, so
+  a crash between them replays the case. Inserts upsert with `ignoreDuplicates`.
+- **Don't call `router.refresh()` on a client-first page.** Offline it's an RSC fetch that
+  fails and takes the page down via the error boundary.
+- **Realtime only covers `visits`, `visit_crew`, and `leads`** — those are the only tables in
+  the `supabase_realtime` publication. A subscription on anything else silently never fires.
+  Refresh from the write instead.
+- **Offline behavior cannot be tested with `npm run dev`** — `defaultCache` degrades to a
+  single `NetworkOnly` rule. Use `npm run build && npm start`.
+
+### The offline queue, concretely
+`lib/crew/mutation-queue.ts` + `lib/crew/idb.ts` — **shared by both surfaces now, so the
+`crew/` path is a misnomer pending a move to `lib/offline/`** (where the photo cache already
+lives). IndexedDB `rooted-crew`, stores `mutations`, `rq-cache`, `photo-blobs`.
+
+Queued types: crew's `completion`, `photo`, `photo_caption`, `job_start`, `job_stop`,
+`job_discard`, `skip`; management's `create_visit`, `assign_crew`, `set_vehicle`,
+`crew_instruction`, `revert_status`, `property_notes`. Adding one means touching
+`MutationType` (idb.ts), the payload interface + `MutationPayload` union, a `case` in the
+flush switch, and `TYPE_LABELS` in `StuckChangesSheet` (compiler-enforced).
+
+Parked after 5 attempts and surfaced in "Changes that didn't save". `OfflineBanner` +
+mount-flush are mounted by `CrewShell` and `ManagementShell`; a surface that enqueues without
+one will queue writes that never sync.
+
+**Deliberately still online-only:** plan photos (three unguarded steps, duplicates on replay),
+`bulkAssignRoute` (delete-then-insert clobbers concurrent edits), and everything on the desk
+routes. These show a "needs a connection" message.
+
+**Photo bytes:** `lib/offline/photo-blobs.ts` caches `how_to` / `customer_request` bytes keyed
+by `storage_path` (100MB LRU). The `photos` bucket is private and its URLs rotate hourly, so a
+URL-keyed cache can never hit — only the bytes can be cached.
 
 ### Realtime subscriptions
 **Crew** (`/crew/*`) — because crew↔visit links now live in `visit_crew` (not a `uuid[]`),
@@ -795,12 +832,16 @@ subscriptions are relational and filterable:
   At this company's scale (≤ a few hundred visits/week) this is cheap.
 
 **Management** (`/management/*`) — owners need live in-progress state, so the schedule and
-dashboard subscribe to `visits` UPDATE events. `SessionsProvider` (schedule page) tracks a
-`Map<visitId, { started_at, ended_at }>` overlay updated by realtime; the schedule grid and
-mobile list merge this with server-fetched visit data. `CrewsOnSitePanel` (dashboard) queries
-visits where `started_at IS NOT NULL AND ended_at IS NULL` on mount, then subscribes to
-`visits` UPDATE to add/remove entries live. Treat realtime as a best-effort live overlay on
-top of server-rendered data, never the source of truth. Owner start/stop alerts are
+dashboard subscribe to `visits` UPDATE events. `SessionsProvider` (schedule page) keeps a
+`Map<visitId, VisitOverlay>` of whole rows from `payload.new`, merged over the grid's data by
+`mergeVisitOverlay` (`lib/utils/visits.ts`), which is version-guarded on `updated_at` so a
+dropped message can't pin a stale value. `CrewsOnSitePanel` (dashboard) fetches in-progress
+visits and subscribes to `visits` UPDATE — and deliberately does **not** cache: offline it
+says it needs a connection rather than showing a frozen list with a ticking timer.
+
+Note the overlay is now a *third* store on top of React Query, left in place because the grid
+used to read server props; folding it into `setQueryData` is pending. Treat realtime as a
+best-effort overlay, never the source of truth. Owner start/stop alerts are
 **in-app only** — no email / SMS / push (Phase 8.3). If an owner doesn't have the app open,
 they simply catch up on next open. (Unaffected by the 8.2/8.3 SMS deferral — these alerts
 were always designed as in-app only, and they are built and working.)
@@ -814,18 +855,17 @@ were always designed as in-app only, and they are built and working.)
 ## Development Conventions
 
 - **TypeScript strict mode** — no `any` types
-- **Mutations follow the route group** (see Data Architecture above): `/management/*`
-  uses **Server Actions**; `/crew/*` uses the **offline mutation queue**, never Server
-  Actions, so completions/photos survive loss of signal
-- **React Query** for client-side data fetching and caching (required on `/crew/*`,
-  optional on `/management/*`)
+- **Mutations follow the *surface*, not the route group** (see Data Architecture above):
+  field routes use the **offline mutation queue**; desk routes use **Server Actions**.
+  `/crew/*` never uses Server Actions at all.
+- **React Query** for client-side data fetching and caching — required on every field
+  route, optional on desk routes
 - **Zod schemas** for all form validation — define schemas in `lib/validators/`
 - **Never** import Supabase browser client in a Server Component
 - **Never** import Supabase server client in a Client Component
 - File naming: `PascalCase` for components, `camelCase` for utilities
-- Prefer Server Components by default on `/management/*`; add `'use client'` only when
-  needed (event handlers, hooks, browser APIs). `/crew/*` is client-first by design
-  (offline support) — see Data Architecture above
+- Server Components are still the default on **desk** routes; field routes are client-first
+  behind a thin RSC shell — see Data Architecture above
 - All Supabase queries go through typed client — run `supabase gen types typescript`
   after schema changes and commit `types/database.ts`
 - **Two Supabase projects now exist**: dev `obbbvohmcaneehzxuuyo` (what `.env.local` points
