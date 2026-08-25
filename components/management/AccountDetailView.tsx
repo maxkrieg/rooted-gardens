@@ -21,6 +21,7 @@ import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
 import { CardListSkeleton, PageHeaderSkeleton } from '@/components/states/skeletons'
 import { useAccountDetail, useAccountPhotos, useSignedPhotoUrls } from '@/hooks/useAccounts'
+import { useCachedPhotoUrls } from '@/hooks/useCachedPhotoUrls'
 import { useIsHydrated } from '@/hooks/use-hydrated'
 import { cn } from '@/lib/utils'
 import { formatAccountPrice } from '@/lib/utils/accounts'
@@ -306,11 +307,14 @@ function PhotosTab({ detail, role }: { detail: AccountDetail; role: EmployeeRole
   const { account } = detail
   const propertyIds = account.properties.map((p) => p.id)
   const { data: photos = [], isError } = useAccountPhotos(account.id, propertyIds)
-  const { data: urlByPath = {} } = useSignedPhotoUrls(photos.map((p) => p.storage_path))
+  const { data: urlByPath } = useSignedPhotoUrls(photos.map((p) => p.storage_path))
+  // How-to and customer-request photos get their bytes cached on the device, so
+  // a gate-code photo still loads in a dead zone.
+  const cachedUrlByPath = useCachedPhotoUrls(photos, urlByPath)
 
   const withUrls: PhotoWithUrl[] = photos.map((p) => ({
     ...p,
-    url: urlByPath[p.storage_path] ?? null,
+    url: urlByPath?.[p.storage_path] ?? cachedUrlByPath[p.storage_path] ?? null,
   }))
 
   return (

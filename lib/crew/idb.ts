@@ -2,8 +2,10 @@ import { openDB, type IDBPDatabase } from 'idb'
 
 const DB_NAME = 'rooted-crew'
 // v2 added `status` + `lastError` so a permanently failing mutation can be
-// parked instead of retried forever.
-const DB_VERSION = 2
+// parked instead of retried forever. v3 added the photo-blobs store, so
+// gate-code photos survive a dead zone (the signed URLs they normally load
+// through rotate hourly, so only the bytes can be cached).
+const DB_VERSION = 3
 
 // Management schedule types (create_visit…revert_status) were added when owners
 // went phone-primary in the field; `payload` is untyped here, so no DB_VERSION bump.
@@ -52,6 +54,12 @@ export function getDB(): Promise<IDBPDatabase> {
         }
         if (!db.objectStoreNames.contains('rq-cache')) {
           db.createObjectStore('rq-cache')
+        }
+        // Keyed by storage_path — the only stable identity a photo has, since
+        // its signed URL carries a token that rotates hourly.
+        if (!db.objectStoreNames.contains('photo-blobs')) {
+          const store = db.createObjectStore('photo-blobs', { keyPath: 'storagePath' })
+          store.createIndex('by-last-used', 'lastUsedAt')
         }
 
         // v1 → v2: rows predate `status`. Default to 'pending' so work queued
