@@ -11,7 +11,7 @@ import {
   SheetTitle,
   SheetFooter,
 } from '@/components/ui/sheet'
-import { useUpdateCrewInstruction } from '@/hooks/crew/useUpdateCrewInstruction'
+import { useUpdateCrewInstruction } from '@/hooks/useUpdateCrewInstruction'
 
 interface CrewInstructionSheetProps {
   visitId: string

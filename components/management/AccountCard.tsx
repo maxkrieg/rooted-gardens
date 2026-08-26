@@ -8,7 +8,7 @@ import type { AccountListRow } from '@/types/app'
 
 export function AccountCard({ account }: { account: AccountListRow }) {
   return (
-    <Link href={`/management/accounts/${account.id}`} className="block">
+    <Link href={`/app/accounts/${account.id}`} className="block">
       <Card className="rounded-2xl border border-border shadow-warm hover:shadow-warm-lg transition-shadow">
         <CardContent className="p-4">
           {/* Header row */}

@@ -50,7 +50,7 @@ export function ConvertLeadSheet({ lead, open, onOpenChange }: ConvertLeadSheetP
   function handleOpenChange(next: boolean) {
     if (!next) {
       if (accountId) {
-        router.push(`/management/accounts/${accountId}`)
+        router.push(`/app/accounts/${accountId}`)
       }
       reset()
     }
@@ -58,7 +58,7 @@ export function ConvertLeadSheet({ lead, open, onOpenChange }: ConvertLeadSheetP
   }
 
   function finish() {
-    if (accountId) router.push(`/management/accounts/${accountId}`)
+    if (accountId) router.push(`/app/accounts/${accountId}`)
     reset()
     onOpenChange(false)
   }

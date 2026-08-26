@@ -20,7 +20,7 @@ export function formatAccountPrice(
 
 /**
  * Builds the DB insert/update payload from validated account form values.
- * Shared by createAccount / updateAccount (app/management/accounts/actions.ts)
+ * Shared by createAccount / updateAccount (app/app/(padded)/accounts/actions.ts)
  * and convertLeadToAccount (app/management/leads/actions.ts, task 9.9) — moved
  * out of the actions file since every export there must be an async Server
  * Action, so a plain payload builder couldn't live there and be imported

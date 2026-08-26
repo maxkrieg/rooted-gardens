@@ -37,7 +37,7 @@ function EditToggle({ className }: { className?: string }) {
 
 /**
  * Sticky top nav for the public marketing site (`app/(public)/*`). Mirrors the
- * active-link and mobile-drawer idiom of `components/management/ManagementNav.tsx`,
+ * active-link and mobile-drawer idiom of `components/app/AppShell.tsx`,
  * but there's no role gating — every link here is reachable signed-out.
  */
 export function PublicHeader({ staffHome }: { staffHome: string | null }) {

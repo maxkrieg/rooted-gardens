@@ -6,7 +6,7 @@ import { Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/management/ConfirmDialog'
-import { archiveAccount } from '@/app/management/accounts/actions'
+import { archiveAccount } from '@/app/app/(padded)/accounts/actions'
 import { useRefreshAccounts } from '@/hooks/useAccounts'
 
 interface DeleteAccountButtonProps {
@@ -42,7 +42,7 @@ export function DeleteAccountButton({
       }
       toast.success(`Deleted ${accountName}`)
       refreshAccounts(accountId)
-      router.push('/management/accounts')
+      router.push('/app/accounts')
     })
   }
 

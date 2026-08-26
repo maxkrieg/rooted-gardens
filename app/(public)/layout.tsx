@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
+import { ROLE_HOME } from '@/lib/auth/access'
+import type { EmployeeRole } from '@/types/app'
 import { EditModeProvider } from '@/components/public/editing/EditModeProvider'
 import { PublicHeader } from '@/components/public/PublicHeader'
 import { PublicFooter } from '@/components/public/PublicFooter'
@@ -32,16 +34,6 @@ async function hasAuthCookie(): Promise<boolean> {
   return store.getAll().some((c) => c.name.includes('-auth-token'))
 }
 
-// Mirrors proxy.ts's ROLE_HOME — where a signed-in employee lands inside the
-// app. Kept as its own small copy here rather than importing proxy.ts (which
-// runs in the Edge runtime) into this Node.js layout.
-const STAFF_HOME: Record<string, string> = {
-  owner: '/management/dashboard',
-  lead: '/management/dashboard',
-  accountant: '/management/billing',
-  crew: '/crew/schedule',
-}
-
 /**
  * Resolves who's viewing the public site: `canEdit` gates the owner-only
  * inline WYSIWYG editor (task 9.2.5); `staffHome` is non-null for *any*
@@ -67,7 +59,7 @@ async function resolveViewer(): Promise<{ canEdit: boolean; staffHome: string | 
 
   return {
     canEdit: employee.role === 'owner',
-    staffHome: STAFF_HOME[employee.role] ?? null,
+    staffHome: ROLE_HOME[employee.role as EmployeeRole] ?? null,
   }
 }
 

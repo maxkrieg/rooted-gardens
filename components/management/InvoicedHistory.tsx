@@ -135,7 +135,7 @@ export function InvoicedHistory({
   }
 
   function handleAccountClick(accountId: string) {
-    router.push(`/management/accounts/${accountId}`)
+    router.push(`/app/accounts/${accountId}`)
   }
 
   function toggleInvoiceExpanded(invoiceId: string) {
@@ -533,7 +533,6 @@ export function InvoicedHistory({
             visit: { ...sheetRow.visit, visit_crew: [] },
           }}
           weekStart={sheetRow.visit.week_start}
-          role={role}
         />
       )}
     </div>

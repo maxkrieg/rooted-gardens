@@ -7,8 +7,6 @@ import { useIsStandalone } from '@/hooks/use-media-query'
 
 const DISMISSED_KEY = 'rg-install-dismissed'
 
-/** Crew and management install as separate apps, so they dismiss separately. */
-export const MANAGEMENT_DISMISSED_KEY = 'rg-install-dismissed-management'
 
 /**
  * The `beforeinstallprompt` event, which TypeScript's DOM lib doesn't ship

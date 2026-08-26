@@ -32,7 +32,7 @@ export function AccountsView() {
   )
 }
 
-/** Mirrors app/management/accounts/loading.tsx, which now only covers the shell. */
+/** Mirrors app/app/(padded)/accounts/loading.tsx, which now only covers the shell. */
 function AccountsSkeleton() {
   return (
     <div className="space-y-6">

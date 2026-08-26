@@ -67,7 +67,7 @@ export function PropertyPhotoGallery({
         hint="Photos hang off properties, so add one on the Details tab first."
         action={
           <Button asChild variant="outline">
-            <Link href={`/management/accounts/${accountId}`}>Go to Details</Link>
+            <Link href={`/app/accounts/${accountId}`}>Go to Details</Link>
           </Button>
         }
         className="rounded-2xl border border-dashed border-border"

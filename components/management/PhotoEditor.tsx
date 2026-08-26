@@ -17,7 +17,7 @@ import { photoTypeLabel } from '@/lib/utils/photos'
 import {
   deletePropertyPhoto,
   updatePropertyPhoto,
-} from '@/app/management/accounts/photo-actions'
+} from '@/app/app/(padded)/accounts/photo-actions'
 import { PHOTO_TYPES, type PhotoType } from '@/types/app'
 import { useRefreshAccounts } from '@/hooks/useAccounts'
 

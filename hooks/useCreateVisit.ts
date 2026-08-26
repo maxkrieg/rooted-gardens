@@ -2,7 +2,7 @@
 
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
-import { enqueueMutation, flushMutationQueue } from '@/lib/crew/mutation-queue'
+import { enqueueMutation, flushMutationQueue } from '@/lib/offline/mutation-queue'
 import { scheduleVisitsKey } from '@/hooks/useManagementSchedule'
 import type { SchedulePropertyRow, VisitWithCrew } from '@/types/app'
 

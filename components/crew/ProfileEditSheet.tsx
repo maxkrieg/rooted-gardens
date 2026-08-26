@@ -12,7 +12,7 @@ import {
   SheetTitle,
   SheetFooter,
 } from '@/components/ui/sheet'
-import { updateMyProfile } from '@/app/crew/profile/actions'
+import { updateMyProfile } from '@/app/app/profile-actions'
 
 interface ProfileEditSheetProps {
   initialPhone: string

@@ -30,7 +30,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { bulkAssignRoute } from '@/app/management/schedule/actions'
+import { bulkAssignRoute } from '@/app/app/(padded)/schedule/actions'
 import { routeAssignSchema, type RouteAssignValues } from '@/lib/validators/visit'
 import type { Employee, RouteGroup, ScheduleWeek, Vehicle } from '@/types/app'
 

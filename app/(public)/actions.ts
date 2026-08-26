@@ -41,7 +41,7 @@ function revalidate() {
  * Resolve the acting employee and assert they're an owner.
  *
  * Same shape as `requireManagingEmployee` in
- * app/management/accounts/photo-actions.ts, restricted to `owner` only —
+ * app/app/(padded)/accounts/photo-actions.ts, restricted to `owner` only —
  * editing the public site is owner-only per the site_content /
  * site_collection_items RLS policies (migration 20260804140000). RLS is the
  * actual security boundary; this exists purely to return a better error
@@ -255,7 +255,7 @@ export async function deleteCollectionItem(
 /**
  * Move a collection item up or down by swapping `sort_order` with its
  * neighbor — verbatim port of `moveRouteGroup`
- * (app/management/routes/actions.ts), scoped by `collection`.
+ * (app/app/(padded)/routes/actions.ts), scoped by `collection`.
  */
 export async function moveCollectionItem(
   values: MoveCollectionItemValues,

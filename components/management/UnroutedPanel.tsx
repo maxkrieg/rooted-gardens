@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { FrequencyBadge } from '@/components/management/badges'
 import { RoutePicker } from '@/components/management/RoutePicker'
 import { RouteGroupSheet } from '@/components/management/RouteGroupSheet'
-import { assignProperty, assignProperties, unassignProperty } from '@/app/management/routes/actions'
+import { assignProperty, assignProperties, unassignProperty } from '@/app/app/(padded)/routes/actions'
 import { useRefreshRoutes } from '@/hooks/useRoutes'
 import type { PropertyWithAccount, RouteGroup } from '@/types/app'
 

@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
  * Caption a photo from the visit drawer.
  *
  * Deliberately a direct-client mutation rather than the `updatePropertyPhoto`
- * Server Action the account gallery uses: this runs on `/crew/stop/[visitId]`,
+ * Server Action the account gallery uses: this runs on `/app/stop/[visitId]`,
  * where CLAUDE.md forbids Server Actions. Same online-only pattern as the other
  * drawer mutations (useUpdateCrewInstruction, useAddVisitPlanPhoto) — captions
  * are typed deliberately, so failing loudly beats silently queueing.

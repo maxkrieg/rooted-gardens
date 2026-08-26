@@ -62,7 +62,7 @@ export function AccountsTable({ accounts }: AccountsTableProps) {
   })
 
   function handleRowClick(id: string) {
-    router.push(`/management/accounts/${id}`)
+    router.push(`/app/accounts/${id}`)
   }
 
   function clearFilters() {

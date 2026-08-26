@@ -15,7 +15,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { propertyPhotoPath, validatePhotoFile } from '@/lib/utils/photos'
-import { createPropertyPhoto } from '@/app/management/accounts/photo-actions'
+import { createPropertyPhoto } from '@/app/app/(padded)/accounts/photo-actions'
 import { useRefreshAccounts } from '@/hooks/useAccounts'
 
 interface PhotoUploadDropzoneProps {

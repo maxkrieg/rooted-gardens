@@ -13,7 +13,7 @@ import { SERVICE_TYPE_LABELS } from '@/types/app'
  * detail view. Shared by the management VisitDetailSheet and the crew stop
  * page — deliberately cross-surface, so it lives at the components/ root
  * rather than under management/ or crew/ (mirroring the existing precedent of
- * crew/ScheduleStopRow importing VisitStatusBadge from management/badges).
+ * the crew stop row importing VisitStatusBadge from management/badges).
  *
  * Collapsed by default and renders nothing when there's no history — this is
  * meant to stay quiet and secondary, never a dense table.

@@ -13,25 +13,32 @@ declare global {
 declare const self: ServiceWorkerGlobalScope
 
 /**
- * Owners run management from the field on weak signal, so these sit ahead of
+ * Owners and crew both work from the field on weak signal, so these sit ahead of
  * defaultCache: its NetworkFirst rules never time out (one bar hangs instead of
  * serving cache) and share one 32-entry LRU across the whole origin.
+ *
+ * Covers `/app` (the merged field surface) and `/management` (the desk routes,
+ * which owners still reach from a phone). Cache names changed with the paths —
+ * the old `management-*` caches only held URLs that no longer exist.
  */
-const managementCaching: RuntimeCaching[] = [
+const isAppPath = (pathname: string) =>
+  pathname.startsWith('/app') || pathname.startsWith('/management')
+
+const appCaching: RuntimeCaching[] = [
   {
     matcher: ({ request, sameOrigin, url }) =>
-      sameOrigin && request.headers.get('RSC') === '1' && url.pathname.startsWith('/management'),
+      sameOrigin && request.headers.get('RSC') === '1' && isAppPath(url.pathname),
     handler: new NetworkFirst({
-      cacheName: 'management-rsc',
+      cacheName: 'app-rsc',
       networkTimeoutSeconds: 3,
       plugins: [new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 })],
     }),
   },
   {
     matcher: ({ request, sameOrigin, url }) =>
-      sameOrigin && request.destination === 'document' && url.pathname.startsWith('/management'),
+      sameOrigin && request.destination === 'document' && isAppPath(url.pathname),
     handler: new NetworkFirst({
-      cacheName: 'management-pages',
+      cacheName: 'app-pages',
       networkTimeoutSeconds: 3,
       plugins: [new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 7 })],
     }),
@@ -45,7 +52,7 @@ const serwist = new Serwist({
   // Off deliberately: preload races the network on every navigation, the wrong
   // bias when the network is the unreliable part.
   navigationPreload: false,
-  runtimeCaching: [...managementCaching, ...defaultCache],
+  runtimeCaching: [...appCaching, ...defaultCache],
   fallbacks: {
     // Static file, not an app route — only public/** and .next/static/** are
     // precached, so an App Router page would not be available offline.

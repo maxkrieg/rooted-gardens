@@ -27,14 +27,14 @@ import { cn } from '@/lib/utils'
 import { formatAccountPrice } from '@/lib/utils/accounts'
 import { groupPhotosByProperty } from '@/lib/utils/photos'
 import type { AccountDetail } from '@/lib/accounts/fetch'
-import type { EmployeeRole, PhotoWithUrl } from '@/types/app'
+import { useCan } from '@/components/app/RoleProvider'
+import type { PhotoWithUrl } from '@/types/app'
 
 type AccountView = 'details' | 'photos'
 
 interface AccountDetailViewProps {
   accountId: string
   initialView: AccountView
-  role: EmployeeRole
 }
 
 /**
@@ -42,7 +42,8 @@ interface AccountDetailViewProps {
  * to render from cache. Tabs are client state rather than `?view=` links, which
  * were an RSC round-trip per switch.
  */
-export function AccountDetailView({ accountId, initialView, role }: AccountDetailViewProps) {
+export function AccountDetailView({ accountId, initialView }: AccountDetailViewProps) {
+  const { archive: canArchive } = useCan()
   const hydrated = useIsHydrated()
   const [view, setView] = useState<AccountView>(initialView)
   const { detail, isLoading, isError, isStale, hasData } = useAccountDetail(accountId)
@@ -70,7 +71,7 @@ export function AccountDetailView({ accountId, initialView, role }: AccountDetai
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <Link
-        href="/management/accounts"
+        href="/app/accounts"
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
@@ -98,7 +99,7 @@ export function AccountDetailView({ accountId, initialView, role }: AccountDetai
           <EditAccountSheet account={account} />
           {/* Deleting an account takes its properties with it, so it's owner-only —
               narrower than editing, which leads can do. */}
-          {role === 'owner' && (
+          {canArchive && (
             <DeleteAccountButton
               accountId={account.id}
               accountName={account.name}
@@ -127,15 +128,16 @@ export function AccountDetailView({ accountId, initialView, role }: AccountDetai
       </div>
 
       {view === 'photos' ? (
-        <PhotosTab detail={detail} role={role} />
+        <PhotosTab detail={detail} />
       ) : (
-        <DetailsTab detail={detail} role={role} />
+        <DetailsTab detail={detail} />
       )}
     </div>
   )
 }
 
-function DetailsTab({ detail, role }: { detail: AccountDetail; role: EmployeeRole }) {
+function DetailsTab({ detail }: { detail: AccountDetail }) {
+  const { archive: canArchive } = useCan()
   const { account, visits, routeGroupByPropertyId, visitsFailed } = detail
 
   return (
@@ -231,7 +233,7 @@ function DetailsTab({ detail, role }: { detail: AccountDetail; role: EmployeeRol
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <PropertySheet accountId={account.id} property={property} />
-                        {role === 'owner' && (
+                        {canArchive && (
                           <DeletePropertyButton
                             propertyId={property.id}
                             accountId={account.id}
@@ -257,7 +259,7 @@ function DetailsTab({ detail, role }: { detail: AccountDetail; role: EmployeeRol
                         {routeGroup?.name ?? 'Not on a route'}
                       </span>
                       <Link
-                        href="/management/routes"
+                        href="/app/routes"
                         className="inline-flex items-center gap-1 text-xs text-[--primary] hover:underline shrink-0"
                       >
                         {routeGroup ? 'Manage' : 'Put on a route'}
@@ -297,13 +299,14 @@ function DetailsTab({ detail, role }: { detail: AccountDetail; role: EmployeeRol
 
       <section className="pb-8">
         <h2 className="font-display text-lg font-semibold text-foreground mb-3">Recent visits</h2>
-        <RecentVisitsList visits={visits} account={account} role={role} loadError={visitsFailed} />
+        <RecentVisitsList visits={visits} account={account} loadError={visitsFailed} />
       </section>
     </div>
   )
 }
 
-function PhotosTab({ detail, role }: { detail: AccountDetail; role: EmployeeRole }) {
+function PhotosTab({ detail }: { detail: AccountDetail }) {
+  const { editAccounts } = useCan()
   const { account } = detail
   const propertyIds = account.properties.map((p) => p.id)
   const { data: photos = [], isError } = useAccountPhotos(account.id, propertyIds)
@@ -323,7 +326,7 @@ function PhotosTab({ detail, role }: { detail: AccountDetail; role: EmployeeRole
         accountId={account.id}
         properties={account.properties.map((p) => ({ id: p.id, address: p.address }))}
         grouped={groupPhotosByProperty(account.properties, withUrls)}
-        canManage={role === 'owner' || role === 'lead'}
+        canManage={editAccounts}
         loadError={isError}
       />
     </div>

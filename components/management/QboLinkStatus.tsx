@@ -4,7 +4,7 @@ import { useTransition } from 'react'
 import { CheckCircle2, ExternalLink, Link2Off } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { syncAccountWithQuickBooks } from '@/app/management/accounts/actions'
+import { syncAccountWithQuickBooks } from '@/app/app/(padded)/accounts/actions'
 import { useRefreshAccounts } from '@/hooks/useAccounts'
 import { qboCustomerUrl } from '@/lib/utils/billing'
 

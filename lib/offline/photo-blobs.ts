@@ -1,4 +1,4 @@
-import { getDB } from '@/lib/crew/idb'
+import { getDB } from '@/lib/offline/idb'
 import type { PhotoType } from '@/types/app'
 
 /**

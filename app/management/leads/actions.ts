@@ -92,7 +92,7 @@ export async function getLeadResumeUrl(id: string): Promise<{ url?: string; erro
  * Convert a service_inquiry lead into an account (task 9.9) — step 1 of the
  * ConvertLeadSheet wizard. Creates the account, then marks the lead won and
  * links it back. Property creation (step 2) is a separate call to the
- * existing createProperty (app/management/accounts/property-actions.ts) once
+ * existing createProperty (app/app/(padded)/accounts/property-actions.ts) once
  * the caller has the new account id.
  *
  * Re-reads the lead server-side rather than trusting the client's `kind` /
@@ -147,7 +147,7 @@ export async function convertLeadToAccount(
     .eq('id', leadId)
 
   revalidatePath('/management/leads')
-  revalidatePath('/management/accounts')
+  revalidatePath('/app/accounts')
 
   if (updateErr) {
     console.error('[convertLeadToAccount] lead link', updateErr)

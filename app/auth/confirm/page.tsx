@@ -66,7 +66,7 @@ export default function AuthConfirmPage() {
       const next =
         requested && requested.startsWith('/') && !requested.startsWith('//')
           ? requested
-          : '/management/dashboard'
+          : '/app/dashboard'
 
       // Drop the tokens from the address bar (and this entry in history) before
       // navigating on, so they aren't left sitting in the URL or back-stack.

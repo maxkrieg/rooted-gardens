@@ -50,7 +50,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
   function handleSelect(id: string) {
     onOpenChange(false)
-    router.push(`/management/accounts/${id}`)
+    router.push(`/app/accounts/${id}`)
   }
 
   const q = query.toLowerCase()

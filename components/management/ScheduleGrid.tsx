@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { getWeekStart, groupRowsByAccount } from '@/lib/utils/schedule'
 import { syncVisitUrlParam } from '@/lib/utils/visit-url'
 import { formatAccountPrice } from '@/lib/utils/accounts'
+import { useCan } from '@/components/app/RoleProvider'
 import { useCreateVisit } from '@/hooks/useCreateVisit'
 import { toUserMessage } from '@/lib/errors'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
@@ -40,13 +41,12 @@ interface ScheduleGridProps {
   weeks: ScheduleWeek[]
   employees: Employee[]
   vehicles: Vehicle[]
-  canEdit: boolean
-  role: EmployeeRole | undefined
   /** True when a filter is narrowing the view — changes the empty state's meaning. */
   filtered?: boolean
 }
 
-export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filtered }: ScheduleGridProps) {
+export function ScheduleGrid({ weeks, employees, vehicles, filtered }: ScheduleGridProps) {
+  const { editSchedule: canEdit } = useCan()
   const currentWeekStart = useMemo(
     () => format(getWeekStart(new Date()), 'yyyy-MM-dd'),
     []
@@ -273,7 +273,7 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
                       )}
                     >
                       <Link
-                        href={`/crew/schedule?week=${week.weekStart}`}
+                        href={`/app/schedule?week=${week.weekStart}`}
                         className="block rounded-md px-1 py-0.5 hover:bg-accent/40 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         title={`Open the crew schedule for ${format(start, 'MMM d')} – ${format(addDays(start, 6), 'MMM d')}`}
                       >
@@ -348,7 +348,7 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
                               Not on a route · {structure.ungrouped.length}
                             </span>
                             <Link
-                              href="/management/routes"
+                              href="/app/routes"
                               className="mr-4 px-2 text-xs font-medium normal-case tracking-normal text-[var(--clay)]/80 hover:text-[var(--clay)] shrink-0"
                             >
                               Put on a route →
@@ -373,7 +373,6 @@ export function ScheduleGrid({ weeks, employees, vehicles, canEdit, role, filter
           onOpenChange={handleSheetOpenChange}
           row={sheetRow}
           weekStart={sheetWeek}
-          role={role}
         />
       )}
 

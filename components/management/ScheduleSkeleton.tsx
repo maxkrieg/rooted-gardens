@@ -1,7 +1,7 @@
 import { Skeleton } from '@/components/ui/skeleton'
 
 /** First-load placeholder for ScheduleView. Shares its shape with
- *  app/management/schedule/loading.tsx, which covers the RSC shell. */
+ *  app/app/(padded)/schedule/loading.tsx, which covers the RSC shell. */
 export function ScheduleSkeleton() {
   return (
     <div>

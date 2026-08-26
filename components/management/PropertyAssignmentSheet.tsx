@@ -15,7 +15,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet'
-import { assignProperty, unassignProperty } from '@/app/management/routes/actions'
+import { assignProperty, unassignProperty } from '@/app/app/(padded)/routes/actions'
 import { useRefreshRoutes } from '@/hooks/useRoutes'
 import type { PropertyWithAccount } from '@/types/app'
 
@@ -237,14 +237,14 @@ export function PropertyAssignmentSheet({
         <div className="min-w-0">
           {!inline && (
             <Link
-              href={`/management/accounts/${property.account_id}`}
+              href={`/app/accounts/${property.account_id}`}
               className="text-sm font-medium text-[--primary] hover:underline truncate block"
             >
               {property.accountName}
             </Link>
           )}
           <Link
-            href={`/management/accounts/${property.account_id}`}
+            href={`/app/accounts/${property.account_id}`}
             className={inline ? addressClass : 'text-xs text-muted-foreground hover:underline truncate block'}
           >
             {property.address}

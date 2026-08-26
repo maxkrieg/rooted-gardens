@@ -6,6 +6,7 @@ import { addDays, format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
 import { ChevronRight, FilePen } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useCan } from '@/components/app/RoleProvider'
 import { useCreateVisit } from '@/hooks/useCreateVisit'
 import { toUserMessage } from '@/lib/errors'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
@@ -42,8 +43,6 @@ interface ScheduleListMobileProps {
   windowWeeks: ScheduleWeek[]
   employees: Employee[]
   vehicles: Vehicle[]
-  canEdit: boolean
-  role: EmployeeRole | undefined
   /** True when a filter is narrowing the view — changes the empty state's meaning. */
   filtered?: boolean
 }
@@ -53,10 +52,9 @@ export function ScheduleListMobile({
   windowWeeks,
   employees,
   vehicles,
-  canEdit,
-  role,
   filtered,
 }: ScheduleListMobileProps) {
+  const { editSchedule: canEdit } = useCan()
   const visitOverlays = useVisitOverlays()
   const createVisit = useCreateVisit()
 
@@ -287,7 +285,7 @@ export function ScheduleListMobile({
   return (
     <>
       <Link
-        href={`/crew/schedule?week=${currentWeek.weekStart}`}
+        href={`/app/schedule?week=${currentWeek.weekStart}`}
         className="inline-flex items-center gap-1 mb-4 text-sm text-muted-foreground tabular-nums hover:text-foreground hover:underline"
       >
         {format(parseISO(currentWeek.weekStart), 'MMM d')} –{' '}
@@ -348,7 +346,7 @@ export function ScheduleListMobile({
                 Not on a route · {currentWeek.ungrouped.length}
               </span>
               <Link
-                href="/management/routes"
+                href="/app/routes"
                 className="px-2 text-xs font-medium normal-case tracking-normal text-[var(--clay)]/80 hover:text-[var(--clay)]"
               >
                 Put on a route →
@@ -377,7 +375,6 @@ export function ScheduleListMobile({
           onOpenChange={handleSheetOpenChange}
           row={sheetRow}
           weekStart={sheetWeek}
-          role={role}
         />
       )}
 

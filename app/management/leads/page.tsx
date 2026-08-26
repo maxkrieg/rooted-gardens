@@ -29,7 +29,7 @@ export default async function LeadsPage({
     .select('role')
     .eq('user_id', user.id)
     .single()
-  if (me?.role !== 'owner' && me?.role !== 'lead') redirect('/management/dashboard')
+  if (me?.role !== 'owner' && me?.role !== 'lead') redirect('/app/dashboard')
 
   const { data: leads, error } = await supabase
     .from('leads')

@@ -34,6 +34,32 @@ const nextConfig: NextConfig = {
         ]
       : [],
   },
+  /**
+   * The crew PWA and the field management routes merged into /app/* (REDESIGN.md
+   * R1). These are load-bearing, not migration scaffolding: an already-installed
+   * PWA keeps its old `start_url` until someone reinstalls it, and phones have
+   * these paths bookmarked.
+   *
+   * Query strings ride along automatically — `?week=`, `?visit=`, and
+   * `?routeGroup=` all appear in real deep links.
+   */
+  async redirects() {
+    return [
+      { source: '/crew/stop/:visitId', destination: '/app/stop/:visitId', permanent: true },
+      { source: '/crew/schedule', destination: '/app/schedule', permanent: true },
+      // History and Profile are gone — History was a read-only personal list, and
+      // Profile's two real controls (sign-out, SMS opt-out) moved into `More`.
+      { source: '/crew/history', destination: '/app/schedule', permanent: true },
+      { source: '/crew/profile', destination: '/app/schedule', permanent: true },
+      { source: '/crew', destination: '/app/schedule', permanent: true },
+
+      { source: '/management/schedule', destination: '/app/schedule', permanent: true },
+      { source: '/management/routes', destination: '/app/routes', permanent: true },
+      { source: '/management/dashboard', destination: '/app/dashboard', permanent: true },
+      { source: '/management/accounts', destination: '/app/accounts', permanent: true },
+      { source: '/management/accounts/:id', destination: '/app/accounts/:id', permanent: true },
+    ]
+  },
 }
 
 export default withSerwist(nextConfig)

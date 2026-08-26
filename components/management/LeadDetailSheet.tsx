@@ -183,7 +183,7 @@ export function LeadDetailSheet({ lead, open, onOpenChange }: LeadDetailSheetPro
                     Converted
                   </p>
                   <Link
-                    href={`/management/accounts/${lead.converted_account_id}`}
+                    href={`/app/accounts/${lead.converted_account_id}`}
                     className="flex items-center gap-2 text-sm text-primary hover:underline"
                   >
                     <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />

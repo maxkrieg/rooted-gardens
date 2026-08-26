@@ -1,9 +1,9 @@
 {
-  "name": "Rooted Crew",
+  "name": "Rooted Gardens",
   "short_name": "Rooted",
-  "description": "Rooted Gardens crew field app",
-  "id": "/crew/schedule",
-  "start_url": "/crew/schedule",
+  "description": "Rooted Gardens field app — schedule, stops, routes, and accounts",
+  "id": "/app/schedule",
+  "start_url": "/app/schedule",
   "scope": "/",
   "display": "standalone",
   "background_color": "#F6F3EA",

@@ -1,23 +1,17 @@
-import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
-import { ManagementNav } from '@/components/management/ManagementNav'
-import { ManagementShell } from '@/components/management/ManagementShell'
+import { getSeedRole } from '@/lib/auth/server-role'
+import { AppShell } from '@/components/app/AppShell'
 import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration'
 
 /**
- * Its own manifest, so installing from a management page yields the management
- * app (browsers use the manifest of the page being installed). Kept off the root
- * layout so anonymous marketing visitors still aren't offered an install.
+ * The desk routes — billing, team, fleet, leads, reports. They kept their
+ * `/management/*` URLs (only the field routes moved to `/app/*`), but they now
+ * render inside the same AppShell, so there is one nav in the app rather than
+ * a sidebar here and a bottom bar there.
+ *
+ * No `metadata` export: the merged manifest lives on app/app/layout.tsx, and an
+ * install started from a desk route should still yield the field app.
  */
-export const metadata: Metadata = {
-  manifest: '/manifest-management.json',
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'black-translucent',
-    title: 'Rooted Gardens',
-  },
-}
-
 export default async function ManagementLayout({
   children,
 }: {
@@ -28,42 +22,14 @@ export default async function ManagementLayout({
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Role drives which nav items show (e.g. Team is owner-only, task 7.1).
-  // A failed lookup silently hides items, which reads as lost features rather
-  // than an error — so log it. Access is still gated by proxy.ts and RLS.
-  let role: string | null = null
-  if (user) {
-    const { data: employee, error } = await supabase
-      .from('employees')
-      .select('role')
-      .eq('user_id', user.id)
-      .single()
-    if (error) console.error('[management/layout] role lookup', error)
-    role = employee?.role ?? null
-  }
-
-  // The sidebar badge counts used to be fetched here — three more round-trips on
-  // every navigation, purely to avoid a flash of "0" before the nav's own client
-  // query landed. They're React Query now (hooks/useNavCounts.ts), where the
-  // persisted cache holds the last value across navigations and offline.
+  const role = await getSeedRole(user?.id)
 
   return (
-    // dvh, not vh — iOS Safari's collapsing URL bar makes 100vh taller than the
-    // visible viewport, which left a sliver of dead space at the bottom.
-    <div className="min-h-[100dvh] bg-background">
+    <>
       <ServiceWorkerRegistration />
-      <ManagementNav userEmail={user?.email} role={role} />
-
-      {/* Main content area:
-          - Mobile: offset below the fixed top header, whose own height already
-            absorbs the safe-area inset (see ManagementNav) — match it here too.
-          - Desktop: offset right of the fixed sidebar (w-56 = ml-56), no top padding */}
-      <main className="lg:ml-56 pt-[calc(3.5rem+env(safe-area-inset-top,0px))] lg:pt-0 min-h-[100dvh]">
-        {/* Banner inside main so it doesn't fight the fixed mobile header. */}
-        <ManagementShell>
-          <div className="p-4 lg:p-6 h-full">{children}</div>
-        </ManagementShell>
-      </main>
-    </div>
+      <AppShell initialRole={role} userId={user?.id} userEmail={user?.email}>
+        <div className="p-4 lg:p-6">{children}</div>
+      </AppShell>
+    </>
   )
 }

@@ -15,7 +15,6 @@ import type { Account, EmployeeRole, RecentVisit, VisitWithCrew } from '@/types/
 interface RecentVisitsListProps {
   visits: RecentVisit[]
   account: Account
-  role: EmployeeRole | undefined
   /** The visits query failed. Without this, an outage renders "No visits yet" on
    *  an account that may have plenty (task 8.5). */
   loadError?: boolean
@@ -27,7 +26,7 @@ interface RecentVisitsListProps {
  * sheet's open/row state itself (mirroring ScheduleGrid/ScheduleListMobile), since
  * the sheet is a client-only concern the server-rendered account page can't hold.
  */
-export function RecentVisitsList({ visits, account, role, loadError }: RecentVisitsListProps) {
+export function RecentVisitsList({ visits, account, loadError }: RecentVisitsListProps) {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sheetVisit, setSheetVisit] = useState<RecentVisit | null>(null)
 
@@ -130,7 +129,6 @@ export function RecentVisitsList({ visits, account, role, loadError }: RecentVis
             visit: sheetVisit as VisitWithCrew,
           }}
           weekStart={sheetVisit.week_start}
-          role={role}
         />
       )}
     </>

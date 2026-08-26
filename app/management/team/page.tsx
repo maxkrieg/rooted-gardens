@@ -25,7 +25,7 @@ export default async function TeamPage() {
     .select('role')
     .eq('user_id', user.id)
     .single()
-  if (me?.role !== 'owner') redirect('/management/dashboard')
+  if (me?.role !== 'owner') redirect('/app/dashboard')
 
   const { data: employees, error } = await supabase
     .from('employees')

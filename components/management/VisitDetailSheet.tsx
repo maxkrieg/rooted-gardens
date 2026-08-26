@@ -33,7 +33,6 @@ interface VisitDetailSheetProps {
   onOpenChange: (open: boolean) => void
   row: VisitDetailRow
   weekStart: string
-  role: EmployeeRole | undefined
 }
 
 /** Normalizes the schedule grid's raw DB-joined row into the same StopDetail
@@ -88,7 +87,7 @@ function normalizeRow(row: VisitDetailRow): StopDetail | undefined {
   }
 }
 
-export function VisitDetailSheet({ open, onOpenChange, row, weekStart, role }: VisitDetailSheetProps) {
+export function VisitDetailSheet({ open, onOpenChange, row, weekStart }: VisitDetailSheetProps) {
   const router = useRouter()
   const visitId = row.visit?.id
   const initialData = useMemo(() => normalizeRow(row), [row])
@@ -191,7 +190,7 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart, role }: V
               {/* The account owns the property, so it reads as an eyebrow above
                   the address rather than trailing after it. */}
               <Link
-                href={`/management/accounts/${row.account.id}`}
+                href={`/app/accounts/${row.account.id}`}
                 className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-widest text-muted-foreground hover:text-[--primary] transition-colors"
               >
                 {row.account.name}
@@ -227,7 +226,7 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart, role }: V
               {/* The phone icon is the point: this is the stop exactly as crew see
                   it on their own phones. */}
               <Button asChild variant="outline" size="sm" className="gap-1.5">
-                <Link href={`/crew/stop/${data.visitId}`}>
+                <Link href={`/app/stop/${data.visitId}`}>
                   <Smartphone className="h-3.5 w-3.5 shrink-0" />
                   Crew view
                 </Link>
@@ -238,7 +237,6 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart, role }: V
           <div className="flex-1 overflow-y-auto px-6 py-6">
             <VisitDetailContent
               data={data}
-              role={role}
               onOpenCompletion={() => setCompletionOpen(true)}
               onOpenSkip={() => setSkipOpen(true)}
               showAddress={false}

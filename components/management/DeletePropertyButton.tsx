@@ -5,7 +5,7 @@ import { Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/management/ConfirmDialog'
-import { archiveProperty } from '@/app/management/accounts/property-actions'
+import { archiveProperty } from '@/app/app/(padded)/accounts/property-actions'
 import { useRefreshAccounts } from '@/hooks/useAccounts'
 
 interface DeletePropertyButtonProps {

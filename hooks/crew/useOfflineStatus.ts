@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { getQueueCounts, flushMutationQueue, subscribeToQueue } from '@/lib/crew/mutation-queue'
+import { getQueueCounts, flushMutationQueue, subscribeToQueue } from '@/lib/offline/mutation-queue'
 
 /**
  * Connectivity + offline-queue state for the crew shell. `failedCount` is what

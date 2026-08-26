@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { createProperty, updateProperty } from '@/app/management/accounts/property-actions'
+import { createProperty, updateProperty } from '@/app/app/(padded)/accounts/property-actions'
 import { useRefreshAccounts, useUpdatePropertyNotes } from '@/hooks/useAccounts'
 import { propertyFormSchema, type PropertyFormValues } from '@/lib/validators/property'
 import type { Property } from '@/types/app'

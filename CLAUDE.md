@@ -105,6 +105,9 @@ web app. Parent company is **Tigertown Farm LLC**.
 rooted-gardens/
 ├── CLAUDE.md                    ← you are here
 ├── PHASES.md                    ← build phases and tasks
+├── REDESIGN.md                  ← PLANNED (not built): field-first redesign — merges /crew/*
+│                                  and the field management routes into one app at /app/*.
+│                                  Everything below describes the CURRENT layout until R1 lands.
 ├── proxy.ts                     ← root request proxy (Next 16; auth + role gating, formerly middleware.ts)
 ├── app/
 │   ├── layout.tsx               ← root layout (fonts, providers)

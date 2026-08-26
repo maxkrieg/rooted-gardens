@@ -17,8 +17,8 @@ import {
   flushMutationQueue,
   getFailedMutations,
   retryMutation,
-} from '@/lib/crew/mutation-queue'
-import type { QueuedMutation } from '@/lib/crew/idb'
+} from '@/lib/offline/mutation-queue'
+import type { QueuedMutation } from '@/lib/offline/idb'
 
 /** What each queued mutation was, in the crew member's words rather than ours. */
 const TYPE_LABELS: Record<QueuedMutation['type'], string> = {
@@ -26,7 +26,6 @@ const TYPE_LABELS: Record<QueuedMutation['type'], string> = {
   photo: 'Photo',
   photo_caption: 'Photo caption',
   job_start: 'Start time',
-  job_stop: 'Stop time',
   job_discard: 'Discarded start time',
   skip: 'Skipped stop',
   create_visit: 'Scheduled stop',

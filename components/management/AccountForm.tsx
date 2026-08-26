@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { createAccount, updateAccount } from '@/app/management/accounts/actions'
+import { createAccount, updateAccount } from '@/app/app/(padded)/accounts/actions'
 import { useRefreshAccounts } from '@/hooks/useAccounts'
 import { accountFormSchema, type AccountFormValues } from '@/lib/validators/account'
 import type { Account } from '@/types/app'

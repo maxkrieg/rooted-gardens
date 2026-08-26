@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/sheet'
 import { ServiceTypeSelector } from '@/components/crew/ServiceTypeSelector'
 import { CrewMultiSelect } from '@/components/crew/CrewMultiSelect'
-import { enqueueMutation, flushMutationQueue } from '@/lib/crew/mutation-queue'
+import { enqueueMutation, flushMutationQueue } from '@/lib/offline/mutation-queue'
 import { useActiveEmployees } from '@/hooks/crew/useActiveEmployees'
 import { patchScheduleVisit } from '@/hooks/useManagementSchedule'
 import type { VisitCrewWithEmployee } from '@/types/app'

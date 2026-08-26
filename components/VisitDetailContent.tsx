@@ -38,22 +38,21 @@ import { CompletionSummary } from '@/components/crew/CompletionSummary'
 import { CrewAssignSheet } from '@/components/crew/CrewAssignSheet'
 import { CrewInstructionSheet } from '@/components/CrewInstructionSheet'
 import { VisitPlanPhotos } from '@/components/crew/VisitPlanPhotos'
-import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
+import { useCan, useRole } from '@/components/app/RoleProvider'
 import { useActiveVehicles } from '@/hooks/crew/useActiveVehicles'
-import { useUpdateVisitVehicle } from '@/hooks/crew/useUpdateVisitVehicle'
-import { useRevertVisitToScheduled } from '@/hooks/crew/useRevertVisitToScheduled'
+import { useUpdateVisitVehicle } from '@/hooks/useUpdateVisitVehicle'
+import { useRevertVisitToScheduled } from '@/hooks/useRevertVisitToScheduled'
 import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
 import type { EmployeeRole, VisitStatus } from '@/types/app'
-import { toastCrewError } from '@/lib/crew/errors'
+import { toastCrewError } from '@/lib/offline/errors'
 
 const VISIT_STATUS_OPTIONS: VisitStatus[] = ['scheduled', 'completed', 'skipped']
 
 interface VisitDetailContentProps {
   data: StopDetail
-  role: EmployeeRole | undefined
   onOpenCompletion: () => void
   onOpenSkip: () => void
   /** False when the container already shows the address in its own header (the
@@ -79,12 +78,14 @@ interface VisitDetailContentProps {
  * change via a small direct-client mutation hook, same pattern as crew
  * reassignment (`useReassignCrew`) already used.
  *
- * `role === undefined` (still loading) renders the most-restrictive state —
- * every role-gated section stays hidden until role resolves.
+ * Capabilities come from the shell's RoleProvider rather than a `role` prop —
+ * this sits at the bottom of a long chain (schedule grid → sheet → here, and
+ * account detail → visit list → sheet → here) that existed only to carry it.
+ * While role is still resolving every capability is false, so the most
+ * restrictive state renders until it lands.
  */
 export function VisitDetailContent({
   data,
-  role,
   onOpenCompletion,
   onOpenSkip,
   showAddress = true,
@@ -129,17 +130,18 @@ export function VisitDetailContent({
     )
   }
 
-  const canManage = role === 'owner' || role === 'lead'
-  const canReassign = role === 'owner' || role === 'lead' || role === 'crew'
-  const canEditCompletion = role !== 'accountant' && role !== undefined
-
-  const { data: currentEmployee } = useCurrentEmployee()
+  const { role, employeeId } = useRole()
+  const {
+    editSchedule: canManage,
+    reassignCrew: canReassign,
+    editCompletion: canEditCompletion,
+  } = useCan()
 
   /** Mirrors the RLS rules: owner/lead caption any photo, crew only their own. */
   function canCaption(photo: LightboxPhoto) {
     if (canManage) return true
     if (role !== 'crew') return false
-    return !!currentEmployee?.id && photo.uploaded_by === currentEmployee.id
+    return !!employeeId && photo.uploaded_by === employeeId
   }
 
   // A final visit's plan (instruction/crew/vehicle) is historical, not actionable —
@@ -247,7 +249,7 @@ export function VisitDetailContent({
             {canManage && (
               <Button asChild variant="outline" className="h-11 gap-1.5">
                 <Link
-                  href={`/management/schedule?week=${visit.week_start}&visit=${data.visitId}`}
+                  href={`/app/schedule?week=${visit.week_start}&visit=${data.visitId}`}
                 >
                   <LayoutGrid className="h-4 w-4 shrink-0" />
                   Manager view

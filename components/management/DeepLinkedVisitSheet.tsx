@@ -12,7 +12,6 @@ interface DeepLinkedVisitSheetProps {
   weeks: ScheduleWeek[]
   /** The `?visit=` param — usually absent, in which case this renders nothing. */
   visitId: string | undefined
-  role: EmployeeRole | undefined
 }
 
 /**
@@ -30,7 +29,7 @@ interface DeepLinkedVisitSheetProps {
  * became client-fetched and `weeks` arrived empty on the first render. The latch
  * is what keeps a later `weeks` change from reopening a sheet the user closed.
  */
-export function DeepLinkedVisitSheet({ weeks, visitId, role }: DeepLinkedVisitSheetProps) {
+export function DeepLinkedVisitSheet({ weeks, visitId }: DeepLinkedVisitSheetProps) {
   // Derived, not latched at mount: `weeks` is empty on the first render now that
   // the schedule is client-fetched, so the visit only becomes findable later.
   const found = useMemo(() => findVisitInWeeks(weeks, visitId), [weeks, visitId])
@@ -52,7 +51,6 @@ export function DeepLinkedVisitSheet({ weeks, visitId, role }: DeepLinkedVisitSh
       }}
       row={found.row}
       weekStart={found.weekStart}
-      role={role}
     />
   )
 }

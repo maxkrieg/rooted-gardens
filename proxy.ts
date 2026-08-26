@@ -4,26 +4,14 @@ import type { Database } from '@/types/database'
 import { formatRoleCookie, parseRoleCookie } from '@/lib/utils/role-cookie'
 import { PUBLIC_ROUTES } from '@/lib/content/routes'
 import { isNetworkError } from '@/lib/errors'
-
-type EmployeeRole = 'owner' | 'lead' | 'crew' | 'accountant'
+import { ROLE_HOME, canAccessRoute, isProtectedRoute } from '@/lib/auth/access'
+import type { EmployeeRole } from '@/types/app'
 
 const ROLE_COOKIE = 'rg-role'
-// 12h, not 1h: past expiry a cached management page renders with no role and
-// silently falls back to 'crew' (read-only). Cost is that a role change takes up
-// to a workday to apply; signing out clears it immediately.
+// 12h, not 1h: past expiry a cached page renders with no role and silently
+// falls back to read-only. Cost is that a role change takes up to a workday to
+// apply; signing out clears it immediately.
 const ROLE_COOKIE_MAX_AGE = 60 * 60 * 12
-
-// Routes accessible per role
-const MANAGEMENT_ROLES: EmployeeRole[] = ['owner', 'lead', 'accountant']
-const CREW_ROLES: EmployeeRole[] = ['owner', 'lead', 'crew']
-
-// Default redirect when a role is denied access
-const ROLE_HOME: Record<EmployeeRole, string> = {
-  owner: '/management/dashboard',
-  lead: '/management/dashboard',
-  accountant: '/management/billing',
-  crew: '/crew/schedule',
-}
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -75,9 +63,12 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-  const isManagement = pathname.startsWith('/management')
-  const isCrew = pathname.startsWith('/crew')
-  const isProtected = isManagement || isCrew
+  const isProtected = isProtectedRoute(pathname)
+  // An authenticated user sitting on the login page. Exempt ?error= — that's the
+  // dead-end the no-role branch redirects to, and bouncing away from it would
+  // recreate the loop it exists to break.
+  const isLoginWithSession =
+    !!user && pathname === '/login' && !request.nextUrl.searchParams.has('error')
 
   // Owners work from the field on weak signal, where getUser() returns a null
   // user rather than throwing. Treat an unreachable auth server as "keep going"
@@ -96,30 +87,18 @@ export async function proxy(request: NextRequest) {
     return response
   }
 
-  // Authenticated user on the login page → their dashboard home.
-  // Clear the role cookie so a previously-cached role from another user can't carry over.
-  // Exempt ?error= — that's the dead-end the no-role branch below redirects to;
-  // redirecting away from it would recreate the loop it exists to break.
-  if (user && pathname === '/login' && !request.nextUrl.searchParams.has('error')) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/management/dashboard'
-    const response = NextResponse.redirect(url)
-    response.cookies.delete(ROLE_COOKIE)
-    return response
-  }
-
-  // Role-based access control on protected routes
-  if (user && isProtected) {
+  // Resolve the role once. Both the login redirect and the route gate need it —
+  // resolving it for /login too is what stops a crew member being bounced to a
+  // management page and then immediately re-bounced; they land on their own home.
+  let role: EmployeeRole | undefined
+  if (user && (isProtected || isLoginWithSession)) {
     // Cookie stores "<userId>_<role>" so a stale cookie from a different user is ignored.
-    const rawCookie = request.cookies.get(ROLE_COOKIE)?.value
-    const parsed = parseRoleCookie(rawCookie)
-    let role: EmployeeRole | undefined =
-      parsed?.userId === user.id ? (parsed.role as EmployeeRole) : undefined
+    const parsed = parseRoleCookie(request.cookies.get(ROLE_COOKIE)?.value)
+    role = parsed && parsed.userId === user.id ? (parsed.role as EmployeeRole) : undefined
 
     if (!role && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      // Use service role key to bypass RLS for this internal role lookup.
-      // RLS policies on employees are added in Phase 2; using service key here
-      // ensures role fetch works before and after those policies land.
+      // Service role key bypasses RLS for this internal role lookup, so it works
+      // regardless of the employees policies.
       const serviceClient = createServerClient<Database>(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -145,51 +124,37 @@ export async function proxy(request: NextRequest) {
         })
       }
     }
+  }
 
-    // No employee record linked to this auth user — deny access to all protected
-    // routes. Terminal, not a bounce: a plain /login redirect would hit the
-    // "authenticated user on login" branch above and get sent right back to
-    // /management/dashboard, which re-enters this same check — an infinite
-    // redirect loop whenever SUPABASE_SERVICE_ROLE_KEY is unset or the auth
-    // user has no employees row. ?error= is what that branch exempts.
-    if (!role) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/login'
-      url.search = '?error=no-employee-record'
-      const response = NextResponse.redirect(url)
-      response.cookies.delete(ROLE_COOKIE)
-      return response
-    }
+  // No employee record linked to this auth user — a terminal dead-end rather
+  // than a bounce, because any redirect into the app re-enters this same check
+  // and loops. Reached whenever SUPABASE_SERVICE_ROLE_KEY is unset or the auth
+  // user has no employees row. ?error= is what isLoginWithSession exempts.
+  if (user && !role && (isProtected || isLoginWithSession)) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    url.search = '?error=no-employee-record'
+    const response = NextResponse.redirect(url)
+    response.cookies.delete(ROLE_COOKIE)
+    return response
+  }
 
-    if (isManagement && !MANAGEMENT_ROLES.includes(role)) {
-      const url = request.nextUrl.clone()
-      url.pathname = ROLE_HOME[role] ?? '/crew/schedule'
-      return NextResponse.redirect(url)
-    }
+  // Authenticated user on the login page → straight to their own home.
+  if (isLoginWithSession && role) {
+    const url = request.nextUrl.clone()
+    url.pathname = ROLE_HOME[role]
+    url.search = ''
+    return NextResponse.redirect(url)
+  }
 
-    // Team management is owner-only (task 7.1) — leads and accountants are
-    // otherwise valid management users, so gate this sub-route specifically.
-    if (pathname.startsWith('/management/team') && role !== 'owner') {
-      const url = request.nextUrl.clone()
-      url.pathname = ROLE_HOME[role] ?? '/management/dashboard'
-      return NextResponse.redirect(url)
-    }
-
-    // The Leads inbox (task 9.8) is owner/lead-only, matching the `leads`
-    // table's RLS policies exactly (migration 20260804130000) — an accountant
-    // is a valid management user but has zero leads access, so send them home
-    // rather than showing a permanently empty inbox.
-    if (pathname.startsWith('/management/leads') && role !== 'owner' && role !== 'lead') {
-      const url = request.nextUrl.clone()
-      url.pathname = ROLE_HOME[role] ?? '/management/dashboard'
-      return NextResponse.redirect(url)
-    }
-
-    if (isCrew && !CREW_ROLES.includes(role)) {
-      const url = request.nextUrl.clone()
-      url.pathname = ROLE_HOME[role] ?? '/management/dashboard'
-      return NextResponse.redirect(url)
-    }
+  // Role-based access control. One allowlist in lib/auth/access.ts drives both
+  // this gate and the nav, so a destination can't appear in one and not the
+  // other. Affordance only goes as far as the UI — RLS is the real boundary.
+  if (user && role && isProtected && !canAccessRoute(pathname, role)) {
+    const url = request.nextUrl.clone()
+    url.pathname = ROLE_HOME[role]
+    url.search = ''
+    return NextResponse.redirect(url)
   }
 
   return supabaseResponse

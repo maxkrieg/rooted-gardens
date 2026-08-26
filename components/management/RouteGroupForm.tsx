@@ -13,7 +13,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { createRouteGroup, updateRouteGroup } from '@/app/management/routes/actions'
+import { createRouteGroup, updateRouteGroup } from '@/app/app/(padded)/routes/actions'
 import { useRefreshRoutes } from '@/hooks/useRoutes'
 import { routeGroupFormSchema, type RouteGroupFormValues } from '@/lib/validators/routeGroup'
 import type { RouteGroup } from '@/types/app'

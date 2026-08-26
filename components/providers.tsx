@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { QueryClient } from '@tanstack/react-query'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
-import { getDB } from '@/lib/crew/idb'
+import { getDB } from '@/lib/offline/idb'
 import { Toaster } from '@/components/ui/sonner'
 import { ErrorBoundary } from '@/components/states/ErrorBoundary'
 import { isRetryableError } from '@/lib/errors'
@@ -43,6 +43,18 @@ const persister = createAsyncStoragePersister({
   storage: idbStorage,
   key: 'rq-v1',
 })
+
+/**
+ * Drop the persisted cache. Call on sign-out: `current-employee` is persisted,
+ * so without this the next person to sign in on the same phone rehydrates the
+ * previous person's employee row — and their role with it.
+ *
+ * Only touches the `rq-cache` store. The `mutations` store in the same database
+ * holds unsynced field writes and must survive a sign-out.
+ */
+export async function clearPersistedQueryCache(): Promise<void> {
+  await persister.removeClient()
+}
 
 /**
  * Bump whenever a persisted query's *shape* changes, not just its data — a

@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/sheet'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useActiveEmployees } from '@/hooks/crew/useActiveEmployees'
-import { useReassignCrew } from '@/hooks/crew/useReassignCrew'
+import { useReassignCrew } from '@/hooks/useReassignCrew'
 
 interface CrewAssignSheetProps {
   visitId: string

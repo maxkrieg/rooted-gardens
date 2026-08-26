@@ -24,13 +24,12 @@ import { DeepLinkedVisitSheet } from '@/components/management/DeepLinkedVisitShe
 import { ScheduleSkeleton } from '@/components/management/ScheduleSkeleton'
 import { CachedNotice } from '@/components/states/CachedNotice'
 import { ErrorState } from '@/components/states/ErrorState'
-import type { Account, EmployeeRole } from '@/types/app'
+import type { Account } from '@/types/app'
 
 interface ScheduleViewProps {
   initialWeek: string
   initialFilters: ScheduleFilterValues
   initialVisitId: string | undefined
-  role: EmployeeRole
 }
 
 /**
@@ -42,7 +41,6 @@ export function ScheduleView({
   initialWeek,
   initialFilters,
   initialVisitId,
-  role,
 }: ScheduleViewProps) {
   const [windowStart, setWindowStart] = useState(initialWeek)
   const [filters, setFilters] = useState<ScheduleFilterValues>(initialFilters)
@@ -75,10 +73,9 @@ export function ScheduleView({
   // offline. Same reasoning as syncVisitUrlParam and the crew schedule page.
   useEffect(() => {
     const params = scheduleFilterParams(filters, windowStart)
-    window.history.replaceState(null, '', `/management/schedule?${params.toString()}`)
+    window.history.replaceState(null, '', `/app/schedule?${params.toString()}`)
   }, [filters, windowStart])
 
-  const canEdit = role === 'owner' || role === 'lead'
   const filtered = hasActiveScheduleFilters(filters)
 
   // Options come from the unfiltered window so they never collapse as filters narrow.
@@ -148,8 +145,6 @@ export function ScheduleView({
             weeks={gridWeeks}
             employees={employees}
             vehicles={vehicles}
-            canEdit={canEdit}
-            role={role}
             filtered={filtered}
           />
         </div>
@@ -159,14 +154,12 @@ export function ScheduleView({
             windowWeeks={weeks}
             employees={employees}
             vehicles={vehicles}
-            canEdit={canEdit}
-            role={role}
             filtered={filtered}
           />
         </div>
         {/* Rendered once, outside both layouts — both are always mounted, so
             giving each the deep link opened two stacked sheets. */}
-        <DeepLinkedVisitSheet weeks={weeks} visitId={initialVisitId} role={role} />
+        <DeepLinkedVisitSheet weeks={weeks} visitId={initialVisitId} />
       </SessionsProvider>
     </div>
   )

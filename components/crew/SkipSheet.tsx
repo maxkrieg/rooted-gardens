@@ -12,7 +12,7 @@ import {
   SheetTitle,
   SheetFooter,
 } from '@/components/ui/sheet'
-import { enqueueMutation, flushMutationQueue } from '@/lib/crew/mutation-queue'
+import { enqueueMutation, flushMutationQueue } from '@/lib/offline/mutation-queue'
 import { nextVisitVersion } from '@/lib/utils/visits'
 import { patchScheduleVisit } from '@/hooks/useManagementSchedule'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
