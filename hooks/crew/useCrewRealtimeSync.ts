@@ -52,8 +52,7 @@ export function useCrewRealtimeSync(employeeId: string | undefined) {
 
           // Refresh on either relation — "My stops" matches assigned OR
           // completed, so a completion row changes what this person should see.
-          queryClient.invalidateQueries({ queryKey: ['crew-today-stops', employeeId] })
-          queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
+          queryClient.invalidateQueries({ queryKey: ['schedule-visits'] })
 
           // ...but only an assignment is a schedule change worth announcing; a
           // completion row is usually their own logging coming back around.
@@ -81,8 +80,7 @@ export function useCrewRealtimeSync(employeeId: string | undefined) {
           filter: `week_start=eq.${weekStartISO}`,
         },
         () => {
-          queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
-          queryClient.invalidateQueries({ queryKey: ['crew-today-stops', employeeId] })
+          queryClient.invalidateQueries({ queryKey: ['schedule-visits'] })
           // Also refresh any open stop detail (e.g. another crew member's Start
           // or Discard) — prefix match so it catches whichever visitId is open.
           queryClient.invalidateQueries({ queryKey: ['stop-detail'] })

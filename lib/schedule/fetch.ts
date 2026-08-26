@@ -50,8 +50,10 @@ export async function fetchScheduleReference(): Promise<ScheduleReference> {
 }
 
 /**
- * One week's visits. `withInvoices` is management-only — crew RLS can't read
- * `invoices`, so the embed would fail on their side.
+ * One week's visits. `withInvoices` adds the billing embed; it's on for every
+ * role because `invoices` grants SELECT to `authenticated` and RLS filters by
+ * role, so crew get an empty embed rather than the error this comment used to
+ * claim. That false premise is what kept a second crew-only hook alive.
  */
 export async function fetchWeekVisits(
   weekStartISO: string,

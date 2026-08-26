@@ -58,7 +58,6 @@ export function useUpdateVisitVehicle(visitId: string) {
 
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
-      queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
       queryClient.invalidateQueries({ queryKey: ['schedule-visits'] })
     },
   })

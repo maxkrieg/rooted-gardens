@@ -36,7 +36,7 @@ export function ScheduleStickyBar({ children }: { children: React.ReactNode }) {
   return (
     <div
       ref={ref}
-      className="sticky top-0 z-40 bg-background pb-3 mb-3"
+      className="sticky top-0 z-40 bg-background pb-2 mb-2 lg:pb-3 lg:mb-3"
     >
       {children}
     </div>

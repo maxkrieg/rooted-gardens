@@ -132,7 +132,7 @@ export default function StopDetailPage() {
     const result = await flushMutationQueue()
     if (result.failed > 0) toast.error('Could not start the timer. Try again.')
     queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
-    queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
+    queryClient.invalidateQueries({ queryKey: ['schedule-visits'] })
   }
 
   async function handleDiscard() {
@@ -149,7 +149,7 @@ export default function StopDetailPage() {
     const result = await flushMutationQueue()
     if (result.failed > 0) toast.error('Could not discard the start time. Try again.')
     queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
-    queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
+    queryClient.invalidateQueries({ queryKey: ['schedule-visits'] })
   }
 
   return (

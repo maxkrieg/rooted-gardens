@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { addDays, format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
-import { ChevronRight, FilePen } from 'lucide-react'
+import { FilePen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useCan } from '@/components/app/RoleProvider'
 import { useCreateVisit } from '@/hooks/useCreateVisit'
@@ -12,12 +11,16 @@ import { toUserMessage } from '@/lib/errors'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
 import { ScheduleEmptyState } from '@/components/management/ScheduleEmptyState'
+import { RouteGroupBand, type RouteGroupStats } from '@/components/management/RouteGroupBand'
+import { SelectionBar } from '@/components/app/SelectionBar'
+import { BulkActionSheet, type BulkActionKind } from '@/components/management/BulkActionSheet'
+import { useBulkScheduleActions } from '@/hooks/useBulkScheduleActions'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useVisitOverlays } from '@/components/management/SessionsProvider'
 import { isVisitInProgress, formatElapsed, mergeVisitOverlay } from '@/lib/utils/visits'
 import { groupRowsByAccount } from '@/lib/utils/schedule'
 import { syncVisitUrlParam } from '@/lib/utils/visit-url'
 import { formatAccountPrice } from '@/lib/utils/accounts'
-import { Button } from '@/components/ui/button'
 import {
   AccountPriceMeta,
   VisitStatusBadge,
@@ -28,7 +31,6 @@ import {
 import type {
   Account,
   Employee,
-  EmployeeRole,
   RouteGroup,
   ScheduleWeek,
   SchedulePropertyRow,
@@ -45,6 +47,10 @@ interface ScheduleListMobileProps {
   vehicles: Vehicle[]
   /** True when a filter is narrowing the view — changes the empty state's meaning. */
   filtered?: boolean
+  /** Rows become checkboxes and the bulk bar appears. Owned by ScheduleView so
+   *  the header's `⋯ → Select` can toggle it. */
+  selectMode?: boolean
+  onExitSelectMode?: () => void
 }
 
 export function ScheduleListMobile({
@@ -53,6 +59,8 @@ export function ScheduleListMobile({
   employees,
   vehicles,
   filtered,
+  selectMode = false,
+  onExitSelectMode,
 }: ScheduleListMobileProps) {
   const { editSchedule: canEdit } = useCan()
   const visitOverlays = useVisitOverlays()
@@ -77,6 +85,60 @@ export function ScheduleListMobile({
 
   const [assignOpen, setAssignOpen] = useState(false)
   const [assignGroup, setAssignGroup] = useState<RouteGroup | null>(null)
+
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkKind, setBulkKind] = useState<BulkActionKind | null>(null)
+  const [busyLabel, setBusyLabel] = useState<string | null>(null)
+  const bulk = useBulkScheduleActions(week?.weekStart ?? '')
+
+  // Leaving select mode must drop the selection, or re-entering it resumes with
+  // stale property ids that may no longer be on screen. Adjusted during render
+  // (React's sanctioned pattern, as in UnroutedPanel) rather than in an effect,
+  // which would render the stale selection once before clearing it.
+  const [selectModeSnapshot, setSelectModeSnapshot] = useState(selectMode)
+  if (selectModeSnapshot !== selectMode) {
+    setSelectModeSnapshot(selectMode)
+    if (selected.size > 0) setSelected(new Set())
+  }
+
+  /**
+   * What the route group band summarises. Reads the same merged visit the rows
+   * do — overlay included — so the progress bar and the on-site dot can't
+   * disagree with the rows underneath them.
+   */
+  function statsFor(rows: SchedulePropertyRow[], weekStart: string): RouteGroupStats {
+    const crewById = new Map<string, Employee>()
+    const vehicleNames = new Set<string>()
+    let done = 0
+    let onSite = false
+
+    for (const row of rows) {
+      const base = row.visit ?? createdVisits.get(`${row.property.id}-${weekStart}`) ?? null
+      const visit = base ? mergeVisitOverlay(base, visitOverlays) : null
+      if (!visit) continue
+
+      // Skipped counts as settled: the decision is made and the week has moved
+      // on, which is what the bar is reporting.
+      if (visit.status === 'completed' || visit.status === 'skipped') done += 1
+      if (isVisitInProgress(visit)) onSite = true
+
+      const completed = visit.visit_crew.filter((vc) => vc.relation === 'completed' && vc.employee)
+      const assigned = visit.visit_crew.filter((vc) => vc.relation === 'assigned' && vc.employee)
+      const source = visit.status === 'completed' && completed.length > 0 ? completed : assigned
+      for (const vc of source) crewById.set(vc.employee!.id, vc.employee!)
+
+      const vehicleName = vehicles.find((v) => v.id === visit.vehicle_id)?.name
+      if (vehicleName) vehicleNames.add(vehicleName)
+    }
+
+    return {
+      done,
+      total: rows.length,
+      crew: [...crewById.values()],
+      vehicles: [...vehicleNames],
+      onSite,
+    }
+  }
 
   function handleSheetOpenChange(next: boolean) {
     setSheetOpen(next)
@@ -130,6 +192,42 @@ export function ScheduleListMobile({
   }
   const currentWeek = week
 
+  const allRows = [
+    ...currentWeek.routeGroups.flatMap((g) => g.rows),
+    ...currentWeek.ungrouped,
+  ]
+  const selectedRows = allRows.filter((row) => selected.has(row.property.id))
+
+  function toggleSelected(propertyId: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(propertyId)) next.delete(propertyId)
+      else next.add(propertyId)
+      return next
+    })
+  }
+
+  /**
+   * One wrapper for every bulk apply: it owns the busy label, the toast, and
+   * dropping the selection on success. A failure keeps the selection so the
+   * owner can retry the same set rather than reselecting it.
+   */
+  async function runBulk(label: string, fn: () => Promise<number>, done: (n: number) => string) {
+    setBulkKind(null)
+    setBusyLabel(label)
+    try {
+      const n = await fn()
+      setSelected(new Set())
+      toast.success(done(n))
+    } catch (err) {
+      toast.error('Some changes did not save', {
+        description: toUserMessage(err, 'They are queued and will retry.', '[ScheduleListMobile.runBulk]'),
+      })
+    } finally {
+      setBusyLabel(null)
+    }
+  }
+
   // Renders one stop button. Shared by both label shapes so the right-side
   // status/crew/on-site content can never drift between them:
   //   - `merged` — the ~99% case: one account with one property. Account
@@ -172,12 +270,17 @@ export function ScheduleListMobile({
     const displayedCrew = displayCrew.slice(0, 2)
     const overflow = displayCrew.length - 2
 
+    const isSelected = selected.has(row.property.id)
+
     return (
       <button
         key={row.property.id}
         type="button"
         disabled={isCreating}
-        onClick={() => handleRowClick(row, visit)}
+        aria-pressed={selectMode ? isSelected : undefined}
+        onClick={() =>
+          selectMode ? toggleSelected(row.property.id) : handleRowClick(row, visit)
+        }
         className={cn(
           'w-full text-left py-3 min-h-[56px]',
           'flex items-center justify-between gap-3',
@@ -186,8 +289,19 @@ export function ScheduleListMobile({
           'hover:bg-accent/20 active:bg-accent/30 transition-colors',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
           isCreating && 'opacity-50 cursor-wait',
+          selectMode && isSelected && 'bg-accent/40',
         )}
       >
+        {selectMode && (
+          <Checkbox
+            checked={isSelected}
+            // The row is the tap target; the box only reflects state, or a tap
+            // near its edge would toggle twice.
+            tabIndex={-1}
+            className="pointer-events-none shrink-0"
+            aria-hidden
+          />
+        )}
         {/* Left: identity */}
         <div className="flex flex-col gap-0.5 min-w-0">
           {!isNested && (
@@ -202,6 +316,15 @@ export function ScheduleListMobile({
             <FrequencyBadge frequency={row.property.frequency} />
             {!isNested && <AccountPriceMeta account={account} />}
           </div>
+          {/* The spreadsheet's orange cell. It used to be a bare icon on the
+              right that said an instruction existed without showing it — on a
+              phone there's no hover to reveal it, so it reads here. */}
+          {visit?.crew_instruction && (
+            <span className="mt-1 flex items-start gap-1 text-[12px] leading-snug text-[var(--clay)]">
+              <FilePen className="mt-px h-3 w-3 shrink-0" aria-hidden />
+              <span className="line-clamp-2">{visit.crew_instruction}</span>
+            </span>
+          )}
         </div>
 
         {/* Right: on-site indicator or crew + status */}
@@ -227,10 +350,6 @@ export function ScheduleListMobile({
                     <span className="text-[10px] text-muted-foreground leading-5">+{overflow}</span>
                   )}
                 </div>
-              )}
-
-              {visit?.crew_instruction && (
-                <FilePen className="w-4 h-4 text-[var(--clay)] shrink-0" />
               )}
 
               {visit ? (
@@ -284,44 +403,30 @@ export function ScheduleListMobile({
 
   return (
     <>
-      <Link
-        href={`/app/schedule?week=${currentWeek.weekStart}`}
-        className="inline-flex items-center gap-1 mb-4 text-sm text-muted-foreground tabular-nums hover:text-foreground hover:underline"
-      >
-        {format(parseISO(currentWeek.weekStart), 'MMM d')} –{' '}
-        {format(addDays(parseISO(currentWeek.weekStart), 6), 'MMM d')}
-        <ChevronRight className="h-3.5 w-3.5" />
-      </Link>
-
       <div className="space-y-4">
         {currentWeek.routeGroups.map(({ routeGroup, rows }) => (
           <div
             key={routeGroup.id}
-            className="rounded-xl border border-border bg-card shadow-warm overflow-hidden"
+            className="rounded-xl border border-border bg-card shadow-warm"
           >
-            {/* Route group header */}
-            <div className="bg-secondary text-secondary-foreground flex items-center justify-between px-4 py-2.5 border-b border-border">
-              <span className="text-xs font-semibold uppercase tracking-widest">
-                {routeGroup.name}
-              </span>
-              {canEdit && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="px-2 text-xs font-medium text-secondary-foreground/70 hover:text-foreground hover:bg-secondary-foreground/10 normal-case tracking-normal"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setAssignGroup(routeGroup)
-                    setAssignOpen(true)
-                  }}
-                >
-                  Assign Route
-                </Button>
-              )}
+            {/* Sticky under the compact header, whose height it reads from
+                --schedule-sticky-h. Knowing which route you're scrolling
+                through is most of what the sheet's frozen rows gave him.
+                The card can't clip its overflow or this stops sticking. */}
+            <div className="sticky z-10" style={{ top: 'var(--schedule-sticky-h, 0px)' }}>
+              <RouteGroupBand
+                name={routeGroup.name}
+                stats={statsFor(rows, currentWeek.weekStart)}
+                canEdit={canEdit}
+                onAssignRoute={() => {
+                  setAssignGroup(routeGroup)
+                  setAssignOpen(true)
+                }}
+              />
             </div>
 
             {/* Properties, nested by account */}
-            <div>
+            <div className="overflow-hidden rounded-b-xl">
               {groupRowsByAccount(rows).map(({ account, rows: acctRows }, acctIdx) => {
                 if (acctRows.length === 1) {
                   return renderStopRow(account, acctRows[0], 'merged', acctIdx > 0)
@@ -338,7 +443,7 @@ export function ScheduleListMobile({
         ))}
 
         {currentWeek.ungrouped.length > 0 && (
-          <div className="rounded-xl border border-[var(--clay)]/30 bg-card shadow-warm overflow-hidden">
+          <div className="overflow-hidden rounded-xl border border-[var(--clay)]/30 bg-card shadow-warm">
             {/* "Not on a route" — properties with no property_route_groups row.
                 These used to be silently dropped from the schedule entirely. */}
             <div className="bg-[var(--clay)]/10 text-[var(--clay)] flex items-center justify-between px-4 py-2.5 border-b border-[var(--clay)]/30">
@@ -368,6 +473,75 @@ export function ScheduleListMobile({
           </div>
         )}
       </div>
+
+      {selectMode && (
+        <SelectionBar
+          count={selected.size}
+          busyLabel={busyLabel}
+          onSelectAll={
+            selected.size < allRows.length
+              ? () => setSelected(new Set(allRows.map((r) => r.property.id)))
+              : undefined
+          }
+          onClear={() => (selected.size > 0 ? setSelected(new Set()) : onExitSelectMode?.())}
+          actions={[
+            {
+              label: 'Crew',
+              disabled: selected.size === 0,
+              onClick: () => setBulkKind('crew'),
+            },
+            {
+              label: 'Truck',
+              disabled: selected.size === 0,
+              onClick: () => setBulkKind('vehicle'),
+            },
+            {
+              label: 'Schedule',
+              disabled: selected.size === 0 || selectedRows.every((r) => r.visit),
+              onClick: () =>
+                runBulk(
+                  'Scheduling…',
+                  () => bulk.scheduleAll(selectedRows),
+                  (n) => `${n} ${n === 1 ? 'stop' : 'stops'} scheduled.`,
+                ),
+            },
+            {
+              label: 'Skip',
+              disabled: selected.size === 0 || !selectedRows.some((r) => r.visit),
+              onClick: () => setBulkKind('skip'),
+            },
+          ]}
+        />
+      )}
+
+      <BulkActionSheet
+        kind={bulkKind}
+        onOpenChange={(open) => !open && setBulkKind(null)}
+        count={selected.size}
+        employees={employees}
+        vehicles={vehicles}
+        onPickCrew={(employee) =>
+          runBulk(
+            `Assigning ${employee.name.split(' ')[0]}…`,
+            () => bulk.assignCrew(selectedRows, employee, 'add'),
+            (n) => `${employee.name.split(' ')[0]} assigned to ${n} ${n === 1 ? 'stop' : 'stops'}.`,
+          )
+        }
+        onPickVehicle={(vehicleId) =>
+          runBulk(
+            'Setting truck…',
+            () => bulk.setVehicle(selectedRows, vehicleId),
+            (n) => `Truck set on ${n} ${n === 1 ? 'stop' : 'stops'}.`,
+          )
+        }
+        onSkip={(reason) =>
+          runBulk(
+            'Skipping…',
+            () => bulk.skipAll(selectedRows, reason),
+            (n) => `${n} ${n === 1 ? 'stop' : 'stops'} skipped.`,
+          )
+        }
+      />
 
       {sheetRow && (
         <VisitDetailSheet

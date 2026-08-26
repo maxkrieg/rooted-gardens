@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { addWeeks, format } from 'date-fns'
 import { getWeekStart, parseWeekParam } from '@/lib/utils/schedule'
 import {
+  activeScheduleFilterCount,
   filterScheduleWeeks,
   hasActiveScheduleFilters,
   scheduleFilterParams,
@@ -14,10 +15,18 @@ import { useActiveEmployees } from '@/hooks/crew/useActiveEmployees'
 import { useActiveVehicles } from '@/hooks/crew/useActiveVehicles'
 import { useMediaQuery } from '@/hooks/use-media-query'
 import { useIsHydrated } from '@/hooks/use-hydrated'
+import { useCan } from '@/components/app/RoleProvider'
 import { ScheduleGrid } from '@/components/management/ScheduleGrid'
 import { ScheduleListMobile } from '@/components/management/ScheduleListMobile'
 import { ScheduleNav } from '@/components/management/ScheduleNav'
 import { ScheduleFilterBar } from '@/components/management/ScheduleFilterBar'
+import { ScheduleFilterSheet } from '@/components/management/ScheduleFilterSheet'
+import { ScheduleHeaderMobile } from '@/components/management/ScheduleHeaderMobile'
+import {
+  ScheduleViewToggle,
+  type ScheduleViewMode,
+} from '@/components/management/ScheduleViewToggle'
+import { DashboardView } from '@/components/management/DashboardView'
 import { ScheduleStickyBar } from '@/components/management/ScheduleStickyBar'
 import { SessionsProvider } from '@/components/management/SessionsProvider'
 import { DeepLinkedVisitSheet } from '@/components/management/DeepLinkedVisitSheet'
@@ -30,7 +39,12 @@ interface ScheduleViewProps {
   initialWeek: string
   initialFilters: ScheduleFilterValues
   initialVisitId: string | undefined
+  /** `?view=` when the URL names one — the old /app/dashboard redirect does.
+   *  null means "no instruction", and the stored preference decides. */
+  initialViewMode: ScheduleViewMode | null
 }
+
+const VIEW_MODE_KEY = 'rg-schedule-view'
 
 /**
  * Client-first schedule. Week and filter state live here rather than in the URL's
@@ -41,6 +55,7 @@ export function ScheduleView({
   initialWeek,
   initialFilters,
   initialVisitId,
+  initialViewMode,
 }: ScheduleViewProps) {
   const [windowStart, setWindowStart] = useState(initialWeek)
   const [filters, setFilters] = useState<ScheduleFilterValues>(initialFilters)
@@ -49,6 +64,40 @@ export function ScheduleView({
   const isWide = useMediaQuery('(min-width: 1024px)')
   const weekCount = isWide ? 4 : 1
   const hydrated = useIsHydrated()
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
+  const [viewOverride, setViewOverride] = useState<ScheduleViewMode | null>(null)
+  const { editSchedule: canEdit, seeDashboard } = useCan()
+
+  // Last-used view wins on open, so whichever one he actually lives in is the
+  // default. Resolved rather than stored in state: localStorage doesn't exist
+  // during the server render, and syncing it into state in an effect would
+  // render the wrong tab once before correcting it. Precedence is
+  // explicit tap → explicit ?view= → last used → Week.
+  const storedViewMode = useMemo<ScheduleViewMode | null>(() => {
+    if (!hydrated) return null
+    try {
+      const stored = window.localStorage.getItem(VIEW_MODE_KEY)
+      return stored === 'today' || stored === 'week' ? stored : null
+    } catch {
+      return null
+    }
+  }, [hydrated])
+
+  // Crew never had a dashboard and shouldn't get one here — it carries
+  // company-wide stats and uninvoiced counts. No toggle, no Today, no
+  // 44px of chrome they'd never use.
+  const requested = viewOverride ?? initialViewMode ?? storedViewMode ?? 'week'
+  const viewMode: ScheduleViewMode = seeDashboard ? requested : 'week'
+
+  function changeViewMode(next: ScheduleViewMode) {
+    setViewOverride(next)
+    try {
+      window.localStorage.setItem(VIEW_MODE_KEY, next)
+    } catch {
+      // Private mode or blocked storage — the choice just doesn't persist.
+    }
+  }
 
   const weekStarts = useMemo(() => {
     const base = parseWeekParam(windowStart)
@@ -119,13 +168,35 @@ export function ScheduleView({
     return <ErrorState title="The schedule didn't load." hint="Check your connection, then try again." />
   }
 
+  // The phone list renders one week, so its match count is that week's rows.
+  const mobileMatchCount =
+    (mobileWeek?.routeGroups.reduce((sum, g) => sum + g.rows.length, 0) ?? 0) +
+    (mobileWeek?.ungrouped.length ?? 0)
+
   return (
     <div>
-      <h1 className="mb-3 min-w-0 truncate font-display text-2xl font-semibold text-foreground">
-        Schedule
-      </h1>
+      {/* No <h1>: the nav tab already says Schedule, and on a phone that line
+          cost more vertical space than anything else on the screen. */}
       <ScheduleStickyBar>
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <div className="lg:hidden">
+          <ScheduleHeaderMobile
+            weekStart={windowStart}
+            onWeekChange={goToWeek}
+            activeFilterCount={activeScheduleFilterCount(filters)}
+            onOpenFilters={() => setFilterSheetOpen(true)}
+            overflowActions={
+              canEdit
+                ? [
+                    {
+                      label: selectMode ? 'Done selecting' : 'Select stops',
+                      onClick: () => setSelectMode((on) => !on),
+                    },
+                  ]
+                : []
+            }
+          />
+        </div>
+        <div className="hidden flex-wrap items-center justify-between gap-x-3 gap-y-2 lg:flex">
           <ScheduleFilterBar
             filters={filters}
             routeGroups={routeGroupOptions}
@@ -137,8 +208,32 @@ export function ScheduleView({
         </div>
       </ScheduleStickyBar>
 
+      {/* Under the sticky bar, not inside it — it scrolls away, because once
+          you're reading the week you don't need the switch pinned. */}
+      {seeDashboard && (
+        <div className="mb-2 max-w-xs lg:mb-3">
+          <ScheduleViewToggle value={viewMode} onChange={changeViewMode} />
+        </div>
+      )}
+
+      <ScheduleFilterSheet
+        open={filterSheetOpen}
+        onOpenChange={setFilterSheetOpen}
+        filters={filters}
+        routeGroups={routeGroupOptions}
+        accounts={accountOptions}
+        employees={employees}
+        onChange={setFilters}
+        matchCount={mobileMatchCount}
+      />
+
       {isStale && <CachedNotice />}
 
+      {viewMode === 'today' && <DashboardView />}
+
+      {/* Kept mounted, not unmounted, when Today is showing: DeepLinkedVisitSheet
+          lives in here and a ?visit= link must still open its sheet. */}
+      <div className={viewMode === 'today' ? 'hidden' : undefined}>
       <SessionsProvider visitIds={visitIds}>
         <div className="hidden lg:block">
           <ScheduleGrid
@@ -155,12 +250,15 @@ export function ScheduleView({
             employees={employees}
             vehicles={vehicles}
             filtered={filtered}
+            selectMode={selectMode}
+            onExitSelectMode={() => setSelectMode(false)}
           />
         </div>
         {/* Rendered once, outside both layouts — both are always mounted, so
             giving each the deep link opened two stacked sheets. */}
         <DeepLinkedVisitSheet weeks={weeks} visitId={initialVisitId} />
       </SessionsProvider>
+      </div>
     </div>
   )
 }

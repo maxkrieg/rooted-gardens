@@ -20,6 +20,8 @@ export default async function SchedulePage({
     status?: string
     /** Deep link from a stop — opens this visit's detail sheet. */
     visit?: string
+    /** 'today' | 'week'. Set by the retired /app/dashboard redirect. */
+    view?: string
   }>
 }) {
   const params = await searchParams
@@ -29,6 +31,9 @@ export default async function SchedulePage({
       initialWeek={format(parseWeekParam(params.week), 'yyyy-MM-dd')}
       initialFilters={parseScheduleFilters(params)}
       initialVisitId={params.visit}
+      initialViewMode={
+        params.view === 'today' ? 'today' : params.view === 'week' ? 'week' : null
+      }
     />
   )
 }

@@ -55,7 +55,14 @@ const nextConfig: NextConfig = {
 
       { source: '/management/schedule', destination: '/app/schedule', permanent: true },
       { source: '/management/routes', destination: '/app/routes', permanent: true },
-      { source: '/management/dashboard', destination: '/app/dashboard', permanent: true },
+      // The dashboard folded into the schedule's Today view in R2.6, so both
+      // its old URLs land there rather than chaining through a dead route.
+      {
+        source: '/management/dashboard',
+        destination: '/app/schedule?view=today',
+        permanent: true,
+      },
+      { source: '/app/dashboard', destination: '/app/schedule?view=today', permanent: false },
       { source: '/management/accounts', destination: '/app/accounts', permanent: true },
       { source: '/management/accounts/:id', destination: '/app/accounts/:id', permanent: true },
     ]

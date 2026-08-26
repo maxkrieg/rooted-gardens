@@ -61,7 +61,7 @@ export function useAddVisitPlanPhoto(visitId: string, propertyId: string) {
 
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
-      queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
+      queryClient.invalidateQueries({ queryKey: ['schedule-visits'] })
     },
   })
 }

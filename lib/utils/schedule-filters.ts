@@ -81,12 +81,14 @@ export function scheduleFilterParams(
 }
 
 export function hasActiveScheduleFilters(filters: ScheduleFilterValues): boolean {
-  return (
-    filters.routeGroup !== 'all' ||
-    filters.account !== 'all' ||
-    filters.crew !== 'all' ||
-    filters.status !== 'all'
-  )
+  return activeScheduleFilterCount(filters) > 0
+}
+
+/** How many filters are narrowing the view — the phone header's badge count. */
+export function activeScheduleFilterCount(filters: ScheduleFilterValues): number {
+  return [filters.routeGroup, filters.account, filters.crew, filters.status].filter(
+    (v) => v !== 'all',
+  ).length
 }
 
 /** Does this crew member appear on the visit, either as planned or as having worked it? */

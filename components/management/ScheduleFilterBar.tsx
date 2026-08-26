@@ -35,6 +35,8 @@ interface ScheduleFilterBarProps {
   accounts: Account[]
   employees: Employee[]
   onChange: (filters: ScheduleFilterValues) => void
+  /** Full-width stacked controls, for the phone's filter sheet. */
+  stacked?: boolean
 }
 
 /**
@@ -49,6 +51,7 @@ export function ScheduleFilterBar({
   accounts,
   employees,
   onChange,
+  stacked = false,
 }: ScheduleFilterBarProps) {
   const [accountOpen, setAccountOpen] = useState(false)
 
@@ -69,10 +72,15 @@ export function ScheduleFilterBar({
     onChange({ ...filters, ...next })
   }
 
-  const controlClass = 'h-9 w-[calc(50%-0.25rem)] sm:w-40'
+  // Sheet controls are full-width and touch-sized; the inline bar stays 2-up.
+  const controlClass = stacked ? 'h-11 w-full' : 'h-9 w-[calc(50%-0.25rem)] sm:w-40'
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div
+      className={cn(
+        stacked ? 'flex flex-col gap-2' : 'flex flex-wrap items-center gap-2',
+      )}
+    >
       <Select value={filters.routeGroup} onValueChange={(v) => apply({ routeGroup: v })}>
         <SelectTrigger className={controlClass} aria-label="Filter by route group">
           <SelectValue />
@@ -100,7 +108,10 @@ export function ScheduleFilterBar({
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-56 p-0" align="start">
+        <PopoverContent
+          className={cn('p-0', stacked ? 'w-[calc(100vw-3rem)] max-w-sm' : 'w-56')}
+          align="start"
+        >
           <Command>
             <CommandInput placeholder="Search accounts…" />
             <CommandList>

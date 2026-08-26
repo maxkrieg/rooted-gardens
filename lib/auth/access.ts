@@ -12,13 +12,12 @@ import type { EmployeeRole } from '@/types/app'
 /**
  * Where a role lands when it has nowhere better to go.
  *
- * Owner/lead still land on the dashboard, unchanged from before the merge.
- * That moves to the schedule in R2.6, when the dashboard folds into it as the
- * `Today` view — not here, so R1 stays behavior-preserving.
+ * Everyone but the accountant lands on the schedule: since R2.6 it carries the
+ * dashboard as its `Today` view, so there is no separate dashboard to land on.
  */
 export const ROLE_HOME: Record<EmployeeRole, string> = {
-  owner: '/app/dashboard',
-  lead: '/app/dashboard',
+  owner: '/app/schedule',
+  lead: '/app/schedule',
   crew: '/app/schedule',
   accountant: '/management/billing',
 }
@@ -38,6 +37,8 @@ const ROUTE_ACCESS: Array<{ prefix: string; roles: readonly EmployeeRole[] }> = 
   { prefix: '/app/stop', roles: ['owner', 'lead', 'crew'] },
   { prefix: '/app/accounts', roles: ['owner', 'lead', 'accountant'] },
   { prefix: '/app/routes', roles: ['owner', 'lead', 'accountant'] },
+  // Retired in R2.6 — kept here so the redirect to ?view=today isn't gated
+  // away before next.config gets to it.
   { prefix: '/app/dashboard', roles: ['owner', 'lead', 'accountant'] },
 
   // Desk routes — unchanged from the old proxy sub-route gates.
@@ -93,6 +94,8 @@ export interface Capabilities {
   archive: boolean
   /** Create route groups and move properties between them. */
   editRoutes: boolean
+  /** The schedule's `Today` view — week stats, fleet issues, uninvoiced counts. */
+  seeDashboard: boolean
   seeBilling: boolean
   seeLeads: boolean
   manageTeam: boolean
@@ -105,6 +108,7 @@ const NO_CAPABILITIES: Capabilities = {
   editAccounts: false,
   archive: false,
   editRoutes: false,
+  seeDashboard: false,
   seeBilling: false,
   seeLeads: false,
   manageTeam: false,
@@ -122,6 +126,7 @@ export function capabilitiesFor(role: EmployeeRole | null | undefined): Capabili
     editAccounts: isOwnerOrLead,
     archive: role === 'owner',
     editRoutes: isOwnerOrLead,
+    seeDashboard: isOwnerOrLead || role === 'accountant',
     seeBilling: isOwnerOrLead || role === 'accountant',
     seeLeads: isOwnerOrLead,
     manageTeam: role === 'owner',

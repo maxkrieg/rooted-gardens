@@ -389,7 +389,6 @@ export function VisitLogger({
     // Invalidate stop-detail so photos appear if user navigates back to this stop,
     // and the week schedule so its in-progress pulse clears on completion.
     queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
-    queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
     queryClient.invalidateQueries({ queryKey: ['schedule-visits'] })
 
     // The grid shows completed-by crew once a visit is done, and visit_crew rows

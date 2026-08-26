@@ -78,7 +78,6 @@ export function SkipSheet({
     }
 
     queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
-    queryClient.invalidateQueries({ queryKey: ['crew-week-schedule'] })
     queryClient.invalidateQueries({ queryKey: ['schedule-visits'] })
 
     patchScheduleVisit(queryClient, visitId, (visit) => ({

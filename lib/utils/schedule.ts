@@ -50,14 +50,13 @@ export type ScheduleAssignment = {
 
 /**
  * Assembles the route group → property → visit grid for a single week.
- * Pure (no I/O) so it can be reused by both the management Server Action
- * (getScheduleForWeek) and the crew client hook (useWeekSchedule).
+ * Pure (no I/O), and now called from exactly one place — useManagementSchedule's
+ * `combine`, which every role's schedule goes through.
  *
- * `ungroupedProperties` is optional and defaults to empty — the crew caller
- * never passes it (crew self-organize off route groups, so an unrouted
- * property has nothing to show them), while the management Server Action
- * supplies every property with no property_route_groups row so they aren't
- * silently dropped from the schedule.
+ * `ungroupedProperties` is optional and defaults to empty. It stays optional
+ * because the shape is useful without it, but the live caller always passes it:
+ * a property on no route group would otherwise be silently dropped from the
+ * schedule rather than landing in the "Not on a route" bucket.
  */
 export function buildScheduleWeek(
   weekStart: string,

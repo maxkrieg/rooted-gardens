@@ -535,13 +535,19 @@ function ScheduleCell({
         'cursor-pointer hover:brightness-95',
       )}
     >
+      {/* Hover tooltip on a pointer device; on touch the tooltip never opens,
+          so the icon keeps a title and the cell's own tap opens the drawer,
+          which shows the instruction in full. It must NOT stop propagation —
+          that turned the one part of the cell most worth tapping into a
+          dead zone. */}
       {hasInstruction && (
         <TooltipProvider delayDuration={200}>
           <Tooltip>
             <TooltipTrigger asChild>
               <span
                 className="absolute top-1 right-1 text-[var(--clay)] leading-none"
-                onClick={(e) => e.stopPropagation()}
+                title={visit.crew_instruction ?? undefined}
+                aria-label="Has a crew instruction"
               >
                 <FilePen className="w-4 h-4" />
               </span>

@@ -5,7 +5,7 @@ management routes into one app. It is a **sibling to `PHASES.md`**, not a replac
 `PHASES.md` remains the historical record of the original build. See `CLAUDE.md` for stack,
 schema, and conventions.
 
-> **Status:** R1 built 2026-08-26 (branch `redesign/r1-app-merge`). R2–R5 planned.
+> **Status:** R1 and R2 built 2026-08-26 (branch `redesign/r1-app-merge`). R3–R5 planned.
 
 ---
 
@@ -288,7 +288,7 @@ tested under `npm run dev`; Serwist's `defaultCache` degrades to a single `Netwo
 > Goal: cut chrome from ~300px to ≤120px and make the week readable at a glance. This is where
 > the "all-in-one view" feeling gets replicated — density and immediacy, not a grid.
 
-- [ ] **R2.1 — Collapse the two week-schedule hooks into one**
+- [x] **R2.1 — Collapse the two week-schedule hooks into one**
   *Depends on: R1.3*
   `hooks/crew/useWeekSchedule.ts` (key `['crew-week-schedule', week]`) and
   `hooks/useManagementSchedule.ts` (keys `['schedule-reference']` + `['schedule-visits', week]`)
@@ -302,7 +302,7 @@ tested under `npm run dev`; Serwist's `defaultCache` degrades to a single `Netwo
   Verify `patchScheduleVisit`, `SessionsProvider`'s overlay, and the shared
   `['stop-detail', visitId]` entry all still hit.
 
-- [ ] **R2.2 — Compact sticky header**
+- [x] **R2.2 — Compact sticky header**
   *Depends on: R2.1*
   Delete the `<h1>Schedule</h1>` (the nav tab already says Schedule) and the duplicated
   week-range `Link` at the top of `ScheduleListMobile.tsx`. Collapse to one 48px sticky row:
@@ -319,7 +319,7 @@ tested under `npm run dev`; Serwist's `defaultCache` degrades to a single `Netwo
   Keep `--schedule-sticky-h` (already published via `ResizeObserver` by `ScheduleStickyBar.tsx`)
   and start consuming it in the mobile list, which ignores it today.
 
-- [ ] **R2.3 — Route-group band, redesigned**
+- [x] **R2.3 — Route-group band, redesigned**
   *Depends on: R2.2*
   The group header is the highest-value real estate on the screen and currently holds a name
   and one ghost button. Make it carry the dispatch state Matt reads first:
@@ -339,7 +339,7 @@ tested under `npm run dev`; Serwist's `defaultCache` degrades to a single `Netwo
   progress bar is the at-a-glance signal the colored spreadsheet block used to give him.
   Keep the existing row renderer in `ScheduleListMobile.tsx` — it is already good.
 
-- [ ] **R2.4 — Select mode + bulk action bar**
+- [x] **R2.4 — Select mode + bulk action bar**
   *Depends on: R2.3*
   Generalize `UnroutedPanel`'s proven pattern (`Set` state + Select all/Clear +
   `sticky bottom-4` bar + Undo toast) into `components/app/SelectionBar.tsx`. On the schedule,
@@ -351,14 +351,14 @@ tested under `npm run dev`; Serwist's `defaultCache` degrades to a single `Netwo
   `create_visit`, `skip`) in a loop, so it works offline for free and needs **no new
   `MutationType`**.
 
-- [ ] **R2.5 — Desktop grid stays, demoted**
+- [x] **R2.5 — Desktop grid stays, demoted**
   *Depends on: R2.3*
   `ScheduleGrid.tsx` (the 4-week `<table>`, `hidden lg:block`) keeps working for the rare
   laptop session. Do not invest further in it. Fix only the touch-dead `Tooltip`s and the bare
   `<FilePen>` icon in `ScheduleListMobile.tsx` that signals a crew instruction exists while
   giving no way to read it.
 
-- [ ] **R2.6 — Fold the Dashboard into Schedule as a `Today` view**
+- [x] **R2.6 — Fold the Dashboard into Schedule as a `Today` view**
   *Depends on: R2.2*
   Schedule gets a `Today | Week` segmented control under the compact header. `Today` reuses
   `DashboardView.tsx` and `CrewsOnSitePanel.tsx` as-is; `Week` is the route list. This removes
@@ -386,6 +386,49 @@ tested under `npm run dev`; Serwist's `defaultCache` degrades to a single `Netwo
 - `/app/dashboard` redirects to `/app/schedule?view=today` (R2.6).
 - The `?visit=<id>` deep link still opens the sheet — `DeepLinkedVisitSheet` is mounted once
   precisely because both layouts are always mounted; that constraint survives (R2.1).
+
+### R2 as built — deviations from the plan above
+
+- **R2.1 was a deletion, not a merge.** R1 removed the crew schedule page, which was
+  `useWeekSchedule`'s only consumer, so there was no second hook left to parametrize with
+  `withInvoices` / `includeUngrouped` — the hook was simply deleted and its 12 orphaned
+  `['crew-week-schedule']` invalidations rewired. Five of them already invalidated
+  `['schedule-visits']` alongside and just lost a dead line; the other seven were substituted.
+  `['crew-today-stops']` and `['crew-history-stops']` turned out to be dead too and went with them.
+  The `fetch.ts` comment claiming crew RLS can't read `invoices` is **false** — the baseline
+  grants SELECT to `authenticated` and RLS filters rows, so the embed returns empty rather than
+  erroring. That false premise is what kept the second hook alive; the comment is corrected.
+
+- **No dropdown-menu primitive exists in the repo.** Both `⋯` menus (the header's and the route
+  group band's) use the installed Popover rather than adding `@radix-ui/react-dropdown-menu`
+  for two menus.
+
+- **R2.3's crew and truck come from the visits, not from group defaults.** Route group defaults
+  are R3.1 and aren't built, so the band aggregates the crew and vehicles actually on the
+  group's visits this week. When R3.1 lands, defaults become the fallback for a visit that has
+  no assignment yet.
+
+- **The route group band is sticky**, pinned under the header via `--schedule-sticky-h` — that's
+  the "start consuming it in the mobile list" R2.2 called for. It required dropping
+  `overflow-hidden` from the group card (a clipping ancestor kills `position: sticky`); the rows
+  keep their own clipping wrapper for the bottom corners.
+
+- **The `Today` view is gated on a new `seeDashboard` capability** (owner/lead/accountant).
+  Crew never had a dashboard and it carries company-wide stats and uninvoiced counts, so they
+  get neither the toggle nor the 44px of chrome it costs.
+
+- **`/app/dashboard` redirects with `permanent: false`.** It's an internal retirement of a route
+  that shipped days ago, not a public URL being retired forever — a 308 would be cached by
+  browsers indefinitely. `/management/dashboard` keeps its 308 and now points straight at
+  `/app/schedule?view=today` rather than chaining through the dead route.
+
+- **`ROLE_HOME` for owner/lead moved to `/app/schedule`**, which R1 deliberately deferred to
+  here. There is no dashboard to land on any more.
+
+- **Measured result** (375px, owner): 16px page padding + 56px sticky header + 8px + 36px
+  `Today | Week` + 8px = **124px** above the first route band, of which **56px is sticky**.
+  Crew, with no view toggle, get **80px**. The ≤120px target was written before R2.6 added the
+  toggle, and the toggle is the 44px over. Was ~300px.
 
 ---
 
