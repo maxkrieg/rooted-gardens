@@ -14,7 +14,7 @@ import { ScheduleEmptyState } from '@/components/management/ScheduleEmptyState'
 import { RouteGroupBand, type RouteGroupStats } from '@/components/management/RouteGroupBand'
 import { SelectionBar } from '@/components/app/SelectionBar'
 import { BulkActionSheet, type BulkActionKind } from '@/components/management/BulkActionSheet'
-import { useBulkScheduleActions } from '@/hooks/useBulkScheduleActions'
+import { useBulkScheduleActions, type BulkResult } from '@/hooks/useBulkScheduleActions'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useVisitOverlays } from '@/components/management/SessionsProvider'
 import { isVisitInProgress, formatElapsed, mergeVisitOverlay } from '@/lib/utils/visits'
@@ -197,6 +197,9 @@ export function ScheduleListMobile({
     ...currentWeek.ungrouped,
   ]
   const selectedRows = allRows.filter((row) => selected.has(row.property.id))
+  // Skip only touches scheduled visits, so the sheet must count those, not the
+  // whole selection — "Skip 12 stops" on a selection where 4 are skippable lies.
+  const skippableCount = selectedRows.filter((row) => row.visit?.status === 'scheduled').length
 
   function toggleSelected(propertyId: string) {
     setSelected((prev) => {
@@ -212,13 +215,36 @@ export function ScheduleListMobile({
    * dropping the selection on success. A failure keeps the selection so the
    * owner can retry the same set rather than reselecting it.
    */
-  async function runBulk(label: string, fn: () => Promise<number>, done: (n: number) => string) {
+  async function runBulk(
+    label: string,
+    fn: () => Promise<BulkResult>,
+    done: (n: number) => string,
+  ) {
     setBulkKind(null)
     setBusyLabel(label)
     try {
-      const n = await fn()
+      const { changed, undo } = await fn()
       setSelected(new Set())
-      toast.success(done(n))
+      if (changed === 0) {
+        toast('Nothing to change', { description: 'Those stops were already set that way.' })
+        return
+      }
+      // Undo goes through the same queue as the change, so it works in a dead
+      // zone too. Scheduling has none — see BulkResult.
+      toast.success(done(changed), {
+        action: undo
+          ? {
+              label: 'Undo',
+              onClick: () => {
+                void undo().catch(() =>
+                  toast.error('Could not undo', {
+                    description: 'The reversal is queued and will retry.',
+                  }),
+                )
+              },
+            }
+          : undefined,
+      })
     } catch (err) {
       toast.error('Some changes did not save', {
         description: toUserMessage(err, 'They are queued and will retry.', '[ScheduleListMobile.runBulk]'),
@@ -507,7 +533,9 @@ export function ScheduleListMobile({
             },
             {
               label: 'Skip',
-              disabled: selected.size === 0 || !selectedRows.some((r) => r.visit),
+              disabled:
+                selected.size === 0 ||
+                skippableCount === 0,
               onClick: () => setBulkKind('skip'),
             },
           ]}
@@ -517,13 +545,13 @@ export function ScheduleListMobile({
       <BulkActionSheet
         kind={bulkKind}
         onOpenChange={(open) => !open && setBulkKind(null)}
-        count={selected.size}
+        count={bulkKind === 'skip' ? skippableCount : selected.size}
         employees={employees}
         vehicles={vehicles}
         onPickCrew={(employee) =>
           runBulk(
             `Assigning ${employee.name.split(' ')[0]}…`,
-            () => bulk.assignCrew(selectedRows, employee, 'add'),
+            () => bulk.assignCrew(selectedRows, employee),
             (n) => `${employee.name.split(' ')[0]} assigned to ${n} ${n === 1 ? 'stop' : 'stops'}.`,
           )
         }

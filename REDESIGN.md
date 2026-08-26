@@ -413,6 +413,15 @@ tested under `npm run dev`; Serwist's `defaultCache` degrades to a single `Netwo
   `overflow-hidden` from the group card (a clipping ancestor kills `position: sticky`); the rows
   keep their own clipping wrapper for the bottom corners.
 
+- **Bulk crew, truck, and skip carry an Undo toast; bulk schedule does not.** Undo goes through
+  the same offline queue as the change it reverses, so it works in a dead zone too. Crew undo
+  only removes the assignments the batch actually added, and truck undo restores each visit's
+  own previous vehicle rather than one shared value. Scheduling has no undo because reversing
+  it means deleting visits and there is no delete-visit mutation type — a visit crew may have
+  already started can't be removed blind. For the same reason **skip only targets `scheduled`
+  visits**: `revert_status` sets `scheduled`, so skipping a completed visit would make undo
+  lossy.
+
 - **The `Today` view is gated on a new `seeDashboard` capability** (owner/lead/accountant).
   Crew never had a dashboard and it carries company-wide stats and uninvoiced counts, so they
   get neither the toggle nor the 44px of chrome it costs.
