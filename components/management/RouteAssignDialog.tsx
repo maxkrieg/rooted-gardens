@@ -31,6 +31,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { bulkAssignRoute } from '@/app/app/(padded)/schedule/actions'
+import { useRefreshSchedule } from '@/hooks/useManagementSchedule'
 import { routeAssignSchema, type RouteAssignValues } from '@/lib/validators/visit'
 import type { Employee, RouteGroup, ScheduleWeek, Vehicle } from '@/types/app'
 
@@ -52,6 +53,7 @@ export function RouteAssignDialog({
   vehicles,
 }: RouteAssignDialogProps) {
   const crewEmployees = employees.filter((e) => e.role === 'crew')
+  const refreshSchedule = useRefreshSchedule()
 
   const form = useForm<RouteAssignValues>({
     resolver: zodResolver(routeAssignSchema),
@@ -82,6 +84,12 @@ export function RouteAssignDialog({
       toast.error('Failed to assign route', { description: res.error })
       return
     }
+    // revalidatePath can't repaint a client-first page. Without this the crew
+    // avatars only appear on the next full reload — the vehicle looked fine
+    // because it rode in on the realtime `visits` overlay, which carries no
+    // visit_crew rows.
+    refreshSchedule(values.week_start)
+
     const count = res.count ?? 0
     toast.success(count === 0 ? 'No scheduled visits found for that week' : `Assigned ${count} visit${count === 1 ? '' : 's'}`)
     form.reset()

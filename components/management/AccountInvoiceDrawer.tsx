@@ -5,6 +5,7 @@ import { format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { CheckIndicator } from '@/components/app/CheckIndicator'
 import { Badge } from '@/components/ui/badge'
 import {
   Sheet,
@@ -139,7 +140,7 @@ export function AccountInvoiceDrawer({
                     : 'border-border bg-card hover:bg-accent/20',
                 )}
               >
-                <Checkbox checked={selected} tabIndex={-1} aria-hidden className="mt-0.5 pointer-events-none" />
+                <CheckIndicator checked={selected} className="mt-0.5" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-foreground">
                     {visit.property?.address ?? 'Unknown property'}

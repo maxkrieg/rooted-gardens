@@ -226,3 +226,72 @@ export async function unassignProperty(
   revalidate()
   return {}
 }
+
+// ─── Route group defaults ────────────────────────────────────────────────────
+
+export type RouteGroupDefaults = {
+  vehicleId: string | null
+  days: string[]
+  crewIds: string[]
+}
+
+const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+
+/**
+ * Set a route group's default crew, truck, and days — what "Wilder - Mon/Tues"
+ * has been encoding in a string on the route sheet all along. A generated week
+ * (R3.5) pre-fills from these.
+ *
+ * A Server Action rather than a queued mutation: this is seasonal configuration
+ * set once and rarely touched, not field work, and the same call has to replace
+ * a set of join rows atomically. Callers must invalidate `schedule-reference`
+ * themselves — the schedule is client-first, so revalidatePath alone repaints a
+ * shell holding no data.
+ */
+export async function setRouteGroupDefaults(
+  routeGroupId: string,
+  defaults: RouteGroupDefaults,
+): Promise<{ error?: string }> {
+  if (defaults.days.some((day) => !WEEKDAYS.includes(day))) {
+    return { error: 'Unrecognised day' }
+  }
+
+  const supabase = await createClient()
+
+  const { error: updateError } = await supabase
+    .from('route_groups')
+    .update({ default_vehicle_id: defaults.vehicleId, default_days: defaults.days })
+    .eq('id', routeGroupId)
+
+  if (updateError) {
+    return { error: toUserMessage(updateError, 'Could not save the route defaults.') }
+  }
+
+  // Replace the crew set. Delete-then-insert clobbers a concurrent edit, which
+  // is acceptable here and nowhere near the visit data: two owners editing the
+  // same route's regulars in the same minute is not a real scenario, and the
+  // whole set is visible in the sheet before saving.
+  const { error: deleteError } = await supabase
+    .from('route_group_default_crew')
+    .delete()
+    .eq('route_group_id', routeGroupId)
+
+  if (deleteError) {
+    return { error: toUserMessage(deleteError, 'Could not save the route defaults.') }
+  }
+
+  if (defaults.crewIds.length > 0) {
+    const { error: insertError } = await supabase.from('route_group_default_crew').insert(
+      defaults.crewIds.map((employeeId) => ({
+        route_group_id: routeGroupId,
+        employee_id: employeeId,
+      })),
+    )
+    if (insertError) {
+      return { error: toUserMessage(insertError, 'Could not save the route defaults.') }
+    }
+  }
+
+  revalidate()
+  return {}
+}

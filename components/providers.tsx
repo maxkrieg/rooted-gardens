@@ -72,6 +72,7 @@ const CACHE_BUSTER = 'management-schedule-client'
 const PERSISTED_QUERY_KEYS = new Set([
   'schedule-reference',
   'schedule-visits',
+  'schedule-week-notes',
   'accounts-list',
   'account-detail',
   'account-photos',

@@ -15,7 +15,11 @@ import { RouteGroupBand, type RouteGroupStats } from '@/components/management/Ro
 import { SelectionBar } from '@/components/app/SelectionBar'
 import { BulkActionSheet, type BulkActionKind } from '@/components/management/BulkActionSheet'
 import { useBulkScheduleActions, type BulkResult } from '@/hooks/useBulkScheduleActions'
-import { Checkbox } from '@/components/ui/checkbox'
+import { CheckIndicator } from '@/components/app/CheckIndicator'
+import { WeekNoteRibbon } from '@/components/management/WeekNoteRibbon'
+import { RouteDefaultsSheet } from '@/components/management/RouteDefaultsSheet'
+import { useScheduleReference } from '@/hooks/useManagementSchedule'
+import { useWeekNotes, useSaveWeekNote } from '@/hooks/useWeekNotes'
 import { useVisitOverlays } from '@/components/management/SessionsProvider'
 import { isVisitInProgress, formatElapsed, mergeVisitOverlay } from '@/lib/utils/visits'
 import { groupRowsByAccount } from '@/lib/utils/schedule'
@@ -90,6 +94,10 @@ export function ScheduleListMobile({
   const [bulkKind, setBulkKind] = useState<BulkActionKind | null>(null)
   const [busyLabel, setBusyLabel] = useState<string | null>(null)
   const bulk = useBulkScheduleActions(week?.weekStart ?? '')
+  const { data: weekNotes = [] } = useWeekNotes(week?.weekStart ?? '')
+  const { data: reference } = useScheduleReference()
+  const [defaultsGroup, setDefaultsGroup] = useState<RouteGroup | null>(null)
+  const saveWeekNote = useSaveWeekNote(week?.weekStart ?? '')
 
   // Leaving select mode must drop the selection, or re-entering it resumes with
   // stale property ids that may no longer be on screen. Adjusted during render
@@ -318,16 +326,9 @@ export function ScheduleListMobile({
           selectMode && isSelected && 'bg-accent/40',
         )}
       >
-        {selectMode && (
-          <Checkbox
-            checked={isSelected}
-            // The row is the tap target; the box only reflects state, or a tap
-            // near its edge would toggle twice.
-            tabIndex={-1}
-            className="pointer-events-none shrink-0"
-            aria-hidden
-          />
-        )}
+        {/* The row is the tap target, so this is presentational only — a real
+            Checkbox here is a <button> inside a <button>. */}
+        {selectMode && <CheckIndicator checked={isSelected} />}
         {/* Left: identity */}
         <div className="flex flex-col gap-0.5 min-w-0">
           {!isNested && (
@@ -442,12 +443,23 @@ export function ScheduleListMobile({
             <div className="sticky z-10" style={{ top: 'var(--schedule-sticky-h, 0px)' }}>
               <RouteGroupBand
                 name={routeGroup.name}
+                days={routeGroup.default_days ?? []}
                 stats={statsFor(rows, currentWeek.weekStart)}
                 canEdit={canEdit}
                 onAssignRoute={() => {
                   setAssignGroup(routeGroup)
                   setAssignOpen(true)
                 }}
+                onEditDefaults={() => setDefaultsGroup(routeGroup)}
+                noteSlot={
+                  <WeekNoteRibbon
+                    note={
+                      weekNotes.find((n) => n.route_group_id === routeGroup.id)?.note ?? null
+                    }
+                    canEdit={canEdit}
+                    onSave={(note) => saveWeekNote(routeGroup.id, note)}
+                  />
+                }
               />
             </div>
 
@@ -577,6 +589,19 @@ export function ScheduleListMobile({
           onOpenChange={handleSheetOpenChange}
           row={sheetRow}
           weekStart={sheetWeek}
+        />
+      )}
+
+      {defaultsGroup && (
+        <RouteDefaultsSheet
+          open
+          onOpenChange={(open) => !open && setDefaultsGroup(null)}
+          routeGroup={defaultsGroup}
+          employees={employees}
+          vehicles={vehicles}
+          currentCrewIds={(reference?.defaultCrew ?? [])
+            .filter((c) => c.route_group_id === defaultsGroup.id)
+            .map((c) => c.employee_id)}
         />
       )}
 

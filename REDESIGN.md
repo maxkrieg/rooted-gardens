@@ -5,7 +5,8 @@ management routes into one app. It is a **sibling to `PHASES.md`**, not a replac
 `PHASES.md` remains the historical record of the original build. See `CLAUDE.md` for stack,
 schema, and conventions.
 
-> **Status:** R1 and R2 built 2026-08-26 (branch `redesign/r1-app-merge`). R3–R5 planned.
+> **Status:** R1–R3 built 2026-08-26 (branch `redesign/r1-app-merge`). R4–R5 planned.
+> **Migrations are on dev only** — prod must be migrated before this reaches `main`.
 
 ---
 
@@ -446,7 +447,7 @@ tested under `npm run dev`; Serwist's `defaultCache` degrades to a single `Netwo
 > Goal: replace "color a block of cells" with "review a generated week." This is the phase that
 > actually removes work from Matt's Sunday night.
 
-- [ ] **R3.1 — Migration: route group defaults**
+- [x] **R3.1 — Migration: route group defaults**
   Add to `route_groups`: `default_vehicle_id uuid FK → vehicles` and `default_days text[]`
   (`'mon'…'sun'`). Add `route_group_default_crew (route_group_id, employee_id)` — a join table,
   **not** a `uuid[]` column, matching the `visit_crew` precedent and `CLAUDE.md`'s stated
@@ -455,21 +456,21 @@ tested under `npm run dev`; Serwist's `defaultCache` degrades to a single `Netwo
   Follow **"Making a schema change (dev → prod)" in `docs/DEPLOYMENT.md`** — prod must be
   migrated before schema-dependent code reaches `main`, because merging is deploying.
 
-- [ ] **R3.2 — Migration: route group week notes**
+- [x] **R3.2 — Migration: route group week notes**
   *Depends on: R3.1*
   `route_group_week_notes (id, route_group_id, week_start date, note text, created_at,
   updated_at)` with `UNIQUE (route_group_id, week_start)`. This is the spreadsheet's
   group-header dispatch note (*"matts gone all week … no Ryan till Thurs"*) — currently
   homeless, and read by the whole crew rather than attached to one visit.
 
-- [ ] **R3.3 — Week note UI**
+- [x] **R3.3 — Week note UI**
   *Depends on: R3.2, R2.3*
   Editable inline on the route-group band for owner/lead; a read-only ribbon for crew.
   New offline `MutationType: 'route_week_note'` — which means touching `MutationType`
   (`idb.ts`), the payload interface + `MutationPayload` union, a `case` in the flush switch,
   and `TYPE_LABELS` in `StuckChangesSheet`. The compiler enforces all four.
 
-- [ ] **R3.4 — `planWeek()` — the generate rule**
+- [x] **R3.4 — `planWeek()` — the generate rule**
   *Depends on: R1.3*
   A pure function in `lib/utils/schedule.ts` beside `buildScheduleWeek`, so it stays testable
   and reusable. Given a week, the route groups with their properties, and each property's most
@@ -483,7 +484,7 @@ tested under `npm run dev`; Serwist's `defaultCache` degrades to a single `Netwo
   - Skips archived properties, and skips any property that already has a visit that week — the
     `UNIQUE (property_id, week_start)` index makes this idempotent regardless.
 
-- [ ] **R3.5 — Generate week, with preview**
+- [x] **R3.5 — Generate week, with preview**
   *Depends on: R3.4, R3.1, R2.4*
   `⋯ → Generate week` opens a preview sheet grouped by route, showing exactly what will be
   created and what will be skipped, with per-row opt-out. Matt confirms a **number** before
@@ -512,6 +513,57 @@ cleanly to a fresh project from the baseline.
 **Security / RLS (R3.1, R3.2):**
 - `route_group_default_crew` and `route_group_week_notes` are readable by all staff roles and
   writable only by owner/lead; crew writes are refused.
+
+### R3 as built — deviations from the plan above
+
+- **A third migration was needed:** `property_last_visit`, a view mirroring the existing
+  `account_last_visit`. `planWeek()` phases biweekly and monthly properties from their own last
+  visit, and the account-grain view is wrong for that — an account with two properties on
+  different cadences would phase both off whichever was done last. Keyed on `ended_at`, so a
+  *skipped* visit correctly doesn't count as a visit.
+
+- **A route-defaults editor was pulled forward from R4.3.** R3's own verification says "set
+  defaults on a route group, then generate" — with the editor in R4.3 that couldn't be run at
+  all without SQL. It's a sheet behind the route group band's `⋯`, and R4.3 still owns putting
+  the same thing on the routes page.
+
+- **`setRouteGroupDefaults` is a Server Action, deliberately online-only.** It replaces a whole
+  set of `route_group_default_crew` rows, which is the same delete-then-insert shape that keeps
+  `bulkAssignRoute` off the queue. The sheet says so when offline rather than failing silently.
+  It invalidates `schedule-reference` client-side — `revalidatePath` alone would repaint a shell
+  holding no data, the trap CLAUDE.md records as having caused three bugs.
+
+- **Week notes are their own query key** (`schedule-week-notes`), not an embed on the visits
+  query. They change on a completely different rhythm — once on Sunday, by one person — and this
+  keeps a note edit from invalidating the whole week's visits.
+
+- **An emptied week note deletes its row** rather than storing a blank, or the band would render
+  an empty clay ribbon for the rest of the week.
+
+- **`default_days` is a label, not a scheduling rule.** It shows on the route group band
+  (`WILDER · MON/TUE`) and in the generate preview's route headings, which is what the R2.3 mock
+  called for. It can't do more than that yet: a visit is keyed to a *week*, not a day, so there
+  is no per-day field to write to. The defaults sheet says so rather than implying otherwise.
+
+- **RLS follows house style,** calling `get_my_role()` directly rather than wrapping it in
+  `(select …)`. The wrapper is the documented Supabase performance pattern, but it would make
+  these two policies the only ones of ~40 written that way, and both tables hold tens of rows.
+  Consistency was worth more than an unmeasurable win.
+
+---
+
+## Tabled — worth doing, not scheduled
+
+- **Realtime `visit_crew` for management.** `visit_crew` is in the `supabase_realtime`
+  publication, but the management subscription (`SessionsProvider`) only covers `visits`. Crew
+  already get their *own* assignments live — `useCrewRealtimeSync` filters
+  `employee_id=eq.<mine>` and toasts "Your schedule was updated" — but nobody sees changes to
+  *other* people's crew rows without a refetch. That's what made the Assign Route bug read as a
+  rendering glitch: the vehicle rode in on the `visits` overlay while the crew avatars didn't,
+  and `useRefreshSchedule` now closes it with an invalidation rather than a subscription.
+  A `visit_crew` subscription on the current week would make it live for everyone and would
+  also matter most in the field, where a reassignment mid-week is exactly what crew need to
+  see without reopening the app. Raised 2026-08-27.
 
 ---
 

@@ -1,6 +1,13 @@
 import { createClient } from '@/lib/supabase/client'
 import type { ScheduleAssignment } from '@/lib/utils/schedule'
-import type { Account, Property, RouteGroup, VisitWithCrew } from '@/types/app'
+import type {
+  Account,
+  Property,
+  RouteGroup,
+  RouteGroupDefaultCrew,
+  RouteGroupWeekNote,
+  VisitWithCrew,
+} from '@/types/app'
 
 /**
  * Route groups, assignments, and properties — everything the schedule needs that
@@ -11,12 +18,15 @@ export type ScheduleReference = {
   routeGroups: RouteGroup[]
   assignments: ScheduleAssignment[]
   ungroupedProperties: Array<Property & { account: Account }>
+  /** Route group regulars — the fallback crew for a visit with none. */
+  defaultCrew: RouteGroupDefaultCrew[]
 }
 
 export async function fetchScheduleReference(): Promise<ScheduleReference> {
   const supabase = createClient()
 
-  const [routeGroupsResult, assignmentsResult, propertiesResult] = await Promise.all([
+  const [routeGroupsResult, assignmentsResult, propertiesResult, defaultCrewResult] =
+    await Promise.all([
     supabase.from('route_groups').select('*').order('sort_order', { ascending: true }),
     // !inner + is_archived so a soft-deleted property can't reach the grid.
     supabase
@@ -27,11 +37,13 @@ export async function fetchScheduleReference(): Promise<ScheduleReference> {
       )
       .eq('property.is_archived', false),
     supabase.from('properties').select('*, account:accounts(*)').eq('is_archived', false),
+    supabase.from('route_group_default_crew').select('*, employee:employees(*)'),
   ])
 
   if (routeGroupsResult.error) throw routeGroupsResult.error
   if (assignmentsResult.error) throw assignmentsResult.error
   if (propertiesResult.error) throw propertiesResult.error
+  if (defaultCrewResult.error) throw defaultCrewResult.error
 
   const assignments = (assignmentsResult.data ?? []) as unknown as ScheduleAssignment[]
   const allProperties = (propertiesResult.data ?? []) as unknown as Array<
@@ -46,7 +58,20 @@ export async function fetchScheduleReference(): Promise<ScheduleReference> {
     routeGroups: (routeGroupsResult.data ?? []) as RouteGroup[],
     assignments,
     ungroupedProperties: allProperties.filter((p) => !assignedIds.has(p.id)),
+    defaultCrew: (defaultCrewResult.data ?? []) as unknown as RouteGroupDefaultCrew[],
   }
+}
+
+/** Every route group's dispatch note for one week. Week-scoped, so it sits with
+ *  the visits query rather than the week-independent reference above. */
+export async function fetchWeekNotes(weekStartISO: string): Promise<RouteGroupWeekNote[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('route_group_week_notes')
+    .select('*')
+    .eq('week_start', weekStartISO)
+  if (error) throw error
+  return (data ?? []) as RouteGroupWeekNote[]
 }
 
 /**

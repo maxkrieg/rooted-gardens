@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   graphql_public: {
     Tables: {
@@ -559,9 +559,79 @@ export type Database = {
           },
         ]
       }
+      route_group_default_crew: {
+        Row: {
+          created_at: string
+          employee_id: string
+          route_group_id: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          route_group_id: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          route_group_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_group_default_crew_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_group_default_crew_route_group_id_fkey"
+            columns: ["route_group_id"]
+            isOneToOne: false
+            referencedRelation: "route_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      route_group_week_notes: {
+        Row: {
+          created_at: string
+          id: string
+          note: string
+          route_group_id: string
+          updated_at: string
+          week_start: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          note: string
+          route_group_id: string
+          updated_at?: string
+          week_start: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          note?: string
+          route_group_id?: string
+          updated_at?: string
+          week_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_group_week_notes_route_group_id_fkey"
+            columns: ["route_group_id"]
+            isOneToOne: false
+            referencedRelation: "route_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       route_groups: {
         Row: {
           created_at: string
+          default_days: string[]
+          default_vehicle_id: string | null
           id: string
           name: string
           sort_order: number
@@ -569,6 +639,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          default_days?: string[]
+          default_vehicle_id?: string | null
           id?: string
           name: string
           sort_order?: number
@@ -576,12 +648,22 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          default_days?: string[]
+          default_vehicle_id?: string | null
           id?: string
           name?: string
           sort_order?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "route_groups_default_vehicle_id_fkey"
+            columns: ["default_vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       site_collection_items: {
         Row: {
@@ -819,6 +901,21 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_last_visit: {
+        Row: {
+          last_visit_at: string | null
+          property_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visits_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
             referencedColumns: ["id"]
           },
         ]

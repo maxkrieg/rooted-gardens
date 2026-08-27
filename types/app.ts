@@ -7,6 +7,11 @@ export type RouteGroup = Tables<'route_groups'>
 export type PropertyRouteGroup = Tables<'property_route_groups'>
 export type Employee = Tables<'employees'>
 export type Vehicle = Tables<'vehicles'>
+export type RouteGroupWeekNote = Tables<'route_group_week_notes'>
+/** A route group's regular crew member, with the employee row resolved. */
+export type RouteGroupDefaultCrew = Tables<'route_group_default_crew'> & {
+  employee: Employee | null
+}
 export type Equipment = Tables<'equipment'>
 export type Visit = Tables<'visits'>
 export type VisitCrew = Tables<'visit_crew'>

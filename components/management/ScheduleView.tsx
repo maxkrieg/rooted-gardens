@@ -27,6 +27,8 @@ import {
   type ScheduleViewMode,
 } from '@/components/management/ScheduleViewToggle'
 import { DashboardView } from '@/components/management/DashboardView'
+import { GenerateWeekSheet } from '@/components/management/GenerateWeekSheet'
+import { useWeekPlan, useGenerateWeek } from '@/hooks/useGenerateWeek'
 import { ScheduleStickyBar } from '@/components/management/ScheduleStickyBar'
 import { SessionsProvider } from '@/components/management/SessionsProvider'
 import { DeepLinkedVisitSheet } from '@/components/management/DeepLinkedVisitSheet'
@@ -66,6 +68,7 @@ export function ScheduleView({
   const hydrated = useIsHydrated()
   const [filterSheetOpen, setFilterSheetOpen] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
+  const [generateOpen, setGenerateOpen] = useState(false)
   const [viewOverride, setViewOverride] = useState<ScheduleViewMode | null>(null)
   const { editSchedule: canEdit, seeDashboard } = useCan()
 
@@ -151,6 +154,11 @@ export function ScheduleView({
     [weeks],
   )
 
+  // Planned against the *unfiltered* week: generating off a filtered view would
+  // silently skip everything the filter hid.
+  const plan = useWeekPlan(windowStart, weeks[0])
+  const generateWeek = useGenerateWeek(windowStart)
+
   const gridWeeks = useMemo(() => filterScheduleWeeks(weeks, filters), [weeks, filters])
   const mobileWeek = useMemo(
     () => filterScheduleWeeks(weeks.slice(0, 1), filters)[0],
@@ -187,6 +195,7 @@ export function ScheduleView({
             overflowActions={
               canEdit
                 ? [
+                    { label: 'Generate week…', onClick: () => setGenerateOpen(true) },
                     {
                       label: selectMode ? 'Done selecting' : 'Select stops',
                       onClick: () => setSelectMode((on) => !on),
@@ -215,6 +224,16 @@ export function ScheduleView({
           <ScheduleViewToggle value={viewMode} onChange={changeViewMode} />
         </div>
       )}
+
+      <GenerateWeekSheet
+        open={generateOpen}
+        onOpenChange={setGenerateOpen}
+        weekStart={windowStart}
+        decisions={plan.decisions}
+        isLoading={plan.isLoading}
+        isError={plan.isError}
+        onConfirm={generateWeek}
+      />
 
       <ScheduleFilterSheet
         open={filterSheetOpen}

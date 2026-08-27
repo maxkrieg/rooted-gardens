@@ -101,6 +101,31 @@ export function patchScheduleVisit(
   }
 }
 
+/**
+ * Repaint the schedule after a Server Action wrote to it.
+ *
+ * The schedule is client-first: `revalidatePath` refreshes an RSC shell holding
+ * no data, so without this a write lands in Postgres and the screen never
+ * changes. The realtime overlay hides half of it — a `visits` UPDATE (a vehicle,
+ * say) arrives on its own, while `visit_crew` rows do not, because the
+ * management subscription only covers `visits`. That asymmetry makes the bug
+ * look like a rendering glitch rather than a missing invalidation.
+ */
+export function useRefreshSchedule() {
+  const queryClient = useQueryClient()
+
+  return useCallback(
+    (weekStartISO?: string) => {
+      queryClient.invalidateQueries({
+        queryKey: weekStartISO ? scheduleVisitsKey(weekStartISO) : ['schedule-visits'],
+      })
+      // The drawer reads its own entry, and shares it with the crew stop page.
+      queryClient.invalidateQueries({ queryKey: ['stop-detail'] })
+    },
+    [queryClient],
+  )
+}
+
 /** Warms the neighbouring weeks so paging works with no signal. */
 export function usePrefetchWeeks() {
   const queryClient = useQueryClient()

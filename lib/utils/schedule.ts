@@ -167,3 +167,102 @@ export function findVisitInWeeks(
   }
   return null
 }
+
+// ─── Week planning ──────────────────────────────────────────────────────────────
+
+/** What `planWeek` needs to know about a property to decide whether it's due. */
+export type PlanCandidate = {
+  property: Property
+  account: Account
+  routeGroup: RouteGroup | null
+  /** ISO date of the most recent completed visit, or null if there's never been one. */
+  lastVisitedOn: string | null
+  /** True when a visit already exists for the week being planned. */
+  hasVisitThisWeek: boolean
+}
+
+export type PlanDecision = {
+  candidate: PlanCandidate
+  due: boolean
+  /** Why, in the owner's words — shown per row in the generate preview. */
+  reason: string
+}
+
+/**
+ * Decide which properties are due for a given week.
+ *
+ * Pure, and deliberately separate from anything that writes: R3.5's preview
+ * renders exactly this output, so what the owner confirms is what gets created.
+ *
+ * Frequency handling:
+ * - `weekly`     — every week.
+ * - `biweekly`   — phased from the property's own last visit, NOT from a fixed
+ *   calendar parity. The real route sheet's biweekly rows drift constantly
+ *   (5/12, 5/18, skip, 6/10) as weather and crew availability move them, so a
+ *   parity rule would fight the way the work actually happens.
+ * - `monthly`    — due when nothing in the prior 4 weeks.
+ * - `as_needed`  — never. These are scheduled by hand, by definition.
+ *
+ * Never returns a property that already has a visit that week, and never an
+ * archived one. The UNIQUE (property_id, week_start) index makes the whole thing
+ * idempotent regardless, so a double-run can't duplicate.
+ */
+export function planWeek(weekStart: string, candidates: PlanCandidate[]): PlanDecision[] {
+  const weekStartDate = parseISO(weekStart)
+
+  return candidates.map((candidate) => {
+    const { property, lastVisitedOn, hasVisitThisWeek } = candidate
+
+    if (property.is_archived) {
+      return { candidate, due: false, reason: 'Archived' }
+    }
+    if (hasVisitThisWeek) {
+      return { candidate, due: false, reason: 'Already on this week' }
+    }
+
+    const frequency = property.frequency
+    if (frequency === 'as_needed') {
+      return { candidate, due: false, reason: 'As needed — schedule by hand' }
+    }
+    if (frequency === 'weekly') {
+      return { candidate, due: true, reason: 'Weekly' }
+    }
+
+    // No history: treat as due rather than guessing a phase. A property that has
+    // never been visited is exactly the one most likely to be overlooked.
+    if (!lastVisitedOn) {
+      return { candidate, due: true, reason: 'Never visited' }
+    }
+
+    const weeksSince = weeksBetween(parseISO(lastVisitedOn), weekStartDate)
+
+    if (frequency === 'biweekly') {
+      return weeksSince >= 2
+        ? { candidate, due: true, reason: `Biweekly — ${weeksAgoLabel(weeksSince)}` }
+        : { candidate, due: false, reason: `Biweekly — done ${weeksAgoLabel(weeksSince)}` }
+    }
+
+    if (frequency === 'monthly') {
+      return weeksSince >= 4
+        ? { candidate, due: true, reason: `Monthly — ${weeksAgoLabel(weeksSince)}` }
+        : { candidate, due: false, reason: `Monthly — done ${weeksAgoLabel(weeksSince)}` }
+    }
+
+    // An unrecognised frequency is not silently dropped — the owner sees it in
+    // the preview's skipped list and can schedule it by hand.
+    return { candidate, due: false, reason: `Unknown frequency (${frequency})` }
+  })
+}
+
+/** Whole weeks from `from` to `to`, floored at 0 so a future date reads as 0. */
+function weeksBetween(from: Date, to: Date): number {
+  const ms = to.getTime() - from.getTime()
+  if (ms <= 0) return 0
+  return Math.floor(ms / (7 * 24 * 60 * 60 * 1000))
+}
+
+function weeksAgoLabel(weeks: number): string {
+  if (weeks === 0) return 'this week'
+  if (weeks === 1) return 'last week'
+  return `${weeks} weeks ago`
+}

@@ -93,6 +93,15 @@ export interface PropertyNotesPayload {
   parkingNotes: string | null
 }
 
+/** One dispatch note per route group per week — the route sheet's group-header
+ *  note. Upserts on (route_group_id, week_start), which is what makes a replay
+ *  safe; an empty note deletes the row rather than storing a blank. */
+export interface RouteWeekNotePayload {
+  routeGroupId: string
+  weekStart: string
+  note: string
+}
+
 export type MutationPayload =
   | { type: 'completion'; payload: CompletionPayload }
   | { type: 'job_start'; payload: JobStartPayload }
@@ -106,6 +115,7 @@ export type MutationPayload =
   | { type: 'crew_instruction'; payload: CrewInstructionPayload }
   | { type: 'revert_status'; payload: RevertStatusPayload }
   | { type: 'property_notes'; payload: PropertyNotesPayload }
+  | { type: 'route_week_note'; payload: RouteWeekNotePayload }
 
 /**
  * Retries before a mutation is parked as 'failed'. `attempts` used to be
@@ -440,6 +450,28 @@ export async function flushMutationQueue(): Promise<FlushResult> {
             })
             .eq('id', p.propertyId)
             .throwOnError()
+          break
+        }
+        case 'route_week_note': {
+          const p = mutation.payload as RouteWeekNotePayload
+          // An emptied note is a deleted row, not a stored blank — a blank would
+          // render an empty ribbon on the band for the rest of the week.
+          if (p.note.trim().length === 0) {
+            await supabase
+              .from('route_group_week_notes')
+              .delete()
+              .eq('route_group_id', p.routeGroupId)
+              .eq('week_start', p.weekStart)
+              .throwOnError()
+          } else {
+            await supabase
+              .from('route_group_week_notes')
+              .upsert(
+                { route_group_id: p.routeGroupId, week_start: p.weekStart, note: p.note },
+                { onConflict: 'route_group_id,week_start' },
+              )
+              .throwOnError()
+          }
           break
         }
         default:

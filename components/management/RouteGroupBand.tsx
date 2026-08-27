@@ -22,9 +22,14 @@ export interface RouteGroupStats {
 
 interface RouteGroupBandProps {
   name: string
+  /** Standing days for the route ('mon'…'sun'), from its defaults. */
+  days?: string[]
   stats: RouteGroupStats
   canEdit: boolean
   onAssignRoute: () => void
+  onEditDefaults: () => void
+  /** The week's dispatch note, rendered below the progress bar. */
+  noteSlot?: React.ReactNode
 }
 
 /**
@@ -40,7 +45,15 @@ interface RouteGroupBandProps {
  * hasn't been assigned yet; until then an unassigned week reads as empty here,
  * which is honest.
  */
-export function RouteGroupBand({ name, stats, canEdit, onAssignRoute }: RouteGroupBandProps) {
+export function RouteGroupBand({
+  name,
+  days = [],
+  stats,
+  canEdit,
+  onAssignRoute,
+  onEditDefaults,
+  noteSlot,
+}: RouteGroupBandProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const { done, total, crew, vehicles, onSite } = stats
   const pct = total > 0 ? Math.round((done / total) * 100) : 0
@@ -52,6 +65,9 @@ export function RouteGroupBand({ name, stats, canEdit, onAssignRoute }: RouteGro
       <div className="flex items-center gap-2 px-4 pt-2.5">
         <span className="min-w-0 flex-1 truncate text-xs font-semibold uppercase tracking-widest">
           {name}
+          {days.length > 0 && (
+            <span className="font-medium text-muted-foreground"> · {formatDays(days)}</span>
+          )}
         </span>
 
         {onSite && (
@@ -114,6 +130,16 @@ export function RouteGroupBand({ name, stats, canEdit, onAssignRoute }: RouteGro
               >
                 Assign route…
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false)
+                  onEditDefaults()
+                }}
+                className="flex min-h-10 w-full items-center rounded-md px-3 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
+              >
+                Route defaults…
+              </button>
             </PopoverContent>
           </Popover>
         )}
@@ -142,8 +168,23 @@ export function RouteGroupBand({ name, stats, canEdit, onAssignRoute }: RouteGro
           {done}/{total}
         </span>
       </div>
+
+      {noteSlot}
     </div>
   )
+}
+
+const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+
+/**
+ * `['tue','mon'] → 'Mon/Tue'`. Sorted into week order rather than the order they
+ * were ticked, so the label reads the way the route sheet writes it.
+ */
+export function formatDays(days: string[]): string {
+  return [...days]
+    .sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b))
+    .map((day) => day.charAt(0).toUpperCase() + day.slice(1))
+    .join('/')
 }
 
 function initialsOf(name: string): string {
