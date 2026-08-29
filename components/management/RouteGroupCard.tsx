@@ -244,24 +244,18 @@ export function RouteGroupCard({
                     can override, so the pair rendered 88px tall on a phone. */}
                 {assignedProperties.length > 1 && (
                   <div className="flex shrink-0 flex-col">
-                    <button
-                      type="button"
-                      className="flex h-4 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:pointer-events-none disabled:opacity-25"
+                    <ReorderButton
+                      direction="up"
                       disabled={index === 0 || busy}
                       onClick={() => void handleReorder(index, 'up')}
-                      aria-label={`Move ${property.address} earlier in the route`}
-                    >
-                      <ChevronUp className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      className="flex h-4 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:pointer-events-none disabled:opacity-25"
+                      label={`Move ${property.address} earlier in the route`}
+                    />
+                    <ReorderButton
+                      direction="down"
                       disabled={index === assignedProperties.length - 1 || busy}
                       onClick={() => void handleReorder(index, 'down')}
-                      aria-label={`Move ${property.address} later in the route`}
-                    >
-                      <ChevronDown className="h-3.5 w-3.5" />
-                    </button>
+                      label={`Move ${property.address} later in the route`}
+                    />
                   </div>
                 )}
               </li>
@@ -286,6 +280,48 @@ export function RouteGroupCard({
         currentCrewIds={defaultCrewIds}
       />
     </Card>
+  )
+}
+
+/**
+ * A reorder caret: small to look at, big to hit.
+ *
+ * The visible control stays 20px so a route of a dozen stops still reads as a
+ * list, while a transparent `::before` carries the touch target out to ~40px —
+ * the same trick `components/ui/checkbox.tsx` uses, and the reason it exists.
+ *
+ * The expansion is one-directional on purpose: up grows upward, down grows
+ * downward. Growing both ways would overlap the two hit areas in the middle and
+ * make the boundary a coin flip.
+ */
+function ReorderButton({
+  direction,
+  disabled,
+  onClick,
+  label,
+}: {
+  direction: 'up' | 'down'
+  disabled: boolean
+  onClick: () => void
+  label: string
+}) {
+  const Icon = direction === 'up' ? ChevronUp : ChevronDown
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      aria-label={label}
+      className={cn(
+        'relative flex h-5 w-8 items-center justify-center rounded text-muted-foreground',
+        'transition-colors hover:bg-secondary hover:text-foreground',
+        'disabled:pointer-events-none disabled:opacity-25',
+        "before:absolute before:content-[''] before:-inset-x-2",
+        direction === 'up' ? 'before:-top-2.5 before:bottom-0' : 'before:top-0 before:-bottom-2.5',
+      )}
+    >
+      <Icon className="h-4 w-4" />
+    </button>
   )
 }
 
