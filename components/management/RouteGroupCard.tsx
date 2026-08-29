@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Building2, ChevronUp, ChevronDown, MoreHorizontal, Trash2, Truck } from 'lucide-react'
+import { Building2, ChevronsUpDown, MoreHorizontal, Trash2, Truck, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { RouteDefaultsSheet } from '@/components/management/RouteDefaultsSheet'
 import { formatDays } from '@/components/management/RouteGroupBand'
-import { useReorderRouteProperties, moveInArray } from '@/hooks/useReorderRouteProperties'
+import { useReorderRouteProperties, moveToGap } from '@/hooks/useReorderRouteProperties'
 import type { Employee, RouteGroup, PropertyWithAccount, Vehicle } from '@/types/app'
 
 interface RouteGroupCardProps {
@@ -50,6 +50,8 @@ export function RouteGroupCard({
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [defaultsOpen, setDefaultsOpen] = useState(false)
+  // Index of the property picked up and waiting for a destination.
+  const [lifted, setLifted] = useState<number | null>(null)
   const reorder = useReorderRouteProperties()
   // Own busy flag, not a transition's pending: a shared pending flag disabled
   // every control on the card and could stay stuck true (see commit f4e09e3,
@@ -72,8 +74,9 @@ export function RouteGroupCard({
     }
   }
 
-  async function handleReorder(index: number, direction: 'up' | 'down') {
-    const ordered = moveInArray(assignedProperties, index, direction)
+  async function handleMoveToGap(from: number, gap: number) {
+    const ordered = moveToGap(assignedProperties, from, gap)
+    setLifted(null)
     if (ordered === assignedProperties) return
     setBusy(true)
     try {
@@ -212,55 +215,110 @@ export function RouteGroupCard({
             className="mb-3"
           />
         ) : (
-          <ul className="mb-3 divide-y divide-border/40">
-            {assignedProperties.map((property, index) => (
-              <li key={property.id} className="flex items-center gap-2 py-1.5">
-                <Building2
-                  className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
-                  aria-hidden
+          <>
+            {lifted !== null && (
+              <div className="mb-2 flex items-center gap-2 rounded-lg bg-accent px-3 py-2 text-accent-foreground">
+                {/* Two lines: the instruction is what teaches the interaction,
+                    and on one line the property name truncated it away. */}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs">
+                    Moving{' '}
+                    <strong className="font-semibold">
+                      {assignedProperties[lifted]?.accountName}
+                    </strong>
+                  </span>
+                  <span className="block text-[11px] text-accent-foreground/75">
+                    Tap a “Move here” spot
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setLifted(null)}
+                  className="flex h-9 shrink-0 items-center gap-1 rounded-lg px-2.5 text-xs font-medium hover:bg-accent-foreground/10"
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden />
+                  Cancel
+                </button>
+              </div>
+            )}
+
+            <ul className={cn('mb-3', lifted === null && 'divide-y divide-border/40')}>
+              {assignedProperties.map((property, index) => (
+                <li key={property.id}>
+                  <DropGap
+                    show={lifted !== null && lifted !== index && lifted !== index - 1}
+                    disabled={busy}
+                    onClick={() => void handleMoveToGap(lifted!, index)}
+                    label={`Move here, before ${property.address}`}
+                  />
+
+                  <div
+                    className={cn(
+                      'flex items-center gap-2 py-1.5',
+                      lifted === index && 'rounded-lg bg-accent px-2 ring-1 ring-primary/40',
+                      lifted !== null && lifted !== index && 'opacity-55',
+                    )}
+                  >
+                    <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                    {/* Account first, address below — mirrors the schedule grid's
+                        label column so owners can toggle between the two pages. */}
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-display text-sm font-semibold leading-tight text-foreground">
+                        {property.accountName}
+                      </div>
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <span className="truncate text-xs leading-tight text-muted-foreground">
+                          {property.address}
+                        </span>
+                        <span className="shrink-0">
+                          <FrequencyBadge frequency={property.frequency} />
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Tap to lift, tap a gap to place. Chevrons cost one tap per
+                        position — moving a stop three places was three precise
+                        taps on a 20px target — and this is two taps at any
+                        distance. Still not drag: the repo has no gesture
+                        infrastructure, and a drag inside a scrolling page is the
+                        case that actually needs it. */}
+                    {assignedProperties.length > 1 && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => setLifted(lifted === index ? null : index)}
+                        aria-label={
+                          lifted === index
+                            ? `Cancel moving ${property.address}`
+                            : `Move ${property.address} within the route`
+                        }
+                        aria-pressed={lifted === index}
+                        className={cn(
+                          'relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
+                          'transition-colors disabled:pointer-events-none disabled:opacity-30',
+                          lifted === index
+                            ? 'bg-primary text-primary-foreground'
+                            : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+                        )}
+                      >
+                        <ChevronsUpDown className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </li>
+              ))}
+
+              {/* The final gap — "move to the end". */}
+              <li>
+                <DropGap
+                  show={lifted !== null && lifted !== assignedProperties.length - 1}
+                  disabled={busy}
+                  onClick={() => void handleMoveToGap(lifted!, assignedProperties.length)}
+                  label="Move to the end of the route"
                 />
-                {/* Account first, address below — mirrors the schedule grid's
-                    label column so owners can toggle between the two pages. */}
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-display text-sm font-semibold leading-tight text-foreground">
-                    {property.accountName}
-                  </div>
-                  <div className="flex min-w-0 items-center gap-1.5">
-                    <span className="truncate text-xs leading-tight text-muted-foreground">
-                      {property.address}
-                    </span>
-                    <span className="shrink-0">
-                      <FrequencyBadge frequency={property.frequency} />
-                    </span>
-                  </div>
-                </div>
-
-                {/* Drive order. Chevrons, not drag-and-drop: the repo has no
-                    gesture infrastructure, and dragging a list this long on a
-                    phone is worse than two taps anyway.
-
-                    Plain buttons, not <Button size="icon">: that variant carries
-                    a `pointer-coarse:size-11` touch target which no className
-                    can override, so the pair rendered 88px tall on a phone. */}
-                {assignedProperties.length > 1 && (
-                  <div className="flex shrink-0 flex-col">
-                    <ReorderButton
-                      direction="up"
-                      disabled={index === 0 || busy}
-                      onClick={() => void handleReorder(index, 'up')}
-                      label={`Move ${property.address} earlier in the route`}
-                    />
-                    <ReorderButton
-                      direction="down"
-                      disabled={index === assignedProperties.length - 1 || busy}
-                      onClick={() => void handleReorder(index, 'down')}
-                      label={`Move ${property.address} later in the route`}
-                    />
-                  </div>
-                )}
               </li>
-            ))}
-          </ul>
+            </ul>
+          </>
         )}
 
         {/* Manage properties trigger */}
@@ -284,43 +342,44 @@ export function RouteGroupCard({
 }
 
 /**
- * A reorder caret: small to look at, big to hit.
+ * A tappable landing strip between two rows, shown only while something is
+ * lifted.
  *
- * The visible control stays 20px so a route of a dozen stops still reads as a
- * list, while a transparent `::before` carries the touch target out to ~40px —
- * the same trick `components/ui/checkbox.tsx` uses, and the reason it exists.
+ * Carries an explicit "Move here" pill rather than just a rule. A dashed line on
+ * its own reads as a divider — the first version used `border-primary/40`, which
+ * on warm paper is a grey hairline indistinguishable from the row separators,
+ * and it was reported as "not showing" even though it was rendering.
  *
- * The expansion is one-directional on purpose: up grows upward, down grows
- * downward. Growing both ways would overlap the two hit areas in the middle and
- * make the boundary a coin flip.
+ * 36px tall and full width: you tap roughly between two rows, no aiming.
  */
-function ReorderButton({
-  direction,
+function DropGap({
+  show,
   disabled,
   onClick,
   label,
 }: {
-  direction: 'up' | 'down'
+  show: boolean
   disabled: boolean
   onClick: () => void
   label: string
 }) {
-  const Icon = direction === 'up' ? ChevronUp : ChevronDown
+  if (!show) return null
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={onClick}
       aria-label={label}
-      className={cn(
-        'relative flex h-5 w-8 items-center justify-center rounded text-muted-foreground',
-        'transition-colors hover:bg-secondary hover:text-foreground',
-        'disabled:pointer-events-none disabled:opacity-25',
-        "before:absolute before:content-[''] before:-inset-x-2",
-        direction === 'up' ? 'before:-top-2.5 before:bottom-0' : 'before:top-0 before:-bottom-2.5',
-      )}
+      className="group relative flex h-9 w-full items-center justify-center disabled:pointer-events-none disabled:opacity-40"
     >
-      <Icon className="h-4 w-4" />
+      <span
+        aria-hidden
+        className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t-2 border-dashed border-primary/70 transition-colors group-active:border-primary"
+      />
+      {/* Sits on bg-card so it masks the rule behind it. */}
+      <span className="relative rounded-full bg-card px-2.5 py-0.5 text-[11px] font-semibold text-primary ring-1 ring-primary/30 transition-colors group-active:bg-primary group-active:text-primary-foreground">
+        Move here
+      </span>
     </button>
   )
 }

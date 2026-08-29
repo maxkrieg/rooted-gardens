@@ -94,11 +94,21 @@ export function useReorderRouteProperties() {
   )
 }
 
-/** Swap the item at `index` with its neighbour, returning a new array. */
-export function moveInArray<T>(items: T[], index: number, direction: 'up' | 'down'): T[] {
-  const target = direction === 'up' ? index - 1 : index + 1
-  if (target < 0 || target >= items.length) return items
+/**
+ * Move the item at `from` into the gap at `gap`, where gap `g` means "before the
+ * item currently at index `g`" — so gaps run 0…length inclusive.
+ *
+ * The index shifts once the item is lifted out, which is the whole subtlety: a
+ * gap *after* the original position is one lower by the time we insert.
+ *
+ * Returns the same array reference for a no-op (the gaps either side of the
+ * item), so callers can skip the write with an identity check.
+ */
+export function moveToGap<T>(items: T[], from: number, gap: number): T[] {
+  if (gap === from || gap === from + 1) return items
+  if (from < 0 || from >= items.length || gap < 0 || gap > items.length) return items
   const next = [...items]
-  ;[next[index], next[target]] = [next[target], next[index]]
+  const [item] = next.splice(from, 1)
+  next.splice(gap > from ? gap - 1 : gap, 0, item)
   return next
 }
