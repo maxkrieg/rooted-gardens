@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, Mail, Phone, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, TriangleAlert } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   AccountStatusBadge,
@@ -28,6 +28,7 @@ import { formatAccountPrice } from '@/lib/utils/accounts'
 import { groupPhotosByProperty } from '@/lib/utils/photos'
 import type { AccountDetail } from '@/lib/accounts/fetch'
 import { useCan } from '@/components/app/RoleProvider'
+import { PropertyRoutePicker } from '@/components/management/PropertyRoutePicker'
 import type { PhotoWithUrl } from '@/types/app'
 
 type AccountView = 'details' | 'photos'
@@ -137,7 +138,7 @@ export function AccountDetailView({ accountId, initialView }: AccountDetailViewP
 }
 
 function DetailsTab({ detail }: { detail: AccountDetail }) {
-  const { archive: canArchive } = useCan()
+  const { archive: canArchive, editRoutes } = useCan()
   const { account, visits, routeGroupByPropertyId, visitsFailed } = detail
 
   return (
@@ -244,8 +245,11 @@ function DetailsTab({ detail }: { detail: AccountDetail }) {
                     </div>
 
                     {/* Unrouted means this property is skipped on the schedule
-                        entirely, so it gets the clay "needs attention" treatment. */}
-                    <div className="flex items-center gap-2 text-sm mb-3">
+                        entirely, so it gets the clay "needs attention" treatment.
+                        The picker is inline: this used to link to /app/routes
+                        carrying no property context, so you arrived at a list of
+                        every route with no memory of what you came to route. */}
+                    <div className="flex flex-wrap items-center gap-2 text-sm mb-3">
                       {!routeGroup && (
                         <TriangleAlert className="h-3.5 w-3.5 text-[var(--clay)] shrink-0" />
                       )}
@@ -258,13 +262,13 @@ function DetailsTab({ detail }: { detail: AccountDetail }) {
                       >
                         {routeGroup?.name ?? 'Not on a route'}
                       </span>
-                      <Link
-                        href="/app/routes"
-                        className="inline-flex items-center gap-1 text-xs text-[--primary] hover:underline shrink-0"
-                      >
-                        {routeGroup ? 'Manage' : 'Put on a route'}
-                        <ArrowRight className="h-3 w-3" />
-                      </Link>
+                      {editRoutes && (
+                        <PropertyRoutePicker
+                          propertyId={property.id}
+                          propertyAddress={property.address}
+                          currentRouteGroupId={routeGroup?.id ?? null}
+                        />
+                      )}
                     </div>
 
                     {(property.crew_notes || property.access_notes || property.parking_notes) && (

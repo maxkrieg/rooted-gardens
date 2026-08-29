@@ -23,6 +23,8 @@ interface RoutePickerProps {
   label?: string
   disabled?: boolean
   className?: string
+  /** Adds a "Take off this route" entry. Only useful where one is selected. */
+  onClear?: () => void
 }
 
 /**
@@ -39,6 +41,7 @@ export function RoutePicker({
   label = 'Put on a route',
   disabled,
   className,
+  onClear,
 }: RoutePickerProps) {
   const [open, setOpen] = useState(false)
 
@@ -79,6 +82,21 @@ export function RoutePicker({
                 </CommandItem>
               ))}
             </CommandGroup>
+            {onClear && value && (
+              <CommandGroup>
+                <CommandItem
+                  value="take off this route"
+                  onSelect={() => {
+                    setOpen(false)
+                    onClear()
+                  }}
+                  className="text-[var(--clay)]"
+                >
+                  <span className="mr-2 h-4 w-4" />
+                  Take off this route
+                </CommandItem>
+              </CommandGroup>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>

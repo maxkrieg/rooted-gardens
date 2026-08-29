@@ -10,13 +10,23 @@ import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
 import { CardListSkeleton, PageHeaderSkeleton } from '@/components/states/skeletons'
 import { useRoutesData } from '@/hooks/useRoutes'
+import { useScheduleReference } from '@/hooks/useManagementSchedule'
+import { useActiveEmployees } from '@/hooks/crew/useActiveEmployees'
+import { useActiveVehicles } from '@/hooks/crew/useActiveVehicles'
 import { useIsHydrated } from '@/hooks/use-hydrated'
+import type { PropertyWithAccount } from '@/types/app'
 
 /** Client-first routes page — readable in the field, and every write repaints
  *  from the cache rather than waiting on an RSC refresh. */
 export function RoutesView() {
   const hydrated = useIsHydrated()
   const { data, isLoading, isError, isStale, hasData } = useRoutesData()
+  // The route defaults live on the schedule's reference query, which the routes
+  // page shares — no extra fetch, and it's already persisted for offline.
+  const { data: reference } = useScheduleReference()
+  const { data: employees = [] } = useActiveEmployees()
+  const { data: vehicles = [] } = useActiveVehicles()
+  const defaultCrew = reference?.defaultCrew ?? []
 
   const routeGroups = useMemo(() => data?.routeGroups ?? [], [data])
   const allProperties = useMemo(() => data?.allProperties ?? [], [data])
@@ -79,15 +89,15 @@ export function RoutesView() {
       ) : (
         <div className="space-y-4 pb-8">
           {routeGroups.map((group, idx) => {
-            const assignedIds = new Set(data?.assignedIdsByGroup[group.id] ?? [])
-            // Account-then-address, so a card groups an account's sites together
-            // the way the schedule grid does (same comparator as UnroutedPanel).
-            const assignedProperties = allProperties
-              .filter((p) => assignedIds.has(p.id))
-              .sort(
-                (a, b) =>
-                  a.accountName.localeCompare(b.accountName) || a.address.localeCompare(b.address),
-              )
+            // Drive order, not alphabetical: assignedIdsByGroup arrives sorted by
+            // sort_order, so mapping through it preserves the route's own order.
+            // Sorting by account name here would hide every reorder made below.
+            const byId = new Map(allProperties.map((p) => [p.id, p]))
+            const assignedProperties = (data?.assignedIdsByGroup[group.id] ?? [])
+              .map((id) => byId.get(id))
+              .filter((p): p is PropertyWithAccount => !!p)
+
+            const crewForGroup = defaultCrew.filter((c) => c.route_group_id === group.id)
 
             return (
               <RouteGroupCard
@@ -95,6 +105,16 @@ export function RoutesView() {
                 routeGroup={group}
                 assignedProperties={assignedProperties}
                 allProperties={allProperties}
+                sortOrderByPropertyId={data?.sortOrderByPropertyId ?? {}}
+                defaultCrewIds={crewForGroup.map((c) => c.employee_id)}
+                defaultCrewNames={crewForGroup
+                  .map((c) => c.employee?.name)
+                  .filter((n): n is string => !!n)}
+                defaultVehicleName={
+                  vehicles.find((v) => v.id === group.default_vehicle_id)?.name ?? null
+                }
+                employees={employees}
+                vehicles={vehicles}
                 isFirst={idx === 0}
                 isLast={idx === routeGroups.length - 1}
               />

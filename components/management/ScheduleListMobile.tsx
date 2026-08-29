@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { toast } from 'sonner'
 import { FilePen } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -18,6 +17,8 @@ import { useBulkScheduleActions, type BulkResult } from '@/hooks/useBulkSchedule
 import { CheckIndicator } from '@/components/app/CheckIndicator'
 import { WeekNoteRibbon } from '@/components/management/WeekNoteRibbon'
 import { RouteDefaultsSheet } from '@/components/management/RouteDefaultsSheet'
+import { RoutePicker } from '@/components/management/RoutePicker'
+import { useAssignPropertyRoute } from '@/hooks/useAssignPropertyRoute'
 import { useScheduleReference } from '@/hooks/useManagementSchedule'
 import { useWeekNotes, useSaveWeekNote } from '@/hooks/useWeekNotes'
 import { useVisitOverlays } from '@/components/management/SessionsProvider'
@@ -97,6 +98,7 @@ export function ScheduleListMobile({
   const { data: weekNotes = [] } = useWeekNotes(week?.weekStart ?? '')
   const { data: reference } = useScheduleReference()
   const [defaultsGroup, setDefaultsGroup] = useState<RouteGroup | null>(null)
+  const assignRoute = useAssignPropertyRoute()
   const saveWeekNote = useSaveWeekNote(week?.weekStart ?? '')
 
   // Leaving select mode must drop the selection, or re-entering it resumes with
@@ -216,6 +218,49 @@ export function ScheduleListMobile({
       else next.add(propertyId)
       return next
     })
+  }
+
+  /**
+   * Put every unrouted property on one route.
+   *
+   * A loop over the queued per-property mutation, not the `assignProperties`
+   * Server Action: that one is a delete-then-insert that clobbers concurrent
+   * edits and is deliberately online-only, and this is a band on a page used
+   * from a truck. Same reasoning as the R2.4 bulk actions.
+   */
+  async function routeAllUngrouped(routeGroupId: string) {
+    const rows = currentWeek.ungrouped
+    const name = reference?.routeGroups.find((rg) => rg.id === routeGroupId)?.name ?? 'the route'
+    try {
+      for (const [index, row] of rows.entries()) {
+        await assignRoute.mutateAsync({
+          propertyId: row.property.id,
+          routeGroupId,
+          sortOrder: index,
+          label: row.property.address,
+        })
+      }
+      toast.success(`${rows.length} added to ${name}.`, {
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            void Promise.all(
+              rows.map((row) =>
+                assignRoute.mutateAsync({
+                  propertyId: row.property.id,
+                  routeGroupId: null,
+                  label: row.property.address,
+                }),
+              ),
+            ).catch(() => toast.error('Could not undo'))
+          },
+        },
+      })
+    } catch (err) {
+      toast.error('Some properties were not routed', {
+        description: toUserMessage(err, 'They are queued and will retry.', '[routeAllUngrouped]'),
+      })
+    }
   }
 
   /**
@@ -488,12 +533,16 @@ export function ScheduleListMobile({
               <span className="text-xs font-semibold uppercase tracking-widest">
                 Not on a route · {currentWeek.ungrouped.length}
               </span>
-              <Link
-                href="/app/routes"
-                className="px-2 text-xs font-medium normal-case tracking-normal text-[var(--clay)]/80 hover:text-[var(--clay)]"
-              >
-                Put on a route →
-              </Link>
+              {/* Was a link to /app/routes carrying no context — you arrived at
+                  a list of every route with no memory of which stop sent you. */}
+              {canEdit && (
+                <RoutePicker
+                  routeGroups={reference?.routeGroups ?? []}
+                  label={`Route all ${currentWeek.ungrouped.length}`}
+                  className="h-8 border-[var(--clay)]/40 text-[var(--clay)]"
+                  onSelect={(routeGroupId) => void routeAllUngrouped(routeGroupId)}
+                />
+              )}
             </div>
             <div>
               {groupRowsByAccount(currentWeek.ungrouped).map(({ account, rows: acctRows }, acctIdx) => {

@@ -8,8 +8,10 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { FrequencyBadge } from '@/components/management/badges'
 import { RoutePicker } from '@/components/management/RoutePicker'
 import { RouteGroupSheet } from '@/components/management/RouteGroupSheet'
-import { assignProperty, assignProperties, unassignProperty } from '@/app/app/(padded)/routes/actions'
+import { assignProperties } from '@/app/app/(padded)/routes/actions'
 import { useRefreshRoutes } from '@/hooks/useRoutes'
+import { useAssignPropertyRoute } from '@/hooks/useAssignPropertyRoute'
+import { useOfflineStatus } from '@/hooks/crew/useOfflineStatus'
 import type { PropertyWithAccount, RouteGroup } from '@/types/app'
 
 interface UnroutedPanelProps {
@@ -32,6 +34,8 @@ interface UnroutedPanelProps {
 export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
   const router = useRouter()
   const refreshRoutes = useRefreshRoutes()
+  const assignRoute = useAssignPropertyRoute()
+  const { isOnline } = useOfflineStatus()
   const [selected, setSelected] = useState<Set<string>>(new Set())
   // Pending flag deliberately discarded — busy state is per row, below.
   const [, startTransition] = useTransition()
@@ -114,65 +118,66 @@ export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
 
   // Putting the rows back is what "Undo" means here, so it has to clear the
   // local hiding as well as reverse the write.
-  function undoAssign(ids: string[], routeGroupId: string) {
+  // No routeGroupId needed: property_route_groups holds at most one row per
+  // property, so taking one off any route is a single delete.
+  async function undoAssign(ids: string[]) {
     markInFlight(ids, true)
-    startTransition(async () => {
-      try {
-        const results = await Promise.all(ids.map((id) => unassignProperty(id, routeGroupId)))
-        const failed = results.find((r) => r.error)
-        if (failed) {
-          toast.error('Could not undo', { description: failed.error })
-          return
-        }
-        markRouted(ids, false)
-        refreshRoutes()
-        router.refresh()
-      } catch {
-        toast.error('Could not undo', {
-          description: 'The change did not reach the server. Check your connection and try again.',
-        })
-      } finally {
-        markInFlight(ids, false)
+    try {
+      for (const id of ids) {
+        await assignRoute.mutateAsync({ propertyId: id, routeGroupId: null })
       }
-    })
+      markRouted(ids, false)
+    } catch {
+      toast.error('Could not undo', {
+        description: 'The reversal is queued and will retry.',
+      })
+    } finally {
+      markInFlight(ids, false)
+    }
   }
 
-  function handleAssignSingle(property: PropertyWithAccount, routeGroupId: string) {
+  /**
+   * Queued, not a Server Action: routing one property is the small correction
+   * made standing in front of it, which is exactly when there's no signal.
+   */
+  async function handleAssignSingle(property: PropertyWithAccount, routeGroupId: string) {
     const name = routeGroupName(routeGroupId)
     markInFlight([property.id], true)
-    startTransition(async () => {
-      try {
-        const res = await assignProperty(property.id, routeGroupId)
-        if (res.error) {
-          toast.error('Could not assign the property', { description: res.error })
-          return
-        }
-        deselect([property.id])
-        markRouted([property.id], true)
-        // revalidatePath only marks the cache stale — this repaints the page.
-        refreshRoutes()
-        router.refresh()
-        toast.success(`${property.address} added to ${name}.`, {
-          action: {
-            label: 'Undo',
-            onClick: () => undoAssign([property.id], routeGroupId),
-          },
-        })
-      } catch {
-        // A thrown failure never reaches the `res.error` branch; without this
-        // the row would stay disabled forever with no explanation.
-        toast.error('Could not assign the property', {
-          description: 'The change did not reach the server. Check your connection and try again.',
-        })
-      } finally {
-        markInFlight([property.id], false)
-      }
-    })
+    try {
+      await assignRoute.mutateAsync({
+        propertyId: property.id,
+        routeGroupId,
+        label: property.address,
+      })
+      deselect([property.id])
+      markRouted([property.id], true)
+      toast.success(`${property.address} added to ${name}.`, {
+        action: {
+          label: 'Undo',
+          onClick: () => undoAssign([property.id]),
+        },
+      })
+    } catch {
+      toast.error('Could not assign the property', {
+        description: 'The change is queued and will retry.',
+      })
+    } finally {
+      markInFlight([property.id], false)
+    }
   }
 
   function handleAssignBulk(routeGroupId: string) {
     const ids = [...selected]
     if (ids.length === 0) return
+    // Deliberately not queued: assignProperties is a bulk upsert that overwrites
+    // whatever each property was on, so replaying it later could undo an edit
+    // made in between. Single assignment above is queued and covers the field.
+    if (!isOnline) {
+      toast.error('Assigning several at once needs a connection', {
+        description: 'One at a time still works offline.',
+      })
+      return
+    }
     const name = routeGroupName(routeGroupId)
     markInFlight(ids, true)
     startTransition(async () => {
@@ -184,12 +189,13 @@ export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
         }
         deselect(ids)
         markRouted(ids, true)
+        // refreshRoutes alone: router.refresh() on a client-first page is an RSC
+        // fetch that adds nothing here and takes the page down when it fails.
         refreshRoutes()
-        router.refresh()
         toast.success(`${ids.length} propert${ids.length === 1 ? 'y' : 'ies'} added to ${name}.`, {
           action: {
             label: 'Undo',
-            onClick: () => undoAssign(ids, routeGroupId),
+            onClick: () => undoAssign(ids),
           },
         })
       } catch {

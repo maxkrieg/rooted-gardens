@@ -102,6 +102,17 @@ export interface RouteWeekNotePayload {
   note: string
 }
 
+/** Move one property onto a route group, or off every route group when
+ *  `routeGroupId` is null. property_route_groups has a UNIQUE index on
+ *  property_id, so a property sits on at most one route — which is what lets
+ *  this upsert rather than delete-then-insert, and makes a replay idempotent. */
+export interface AssignPropertyRoutePayload {
+  propertyId: string
+  routeGroupId: string | null
+  /** Position within the route. Drive order — see buildScheduleWeek's sort. */
+  sortOrder: number
+}
+
 export type MutationPayload =
   | { type: 'completion'; payload: CompletionPayload }
   | { type: 'job_start'; payload: JobStartPayload }
@@ -116,6 +127,7 @@ export type MutationPayload =
   | { type: 'revert_status'; payload: RevertStatusPayload }
   | { type: 'property_notes'; payload: PropertyNotesPayload }
   | { type: 'route_week_note'; payload: RouteWeekNotePayload }
+  | { type: 'assign_property_route'; payload: AssignPropertyRoutePayload }
 
 /**
  * Retries before a mutation is parked as 'failed'. `attempts` used to be
@@ -469,6 +481,29 @@ export async function flushMutationQueue(): Promise<FlushResult> {
               .upsert(
                 { route_group_id: p.routeGroupId, week_start: p.weekStart, note: p.note },
                 { onConflict: 'route_group_id,week_start' },
+              )
+              .throwOnError()
+          }
+          break
+        }
+        case 'assign_property_route': {
+          const p = mutation.payload as AssignPropertyRoutePayload
+          if (p.routeGroupId === null) {
+            await supabase
+              .from('property_route_groups')
+              .delete()
+              .eq('property_id', p.propertyId)
+              .throwOnError()
+          } else {
+            await supabase
+              .from('property_route_groups')
+              .upsert(
+                {
+                  property_id: p.propertyId,
+                  route_group_id: p.routeGroupId,
+                  sort_order: p.sortOrder,
+                },
+                { onConflict: 'property_id' },
               )
               .throwOnError()
           }

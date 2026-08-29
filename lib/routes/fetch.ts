@@ -3,9 +3,11 @@ import type { Property, PropertyWithAccount, RouteGroup } from '@/types/app'
 
 export type RoutesData = {
   routeGroups: RouteGroup[]
-  /** route_group_id → property ids on it. */
+  /** route_group_id → property ids on it, in drive order (sort_order). */
   assignedIdsByGroup: Record<string, string[]>
   allProperties: PropertyWithAccount[]
+  /** property_id → its sort_order, so a reorder can enqueue only what changed. */
+  sortOrderByPropertyId: Record<string, number>
 }
 
 /**
@@ -23,7 +25,10 @@ export async function fetchRoutesData(): Promise<RoutesData> {
       .select('*')
       .order('sort_order', { ascending: true })
       .order('name', { ascending: true }),
-    supabase.from('property_route_groups').select('property_id, route_group_id'),
+    supabase
+      .from('property_route_groups')
+      .select('property_id, route_group_id, sort_order')
+      .order('sort_order', { ascending: true }),
     supabase
       .from('properties')
       .select('id, address, account_id, frequency, is_archived, accounts(name)')
@@ -46,8 +51,11 @@ export async function fetchRoutesData(): Promise<RoutesData> {
   // already claimed elsewhere.
   const groupByPropertyId = new Map<string, { id: string; name: string }>()
 
+  const sortOrderByPropertyId: RoutesData['sortOrderByPropertyId'] = {}
+
   for (const row of assignments) {
     ;(assignedIdsByGroup[row.route_group_id] ??= []).push(row.property_id)
+    sortOrderByPropertyId[row.property_id] = row.sort_order
     const name = routeGroupNameById.get(row.route_group_id)
     if (name) groupByPropertyId.set(row.property_id, { id: row.route_group_id, name })
   }
@@ -63,5 +71,5 @@ export async function fetchRoutesData(): Promise<RoutesData> {
     }
   })
 
-  return { routeGroups, assignedIdsByGroup, allProperties }
+  return { routeGroups, assignedIdsByGroup, allProperties, sortOrderByPropertyId }
 }

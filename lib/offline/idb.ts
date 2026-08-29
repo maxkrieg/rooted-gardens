@@ -23,6 +23,7 @@ export type MutationType =
   | 'revert_status'
   | 'property_notes'
   | 'route_week_note'
+  | 'assign_property_route'
 
 /** 'failed' mutations are excluded from flushes, so a poisoned one stops burning
  *  a request on every app open, and surfaced so lost work can't stay invisible. */

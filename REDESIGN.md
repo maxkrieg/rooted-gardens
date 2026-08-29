@@ -5,7 +5,7 @@ management routes into one app. It is a **sibling to `PHASES.md`**, not a replac
 `PHASES.md` remains the historical record of the original build. See `CLAUDE.md` for stack,
 schema, and conventions.
 
-> **Status:** R1–R3 built 2026-08-26 (branch `redesign/r1-app-merge`). R4–R5 planned.
+> **Status:** R1–R4 built (branch `redesign/r1-app-merge`). R5 planned.
 > **Migrations are on dev only** — prod must be migrated before this reaches `main`.
 
 ---
@@ -573,14 +573,14 @@ cleanly to a fresh project from the baseline.
 > only *display* a property's route group and links out to `/management/routes` **carrying no
 > property context** — the single worst workflow gap found.
 
-- [ ] **R4.1 — Assign a route from the property card**
+- [x] **R4.1 — Assign a route from the property card**
   *Depends on: R1.3*
   Replace the "Manage" / "Put on a route" link on the account detail property card with an
   inline `RoutePicker` (`components/management/RoutePicker.tsx` already exists and is a
   searchable combobox). Put the same control on the schedule's "Not on a route" band,
   replacing its link-out.
 
-- [ ] **R4.2 — Convert routes writes to the offline queue**
+- [x] **R4.2 — Convert routes writes to the offline queue**
   *Depends on: R4.1*
   `/management/routes` is 100% Server Actions today (`app/management/routes/actions.ts`, seven
   of them) — it is the one field route that **does not work offline for writes**, which is
@@ -593,7 +593,7 @@ cleanly to a fresh project from the baseline.
   **Watch the RSC-shell trap** (see Risks): each converted action needs `useRefreshRoutes()` on
   its success path, not `revalidatePath`.
 
-- [ ] **R4.3 — Routes page, mobile-first**
+- [x] **R4.3 — Routes page, mobile-first**
   *Depends on: R4.2*
   There are currently three breakpoint usages in the entire page, and a five-target action row
   crammed next to a truncating title in `RouteGroupCard.tsx`. Rebuild: group cards with a
@@ -601,7 +601,7 @@ cleanly to a fresh project from the baseline.
   line, and reordering via the existing `moveRouteGroup` chevrons — **no drag-and-drop**,
   consistent with R2.4.
 
-- [ ] **R4.4 — Stop order within a route**
+- [x] **R4.4 — Stop order within a route**
   *Depends on: R4.3*
   `property_route_groups.sort_order` already exists, is already fetched (`lib/schedule/fetch.ts`),
   and `buildScheduleWeek` **already sorts by it** — it is simply always written as `0`. Make
@@ -621,6 +621,45 @@ cleanly to a fresh project from the baseline.
 - Reorder stops within a group; the new order shows on `/app/schedule` for a crew account (R4.4).
 - Archiving a property still clears its `property_route_groups` row, so the unrouted badge
   doesn't under-count (regression check — see `CLAUDE.md` "Archiving").
+
+---
+
+### R4 as built — deviations from the plan above
+
+- **The "Not on a route" band's picker is an explicit bulk action, labelled `Route all N`.** A
+  band-level control has no single property to act on, and the rows are `<button>`s so a picker
+  can't live inside one. It loops the queued per-property mutation rather than calling
+  `assignProperties`, so it still works offline — the same shape as the R2.4 bulk actions — and
+  carries an Undo.
+
+- **`useAssignPropertyRoute` hand-patches three caches** (`routes-data`, `schedule-reference`,
+  `nav-unrouted-count`) rather than invalidating them. Offline an invalidation is a refetch that
+  fails, and the whole point of queueing the write is that the screen agrees with it
+  immediately. `onSettled` still invalidates, which is a no-op offline and a reconcile online.
+
+- **`assignProperties` (bulk) stays a Server Action and now says so when offline.** Single
+  assignment is queued and covers the field case.
+
+- **Route order beat alphabetical order.** `RoutesView` sorted each card's properties by account
+  then address, which would have silently discarded every reorder. It now maps through
+  `assignedIdsByGroup`, which arrives sorted by `sort_order`.
+
+- **The routes page shares the schedule's reference query** for route defaults rather than
+  adding a fetch — it's already persisted for offline use.
+
+- **Reordering renumbers lazily.** Every legacy `sort_order` is `0`, so the first move on a route
+  writes a real index for the whole group; every move after that touches two rows.
+
+- **A reorder is a batch that owns its own optimistic state.** Each write runs `silent`, skipping
+  the per-row patch and invalidation. Letting them run made one move visibly bounce — the row
+  jumped, a mid-flight refetch returned the pre-move order, then the next write moved it again —
+  and the per-row patch *appended* rather than inserting, so a move briefly read as "sent to the
+  bottom". The batch patches `routes-data` and `schedule-reference` once up front and invalidates
+  once at the end.
+
+- **`account-detail` had to be patched too.** The account page keeps its own
+  `routeGroupByPropertyId` map, so changing a property's route from there wrote to the database
+  and left the card's "Route group: …" line unchanged.
 
 ---
 
