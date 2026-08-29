@@ -54,34 +54,6 @@ export function nextVisitVersion(current: string | null | undefined): string {
   return new Date((ms ?? Date.now()) + 1).toISOString()
 }
 
-/**
- * Layer a live overlay over a server-rendered visit.
- *
- * Guarded by `updated_at` rather than applied unconditionally: a dropped
- * Realtime message would otherwise pin a stale status on a cell forever, beating
- * fresher server data on every subsequent render. `updated_at` is
- * trigger-maintained, so it is a reliable version marker — compared with
- * `Date.parse` because PostgREST and Realtime don't format timestamps
- * identically ('…Z' vs '…+00:00'), which breaks string ordering.
- *
- * The overlay is a bare `visits` row, so spreading it can only replace scalar
- * columns — joined fields the caller holds (`visit_crew`, `invoice`,
- * `photo_count`) are absent from it and survive untouched.
- */
-export function mergeVisitOverlay<T extends { id: string; updated_at: string }>(
-  base: T,
-  overlays: Map<string, VisitOverlay>,
-): T {
-  const overlay = overlays.get(base.id)
-  if (!overlay) return base
-  const overlayVersion = visitVersion(overlay)
-  const baseVersion = visitVersion(base)
-  // Undecidable either way — keep the server row rather than guess.
-  if (overlayVersion === null || baseVersion === null) return base
-  if (overlayVersion <= baseVersion) return base
-  return { ...base, ...overlay }
-}
-
 export function formatElapsed(startedAt: string): string {
   const mins = differenceInMinutes(new Date(), parseISO(startedAt))
   const h = Math.floor(mins / 60)

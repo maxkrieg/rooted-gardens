@@ -30,7 +30,7 @@ import { DashboardView } from '@/components/management/DashboardView'
 import { GenerateWeekSheet } from '@/components/management/GenerateWeekSheet'
 import { useWeekPlan, useGenerateWeek } from '@/hooks/useGenerateWeek'
 import { ScheduleStickyBar } from '@/components/management/ScheduleStickyBar'
-import { SessionsProvider } from '@/components/management/SessionsProvider'
+import { ScheduleRealtime } from '@/components/management/ScheduleRealtime'
 import { DeepLinkedVisitSheet } from '@/components/management/DeepLinkedVisitSheet'
 import { ScheduleSkeleton } from '@/components/management/ScheduleSkeleton'
 import { CachedNotice } from '@/components/states/CachedNotice'
@@ -61,8 +61,9 @@ export function ScheduleView({
 }: ScheduleViewProps) {
   const [windowStart, setWindowStart] = useState(initialWeek)
   const [filters, setFilters] = useState<ScheduleFilterValues>(initialFilters)
-  // Matches the `lg:` breakpoint the two layouts switch on, so a phone never
-  // fetches the three extra weeks only the desktop grid renders.
+  // Must stay equal to the `lg:` breakpoint the two layouts switch on (see the
+  // breakpoint rule in CLAUDE.md): if this and the CSS disagree, a phone either
+  // fetches three weeks it never renders or renders a grid it never fetched.
   const isWide = useMediaQuery('(min-width: 1024px)')
   const weekCount = isWide ? 4 : 1
   const hydrated = useIsHydrated()
@@ -253,7 +254,7 @@ export function ScheduleView({
       {/* Kept mounted, not unmounted, when Today is showing: DeepLinkedVisitSheet
           lives in here and a ?visit= link must still open its sheet. */}
       <div className={viewMode === 'today' ? 'hidden' : undefined}>
-      <SessionsProvider visitIds={visitIds}>
+      <ScheduleRealtime visitIds={visitIds} />
         <div className="hidden lg:block">
           <ScheduleGrid
             weeks={gridWeeks}
@@ -276,7 +277,6 @@ export function ScheduleView({
         {/* Rendered once, outside both layouts — both are always mounted, so
             giving each the deep link opened two stacked sheets. */}
         <DeepLinkedVisitSheet weeks={weeks} visitId={initialVisitId} />
-      </SessionsProvider>
       </div>
     </div>
   )

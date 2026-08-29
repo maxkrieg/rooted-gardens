@@ -14,8 +14,7 @@ import { toUserMessage } from '@/lib/errors'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
 import { ScheduleEmptyState } from '@/components/management/ScheduleEmptyState'
-import { useVisitOverlays } from '@/components/management/SessionsProvider'
-import { isVisitInProgress, formatElapsed, mergeVisitOverlay } from '@/lib/utils/visits'
+import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { FilePen, Camera } from 'lucide-react'
@@ -51,7 +50,6 @@ export function ScheduleGrid({ weeks, employees, vehicles, filtered }: ScheduleG
     () => format(getWeekStart(new Date()), 'yyyy-MM-dd'),
     []
   )
-  const visitOverlays = useVisitOverlays()
   const createVisit = useCreateVisit()
 
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -165,7 +163,7 @@ export function ScheduleGrid({ weeks, employees, vehicles, filtered }: ScheduleG
     // Layer the live overlay (realtime UPDATEs + the drawer's own writes) over
     // the server row, so status, timing, and the instruction flag all repaint
     // without waiting on a server render.
-    const visit = base ? mergeVisitOverlay(base, visitOverlays) : null
+    const visit = base
     const inProgress = visit ? isVisitInProgress(visit) : false
     // week.weekStart and currentWeekStart are both 'yyyy-MM-dd', so this sorts lexicographically.
     const isPastWeek = week.weekStart < currentWeekStart

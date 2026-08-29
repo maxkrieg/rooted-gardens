@@ -21,8 +21,7 @@ import { RoutePicker } from '@/components/management/RoutePicker'
 import { useAssignPropertyRoute } from '@/hooks/useAssignPropertyRoute'
 import { useScheduleReference } from '@/hooks/useManagementSchedule'
 import { useWeekNotes, useSaveWeekNote } from '@/hooks/useWeekNotes'
-import { useVisitOverlays } from '@/components/management/SessionsProvider'
-import { isVisitInProgress, formatElapsed, mergeVisitOverlay } from '@/lib/utils/visits'
+import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
 import { groupRowsByAccount } from '@/lib/utils/schedule'
 import { syncVisitUrlParam } from '@/lib/utils/visit-url'
 import { formatAccountPrice } from '@/lib/utils/accounts'
@@ -68,7 +67,6 @@ export function ScheduleListMobile({
   onExitSelectMode,
 }: ScheduleListMobileProps) {
   const { editSchedule: canEdit } = useCan()
-  const visitOverlays = useVisitOverlays()
   const createVisit = useCreateVisit()
 
   // Tick elapsed time every 30s
@@ -124,7 +122,7 @@ export function ScheduleListMobile({
 
     for (const row of rows) {
       const base = row.visit ?? createdVisits.get(`${row.property.id}-${weekStart}`) ?? null
-      const visit = base ? mergeVisitOverlay(base, visitOverlays) : null
+      const visit = base
       if (!visit) continue
 
       // Skipped counts as settled: the decision is made and the week has moved
@@ -329,7 +327,7 @@ export function ScheduleListMobile({
     // Layer the live overlay (realtime UPDATEs + the drawer's own writes) over
     // the server row, so status, timing, and the instruction flag all repaint
     // without waiting on a server render.
-    const visit = base ? mergeVisitOverlay(base, visitOverlays) : null
+    const visit = base
     const effectiveStartedAt = visit?.started_at ?? null
     const inProgress = visit ? isVisitInProgress(visit) : false
     // Once a visit is completed, show who actually did the work rather than

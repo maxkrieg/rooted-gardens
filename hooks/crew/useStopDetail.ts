@@ -18,7 +18,7 @@ export type StopDetail = {
     skip_reason: string | null
     vehicle_id: string | null
     /** Version marker — lets the management drawer push this row into the
-     *  schedule's live overlay with a comparable timestamp (mergeVisitOverlay). */
+     *  schedule's cache with a comparable timestamp (applyVisitUpdate). */
     updated_at: string
   }
   // The invoice this visit was billed on, if any (null when uninvoiced, or under

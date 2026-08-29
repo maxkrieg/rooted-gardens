@@ -5,7 +5,8 @@ management routes into one app. It is a **sibling to `PHASES.md`**, not a replac
 `PHASES.md` remains the historical record of the original build. See `CLAUDE.md` for stack,
 schema, and conventions.
 
-> **Status:** R1–R4 built (branch `redesign/r1-app-merge`). R5 planned.
+> **Status:** R1–R5 built (branch `redesign/r1-app-merge`). The redesign is complete.
+> **Migrations are on dev only** — prod must be migrated before this reaches `main`.
 > **Migrations are on dev only** — prod must be migrated before this reaches `main`.
 
 ---
@@ -668,21 +669,45 @@ cleanly to a fresh project from the baseline.
 > Goal: pay off the duplication the merge exposes. Nothing user-visible — do it while the
 > reasoning is fresh, not "later."
 
-- [ ] **R5.1 — One filter bar.** Delete `components/crew/CrewScheduleFilters.tsx`; keep
+- [x] **R5.1 — One filter bar.** Delete `components/crew/CrewScheduleFilters.tsx`; keep
   `ScheduleFilterBar` + `lib/utils/schedule-filters.ts`, which already has URL serialization.
-- [ ] **R5.2 — One stop row.** Delete `components/crew/ScheduleStopRow.tsx` in favor of the
+- [x] **R5.2 — One stop row.** Delete `components/crew/ScheduleStopRow.tsx` in favor of the
   schedule list's renderer; both already import the same badges and `isVisitInProgress`.
-- [ ] **R5.3 — One `SERVICE_TYPE_LABELS`.** The copy in the deleted crew History page goes;
+- [x] **R5.3 — One `SERVICE_TYPE_LABELS`.** The copy in the deleted crew History page goes;
   `types/app.ts` is the source of truth.
-- [ ] **R5.4 — Consistent breakpoints.** Schedule splits at `lg` (1024px), Accounts at `md`
+- [x] **R5.4 — Consistent breakpoints.** Schedule splits at `lg` (1024px), Accounts at `md`
   (768px), Routes not at all. Pick one and document it here.
-- [ ] **R5.5 — Fold the realtime overlay into React Query.** `SessionsProvider`'s
+- [x] **R5.5 — Fold the realtime overlay into React Query.** `SessionsProvider`'s
   `Map<visitId, VisitOverlay>` is a third store on top of React Query, kept because the grid
   used to read server props. It no longer does. Fold it into `setQueryData`, preserving the
   `updated_at` version guard in `mergeVisitOverlay`.
-- [ ] **R5.6 — Update `CLAUDE.md`.** Repository Structure, the Data Architecture field/desk
+- [x] **R5.6 — Update `CLAUDE.md`.** Repository Structure, the Data Architecture field/desk
   split (the field list becomes `/app/*`), the Realtime section, and the `lib/crew/` misnomer
   note all describe a layout that no longer exists after R1.
+
+### R5 as built — deviations from the plan above
+
+- **R5.1–R5.3 were already done.** `CrewScheduleFilters` and `ScheduleStopRow` were deleted in
+  R1 as part of the move, and `SERVICE_TYPE_LABELS` had one definition in `types/app.ts` with
+  every consumer already importing it — the duplicate died with the crew History page.
+
+- **R5.4 kept two breakpoints rather than forcing one,** and documented the rule in `CLAUDE.md`:
+  `md` (768px) for table↔card on list screens, `lg` (1024px) for the nav and the 4-week grid.
+  Collapsing the grid to `md` would make it scroll horizontally, which `CLAUDE.md` forbids for
+  owners. The note also records that `ScheduleView` couples `useMediaQuery('(min-width:
+  1024px)')` to the CSS breakpoint — if those drift, a phone fetches weeks it never renders.
+
+- **R5.5 deleted the overlay outright** rather than folding it in. `SessionsProvider` became
+  `ScheduleRealtime`, a component that renders `null` and takes no children — so it cannot
+  quietly become a context boundary again. `mergeVisitOverlay` is gone; `applyVisitUpdate`
+  writes version-guarded into `schedule-visits` and `stop-detail`. Side effect worth knowing:
+  live updates now land in a *persisted* cache, so a realtime change survives a reload offline,
+  which the in-memory map never did.
+
+- **`CLAUDE.md` gained two hard-won rules** beyond the routes R5.6 listed: enumerate every cache
+  the *feature* reads rather than the ones the page owns (the account-detail bug), and let a
+  batch own its optimistic state instead of patching per row (the reorder bounce). The
+  RSC-shell trap's count went from three bugs to five.
 
 ### ✅ Verifying Phase R5 — Consolidation
 

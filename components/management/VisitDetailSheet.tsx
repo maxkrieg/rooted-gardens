@@ -19,9 +19,9 @@ import { VisitDetailContent } from '@/components/VisitDetailContent'
 import { VisitLogger } from '@/components/crew/VisitLogger'
 import { SkipSheet } from '@/components/crew/SkipSheet'
 import { useStopDetail, type StopDetail } from '@/hooks/crew/useStopDetail'
-import { useApplyVisitOverlay, useVisitOverlays } from '@/components/management/SessionsProvider'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
-import { isVisitInProgress, mergeVisitOverlay } from '@/lib/utils/visits'
+import { isVisitInProgress } from '@/lib/utils/visits'
+import { useApplyVisitUpdate } from '@/hooks/useManagementSchedule'
 import type { EmployeeRole, SchedulePropertyRow } from '@/types/app'
 
 // routeGroup is never read in this component — callers without route-group context
@@ -93,38 +93,28 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart }: VisitDe
   const initialData = useMemo(() => normalizeRow(row), [row])
 
   const { data: raw } = useStopDetail(visitId, { initialData })
+  const applyVisitUpdate = useApplyVisitUpdate()
 
-  // Merge the live overlay (management-only concern — the grid's SessionsProvider)
-  // over the query result before handing data to the shared content.
-  const visitOverlays = useVisitOverlays()
-  const applyVisitOverlay = useApplyVisitOverlay()
-  const data = useMemo(() => {
-    if (!raw) return raw
-    const merged = mergeVisitOverlay(raw.visit, visitOverlays)
-    return merged === raw.visit ? raw : { ...raw, visit: merged }
-  }, [raw, visitOverlays])
+  // No overlay to merge any more: the drawer and the grid read the same React
+  // Query entries, and live updates are written into those (applyVisitUpdate).
+  const data = raw
 
-  // Push what the drawer knows back into the grid's overlay. Status writes here
-  // are direct-client (no Server Action, no revalidatePath) and the close-time
-  // router.refresh() has proven unreliable, so this is what actually repaints the
-  // cell behind the sheet — including the revert-to-scheduled path, which never
+  // Push what the drawer knows into the schedule's cache. Status writes here are
+  // direct-client (no Server Action, no revalidatePath) and the close-time
+  // router.refresh() has proven unreliable, so this is what actually repaints
+  // the cell behind the sheet — including revert-to-scheduled, which never
   // closes the drawer at all.
   //
-  // The optimistic cache write that lands first carries the *old* updated_at, so
-  // mergeVisitOverlay rejects it; the refetch forced by the mutation's
+  // The optimistic write that lands first carries the *old* updated_at, so the
+  // version guard rejects it; the refetch forced by the mutation's
   // invalidateQueries then arrives with the server's real updated_at and wins.
   // Deliberately not synthesizing a client timestamp — a fast client clock would
-  // pin the overlay and start rejecting genuine later updates.
-  //
-  // Pushes `raw`, never `data`: `data` is the overlay already merged back in, so
-  // feeding it here is a cycle by construction — every push mints a new merged
-  // object that re-fires this effect. React Query's structural sharing keeps
-  // `raw.visit` referentially stable until its contents actually change.
+  // pin the value and start rejecting genuine later updates.
   const visitForOverlay = raw?.visit
   useEffect(() => {
     if (!visitForOverlay) return
-    applyVisitOverlay(visitForOverlay)
-  }, [visitForOverlay, applyVisitOverlay])
+    applyVisitUpdate(visitForOverlay)
+  }, [visitForOverlay, applyVisitUpdate])
 
   const [completionOpen, setCompletionOpen] = useState(false)
   const [skipOpen, setSkipOpen] = useState(false)

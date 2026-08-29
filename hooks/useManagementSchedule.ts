@@ -4,6 +4,7 @@ import { useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstac
 import { useCallback } from 'react'
 import { fetchScheduleReference, fetchWeekVisits } from '@/lib/schedule/fetch'
 import { buildScheduleWeek } from '@/lib/utils/schedule'
+import { visitVersion, type VisitOverlay } from '@/lib/utils/visits'
 import type { ScheduleWeek, VisitWithCrew } from '@/types/app'
 
 export const scheduleReferenceKey = ['schedule-reference'] as const
@@ -99,6 +100,65 @@ export function patchScheduleVisit(
       data.map((v) => (v.id === visitId ? update(v) : v)),
     )
   }
+}
+
+/**
+ * Apply a live visit update — a Realtime UPDATE, or a write the drawer just
+ * made — straight into the query cache.
+ *
+ * This replaces the separate overlay `Map` that used to sit beside React Query.
+ * That map existed because the grid once read server props and had nowhere else
+ * to put live data; it now reads the cache, so a third store only meant every
+ * consumer had to remember to merge.
+ *
+ * The `updated_at` guard is the part that has to survive: applied
+ * unconditionally, a dropped or out-of-order Realtime message would pin a stale
+ * status on a cell and beat fresher server data on every later render. Compared
+ * numerically via `visitVersion` because PostgREST and Realtime don't format
+ * timestamps identically ('…Z' vs '…+00:00'), which breaks string ordering.
+ *
+ * Returning the previous data object unchanged when the incoming row is not
+ * newer is load-bearing: a new object identity here re-renders the whole grid.
+ */
+export function applyVisitUpdate(queryClient: QueryClient, incoming: VisitOverlay): void {
+  const incomingVersion = visitVersion(incoming)
+  // No usable version marker — applying it would make every later comparison
+  // undecidable, so drop it rather than guess.
+  if (incomingVersion === null) return
+
+  for (const [key, data] of queryClient.getQueriesData<VisitWithCrew[]>({
+    queryKey: ['schedule-visits'],
+  })) {
+    if (!data) continue
+    const existing = data.find((v) => v.id === incoming.id)
+    if (!existing) continue
+    const existingVersion = visitVersion(existing)
+    if (existingVersion === null || existingVersion >= incomingVersion) continue
+    queryClient.setQueryData<VisitWithCrew[]>(
+      key,
+      data.map((v) => (v.id === incoming.id ? { ...v, ...incoming } : v)),
+    )
+  }
+
+  // The drawer reads its own entry, shared with the crew stop page.
+  queryClient.setQueryData<{ visit: { id: string; updated_at?: string } } | null>(
+    ['stop-detail', incoming.id],
+    (old) => {
+      if (!old?.visit) return old
+      const existingVersion = visitVersion(old.visit)
+      if (existingVersion === null || existingVersion >= incomingVersion) return old
+      return { ...old, visit: { ...old.visit, ...incoming } }
+    },
+  )
+}
+
+/** `applyVisitUpdate` bound to the active client, for components. */
+export function useApplyVisitUpdate() {
+  const queryClient = useQueryClient()
+  return useCallback(
+    (visit: VisitOverlay) => applyVisitUpdate(queryClient, visit),
+    [queryClient],
+  )
 }
 
 /**

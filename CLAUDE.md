@@ -24,7 +24,8 @@ web app. Parent company is **Tigertown Farm LLC**.
 
 **Critical:** Everyone except the accountant works primarily from a phone.
 - Crew members use personal phones only — the crew experience must be a PWA
-  (installable from browser, no app store), mobile-first for all `/crew/*` routes.
+  (installable from browser, no app store). Since the R1 merge that PWA is the whole
+  signed-in app at `/app/*` — owners install the same thing crew do.
 - The owners also use the app **mostly on their phones**, only
   occasionally on a laptop. So `/management/*` routes must be **fully responsive and
   usable one-handed on a phone first**, then progressively enhanced for the extra
@@ -105,9 +106,9 @@ web app. Parent company is **Tigertown Farm LLC**.
 rooted-gardens/
 ├── CLAUDE.md                    ← you are here
 ├── PHASES.md                    ← build phases and tasks
-├── REDESIGN.md                  ← PLANNED (not built): field-first redesign — merges /crew/*
-│                                  and the field management routes into one app at /app/*.
-│                                  Everything below describes the CURRENT layout until R1 lands.
+├── REDESIGN.md                  ← the field-first redesign, R1–R5. BUILT — this file
+│                                  describes the result. Read it for the reasoning behind
+│                                  /app/*, the generated week, and route defaults.
 ├── proxy.ts                     ← root request proxy (Next 16; auth + role gating, formerly middleware.ts)
 ├── app/
 │   ├── layout.tsx               ← root layout (fonts, providers)
@@ -122,21 +123,23 @@ rooted-gardens/
 │   │   ├── faq/page.tsx
 │   │   ├── jobs/page.tsx        ← careers + application form
 │   │   └── contact/page.tsx     ← inquiry intake form
-│   ├── management/              ← desktop management UI
-│   │   ├── layout.tsx           ← sidebar nav, desktop shell
-│   │   ├── dashboard/page.tsx
-│   │   ├── schedule/page.tsx    ← the main schedule grid
-│   │   ├── accounts/
-│   │   │   ├── page.tsx         ← account list
-│   │   │   └── [id]/page.tsx    ← account detail
-│   │   ├── billing/page.tsx     ← invoice queue
+│   ├── app/                     ← THE FIELD APP (PWA) — crew, lead, owner, accountant
+│   │   ├── layout.tsx           ← PWA metadata + AppShell (one nav for the whole app)
+│   │   ├── (padded)/            ← route group: page padding only, adds no URL segment
+│   │   │   ├── schedule/page.tsx    ← the core screen; carries `Today` and `Week`
+│   │   │   ├── accounts/
+│   │   │   │   ├── page.tsx         ← account list
+│   │   │   │   └── [id]/page.tsx    ← account detail
+│   │   │   └── routes/page.tsx      ← route groups + their defaults
+│   │   └── stop/[visitId]/      ← one stop: log completion, start/stop, photos.
+│   │       └── page.tsx             Outside (padded) — it owns its own chrome.
+│   ├── management/              ← THE DESK ROUTES — server-first, same AppShell
+│   │   ├── layout.tsx
+│   │   ├── billing/page.tsx     ← invoice queue (the one laptop-first screen)
+│   │   ├── leads/page.tsx
+│   │   ├── reports/page.tsx
 │   │   ├── fleet/page.tsx
 │   │   └── team/page.tsx
-│   ├── crew/                    ← mobile crew UI (PWA)
-│   │   ├── layout.tsx           ← bottom nav, mobile shell
-│   │   ├── today/page.tsx       ← today's stops
-│   │   └── stop/[visitId]/
-│   │       └── page.tsx         ← individual stop detail + log
 │   └── api/
 │       ├── quickbooks/
 │       │   ├── connect/route.ts ← OAuth initiation
@@ -146,16 +149,26 @@ rooted-gardens/
 │           └── twilio/route.ts   ← inbound STOP/HELP (SMS opt-out) [DEFERRED — not built]
 ├── components/
 │   ├── ui/                      ← shadcn components (auto-generated, don't edit)
-│   ├── management/              ← desktop-specific components
-│   │   ├── ScheduleGrid.tsx     ← the week grid (core component)
-│   │   ├── AccountCard.tsx
-│   │   ├── RouteGroup.tsx
+│   ├── app/                     ← shell, nav, role context, shared selection UI
+│   │   ├── AppShell.tsx         ← the one shell: bottom bar, sidebar, More sheet
+│   │   ├── RoleProvider.tsx     ← useRole() / useCan() — affordances, never security
+│   │   └── nav-items.ts         ← one nav array, access-filtered by lib/auth/access.ts
+│   ├── management/              ← schedule, accounts, routes, billing components
+│   │   ├── ScheduleGrid.tsx     ← the 4-week desktop grid (lg+ only)
+│   │   ├── ScheduleListMobile.tsx   ← the phone schedule (the screen that matters)
+│   │   ├── RouteGroupBand.tsx       ← route header: crew, truck, progress, week note
 │   │   └── InvoiceQueue.tsx
-│   └── crew/                    ← mobile-specific components
-│       ├── StopCard.tsx
-│       ├── VisitLogger.tsx
+│   └── crew/                    ← field-work components (name predates the merge)
+│       ├── VisitLogger.tsx      ← completion form
 │       └── ServiceTypeSelector.tsx
 ├── lib/
+│   ├── auth/
+│   │   └── access.ts            ← ROUTE_ACCESS + capabilities; imported by proxy.ts,
+│   │                              so it must stay dependency-free (Edge runtime)
+│   ├── offline/                 ← the offline queue + caches (was lib/crew/)
+│   │   ├── mutation-queue.ts
+│   │   ├── idb.ts
+│   │   └── photo-blobs.ts
 │   ├── supabase/
 │   │   ├── client.ts            ← browser client
 │   │   ├── server.ts            ← server client (Server Actions / RSC)
@@ -165,6 +178,7 @@ rooted-gardens/
 │   │   └── sync.ts              ← push visits to QBO
 │   └── utils/
 │       ├── dates.ts             ← week helpers (getWeekStart, etc.)
+│       ├── schedule.ts          ← buildScheduleWeek + planWeek (the generate rule)
 │       └── visits.ts            ← visit status helpers
 ├── types/
 │   ├── database.ts              ← generated Supabase types (supabase gen types)
@@ -308,8 +322,49 @@ route_groups (
   id uuid PK,
   name text NOT NULL,   -- e.g. "Sharon VT", "Hawk Pine Rd Corridor"
   sort_order integer DEFAULT 0,
+  -- The standing plan. The paper route sheet encoded this in the group NAME
+  -- ("Wilder - Mon/Tues") because there was nowhere else for it. A generated
+  -- week (planWeek + the generate preview) pre-fills from these; a visit's own
+  -- crew and vehicle always win over them.
+  default_vehicle_id uuid FK → vehicles ON DELETE SET NULL,
+  default_days text[] NOT NULL DEFAULT '{}'  -- 'mon'…'sun', CHECKed by containment
+    -- NOTE: display only. A visit is keyed to a WEEK, not a day, so there is no
+    -- per-day field to schedule into. It labels the plan; it doesn't drive it.
   created_at, updated_at
 )
+
+-- A route group's regular crew. A join table, not a uuid[] — same reasoning as
+-- visit_crew: Realtime can't filter array containment, arrays can't be
+-- FK-joined, and they're awkward in RLS.
+route_group_default_crew (
+  route_group_id uuid FK → route_groups ON DELETE CASCADE,
+  employee_id uuid FK → employees ON DELETE CASCADE,
+  created_at,
+  PRIMARY KEY (route_group_id, employee_id)
+)
+-- RLS: SELECT all staff (crew need to see a route's regulars); writes owner/lead.
+
+-- The route sheet's group-header dispatch note: "no Ryan till Thurs",
+-- "matts gone all week". About the WEEK and the ROUTE, read by everyone working
+-- it — which is why it can't live on one visit's crew_instruction.
+route_group_week_notes (
+  id uuid PK,
+  route_group_id uuid FK → route_groups ON DELETE CASCADE,
+  week_start date NOT NULL,        -- always a Monday
+  note text NOT NULL,
+  created_at, updated_at,
+  UNIQUE (route_group_id, week_start)  -- what makes the queued upsert replay-safe
+)
+-- RLS: SELECT all staff; writes owner/lead. Emptying the note DELETES the row
+-- rather than storing a blank, or the band renders an empty ribbon all week.
+
+-- Views: account_last_visit and property_last_visit — most recent COMPLETED
+-- visit, per account and per property. Both security_invoker (without it a view
+-- runs with its owner's rights and bypasses RLS on visits). Both keyed on
+-- ended_at, so a SKIPPED visit correctly doesn't count as a visit: skipping
+-- means the work didn't happen, which is exactly when it should come up due
+-- again. planWeek() needs the property grain — an account with two properties
+-- on different cadences would otherwise phase both off whichever was done last.
 
 -- Assign properties to route groups
 property_route_groups (
@@ -505,10 +560,20 @@ Supabase Auth with **magic link** (email only — no passwords).
 
 | Role | Access |
 |------|--------|
-| `owner` | Full access to all management and crew views |
-| `lead` | Schedule read + crew views + visit logging |
-| `crew` | Crew views only (`/crew/*`) — today's stops, log completion |
-| `accountant` | Billing views only + account read |
+| `owner` | Everything, plus the only role that can archive or manage the team |
+| `lead` | Same as owner minus Team and archiving |
+| `crew` | `/app/schedule` and `/app/stop/*` only — see the week, log their own work |
+| `accountant` | Billing and reports; read-only on schedule, accounts and routes |
+
+**One allowlist drives both the redirect gate and the nav** — `ROUTE_ACCESS` in
+`lib/auth/access.ts`, imported by `proxy.ts` (Edge, so that module must stay dependency-free)
+and by `components/app/nav-items.ts`. A destination cannot appear in one and not the other,
+and an unmatched protected path *denies*, so a new route is inaccessible until it's listed.
+
+`capabilitiesFor()` in the same file answers what a role may *do* — `useCan()` reads it in
+components. **These are affordances only. RLS is the boundary**, and since crew and owner now
+share `/app/schedule`, a capability bug is a data-exposure bug: verify the policy, never just
+the flag.
 
 Role is stored in `employees.role`. Check via:
 ```ts
@@ -558,7 +623,7 @@ all FK back with NO ACTION, so a real delete is either rejected by Postgres or t
 history with it. Archiving keeps the row so past visits and invoices still render their
 account name and property address.
 - Archiving an account archives **all of its properties** (`archiveAccount` in
-  `app/management/accounts/actions.ts`); a single property archives alone (`archiveProperty`
+  `app/app/(padded)/accounts/actions.ts`); a single property archives alone (`archiveProperty`
   in `property-actions.ts`). Both also delete the property's `property_route_groups` rows —
   that join table carries no history, and a leftover row under-counts the "unrouted" nav
   badge, which is `properties − property_route_groups`.
@@ -718,29 +783,50 @@ Dark theme ("soil at dusk", for dawn/dusk field use): `--background #1C1A15`, `-
   stat cards; a "Crews on site now" panel with terracotta live pulses + elapsed; "This week"
   summary; amber maintenance chips. Editorial and warm, comfortable density; stacks on a phone.
 
-### Mobile (Crew) — `/crew/*`
-- Full-height viewport, touch-optimized
-- Bottom navigation bar (Today | History | Profile)
-- Large tap targets (min 44px)
-- Minimal text, icon-forward
-- No tables, no dense layouts
-- Offline-tolerant: use Supabase Realtime + local state, show stale data gracefully
-- Colors & type: per the **Design System** above (warm paper bg, sage-green primary, Fraunces +
-  Hanken Grotesk). Favor high contrast and large type for sunlight legibility in the field.
+### The field app — `/app/*` (one surface, four roles)
 
-### Management — `/management/*` (phone-primary, responsive)
-- Owners use these routes **mostly on a phone**, occasionally on a laptop — design
-  mobile-first, then enhance for desktop. Do NOT build desktop-only layouts.
-- Navigation: bottom bar / hamburger on phone; collapsible left sidebar on desktop.
-- Data-dense tables, grids, and multi-column layouts are fine on desktop but must
-  degrade to card / stacked layouts on phone — no horizontal-scrolling tables for owners.
-- The schedule grid is the core view and the hardest to fit on a phone. Provide a
-  **mobile-adapted view** (e.g. single week, vertically stacked by route group) that
-  collapses the 4-week desktop grid. Spreadsheet-like density is a desktop affordance.
-- Billing (`/management/billing/*`) is the exception — the accountant is laptop-first,
-  so it can assume a wide screen and stay table/grid-dense.
-- Colors & type: per the **Design System** above; lean on the warm neutrals for dense data and
-  use `tabular-nums` for numeric columns (schedule, billing).
+`/crew/*` and the field management routes merged into one installable app at `/app/*`
+(REDESIGN.md R1). There is no separate crew site: crew, lead, owner and accountant all load
+the same `/app/schedule`, and role decides what they can *do*, not which site they're on.
+
+- Phone-first everywhere, not just for crew. The owners run this from a truck.
+- One bottom bar on phone, the same items as a sidebar from `lg` up — both from `NAV_ITEMS`
+  in `components/app/nav-items.ts`. The bar holds what works offline; `More` holds what needs
+  a connection. That is the same field/desk split as the data architecture below, which is
+  what makes the overflow a real category rather than a junk drawer.
+- Large tap targets (min 44px). `Button size="icon"` enforces this with
+  `pointer-coarse:size-11` — a media-variant class **no `className` can merge away**, so opt
+  out with a plain `<button>` when a control genuinely must be smaller.
+- No horizontal-scrolling tables. Dense grids are a desktop affordance and must degrade to
+  cards or stacked rows on a phone.
+- Offline-tolerant: show stale cached data flagged with `CachedNotice`, never an error over
+  data the owner can still act on.
+- Colors & type: per the **Design System** above. Favor high contrast and large type for
+  sunlight legibility in the field.
+
+### The desk routes — `/management/*`
+
+Billing, team, fleet, leads and reports kept their URLs. They render inside the same
+`AppShell`, so there is one nav in the app, but they are still server-first (see Data
+Architecture). Billing is the one genuinely laptop-first screen — the accountant — so it can
+assume a wide screen and stay table-dense.
+
+### Breakpoints
+
+Two tiers, and only two. Pick from these rather than introducing a third:
+
+| Breakpoint | What changes | Why |
+|---|---|---|
+| `md` (768px) | Table ↔ card for list screens: accounts, leads | The width a simple table needs before it has to scroll sideways |
+| `lg` (1024px) | The nav (bottom bar → sidebar), and the 4-week schedule grid | The grid needs a sticky label column plus four week columns; below this it would scroll horizontally, which is forbidden above |
+
+The routes page uses neither — it is cards at every width, which is the right answer when a
+screen has no table to degrade.
+
+**`ScheduleView` couples a JS media query to the CSS breakpoint** — `useMediaQuery('(min-width:
+1024px)')` decides whether to fetch one week or four, while `hidden lg:block` / `lg:hidden`
+decide which layout renders. If those two ever disagree, a phone either fetches three weeks it
+never renders or renders a grid it never fetched.
 
 ### Shared Components
 - Use shadcn/ui primitives as the base (Button, Card, Dialog, etc.)
@@ -763,16 +849,19 @@ client-first model across three phases (`8918429`, `c5a7760`, `a857567`, `655ba8
 `fefd77a`, `2502e69`). The split is no longer crew-vs-management; it is **field vs desk**.
 
 ### Field routes — client-first + offline queue
-`/crew/*` (always was), plus `/management/schedule`, `/management/accounts`,
-`/management/accounts/[id]`, `/management/dashboard`, `/management/routes`.
+Everything under `/app/*`: `/app/schedule` (which carries the dashboard as its `Today` view),
+`/app/accounts`, `/app/accounts/[id]`, `/app/routes`, `/app/stop/[visitId]`.
 - **Reads:** client components using **React Query** over the Supabase **browser** client,
   persisted to IndexedDB. Pages are a thin RSC shell that only reads the `rg-role` cookie
   and renders the client view. Show cached data flagged stale (`CachedNotice`), never an
   error over data the owner can still act on.
-- **Writes:** the **offline mutation queue** (`lib/crew/mutation-queue.ts`) for
+- **Writes:** the **offline mutation queue** (`lib/offline/mutation-queue.ts`) for
   field-critical mutations; Server Actions only for desk-shaped ones.
 - Pattern to copy: `lib/schedule/fetch.ts` → `hooks/useManagementSchedule.ts` →
   `components/management/ScheduleView.tsx`.
+- **Server Actions are still allowed here** for genuinely desk-shaped writes — route group
+  CRUD, route defaults — but each one must call a `useRefresh*` hook on success (see below),
+  and must say "needs a connection" rather than fail silently offline.
 
 ### Desk routes — still server-first
 `/management/billing` (the accountant is laptop-first), `/management/team`,
@@ -784,7 +873,17 @@ as before. Don't convert these without a reason.
 - **Converting a page to client-first breaks every Server Action that feeds it.**
   `revalidatePath` then refreshes an RSC shell holding no data — the write lands in Postgres
   and the screen never changes. Every such page needs a `useRefresh*` hook invalidating its
-  query keys, called from each action's success path. This has caused three separate bugs.
+  query keys, called from each action's success path. **This has caused five separate bugs**;
+  it is the single most repeated mistake in this codebase.
+- **Enumerate every cache the *feature* reads, not just the ones the page owns.** The same
+  failure wearing different clothes: changing a property's route from the account page patched
+  `routes-data` and `schedule-reference` and left `account-detail`, which is the map that page
+  actually renders — so the write landed and the card never moved. Ask what reads this data,
+  not what wrote it.
+- **A batch of writes must own its optimistic state.** Per-row patch + per-row invalidation in
+  a loop makes the UI visibly bounce: a mid-batch refetch returns the pre-batch state. Patch
+  once up front, run each write `silent`, invalidate once at the end (see
+  `useReorderRouteProperties`).
 - **Queued mutations need `networkMode: 'always'`.** React Query's default *pauses* a
   mutation when offline: `onMutate` runs (so the UI looks saved) but `mutationFn` never
   does, so nothing is enqueued. Genuinely online-only mutations keep the default.
@@ -802,52 +901,64 @@ as before. Don't convert these without a reason.
   single `NetworkOnly` rule. Use `npm run build && npm start`.
 
 ### The offline queue, concretely
-`lib/crew/mutation-queue.ts` + `lib/crew/idb.ts` — **shared by both surfaces now, so the
-`crew/` path is a misnomer pending a move to `lib/offline/`** (where the photo cache already
-lives). IndexedDB `rooted-crew`, stores `mutations`, `rq-cache`, `photo-blobs`.
+`lib/offline/mutation-queue.ts` + `lib/offline/idb.ts`, alongside `lib/offline/photo-blobs.ts`.
+IndexedDB `rooted-crew`, stores `mutations`, `rq-cache`, `photo-blobs` — **the database and
+store names are deliberately unchanged**: a crew phone may be holding unflushed field writes
+across any deploy that renames them.
 
-Queued types: crew's `completion`, `photo`, `photo_caption`, `job_start`, `job_stop`,
-`job_discard`, `skip`; management's `create_visit`, `assign_crew`, `set_vehicle`,
-`crew_instruction`, `revert_status`, `property_notes`. Adding one means touching
+Queued types: `completion`, `photo`, `photo_caption`, `job_start`, `job_discard`, `skip`,
+`create_visit`, `assign_crew`, `set_vehicle`, `crew_instruction`, `revert_status`,
+`property_notes`, `route_week_note`, `assign_property_route`. Adding one means touching
 `MutationType` (idb.ts), the payload interface + `MutationPayload` union, a `case` in the
 flush switch, and `TYPE_LABELS` in `StuckChangesSheet` (compiler-enforced).
 
-Parked after 5 attempts and surfaced in "Changes that didn't save". `OfflineBanner` +
-mount-flush are mounted by `CrewShell` and `ManagementShell`; a surface that enqueues without
-one will queue writes that never sync.
+Parked after 5 attempts and surfaced in "Changes that didn't save". `OfflineBanner` and the
+mount-flush are mounted once by `AppShell`, which wraps every signed-in surface.
 
 **Deliberately still online-only:** plan photos (three unguarded steps, duplicates on replay),
-`bulkAssignRoute` (delete-then-insert clobbers concurrent edits), and everything on the desk
-routes. These show a "needs a connection" message.
+`bulkAssignRoute` and `assignProperties` (both overwrite whatever was there, so a delayed
+replay could undo an edit made in between), `setRouteGroupDefaults` (replaces a whole set of
+join rows), and everything on the desk routes. These show a "needs a connection" message.
 
 **Photo bytes:** `lib/offline/photo-blobs.ts` caches `how_to` / `customer_request` bytes keyed
 by `storage_path` (100MB LRU). The `photos` bucket is private and its URLs rotate hourly, so a
 URL-keyed cache can never hit — only the bytes can be cached.
 
 ### Realtime subscriptions
-**Crew** (`/crew/*`) — because crew↔visit links now live in `visit_crew` (not a `uuid[]`),
-subscriptions are relational and filterable:
-- **New / changed assignments:** subscribe to `visit_crew` filtered by
-  `employee_id=eq.<my_employee_id>` and `relation=eq.assigned`.
-- **Content changes** (crew instruction edits, new stops in the week): subscribe to
-  `visits`. Realtime cannot filter `visits` by the crew set, so subscribe to the current
-  week and filter client-side against the `visit_id`s the crew member is assigned to.
-  At this company's scale (≤ a few hundred visits/week) this is cheap.
+Because crew↔visit links live in `visit_crew` (not a `uuid[]`), subscriptions are relational
+and filterable.
 
-**Management** (`/management/*`) — owners need live in-progress state, so the schedule and
-dashboard subscribe to `visits` UPDATE events. `SessionsProvider` (schedule page) keeps a
-`Map<visitId, VisitOverlay>` of whole rows from `payload.new`, merged over the grid's data by
-`mergeVisitOverlay` (`lib/utils/visits.ts`), which is version-guarded on `updated_at` so a
-dropped message can't pin a stale value. `CrewsOnSitePanel` (dashboard) fetches in-progress
-visits and subscribes to `visits` UPDATE — and deliberately does **not** cache: offline it
-says it needs a connection rather than showing a frozen list with a ticking timer.
+**Per-crew-member** (`useCrewRealtimeSync`, mounted by `AppShell` for whoever is signed in):
+- **Their own assignments:** `visit_crew` filtered by `employee_id=eq.<my_employee_id>`. This
+  is what raises the "Your schedule was updated" toast.
+- **Content changes** (crew instruction edits, new stops in the week): subscribe to `visits`.
+  Realtime cannot filter `visits` by the crew set, so subscribe to the current week and filter
+  client-side against the visit ids on screen. At this company's scale (≤ a few hundred
+  visits/week) that is cheap.
 
-Note the overlay is now a *third* store on top of React Query, left in place because the grid
-used to read server props; folding it into `setQueryData` is pending. Treat realtime as a
-best-effort overlay, never the source of truth. Owner start/stop alerts are
+**Schedule-wide** (`ScheduleRealtime`) — owners need live in-progress state, so the schedule
+subscribes to `visits` UPDATE and writes each `payload.new` **straight into the React Query
+cache** via `applyVisitUpdate` (`hooks/useManagementSchedule.ts`). It is version-guarded on
+`updated_at`, so a dropped or out-of-order message can't pin a stale value; an unguarded write
+would beat fresher server data on every later render. There is no separate overlay store any
+more — the `Map<visitId, VisitOverlay>` that `SessionsProvider` kept was folded into the cache
+in R5.5, because the grid no longer reads server props and a third store only meant every
+consumer had to remember to merge.
+
+`CrewsOnSitePanel` (the schedule's `Today` view) fetches in-progress visits and subscribes to
+`visits` UPDATE — and deliberately does **not** cache: offline it says it needs a connection
+rather than showing a frozen list with a ticking timer. Don't "fix" that.
+
+> **Known gap:** nothing subscribes to `visit_crew` for *other* people, so a crew change made
+> elsewhere doesn't reach a screen until something refetches. That is why `bulkAssignRoute`
+> needs `useRefreshSchedule()` — and why the vehicle appeared live while the crew avatars
+> didn't, which read as a rendering glitch rather than a missing invalidation. Raised in
+> REDESIGN.md under "Tabled".
+
+Treat realtime as best-effort, never the source of truth. Owner start/stop alerts are
 **in-app only** — no email / SMS / push (Phase 8.3). If an owner doesn't have the app open,
-they simply catch up on next open. (Unaffected by the 8.2/8.3 SMS deferral — these alerts
-were always designed as in-app only, and they are built and working.)
+they catch up on next open. (Unaffected by the 8.2/8.3 SMS deferral — these were always
+designed as in-app only, and they are built and working.)
 
 > Why this matters: the old `assigned_crew uuid[]` design could not be filtered by
 > Supabase Realtime (its `postgres_changes` filters don't support array containment),
@@ -859,8 +970,9 @@ were always designed as in-app only, and they are built and working.)
 
 - **TypeScript strict mode** — no `any` types
 - **Mutations follow the *surface*, not the route group** (see Data Architecture above):
-  field routes use the **offline mutation queue**; desk routes use **Server Actions**.
-  `/crew/*` never uses Server Actions at all.
+  `/app/*` uses the **offline mutation queue** for field-critical writes; `/management/*` uses
+  **Server Actions**. A Server Action on an `/app/*` page is allowed only for genuinely
+  desk-shaped work, and must both refresh the client cache and say "needs a connection".
 - **React Query** for client-side data fetching and caching — required on every field
   route, optional on desk routes
 - **Zod schemas** for all form validation — define schemas in `lib/validators/`
