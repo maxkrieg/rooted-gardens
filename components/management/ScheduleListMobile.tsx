@@ -96,6 +96,9 @@ export function ScheduleListMobile({
   const { data: weekNotes = [] } = useWeekNotes(week?.weekStart ?? '')
   const { data: reference } = useScheduleReference()
   const [defaultsGroup, setDefaultsGroup] = useState<RouteGroup | null>(null)
+  // Which group's note editor is open. Lifted here because the band's ⋯ opens
+  // it and the ribbon renders it — there's no permanent "add a note" row.
+  const [noteEditGroupId, setNoteEditGroupId] = useState<string | null>(null)
   const assignRoute = useAssignPropertyRoute()
   const saveWeekNote = useSaveWeekNote(week?.weekStart ?? '')
 
@@ -494,12 +497,18 @@ export function ScheduleListMobile({
                   setAssignOpen(true)
                 }}
                 onEditDefaults={() => setDefaultsGroup(routeGroup)}
+                onEditNote={() => setNoteEditGroupId(routeGroup.id)}
+                hasNote={weekNotes.some((n) => n.route_group_id === routeGroup.id)}
                 noteSlot={
                   <WeekNoteRibbon
                     note={
                       weekNotes.find((n) => n.route_group_id === routeGroup.id)?.note ?? null
                     }
                     canEdit={canEdit}
+                    editing={noteEditGroupId === routeGroup.id}
+                    onEditingChange={(open) =>
+                      setNoteEditGroupId(open ? routeGroup.id : null)
+                    }
                     onSave={(note) => saveWeekNote(routeGroup.id, note)}
                   />
                 }
