@@ -69,7 +69,7 @@ export function RouteGroupBand({
   const hasPlan = days.length > 0 || crew.length > 0 || vehicles.length > 0
 
   return (
-    <div className="rounded-t-xl bg-secondary text-secondary-foreground">
+    <div className="bg-secondary text-secondary-foreground">
       <div className="flex items-center gap-2 px-4 pt-2">
         <span className="min-w-0 flex-1 truncate text-xs font-semibold uppercase tracking-widest">
           {name}

@@ -263,7 +263,10 @@ export function ScheduleView({
             filtered={filtered}
           />
         </div>
-        <div className="lg:hidden">
+        {/* -mx-4 cancels the (padded) layout's p-4 so the route cards run to
+            both viewport edges — the phone list needs every pixel for the
+            account name and address. Desktop keeps the page padding. */}
+        <div className="lg:hidden -mx-4">
           <ScheduleListMobile
             week={mobileWeek}
             windowWeeks={weeks}

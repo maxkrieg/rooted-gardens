@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { FilePen } from 'lucide-react'
+import { FilePen, Receipt } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useCan } from '@/components/app/RoleProvider'
 import { useCreateVisit } from '@/hooks/useCreateVisit'
@@ -24,13 +24,11 @@ import { useWeekNotes, useSaveWeekNote } from '@/hooks/useWeekNotes'
 import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
 import { groupRowsByAccount } from '@/lib/utils/schedule'
 import { syncVisitUrlParam } from '@/lib/utils/visit-url'
-import { formatAccountPrice } from '@/lib/utils/accounts'
 import {
-  AccountPriceMeta,
-  VisitStatusBadge,
+  VisitStatusIcon,
+  visitRowTint,
   FrequencyBadge,
-  BillingTypeBadge,
-  InvoiceStatusBadge,
+  invoiceStatusLabel,
 } from '@/components/management/badges'
 import type {
   Account,
@@ -308,13 +306,20 @@ export function ScheduleListMobile({
     }
   }
 
-  // Renders one stop button. Shared by both label shapes so the right-side
-  // status/crew/on-site content can never drift between them:
+  // Renders one stop button. Shared by both label shapes so the status/crew/
+  // on-site content can never drift between them:
   //   - `merged` — the ~99% case: one account with one property. Account
   //     name, address, and frequency/price all live in this one button.
   //   - `nested` — a property row under a multi-property account header.
   //     Only these carry the sage rail — it means "a site of the account
   //     above," not "this is a property row."
+  //
+  // Status is a glyph in the left gutter plus a row-wide tint, not a badge: the
+  // row used to carry up to five pills (status, frequency, invoice, two crew
+  // chips) and the account name was truncating to make room for them. Settled
+  // visits recede behind a wash with muted text; an outstanding one keeps the
+  // plain paper surface and full-strength ink, which is what makes it the thing
+  // your eye lands on.
   function renderStopRow(
     account: Account,
     row: SchedulePropertyRow,
@@ -351,6 +356,8 @@ export function ScheduleListMobile({
     const overflow = displayCrew.length - 2
 
     const isSelected = selected.has(row.property.id)
+    const settled = visit?.status === 'completed' || visit?.status === 'skipped'
+    const crewLabel = displayedCrew.map((emp) => emp.name.split(' ')[0]).join(', ')
 
     return (
       <button
@@ -363,31 +370,56 @@ export function ScheduleListMobile({
         }
         className={cn(
           'w-full text-left py-3 min-h-[56px]',
-          'flex items-center justify-between gap-3',
-          isNested ? 'border-l-2 border-l-primary/25 pl-7 pr-4' : 'px-5',
+          'flex items-start gap-3',
+          isNested ? 'border-l-2 border-l-primary/25 pl-6 pr-4' : 'px-4',
           showTopBorder && 'border-t border-border/50',
-          'hover:bg-accent/20 active:bg-accent/30 transition-colors',
+          visitRowTint(visit?.status),
+          // brightness, not a background — a bg-* hover is the same property as
+          // the status tint and would strip the wash off the row on touch.
+          'transition-[filter] hover:brightness-[0.97] active:brightness-[0.94]',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
           isCreating && 'opacity-50 cursor-wait',
+          // Selection deliberately beats the status wash — in select mode what's
+          // ticked matters more than what's done.
           selectMode && isSelected && 'bg-accent/40',
         )}
       >
         {/* The row is the tap target, so this is presentational only — a real
             Checkbox here is a <button> inside a <button>. */}
-        {selectMode && <CheckIndicator checked={isSelected} />}
-        {/* Left: identity */}
-        <div className="flex flex-col gap-0.5 min-w-0">
+        {selectMode && <CheckIndicator checked={isSelected} className="mt-0.5" />}
+
+        {/* Identity */}
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           {!isNested && (
-            <span className="font-display text-[15px] font-semibold leading-snug text-foreground truncate">
+            <span
+              className={cn(
+                'font-display text-[15px] font-semibold leading-snug truncate',
+                settled ? 'text-muted-foreground' : 'text-foreground',
+              )}
+            >
               {account.name}
             </span>
           )}
           <span className="text-[13px] leading-snug text-muted-foreground truncate">
             {row.property.address}
           </span>
-          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          {/* One meta line carries what used to be pills on the right: cadence,
+              who worked it, and where the invoice is. No rate — the schedule is
+              a dispatch screen, and pricing is the accountant's question. */}
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
             <FrequencyBadge frequency={row.property.frequency} />
-            {!isNested && <AccountPriceMeta account={account} />}
+            {crewLabel && (
+              <span className="truncate">
+                {crewLabel}
+                {overflow > 0 && ` +${overflow}`}
+              </span>
+            )}
+            {visit?.status === 'completed' && visit.invoice && (
+              <span className="ink-invoiced flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide">
+                <Receipt className="h-2.5 w-2.5 shrink-0" aria-hidden />
+                {invoiceStatusLabel(visit.invoice.status)}
+              </span>
+            )}
           </div>
           {/* The spreadsheet's orange cell. It used to be a bare icon on the
               right that said an instruction existed without showing it — on a
@@ -400,46 +432,23 @@ export function ScheduleListMobile({
           )}
         </div>
 
-        {/* Right: on-site indicator or crew + status */}
-        <div className="flex items-center gap-2 shrink-0">
-          {inProgress && effectiveStartedAt ? (
-            <div className="flex items-center gap-1.5 rounded-full bg-[var(--clay)]/10 border border-[var(--clay)]/30 px-2.5 py-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--clay)] animate-pulse shrink-0" />
-              <span className="text-[11px] font-semibold text-[var(--clay)]">On site</span>
-              <span className="text-[11px] text-[var(--clay)]/70 tabular-nums">
-                {formatElapsed(effectiveStartedAt)}
-              </span>
-            </div>
-          ) : (
-            <>
-              {displayedCrew.length > 0 && (
-                <div className="flex gap-0.5">
-                  {displayedCrew.map((emp) => (
-                    <span key={emp.id} className="text-[10px] bg-muted/60 rounded px-1 leading-5">
-                      {emp.name.split(' ')[0]}
-                    </span>
-                  ))}
-                  {overflow > 0 && (
-                    <span className="text-[10px] text-muted-foreground leading-5">+{overflow}</span>
-                  )}
-                </div>
-              )}
-
-              {visit ? (
-                <div className="flex flex-col items-end gap-1">
-                  <VisitStatusBadge status={visit.status} />
-                  {visit.status === 'completed' && visit.invoice && (
-                    <InvoiceStatusBadge status={visit.invoice.status} withIcon />
-                  )}
-                </div>
-              ) : (
-                <span className="text-xs text-muted-foreground/50">
-                  {isCreating ? '…' : '+ Schedule'}
-                </span>
-              )}
-            </>
-          )}
-        </div>
+        {/* Right: the status mark, the live clock, or the schedule action —
+            never more than one. A scheduled stop renders nothing here but its
+            screen-reader label; an undecorated row IS the outstanding one. */}
+        {visit && inProgress && effectiveStartedAt ? (
+          <span className="mt-0.5 flex shrink-0 items-center gap-1.5 text-[11px] font-semibold tabular-nums text-[var(--clay)]">
+            <VisitStatusIcon status={visit.status} inProgress />
+            {formatElapsed(effectiveStartedAt)}
+          </span>
+        ) : !visit ? (
+          <span className="mt-0.5 shrink-0 text-xs font-medium text-primary">
+            {isCreating ? '…' : '+ Schedule'}
+          </span>
+        ) : (
+          <span className="mt-0.5 flex shrink-0">
+            <VisitStatusIcon status={visit.status} />
+          </span>
+        )}
       </button>
     )
   }
@@ -456,31 +465,27 @@ export function ScheduleListMobile({
     propertyCount: number
     showTopBorder: boolean
   }) {
-    const price = formatAccountPrice(account)
     return (
-      <div className={cn('px-5 pt-2.5 pb-1.5', showTopBorder && 'border-t border-border/60')}>
+      <div className={cn('px-4 pt-2.5 pb-1.5', showTopBorder && 'border-t border-border/60')}>
         <div className="font-display text-[15px] font-semibold leading-snug text-foreground truncate">
           {account.name}
         </div>
-        <div className="mt-0.5 flex items-center gap-2">
-          {price !== '—' ? (
-            <span className="text-[11px] tabular-nums text-muted-foreground">{price}</span>
-          ) : (
-            <BillingTypeBadge billingType={account.billing_type} />
-          )}
-          <span className="text-[11px] text-muted-foreground ml-auto shrink-0">{propertyCount} sites</span>
-        </div>
+        {/* The rate used to sit opposite this; with it gone the count reads
+            left, under the name, rather than floating against nothing. */}
+        <div className="mt-0.5 text-[11px] text-muted-foreground">{propertyCount} sites</div>
       </div>
     )
   }
 
   return (
     <>
-      <div className="space-y-4">
+      <div className="space-y-3">
         {currentWeek.routeGroups.map(({ routeGroup, rows }) => (
           <div
             key={routeGroup.id}
-            className="rounded-xl border border-border bg-card shadow-warm"
+            /* Full-bleed on a phone (ScheduleView cancels the page padding), so
+               there are no side edges to round or shadow — just hairlines. */
+            className="border-y border-border bg-card"
           >
             {/* Sticky under the compact header, whose height it reads from
                 --schedule-sticky-h. Knowing which route you're scrolling
@@ -516,7 +521,7 @@ export function ScheduleListMobile({
             </div>
 
             {/* Properties, nested by account */}
-            <div className="overflow-hidden rounded-b-xl">
+            <div className="overflow-hidden">
               {groupRowsByAccount(rows).map(({ account, rows: acctRows }, acctIdx) => {
                 if (acctRows.length === 1) {
                   return renderStopRow(account, acctRows[0], 'merged', acctIdx > 0)
@@ -533,7 +538,7 @@ export function ScheduleListMobile({
         ))}
 
         {currentWeek.ungrouped.length > 0 && (
-          <div className="overflow-hidden rounded-xl border border-[var(--clay)]/30 bg-card shadow-warm">
+          <div className="overflow-hidden border-y border-[var(--clay)]/30 bg-card">
             {/* "Not on a route" — properties with no property_route_groups row.
                 These used to be silently dropped from the schedule entirely. */}
             <div className="bg-[var(--clay)]/10 text-[var(--clay)] flex items-center justify-between px-4 py-2.5 border-b border-[var(--clay)]/30">

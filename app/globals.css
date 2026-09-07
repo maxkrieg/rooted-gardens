@@ -201,9 +201,11 @@
   }
 
   /* Billing type badge colors */
+  /* Neutral stone, same as the frequency pill. Billing type describes the
+     arrangement, not the state of any work — see .freq-badge below. */
   .billing-per_visit {
-    background-color: #e3ede4;
-    color: #3a6347;
+    background-color: #ece8df;
+    color: #6e665a;
   }
   .billing-contract {
     background-color: #e4ecf2;
@@ -217,22 +219,59 @@
     color: #6e665a;
   }
 
-  /* Zone frequency badge colors */
-  .freq-weekly {
-    background-color: #e3f1e7;
-    color: #2f6e45;
+  /* Frequency badge. One neutral pill for every cadence: colour in this app
+     encodes visit status only, and the old green .freq-weekly was the exact
+     fill of .status-completed sitting inches away on the same schedule row. */
+  .freq-badge {
+    background-color: #ece8df;
+    color: #6e665a;
   }
-  .freq-biweekly {
-    background-color: #e3ede4;
-    color: #3a6347;
+
+  /* Full-row wash for a settled visit on the phone schedule. Deliberately
+     lighter than the .status-* pill fills — across a whole row that tint reads
+     as a highlight rather than a background. These do need dark overrides,
+     unlike the pills: a pastel covering a whole row on the dark card doesn't
+     survive the way 20px of badge does. */
+  .row-completed {
+    background-color: #eaf4ed;
   }
-  .freq-monthly {
-    background-color: #e4ecf2;
+  .row-skipped {
+    background-color: #faf3e2;
+  }
+  .dark .row-completed {
+    background-color: #1f2a22;
+  }
+  .dark .row-skipped {
+    background-color: #2a2519;
+  }
+
+  /* The glyphs that replaced the row's status pill. Solid disc, with the mark
+     knocked out in the row's own wash colour rather than drawn in ink — an
+     outlined ring at this size reads as an empty checkbox. Stroke therefore
+     tracks the .row-* backgrounds above and moves with them in dark. */
+  .icon-completed {
+    fill: #2f6e45;
+    stroke: #eaf4ed;
+  }
+  .icon-skipped {
+    fill: #9a6b16;
+    stroke: #faf3e2;
+  }
+  .dark .icon-completed {
+    fill: #8cc4a0;
+    stroke: #1f2a22;
+  }
+  .dark .icon-skipped {
+    fill: #d9a441;
+    stroke: #2a2519;
+  }
+
+  /* Denim ink for the invoice state, which stayed text rather than a glyph. */
+  .ink-invoiced {
     color: #3f6e97;
   }
-  .freq-as_needed {
-    background-color: #ede9df;
-    color: #6e665a;
+  .dark .ink-invoiced {
+    color: #8fb4d1;
   }
 }
 

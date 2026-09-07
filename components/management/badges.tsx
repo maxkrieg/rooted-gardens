@@ -3,7 +3,7 @@
  * Colours are defined as CSS classes in globals.css (@layer base).
  */
 
-import { AlertTriangle, Receipt } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Circle, MinusCircle, Receipt } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import type {
   Account,
@@ -68,21 +68,21 @@ export function BillingTypeBadge({ billingType }: { billingType: string }) {
 
 // ─── Frequency ────────────────────────────────────────────────────────────────
 
-const FREQUENCY_META: Record<Frequency, { label: string; className: string }> = {
-  weekly:    { label: 'Weekly',    className: 'freq-weekly' },
-  biweekly:  { label: 'Bi-weekly', className: 'freq-biweekly' },
-  monthly:   { label: 'Monthly',   className: 'freq-monthly' },
-  as_needed: { label: 'As Needed', className: 'freq-as_needed' },
+// One neutral pill for every cadence — the colour used to differ per frequency,
+// but weekly's green was indistinguishable from a COMPLETED badge on the same
+// schedule row. Colour is reserved for visit status; this is a label.
+const FREQUENCY_LABELS: Record<Frequency, string> = {
+  weekly:    'Weekly',
+  biweekly:  'Bi-weekly',
+  monthly:   'Monthly',
+  as_needed: 'As Needed',
 }
 
 export function FrequencyBadge({ frequency }: { frequency: string }) {
-  const meta = FREQUENCY_META[frequency as Frequency] ?? {
-    label: frequency,
-    className: 'freq-as_needed',
-  }
+  const label = FREQUENCY_LABELS[frequency as Frequency] ?? frequency
   return (
-    <Badge variant="outline" className={`border-transparent uppercase tracking-wide text-[10px] font-semibold ${meta.className}`}>
-      {meta.label}
+    <Badge variant="outline" className="border-transparent uppercase tracking-wide text-[10px] font-semibold freq-badge">
+      {label}
     </Badge>
   )
 }
@@ -120,6 +120,49 @@ export function VisitStatusBadge({ status }: { status: string }) {
   )
 }
 
+// The phone schedule says status with a glyph and a row-wide tint instead of a
+// badge — five pills on one row left no width for the account name. The word
+// still reaches screen readers via the sr-only label.
+//
+// Only the settled states get a mark. 'Scheduled' deliberately draws nothing:
+// an outlined ring reads as an empty checkbox, and the whole point of the
+// treatment is that outstanding work is the row with no decoration on it.
+const VISIT_STATUS_ICON: Partial<Record<VisitStatus, { Icon: typeof Circle; className: string }>> = {
+  completed: { Icon: CheckCircle2, className: 'icon-completed' },
+  skipped:   { Icon: MinusCircle,  className: 'icon-skipped' },
+}
+
+export function VisitStatusIcon({ status, inProgress }: { status: string; inProgress?: boolean }) {
+  const label = VISIT_STATUS_META[status as VisitStatus]?.label ?? status
+
+  // On site wins over the underlying 'scheduled' — it's the live state, and it
+  // gets the clay pulse the design system reserves for it.
+  if (inProgress) {
+    return (
+      <>
+        <Circle className="h-2 w-2 shrink-0 animate-pulse fill-current text-[var(--clay)]" aria-hidden />
+        <span className="sr-only">On site</span>
+      </>
+    )
+  }
+
+  const meta = VISIT_STATUS_ICON[status as VisitStatus]
+  if (!meta) return <span className="sr-only">{label}</span>
+  return (
+    <>
+      <meta.Icon className={`h-[18px] w-[18px] shrink-0 ${meta.className}`} aria-hidden />
+      <span className="sr-only">{label}</span>
+    </>
+  )
+}
+
+/** Row-wide background for a settled visit; '' for anything still outstanding. */
+export function visitRowTint(status: string | null | undefined): string {
+  if (status === 'completed') return 'row-completed'
+  if (status === 'skipped') return 'row-skipped'
+  return ''
+}
+
 // ─── Invoice lifecycle status ─────────────────────────────────────────────────
 
 // Real QBO invoice status, synced back from QuickBooks (draft → sent → paid,
@@ -136,6 +179,12 @@ const INVOICE_STATUS_META: Record<InvoiceStatus, { label: string; className: str
 // status wherever it sits next to a visit-status badge (schedule cells, the visit
 // drawer, account recent-visits). The Billing → Invoices tab omits it — the
 // context there is already unambiguous.
+/** The badge's label alone, for surfaces too tight for a pill (the phone
+ *  schedule row renders it as plain denim text beside a receipt glyph). */
+export function invoiceStatusLabel(status: string): string {
+  return INVOICE_STATUS_META[status as InvoiceStatus]?.label ?? status
+}
+
 export function InvoiceStatusBadge({ status, withIcon = false }: { status: string; withIcon?: boolean }) {
   const meta = INVOICE_STATUS_META[status as InvoiceStatus] ?? {
     label: status,
