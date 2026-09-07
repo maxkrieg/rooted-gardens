@@ -400,20 +400,28 @@ export function VisitDetailContent({
               </div>
             </div>
 
-            {/* Assigned crew */}
-            <div className="flex items-start gap-3">
-              <Users className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2 mb-1">
+            {/* Assigned crew — unlike the sibling rows, the label shares a line
+                with a full-height button, so the icon sits *inside* that row and
+                centers with the label. Pinning it outside at mt-0.5 left it
+                floating above (and `size="sm"` is taller again on touch, so a
+                fixed nudge wouldn't hold). */}
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Users className="h-4 w-4 text-muted-foreground shrink-0" />
                   <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
                     Assigned Crew
                   </p>
-                  {canReassign && !isFinalVisit && (
-                    <Button variant="outline" size="sm" className="-mt-1 shrink-0" onClick={() => setAssignOpen(true)}>
-                      Manage
-                    </Button>
-                  )}
                 </div>
+                {canReassign && !isFinalVisit && (
+                  <Button variant="outline" size="sm" className="shrink-0" onClick={() => setAssignOpen(true)}>
+                    Manage
+                  </Button>
+                )}
+              </div>
+              {/* pl-7 = the 16px icon + the gap-3 beside it, so the value lines
+                  up with every other row's text column. */}
+              <div className="pl-7">
                 {assignedCrew.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5">
                     {assignedCrew.map((c) => (
