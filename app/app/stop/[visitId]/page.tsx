@@ -10,6 +10,7 @@ import { ArrowLeft, CalendarDays, Play, Flag, SkipForward, Check, RotateCcw } fr
 import { Button } from '@/components/ui/button'
 import { VisitDetailContent } from '@/components/VisitDetailContent'
 import { useCan } from '@/components/app/RoleProvider'
+import { useKeyboardOpen } from '@/hooks/use-keyboard-open'
 import { useStopDetail, type StopDetail } from '@/hooks/crew/useStopDetail'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { VisitLogger } from '@/components/crew/VisitLogger'
@@ -54,6 +55,7 @@ export default function StopDetailPage() {
   const [completionOpen, setCompletionOpen] = useState(false)
   const [skipOpen, setSkipOpen] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
+  const keyboardOpen = useKeyboardOpen()
 
   // A stop is routinely a cold entry point — the PWA launching straight into it,
   // a shared link, or a jump from the management visit sheet — and in those
@@ -197,10 +199,12 @@ export default function StopDetailPage() {
         />
       </div>
 
-      {/* Fixed action bar — three inline icon+label actions above the bottom nav */}
+      {/* Fixed action bar — three inline icon+label actions above the bottom nav.
+          The offset is the nav's height, so it has to drop to 0 whenever the nav
+          hides for the keyboard or the bar leaves a 56px gap over it. */}
       <div
         className="fixed inset-x-0 z-40 bg-background/95 backdrop-blur border-t border-[--border] px-4 pt-2 pb-2"
-        style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }}
+        style={{ bottom: keyboardOpen ? '0px' : 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }}
       >
         {/* On-site line — stays visible above the button row once Start has been
             tapped, independent of whether the Discard cell is mid-confirm. */}

@@ -14,6 +14,7 @@ import { MoreSheet } from '@/components/app/MoreSheet'
 import { RoleProvider, useRole } from '@/components/app/RoleProvider'
 import { isNavItemActive, navFor, type NavItem } from '@/components/app/nav-items'
 import { canAccessRoute } from '@/lib/auth/access'
+import { useKeyboardOpen } from '@/hooks/use-keyboard-open'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { useCrewRealtimeSync } from '@/hooks/crew/useCrewRealtimeSync'
 import { navLeadCountKey, useNewLeadCount, useUnroutedCount } from '@/hooks/useNavCounts'
@@ -77,6 +78,7 @@ function AppShellInner({
   const { data: employee, isError: employeeError } = useCurrentEmployee()
   const [moreOpen, setMoreOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const keyboardOpen = useKeyboardOpen()
   const lastToastAt = useRef(0)
 
   const { data: newLeadCount = 0 } = useNewLeadCount(role)
@@ -229,9 +231,17 @@ function AppShellInner({
         {children}
       </main>
 
-      {/* Bottom bar — phone only; desktop uses the sidebar above. */}
+      {/* Bottom bar — phone only; desktop uses the sidebar above. Hidden while
+          a keyboard is up: under 'resizes-content' it would otherwise ride on
+          top of the keyboard, covering its top row. `main`'s bottom padding
+          deliberately does NOT collapse with it — reclaiming that space
+          mid-focus would shift the scroll position out from under the field
+          the browser just scrolled into view. */}
       <nav
-        className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-card border-t border-border"
+        className={cn(
+          'lg:hidden fixed bottom-0 inset-x-0 z-50 bg-card border-t border-border',
+          keyboardOpen && 'hidden',
+        )}
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
         <ul className="flex items-stretch h-14">

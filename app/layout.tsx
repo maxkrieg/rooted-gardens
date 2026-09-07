@@ -42,6 +42,14 @@ export const viewport: Viewport = {
   // Required for env(safe-area-inset-*) to resolve to anything but 0px on
   // notched iOS. Without it every safe-area calc in the app is a no-op.
   viewportFit: 'cover',
+  // Android Chrome defaults to 'resizes-visual': the keyboard shrinks only the
+  // visual viewport, so dvh stays tall and every `fixed … bottom-0` element —
+  // above all the bottom sheets, which is where nearly all the app's text input
+  // lives — sits stranded behind the keyboard. iOS reparents fixed elements onto
+  // the visual viewport instead, which is why this only ever broke on Android.
+  // 'resizes-content' shrinks the layout viewport, so dvh, the sheets, and
+  // Chrome's own scroll-into-view all start working. iOS ignores the key.
+  interactiveWidget: 'resizes-content',
   // No maximum-scale / user-scalable: blocking pinch-zoom fails WCAG 1.4.4, and
   // it isn't needed — every input bases at text-base (16px), which is what
   // actually prevents iOS zoom-on-focus.
