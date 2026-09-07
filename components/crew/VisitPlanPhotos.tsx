@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Image as ImageIcon, X } from 'lucide-react'
+import { Camera, Image as ImageIcon, ImagePlus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { useAddVisitPlanPhoto } from '@/hooks/crew/useAddVisitPlanPhoto'
@@ -42,7 +42,8 @@ export function VisitPlanPhotos({
   onOpenPhoto,
   onPhotoAdded,
 }: VisitPlanPhotosProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const libraryInputRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState<string | null>(null)
   const addPhoto = useAddVisitPlanPhoto(visitId, propertyId)
   const deletePhoto = useDeleteVisitPlanPhoto(visitId)
@@ -164,30 +165,62 @@ export function VisitPlanPhotos({
 
         {canEdit && (
           <>
-            {/* Hidden file input — capture="environment" opens rear camera on mobile */}
+            {/* Two inputs, not one: capture="environment" jumps straight to the
+                rear camera, so the library needs its own input without it. */}
             <input
-              ref={fileInputRef}
+              ref={cameraInputRef}
               type="file"
               accept="image/*"
               capture="environment"
               className="sr-only"
               onChange={handleFileChange}
             />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={photos.length >= MAX_PLAN_PHOTOS || addPhoto.isPending}
-            >
-              <ImageIcon className="h-3.5 w-3.5" />
-              {addPhoto.isPending
-                ? 'Uploading…'
-                : photos.length > 0
-                  ? `Add Photo (${photos.length}/${MAX_PLAN_PHOTOS})`
-                  : 'Add Photo'}
-            </Button>
+            <input
+              ref={libraryInputRef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={handleFileChange}
+            />
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Camera-only on touch devices: `pointer-coarse` means the primary
+                  pointer is a finger, so a touchscreen laptop still gets the
+                  single desktop button. CSS, not JS — no hydration flash. */}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="hidden pointer-coarse:inline-flex gap-1.5"
+                onClick={() => cameraInputRef.current?.click()}
+                disabled={photos.length >= MAX_PLAN_PHOTOS || addPhoto.isPending}
+              >
+                <Camera className="h-3.5 w-3.5" />
+                {addPhoto.isPending ? 'Uploading…' : 'Take Photo'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => libraryInputRef.current?.click()}
+                disabled={photos.length >= MAX_PLAN_PHOTOS || addPhoto.isPending}
+              >
+                <ImagePlus className="h-3.5 w-3.5" />
+                {addPhoto.isPending ? (
+                  'Uploading…'
+                ) : (
+                  <>
+                    <span className="pointer-coarse:hidden">Add Photo</span>
+                    <span className="hidden pointer-coarse:inline">Choose Photo</span>
+                  </>
+                )}
+              </Button>
+              {photos.length > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {photos.length}/{MAX_PLAN_PHOTOS}
+                </span>
+              )}
+            </div>
             {error && <p className="text-xs text-destructive">{error}</p>}
           </>
         )}

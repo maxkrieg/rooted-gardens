@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { addDays, endOfDay, format, min as minDate, parseISO, startOfDay } from 'date-fns'
-import { Camera, X } from 'lucide-react'
+import { Camera, ImagePlus, X } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -96,7 +96,8 @@ export function VisitLogger({
 }: VisitLoggerProps) {
   const queryClient = useQueryClient()
   const { data: activeEmployees = [] } = useActiveEmployees()
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const libraryInputRef = useRef<HTMLInputElement>(null)
 
   // The visit's scheduled week bounds Start/End — Monday 00:00 through the earlier
   // of Sunday 23:59 or "now" (can't log a future completion either).
@@ -553,30 +554,60 @@ export function VisitLogger({
 
           {/* Photo capture */}
           <div className="space-y-2">
-            {/* Hidden file input — capture="environment" opens rear camera on mobile */}
+            {/* Two inputs, not one: capture="environment" jumps straight to the
+                rear camera, so the library needs its own input without it. */}
             <input
-              ref={fileInputRef}
+              ref={cameraInputRef}
               type="file"
               accept="image/*"
               capture="environment"
               className="sr-only"
               onChange={handlePhotoCapture}
             />
+            <input
+              ref={libraryInputRef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={handlePhotoCapture}
+            />
 
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full h-11 gap-2"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={photos.length >= 4 || uploadingPhoto || submitting}
-            >
-              <Camera className="h-4 w-4" />
-              {uploadingPhoto
-                ? 'Uploading…'
-                : photos.length > 0
-                  ? `Add Photo (${photos.length}/4)`
-                  : 'Add Photo'}
-            </Button>
+            {/* Camera-only on touch devices: `pointer-coarse` means the primary
+                pointer is a finger, so a touchscreen laptop still gets the
+                single desktop button. CSS, not JS — no hydration flash. */}
+            <div className="grid grid-cols-1 pointer-coarse:grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="hidden pointer-coarse:inline-flex h-11 gap-2"
+                onClick={() => cameraInputRef.current?.click()}
+                disabled={photos.length >= 4 || uploadingPhoto || submitting}
+              >
+                <Camera className="h-4 w-4" />
+                {uploadingPhoto ? 'Uploading…' : 'Take Photo'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 gap-2"
+                onClick={() => libraryInputRef.current?.click()}
+                disabled={photos.length >= 4 || uploadingPhoto || submitting}
+              >
+                <ImagePlus className="h-4 w-4" />
+                {uploadingPhoto ? (
+                  'Uploading…'
+                ) : (
+                  <>
+                    <span className="pointer-coarse:hidden">Add Photo</span>
+                    <span className="hidden pointer-coarse:inline">Choose Photo</span>
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {photos.length > 0 && (
+              <p className="text-xs text-muted-foreground">{photos.length}/4 photos</p>
+            )}
 
             {photoError && (
               <p className="text-xs text-destructive">{photoError}</p>
