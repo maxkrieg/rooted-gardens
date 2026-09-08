@@ -14,6 +14,10 @@ import { useEffect, useRef } from 'react'
  * `top-0` on every breakpoint: the mobile offset used to clear the management
  * shell's 56px fixed header, which the bottom bar replaced — it survived the
  * merge as a gap the page scrolled through.
+ *
+ * On a phone it cancels the page padding and re-applies it as its own, so the
+ * background reaches both screen edges: the schedule list below is full-bleed,
+ * and a bar inset by 16px let the rows scroll visibly through the gutters.
  */
 export function ScheduleStickyBar({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -36,7 +40,7 @@ export function ScheduleStickyBar({ children }: { children: React.ReactNode }) {
   return (
     <div
       ref={ref}
-      className="sticky top-0 z-40 bg-background pb-2 mb-2 lg:pb-3 lg:mb-3"
+      className="sticky top-0 z-40 -mx-4 bg-background px-4 pb-2 mb-2 lg:mx-0 lg:px-0 lg:pb-3 lg:mb-3"
     >
       {children}
     </div>
