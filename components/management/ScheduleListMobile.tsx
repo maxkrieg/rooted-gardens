@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { FilePen, Receipt } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -22,12 +22,21 @@ import { useAssignPropertyRoute } from '@/hooks/useAssignPropertyRoute'
 import { useScheduleReference } from '@/hooks/useManagementSchedule'
 import { useWeekNotes, useSaveWeekNote } from '@/hooks/useWeekNotes'
 import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
-import { groupRowsByAccount } from '@/lib/utils/schedule'
+import { groupRowsByAccount, sortRowsByPriority } from '@/lib/utils/schedule'
+import { usePropertyLastVisit } from '@/hooks/usePropertyLastVisit'
+import {
+  DEFAULT_SCHEDULE_SORT,
+  UNGROUPED_SORT_KEY,
+  sortModeForGroup,
+  type ScheduleSortMode,
+  type ScheduleSortState,
+} from '@/lib/utils/schedule-sort'
+import { ScheduleSortToggle } from '@/components/management/ScheduleSortToggle'
 import { syncVisitUrlParam } from '@/lib/utils/visit-url'
 import {
   VisitStatusIcon,
   visitRowTint,
-  FrequencyBadge,
+  CadenceBadge,
   invoiceStatusLabel,
 } from '@/components/management/badges'
 import type {
@@ -53,6 +62,10 @@ interface ScheduleListMobileProps {
    *  the header's `⋯ → Select` can toggle it. */
   selectMode?: boolean
   onExitSelectMode?: () => void
+  /** Schedule-wide default plus per-group overrides. Owned by ScheduleView so
+   *  the top-of-page switch and the per-band switches share one state. */
+  sortState?: ScheduleSortState
+  onGroupSortChange?: (groupKey: string, mode: ScheduleSortMode) => void
 }
 
 export function ScheduleListMobile({
@@ -63,9 +76,24 @@ export function ScheduleListMobile({
   filtered,
   selectMode = false,
   onExitSelectMode,
+  sortState = DEFAULT_SCHEDULE_SORT,
+  onGroupSortChange,
 }: ScheduleListMobileProps) {
   const { editSchedule: canEdit } = useCan()
   const createVisit = useCreateVisit()
+
+  const { data: lastVisitByProperty } = usePropertyLastVisit()
+
+  // Each band resolves its own mode — its override, else the schedule-wide
+  // default. Applied before groupRowsByAccount so a multi-property account still
+  // clusters; the cluster just moves to wherever its most urgent property lands.
+  const orderRows = useCallback(
+    (groupKey: string, rows: SchedulePropertyRow[]) =>
+      sortModeForGroup(sortState, groupKey) === 'priority'
+        ? sortRowsByPriority(rows, lastVisitByProperty)
+        : rows,
+    [sortState, lastVisitByProperty],
+  )
 
   // Tick elapsed time every 30s
   const [, setTick] = useState(0)
@@ -407,7 +435,13 @@ export function ScheduleListMobile({
               who worked it, and where the invoice is. No rate — the schedule is
               a dispatch screen, and pricing is the accountant's question. */}
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
-            <FrequencyBadge frequency={row.property.frequency} />
+            {/* Settled work needs no countdown — the row already carries its
+                status wash and glyph. Outstanding work is where the wait matters. */}
+            <CadenceBadge
+              property={row.property}
+              lastVisitOn={lastVisitByProperty?.[row.property.id] ?? null}
+              showDays={!visit || visit.status === 'scheduled'}
+            />
             {crewLabel && (
               <span className="truncate">
                 {crewLabel}
@@ -494,6 +528,16 @@ export function ScheduleListMobile({
             <div className="sticky z-10" style={{ top: 'var(--schedule-sticky-h, 0px)' }}>
               <RouteGroupBand
                 name={routeGroup.name}
+                sortSlot={
+                  onGroupSortChange && (
+                    <ScheduleSortToggle
+                      size="compact"
+                      scope={routeGroup.name}
+                      mode={sortModeForGroup(sortState, routeGroup.id)}
+                      onChange={(mode) => onGroupSortChange(routeGroup.id, mode)}
+                    />
+                  )
+                }
                 days={routeGroup.default_days ?? []}
                 stats={statsFor(rows, currentWeek.weekStart)}
                 canEdit={canEdit}
@@ -522,7 +566,7 @@ export function ScheduleListMobile({
 
             {/* Properties, nested by account */}
             <div className="overflow-hidden">
-              {groupRowsByAccount(rows).map(({ account, rows: acctRows }, acctIdx) => {
+              {groupRowsByAccount(orderRows(routeGroup.id, rows)).map(({ account, rows: acctRows }, acctIdx) => {
                 if (acctRows.length === 1) {
                   return renderStopRow(account, acctRows[0], 'merged', acctIdx > 0)
                 }
@@ -542,8 +586,18 @@ export function ScheduleListMobile({
             {/* "Not on a route" — properties with no property_route_groups row.
                 These used to be silently dropped from the schedule entirely. */}
             <div className="bg-[var(--clay)]/10 text-[var(--clay)] flex items-center justify-between px-4 py-2.5 border-b border-[var(--clay)]/30">
-              <span className="text-xs font-semibold uppercase tracking-widest">
-                Not on a route · {currentWeek.ungrouped.length}
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="truncate text-xs font-semibold uppercase tracking-widest">
+                  Not on a route · {currentWeek.ungrouped.length}
+                </span>
+                {onGroupSortChange && (
+                  <ScheduleSortToggle
+                    size="compact"
+                    scope="Stops with no route"
+                    mode={sortModeForGroup(sortState, UNGROUPED_SORT_KEY)}
+                    onChange={(mode) => onGroupSortChange(UNGROUPED_SORT_KEY, mode)}
+                  />
+                )}
               </span>
               {/* Was a link to /app/routes carrying no context — you arrived at
                   a list of every route with no memory of which stop sent you. */}
@@ -557,7 +611,7 @@ export function ScheduleListMobile({
               )}
             </div>
             <div>
-              {groupRowsByAccount(currentWeek.ungrouped).map(({ account, rows: acctRows }, acctIdx) => {
+              {groupRowsByAccount(orderRows(UNGROUPED_SORT_KEY, currentWeek.ungrouped)).map(({ account, rows: acctRows }, acctIdx) => {
                 if (acctRows.length === 1) {
                   return renderStopRow(account, acctRows[0], 'merged', acctIdx > 0)
                 }

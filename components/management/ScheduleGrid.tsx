@@ -1,11 +1,20 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { addDays, format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { getWeekStart, groupRowsByAccount } from '@/lib/utils/schedule'
+import { getWeekStart, groupRowsByAccount, sortRowsByPriority } from '@/lib/utils/schedule'
+import { usePropertyLastVisit } from '@/hooks/usePropertyLastVisit'
+import {
+  DEFAULT_SCHEDULE_SORT,
+  UNGROUPED_SORT_KEY,
+  sortModeForGroup,
+  type ScheduleSortMode,
+  type ScheduleSortState,
+} from '@/lib/utils/schedule-sort'
+import { ScheduleSortToggle } from '@/components/management/ScheduleSortToggle'
 import { syncVisitUrlParam } from '@/lib/utils/visit-url'
 import { formatAccountPrice } from '@/lib/utils/accounts'
 import { useCan } from '@/components/app/RoleProvider'
@@ -18,7 +27,7 @@ import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { FilePen, Camera } from 'lucide-react'
-import { AccountPriceMeta, FrequencyBadge, BillingTypeBadge, InvoiceStatusBadge } from '@/components/management/badges'
+import { AccountPriceMeta, CadenceBadge, BillingTypeBadge, InvoiceStatusBadge } from '@/components/management/badges'
 import type {
   Account,
   Employee,
@@ -42,15 +51,37 @@ interface ScheduleGridProps {
   vehicles: Vehicle[]
   /** True when a filter is narrowing the view — changes the empty state's meaning. */
   filtered?: boolean
+  /** Shared with the phone list so the two schedule views can't disagree. */
+  sortState?: ScheduleSortState
+  onGroupSortChange?: (groupKey: string, mode: ScheduleSortMode) => void
 }
 
-export function ScheduleGrid({ weeks, employees, vehicles, filtered }: ScheduleGridProps) {
+export function ScheduleGrid({
+  weeks,
+  employees,
+  vehicles,
+  filtered,
+  sortState = DEFAULT_SCHEDULE_SORT,
+  onGroupSortChange,
+}: ScheduleGridProps) {
   const { editSchedule: canEdit } = useCan()
   const currentWeekStart = useMemo(
     () => format(getWeekStart(new Date()), 'yyyy-MM-dd'),
     []
   )
   const createVisit = useCreateVisit()
+
+  const { data: lastVisitByProperty } = usePropertyLastVisit()
+
+  // Each group resolves its own mode, exactly as the phone list does.
+  // Applied before groupRowsByAccount so a multi-property account still clusters.
+  const orderRows = useCallback(
+    (groupKey: string, rows: SchedulePropertyRow[]) =>
+      sortModeForGroup(sortState, groupKey) === 'priority'
+        ? sortRowsByPriority(rows, lastVisitByProperty)
+        : rows,
+    [sortState, lastVisitByProperty],
+  )
 
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sheetRow, setSheetRow] = useState<SchedulePropertyRow | null>(null)
@@ -192,7 +223,12 @@ export function ScheduleGrid({ weeks, employees, vehicles, filtered }: ScheduleG
           key={`${keyPrefix}-${row.property.id}`}
           className="group border-b border-border/50 hover:bg-accent/20 transition-colors"
         >
-          <PropertyLabelCell account={account} property={row.property} variant="merged" />
+          <PropertyLabelCell
+            account={account}
+            property={row.property}
+            variant="merged"
+            lastVisitOn={lastVisitByProperty?.[row.property.id] ?? null}
+          />
           {weeks.map((week) => renderWeekCell(row, week))}
         </tr>,
       ]
@@ -208,7 +244,12 @@ export function ScheduleGrid({ weeks, employees, vehicles, filtered }: ScheduleG
           key={`${keyPrefix}-${row.property.id}`}
           className="group border-b border-border/50 hover:bg-accent/20 transition-colors"
         >
-          <PropertyLabelCell account={account} property={row.property} variant="nested" />
+          <PropertyLabelCell
+            account={account}
+            property={row.property}
+            variant="nested"
+            lastVisitOn={lastVisitByProperty?.[row.property.id] ?? null}
+          />
           {weeks.map((week) => renderWeekCell(row, week))}
         </tr>
       )),
@@ -303,8 +344,17 @@ export function ScheduleGrid({ weeks, employees, vehicles, filtered }: ScheduleG
                       className="bg-secondary text-secondary-foreground text-xs font-semibold uppercase tracking-widest py-2 border-b border-border"
                     >
                       <div className="flex items-center justify-between">
-                        <span className={cn('sticky left-0 px-4', LABEL_COL_WIDTH)}>
-                          {routeGroup.name}
+                        <span className={cn('sticky left-0 flex items-center gap-2 px-4', LABEL_COL_WIDTH)}>
+                          <span className="truncate">{routeGroup.name}</span>
+                          {onGroupSortChange && (
+                            <ScheduleSortToggle
+                              size="compact"
+                              scope={routeGroup.name}
+                              mode={sortModeForGroup(sortState, routeGroup.id)}
+                              onChange={(mode) => onGroupSortChange(routeGroup.id, mode)}
+                              className="normal-case tracking-normal"
+                            />
+                          )}
                         </span>
                         {canEdit && (
                           <Button
@@ -327,7 +377,7 @@ export function ScheduleGrid({ weeks, employees, vehicles, filtered }: ScheduleG
                   // identity and its single site into one label cell instead of a
                   // separate spanning header row. Only accounts with multiple sites
                   // get a real header row + indented, railed property rows below it.
-                  ...groupRowsByAccount(rows).flatMap(({ account, rows: acctRows }) =>
+                  ...groupRowsByAccount(orderRows(routeGroup.id, rows)).flatMap(({ account, rows: acctRows }) =>
                     renderPropertyRows(routeGroup.id, account, acctRows)
                   ),
                 ]),
@@ -342,8 +392,17 @@ export function ScheduleGrid({ weeks, employees, vehicles, filtered }: ScheduleG
                           className="bg-[var(--clay)]/10 text-[var(--clay)] text-xs font-semibold uppercase tracking-widest py-2 border-b border-border"
                         >
                           <div className="flex items-center justify-between">
-                            <span className={cn('sticky left-0 px-4', LABEL_COL_WIDTH)}>
-                              Not on a route · {structure.ungrouped.length}
+                            <span className={cn('sticky left-0 flex items-center gap-2 px-4', LABEL_COL_WIDTH)}>
+                              <span className="truncate">Not on a route · {structure.ungrouped.length}</span>
+                              {onGroupSortChange && (
+                                <ScheduleSortToggle
+                                  size="compact"
+                                  scope="Stops with no route"
+                                  mode={sortModeForGroup(sortState, UNGROUPED_SORT_KEY)}
+                                  onChange={(mode) => onGroupSortChange(UNGROUPED_SORT_KEY, mode)}
+                                  className="normal-case tracking-normal"
+                                />
+                              )}
                             </span>
                             <Link
                               href="/app/routes"
@@ -354,7 +413,7 @@ export function ScheduleGrid({ weeks, employees, vehicles, filtered }: ScheduleG
                           </div>
                         </td>
                       </tr>,
-                      ...groupRowsByAccount(structure.ungrouped).flatMap(({ account, rows: acctRows }) =>
+                      ...groupRowsByAccount(orderRows(UNGROUPED_SORT_KEY, structure.ungrouped)).flatMap(({ account, rows: acctRows }) =>
                         renderPropertyRows('ungrouped', account, acctRows)
                       ),
                     ]
@@ -403,10 +462,12 @@ function PropertyLabelCell({
   account,
   property,
   variant,
+  lastVisitOn,
 }: {
   account: Account
   property: Property
   variant: 'merged' | 'nested'
+  lastVisitOn: string | null
 }) {
   const isNested = variant === 'nested'
   return (
@@ -426,7 +487,10 @@ function PropertyLabelCell({
         {property.address}
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-1.5">
-        <FrequencyBadge frequency={property.frequency} />
+        {/* Always counted here, unlike the phone list: this cell is the label for
+            all four week columns at once, so it can't take its cue from any one
+            week's visit. Days-since is a property fact, so it reads the same. */}
+        <CadenceBadge property={property} lastVisitOn={lastVisitOn} showDays />
         {!isNested && <AccountPriceMeta account={account} />}
       </div>
     </td>

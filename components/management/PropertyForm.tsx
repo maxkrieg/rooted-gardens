@@ -1,6 +1,6 @@
 'use client'
 
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -23,12 +23,23 @@ import {
 } from '@/components/ui/select'
 import { createProperty, updateProperty } from '@/app/app/(padded)/accounts/property-actions'
 import { useRefreshAccounts, useUpdatePropertyNotes } from '@/hooks/useAccounts'
+import { FREQUENCY_DEFAULT_INTERVAL_DAYS } from '@/lib/utils/cadence'
 import { propertyFormSchema, type PropertyFormValues } from '@/lib/validators/property'
 import type { Property } from '@/types/app'
 
-/** True when only the three note fields differ from what's stored. */
-function isNotesOnlyChange(property: Property, values: PropertyFormValues): boolean {
+/**
+ * True when the edit touches only the fields the offline queue can replay
+ * safely: the three notes plus the service interval. Address and frequency
+ * still need the Server Action — replaying those blindly could clobber a real
+ * edit made in between.
+ */
+function isQueueableChange(property: Property, values: PropertyFormValues): boolean {
   return property.address === values.address.trim() && property.frequency === values.frequency
+}
+
+/** '' / undefined means "follow the frequency default" and stores as NULL. */
+function parseInterval(value: string | undefined): number | null {
+  return value ? Number(value) : null
 }
 
 const FREQUENCY_LABELS: Record<PropertyFormValues['frequency'], string> = {
@@ -57,6 +68,7 @@ export function PropertyForm({ accountId, onSuccess, property, defaults }: Prope
       ? {
           address: property.address,
           frequency: property.frequency as PropertyFormValues['frequency'],
+          preferred_interval_days: property.preferred_interval_days?.toString() ?? '',
           parking_notes: property.parking_notes ?? '',
           access_notes: property.access_notes ?? '',
           crew_notes: property.crew_notes ?? '',
@@ -64,6 +76,7 @@ export function PropertyForm({ accountId, onSuccess, property, defaults }: Prope
       : {
           address: '',
           frequency: 'weekly',
+          preferred_interval_days: '',
           parking_notes: '',
           access_notes: '',
           crew_notes: '',
@@ -77,10 +90,9 @@ export function PropertyForm({ accountId, onSuccess, property, defaults }: Prope
   const refreshAccounts = useRefreshAccounts()
 
   async function onSubmit(values: PropertyFormValues) {
-    // A notes-only edit goes through the offline queue — that's the correction an
-    // owner makes standing at the property. Address/frequency changes still need
-    // the Server Action, since replaying those blindly could clobber a real edit.
-    if (isEdit && property && isNotesOnlyChange(property, values)) {
+    // Notes and the interval go through the offline queue — those are the
+    // corrections an owner makes standing at the property, often with no signal.
+    if (isEdit && property && isQueueableChange(property, values)) {
       try {
         await updateNotes(
           property.id,
@@ -88,6 +100,7 @@ export function PropertyForm({ accountId, onSuccess, property, defaults }: Prope
             crewNotes: values.crew_notes?.trim() || null,
             accessNotes: values.access_notes?.trim() || null,
             parkingNotes: values.parking_notes?.trim() || null,
+            preferredIntervalDays: parseInterval(values.preferred_interval_days),
           },
           property.address,
         )
@@ -117,6 +130,16 @@ export function PropertyForm({ accountId, onSuccess, property, defaults }: Prope
     if (!isEdit) form.reset()
     onSuccess()
   }
+
+  // useWatch, not form.watch: watch() opts the whole component out of React
+  // Compiler memoization. Same pattern as AccountForm's billing-type branch.
+  const selectedFrequency = useWatch({ control: form.control, name: 'frequency' })
+  const defaultInterval = FREQUENCY_DEFAULT_INTERVAL_DAYS[selectedFrequency] ?? null
+  const intervalPlaceholder = defaultInterval === null ? 'No overdue warning' : `${defaultInterval}`
+  const intervalHelp =
+    defaultInterval === null
+      ? 'As-needed properties have no interval. Set a number of days to get an overdue warning anyway.'
+      : `Leave blank to follow ${FREQUENCY_LABELS[selectedFrequency]} — ${defaultInterval} days.`
 
   return (
     <Form {...form}>
@@ -160,6 +183,37 @@ export function PropertyForm({ accountId, onSuccess, property, defaults }: Prope
                   ))}
                 </SelectContent>
               </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="preferred_interval_days"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Service interval</FormLabel>
+              <FormControl>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={365}
+                    // The placeholder is the derived default, live off the
+                    // frequency field above — it's what makes "leave this blank"
+                    // legible without a second control explaining it.
+                    placeholder={intervalPlaceholder}
+                    className="h-11 text-base pr-14"
+                    {...field}
+                  />
+                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground">
+                    days
+                  </span>
+                </div>
+              </FormControl>
+              <p className="text-xs text-muted-foreground">{intervalHelp}</p>
               <FormMessage />
             </FormItem>
           )}

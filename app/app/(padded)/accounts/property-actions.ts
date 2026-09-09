@@ -11,6 +11,11 @@ function revalidateAccount(accountId: string) {
   revalidatePath(`/app/accounts/${accountId}`)
 }
 
+/** '' means "follow the frequency default", which stores as NULL. */
+function parseInterval(value: string | undefined): number | null {
+  return value ? Number(value) : null
+}
+
 // ─── Properties ───────────────────────────────────────────────────────────────
 
 /**
@@ -31,6 +36,7 @@ export async function createProperty(
     account_id: accountId,
     address: parsed.data.address,
     frequency: parsed.data.frequency,
+    preferred_interval_days: parseInterval(parsed.data.preferred_interval_days),
     parking_notes: parsed.data.parking_notes?.trim() || null,
     access_notes: parsed.data.access_notes?.trim() || null,
     crew_notes: parsed.data.crew_notes?.trim() || null,
@@ -45,7 +51,7 @@ export async function createProperty(
 }
 
 /**
- * Update an existing property's address, frequency, and notes.
+ * Update an existing property's address, frequency, service interval, and notes.
  */
 export async function updateProperty(
   id: string,
@@ -63,6 +69,7 @@ export async function updateProperty(
     .update({
       address: parsed.data.address,
       frequency: parsed.data.frequency,
+      preferred_interval_days: parseInterval(parsed.data.preferred_interval_days),
       parking_notes: parsed.data.parking_notes?.trim() || null,
       access_notes: parsed.data.access_notes?.trim() || null,
       crew_notes: parsed.data.crew_notes?.trim() || null,

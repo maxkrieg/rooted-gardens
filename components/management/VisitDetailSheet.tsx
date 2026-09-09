@@ -71,6 +71,7 @@ function normalizeRow(row: VisitDetailRow): StopDetail | undefined {
       id: row.property.id,
       address: row.property.address,
       frequency: row.property.frequency,
+      preferred_interval_days: row.property.preferred_interval_days,
       crew_notes: row.property.crew_notes,
       access_notes: row.property.access_notes,
       parking_notes: row.property.parking_notes,

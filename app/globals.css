@@ -227,6 +227,20 @@
     color: #6e665a;
   }
 
+  /* The two states where the cadence pill stops being a label and becomes a
+     signal. Same ochre and brick as .status-skipped and the overdue invoice —
+     the hues already mean "attention" and "past due" in this app, so borrowing
+     them is honest rather than a collision. What keeps the families apart is
+     the leading dot: no status pill draws one. */
+  .cadence-due {
+    background-color: #fbf0d6;
+    color: #9a6b16;
+  }
+  .cadence-over {
+    background-color: #f5e1d8;
+    color: #b0492f;
+  }
+
   /* Full-row wash for a settled visit on the phone schedule. Deliberately
      lighter than the .status-* pill fills — across a whole row that tint reads
      as a highlight rather than a background. These do need dark overrides,

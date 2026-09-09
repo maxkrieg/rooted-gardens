@@ -62,12 +62,16 @@ export async function clearPersistedQueryCache(): Promise<void> {
  * a fresh one. `stop-detail` gaining `visit.updated_at` is the case in hand:
  * entries missing it made version comparison undecidable downstream.
  */
-const CACHE_BUSTER = 'management-schedule-client'
+const CACHE_BUSTER = 'property-cadence-2'
 
 /**
  * Allowlist, not a denylist: persistence is otherwise all-or-nothing, so any new
  * query would silently land in IndexedDB on a personal phone. Only what's needed
  * in the field belongs here — billing, team, and leads deliberately don't.
+ *
+ * Anything listed here must return JSON-safe data. The persister serialises with
+ * JSON.stringify, so a Map or Set rehydrates as `{}` — which works until the
+ * first reload and then throws on `.get`. Key by object, not by Map.
  */
 const PERSISTED_QUERY_KEYS = new Set([
   'schedule-reference',
@@ -86,6 +90,7 @@ const PERSISTED_QUERY_KEYS = new Set([
   'active-vehicles',
   'property-photos',
   'property-visit-history',
+  'property-last-visit',
 ])
 
 export function Providers({ children }: { children: React.ReactNode }) {

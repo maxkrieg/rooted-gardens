@@ -1,14 +1,13 @@
 'use client'
 
 import { useCallback } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { format, parseISO } from 'date-fns'
-import { createClient } from '@/lib/supabase/client'
+import { useQueryClient } from '@tanstack/react-query'
 import { enqueueMutation, flushMutationQueue } from '@/lib/offline/mutation-queue'
 import { patchScheduleVisit, useScheduleReference } from '@/hooks/useManagementSchedule'
 import { useCreateVisit } from '@/hooks/useCreateVisit'
 import { nextVisitVersion } from '@/lib/utils/visits'
 import { planWeek, type PlanCandidate, type PlanDecision } from '@/lib/utils/schedule'
+import { usePropertyLastVisit } from '@/hooks/usePropertyLastVisit'
 import type {
   Account,
   Property,
@@ -16,28 +15,6 @@ import type {
   ScheduleWeek,
   VisitCrewWithEmployee,
 } from '@/types/app'
-
-export const propertyLastVisitKey = ['property-last-visit'] as const
-
-/** Most recent completed visit per property — what phases biweekly and monthly. */
-export function usePropertyLastVisit() {
-  return useQuery({
-    queryKey: propertyLastVisitKey,
-    queryFn: async () => {
-      const supabase = createClient()
-      const { data, error } = await supabase.from('property_last_visit').select('*')
-      if (error) throw error
-      const byProperty = new Map<string, string>()
-      for (const row of data ?? []) {
-        if (row.property_id && row.last_visit_at) {
-          byProperty.set(row.property_id, format(parseISO(row.last_visit_at), 'yyyy-MM-dd'))
-        }
-      }
-      return byProperty
-    },
-    staleTime: 5 * 60_000,
-  })
-}
 
 /**
  * The generate-week plan for one week: every property the owner could schedule,
@@ -58,7 +35,7 @@ export function useWeekPlan(weekStart: string, week: ScheduleWeek | undefined) {
         property: row.property,
         account: row.account,
         routeGroup: row.routeGroup,
-        lastVisitedOn: lastVisit.data?.get(row.property.id) ?? null,
+        lastVisitedOn: lastVisit.data?.[row.property.id] ?? null,
         hasVisitThisWeek: !!row.visit,
       })
     }

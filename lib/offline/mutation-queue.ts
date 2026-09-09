@@ -85,12 +85,18 @@ export interface RevertStatusPayload {
 
 /** Narrow column patch, NOT the whole property form: updateProperty also writes
  *  address and frequency, and replaying that would clobber an address changed
- *  meanwhile. These three columns are safe to replay. */
+ *  meanwhile. These columns are safe to replay.
+ *
+ *  `preferredIntervalDays` is optional because a crew phone may still be holding
+ *  items queued before it existed — those must replay as a notes-only write, so
+ *  the flush skips the column when the key is absent. The 'property_notes' type
+ *  string is deliberately unchanged for the same reason. */
 export interface PropertyNotesPayload {
   propertyId: string
   crewNotes: string | null
   accessNotes: string | null
   parkingNotes: string | null
+  preferredIntervalDays?: number | null
 }
 
 /** One dispatch note per route group per week — the route sheet's group-header
@@ -459,6 +465,11 @@ export async function flushMutationQueue(): Promise<FlushResult> {
               crew_notes: p.crewNotes,
               access_notes: p.accessNotes,
               parking_notes: p.parkingNotes,
+              // Absent on items queued before the interval field shipped — those
+              // must not null out a value the owner set since.
+              ...(p.preferredIntervalDays !== undefined
+                ? { preferred_interval_days: p.preferredIntervalDays }
+                : {}),
             })
             .eq('id', p.propertyId)
             .throwOnError()

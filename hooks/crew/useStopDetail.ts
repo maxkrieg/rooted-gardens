@@ -29,6 +29,7 @@ export type StopDetail = {
     id: string
     address: string
     frequency: string
+    preferred_interval_days: number | null
     crew_notes: string | null
     access_notes: string | null
     parking_notes: string | null
@@ -73,7 +74,8 @@ export function useStopDetail(visitId: string | undefined, options?: { initialDa
           service_types, completion_note, skip_reason, vehicle_id, updated_at,
           invoice:invoices(status, qbo_invoice_id),
           property:properties!inner(
-            id, address, frequency, crew_notes, access_notes, parking_notes
+            id, address, frequency, preferred_interval_days,
+            crew_notes, access_notes, parking_notes
           ),
           account:accounts!inner(id, name, billing_type, contact_name),
           visit_crew(employee_id, relation, employees(id, name)),

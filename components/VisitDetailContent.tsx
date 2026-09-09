@@ -17,6 +17,7 @@ import {
   FilePen,
   ExternalLink,
   LayoutGrid,
+  CalendarClock,
 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -28,7 +29,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { FrequencyBadge, VisitStatusBadge, InvoiceStatusBadge } from '@/components/management/badges'
+import { CadenceBadge, CadenceSummary, VisitStatusBadge, InvoiceStatusBadge } from '@/components/management/badges'
+import { usePropertyLastVisit } from '@/hooks/usePropertyLastVisit'
 import { qboInvoiceUrl } from '@/lib/utils/billing'
 import { PropertyVisitHistory } from '@/components/PropertyVisitHistory'
 import { PropertyPhotosSection } from '@/components/PropertyPhotosSection'
@@ -93,6 +95,8 @@ export function VisitDetailContent({
   onPhotoViewerChange,
 }: VisitDetailContentProps) {
   const { visit, property, account } = data
+  const { data: lastVisitByProperty } = usePropertyLastVisit()
+  const lastVisitOn = lastVisitByProperty?.[property.id] ?? null
   // Defensive: a stale persisted cache entry (or a momentarily malformed embed)
   // could be missing these arrays even though StopDetail declares them required.
   const assignedCrew = data.assignedCrew ?? []
@@ -513,7 +517,14 @@ export function VisitDetailContent({
             className="w-full flex items-center justify-between px-4 py-3.5 text-left"
             aria-expanded={notesOpen}
           >
-            <span className="text-sm font-semibold text-foreground">Property Notes</span>
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="text-sm font-semibold text-foreground">Property Notes</span>
+              <CadenceBadge
+                property={property}
+                lastVisitOn={lastVisitOn}
+                showDays
+              />
+            </span>
             <ChevronDown
               className="h-4 w-4 text-muted-foreground transition-transform duration-200"
               style={{ transform: notesOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
@@ -522,6 +533,15 @@ export function VisitDetailContent({
 
           {notesOpen && (
             <div className="border-t border-[--border] px-4 pb-4 space-y-3.5 pt-3.5">
+              <div className="flex items-start gap-3">
+                <CalendarClock className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">
+                    Cadence
+                  </p>
+                  <CadenceSummary property={property} lastVisitOn={lastVisitOn} className="leading-relaxed" />
+                </div>
+              </div>
               {account.contact_name && (
                 <div className="flex items-start gap-3">
                   <User className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />

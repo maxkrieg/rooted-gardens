@@ -6,7 +6,8 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { EmptyState } from '@/components/states/EmptyState'
-import { FrequencyBadge } from '@/components/management/badges'
+import { CadenceBadge } from '@/components/management/badges'
+import { usePropertyLastVisit } from '@/hooks/usePropertyLastVisit'
 import { RouteGroupSheet } from '@/components/management/RouteGroupSheet'
 import { PropertyAssignmentSheet } from '@/components/management/PropertyAssignmentSheet'
 import { deleteRouteGroup, moveRouteGroup } from '@/app/app/(padded)/routes/actions'
@@ -47,6 +48,7 @@ export function RouteGroupCard({
   isFirst,
   isLast,
 }: RouteGroupCardProps) {
+  const { data: lastVisitByProperty } = usePropertyLastVisit()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [defaultsOpen, setDefaultsOpen] = useState(false)
@@ -271,7 +273,11 @@ export function RouteGroupCard({
                           {property.address}
                         </span>
                         <span className="shrink-0">
-                          <FrequencyBadge frequency={property.frequency} />
+                          <CadenceBadge
+                            property={property}
+                            lastVisitOn={lastVisitByProperty?.[property.id] ?? null}
+                            showDays
+                          />
                         </span>
                       </div>
                     </div>

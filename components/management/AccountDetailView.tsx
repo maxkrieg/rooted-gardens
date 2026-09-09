@@ -7,7 +7,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import {
   AccountStatusBadge,
   BillingTypeBadge,
-  FrequencyBadge,
+  CadenceBadge,
+  CadenceSummary,
 } from '@/components/management/badges'
 import { EditAccountSheet } from '@/components/management/EditAccountSheet'
 import { DeleteAccountButton } from '@/components/management/DeleteAccountButton'
@@ -21,6 +22,7 @@ import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
 import { CardListSkeleton, PageHeaderSkeleton } from '@/components/states/skeletons'
 import { useAccountDetail, useAccountPhotos, useSignedPhotoUrls } from '@/hooks/useAccounts'
+import { usePropertyLastVisit } from '@/hooks/usePropertyLastVisit'
 import { useCachedPhotoUrls } from '@/hooks/useCachedPhotoUrls'
 import { useIsHydrated } from '@/hooks/use-hydrated'
 import { cn } from '@/lib/utils'
@@ -140,6 +142,7 @@ export function AccountDetailView({ accountId, initialView }: AccountDetailViewP
 function DetailsTab({ detail }: { detail: AccountDetail }) {
   const { archive: canArchive, editRoutes } = useCan()
   const { account, visits, routeGroupByPropertyId, visitsFailed } = detail
+  const { data: lastVisitByProperty } = usePropertyLastVisit()
 
   return (
     <div className="space-y-6">
@@ -229,7 +232,11 @@ function DetailsTab({ detail }: { detail: AccountDetail }) {
                           {property.address}
                         </p>
                         <div className="mt-1">
-                          <FrequencyBadge frequency={property.frequency} />
+                          <CadenceBadge
+                            property={property}
+                            lastVisitOn={lastVisitByProperty?.[property.id] ?? null}
+                            showDays
+                          />
                         </div>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
@@ -249,6 +256,12 @@ function DetailsTab({ detail }: { detail: AccountDetail }) {
                         The picker is inline: this used to link to /app/routes
                         carrying no property context, so you arrived at a list of
                         every route with no memory of what you came to route. */}
+                    <CadenceSummary
+                      property={property}
+                      lastVisitOn={lastVisitByProperty?.[property.id] ?? null}
+                      className="mb-3"
+                    />
+
                     <div className="flex flex-wrap items-center gap-2 text-sm mb-3">
                       {!routeGroup && (
                         <TriangleAlert className="h-3.5 w-3.5 text-[var(--clay)] shrink-0" />

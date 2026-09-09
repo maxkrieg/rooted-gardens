@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { Checkbox } from '@/components/ui/checkbox'
-import { FrequencyBadge } from '@/components/management/badges'
+import { CadenceBadge } from '@/components/management/badges'
+import { usePropertyLastVisit } from '@/hooks/usePropertyLastVisit'
 import { RoutePicker } from '@/components/management/RoutePicker'
 import { RouteGroupSheet } from '@/components/management/RouteGroupSheet'
 import { assignProperties } from '@/app/app/(padded)/routes/actions'
@@ -32,6 +33,7 @@ interface UnroutedPanelProps {
  * pending flag (which gated every row at once and could stay stuck true).
  */
 export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
+  const { data: lastVisitByProperty } = usePropertyLastVisit()
   const router = useRouter()
   const refreshRoutes = useRefreshRoutes()
   const assignRoute = useAssignPropertyRoute()
@@ -282,7 +284,11 @@ export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
                       {property.address}
                     </span>
                     <span className="shrink-0">
-                      <FrequencyBadge frequency={property.frequency} />
+                      <CadenceBadge
+                            property={property}
+                            lastVisitOn={lastVisitByProperty?.[property.id] ?? null}
+                            showDays
+                          />
                     </span>
                   </div>
                 </div>

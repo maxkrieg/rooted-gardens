@@ -1,4 +1,5 @@
-import { startOfWeek, addWeeks, isBefore, parseISO, format } from 'date-fns'
+import { startOfWeek, addDays, addWeeks, isAfter, isBefore, parseISO, format } from 'date-fns'
+import { cadenceFor, cadencePriority, intervalDaysFor } from '@/lib/utils/cadence'
 import type {
   Account,
   Property,
@@ -194,21 +195,29 @@ export type PlanDecision = {
  * Pure, and deliberately separate from anything that writes: R3.5's preview
  * renders exactly this output, so what the owner confirms is what gets created.
  *
- * Frequency handling:
- * - `weekly`     — every week.
- * - `biweekly`   — phased from the property's own last visit, NOT from a fixed
- *   calendar parity. The real route sheet's biweekly rows drift constantly
- *   (5/12, 5/18, skip, 6/10) as weather and crew availability move them, so a
- *   parity rule would fight the way the work actually happens.
- * - `monthly`    — due when nothing in the prior 4 weeks.
- * - `as_needed`  — never. These are scheduled by hand, by definition.
+ * A property is due when its next-due date — last completed visit plus its
+ * interval — lands on or before the target week's Sunday. The interval is
+ * intervalDaysFor(): the owner's per-property override, else the frequency
+ * default. Sharing that one function with the cadence badge is the point; the
+ * generator and the overdue chip can't disagree about the same property.
+ *
+ * Always phased from the property's own last visit, never from a fixed calendar
+ * parity. The real route sheet's biweekly rows drift constantly (5/12, 5/18,
+ * skip, 6/10) as weather and crew availability move them, so a parity rule would
+ * fight the way the work actually happens.
+ *
+ * `as_needed` with no override has no interval at all and is never due — those
+ * are scheduled by hand, by definition.
  *
  * Never returns a property that already has a visit that week, and never an
  * archived one. The UNIQUE (property_id, week_start) index makes the whole thing
  * idempotent regardless, so a double-run can't duplicate.
  */
 export function planWeek(weekStart: string, candidates: PlanCandidate[]): PlanDecision[] {
-  const weekStartDate = parseISO(weekStart)
+  // Compared against the week's Sunday, not its Monday: a property that comes
+  // due on Thursday belongs on Thursday's week, and anchoring on the Monday
+  // would push it a week late.
+  const weekEnd = addDays(parseISO(weekStart), 6)
 
   return candidates.map((candidate) => {
     const { property, lastVisitedOn, hasVisitThisWeek } = candidate
@@ -220,12 +229,16 @@ export function planWeek(weekStart: string, candidates: PlanCandidate[]): PlanDe
       return { candidate, due: false, reason: 'Already on this week' }
     }
 
-    const frequency = property.frequency
-    if (frequency === 'as_needed') {
-      return { candidate, due: false, reason: 'As needed — schedule by hand' }
-    }
-    if (frequency === 'weekly') {
-      return { candidate, due: true, reason: 'Weekly' }
+    const label = frequencyLabel(property.frequency)
+    const intervalDays = intervalDaysFor(property)
+
+    // No interval at all — as_needed with no override. Not silently dropped: an
+    // unrecognised frequency lands here too, and the owner sees it in the
+    // preview's skipped list and can schedule it by hand.
+    if (intervalDays === null) {
+      return property.frequency === 'as_needed'
+        ? { candidate, due: false, reason: 'As needed — schedule by hand' }
+        : { candidate, due: false, reason: `Unknown frequency (${property.frequency})` }
     }
 
     // No history: treat as due rather than guessing a phase. A property that has
@@ -234,35 +247,48 @@ export function planWeek(weekStart: string, candidates: PlanCandidate[]): PlanDe
       return { candidate, due: true, reason: 'Never visited' }
     }
 
-    const weeksSince = weeksBetween(parseISO(lastVisitedOn), weekStartDate)
+    const nextDue = addDays(parseISO(lastVisitedOn), intervalDays)
+    const every = `${label} — every ${intervalDays} days`
 
-    if (frequency === 'biweekly') {
-      return weeksSince >= 2
-        ? { candidate, due: true, reason: `Biweekly — ${weeksAgoLabel(weeksSince)}` }
-        : { candidate, due: false, reason: `Biweekly — done ${weeksAgoLabel(weeksSince)}` }
-    }
-
-    if (frequency === 'monthly') {
-      return weeksSince >= 4
-        ? { candidate, due: true, reason: `Monthly — ${weeksAgoLabel(weeksSince)}` }
-        : { candidate, due: false, reason: `Monthly — done ${weeksAgoLabel(weeksSince)}` }
-    }
-
-    // An unrecognised frequency is not silently dropped — the owner sees it in
-    // the preview's skipped list and can schedule it by hand.
-    return { candidate, due: false, reason: `Unknown frequency (${frequency})` }
+    return isAfter(nextDue, weekEnd)
+      ? { candidate, due: false, reason: `${every}, next due ${format(nextDue, 'EEE MMM d')}` }
+      : { candidate, due: true, reason: `${every}, due ${format(nextDue, 'EEE MMM d')}` }
   })
 }
 
-/** Whole weeks from `from` to `to`, floored at 0 so a future date reads as 0. */
-function weeksBetween(from: Date, to: Date): number {
-  const ms = to.getTime() - from.getTime()
-  if (ms <= 0) return 0
-  return Math.floor(ms / (7 * 24 * 60 * 60 * 1000))
+function frequencyLabel(frequency: string): string {
+  if (frequency === 'weekly') return 'Weekly'
+  if (frequency === 'biweekly') return 'Biweekly'
+  if (frequency === 'monthly') return 'Monthly'
+  if (frequency === 'as_needed') return 'As needed'
+  return frequency
 }
 
-function weeksAgoLabel(weeks: number): string {
-  if (weeks === 0) return 'this week'
-  if (weeks === 1) return 'last week'
-  return `${weeks} weeks ago`
+// ─── Priority ordering ──────────────────────────────────────────────────────────
+
+/**
+ * Reorder a route group's rows so the properties that have waited longest come
+ * first, most overdue at the top.
+ *
+ * A *view* over the rows, never a write. property_route_groups.sort_order is the
+ * order the crew physically drive the route, so this is opt-in and the schedule
+ * defaults to leaving it alone. Ties keep the incoming drive order — Array.sort
+ * is stable — so within a band of equally-urgent stops the route still reads in
+ * driving sequence.
+ *
+ * Settled visits sink to the bottom: work that's done needs no attention, and
+ * leaving them interleaved buries the stops the mode exists to surface.
+ */
+export function sortRowsByPriority(
+  rows: SchedulePropertyRow[],
+  lastVisitByProperty: Record<string, string> | undefined,
+  today: Date = new Date(),
+): SchedulePropertyRow[] {
+  const weight = (row: SchedulePropertyRow): number => {
+    const settled = row.visit?.status === 'completed' || row.visit?.status === 'skipped'
+    if (settled) return -Infinity
+    return cadencePriority(cadenceFor(row.property, lastVisitByProperty?.[row.property.id], today))
+  }
+
+  return [...rows].sort((a, b) => weight(b) - weight(a))
 }

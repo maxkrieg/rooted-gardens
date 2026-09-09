@@ -16,6 +16,16 @@ import { useActiveVehicles } from '@/hooks/crew/useActiveVehicles'
 import { useMediaQuery } from '@/hooks/use-media-query'
 import { useIsHydrated } from '@/hooks/use-hydrated'
 import { useCan } from '@/components/app/RoleProvider'
+import {
+  DEFAULT_SCHEDULE_SORT,
+  SCHEDULE_SORT_KEY,
+  parseScheduleSortState,
+  setAllSortMode,
+  setGroupSortMode,
+  type ScheduleSortMode,
+  type ScheduleSortState,
+} from '@/lib/utils/schedule-sort'
+import { ScheduleSortToggle } from '@/components/management/ScheduleSortToggle'
 import { ScheduleGrid } from '@/components/management/ScheduleGrid'
 import { ScheduleListMobile } from '@/components/management/ScheduleListMobile'
 import { ScheduleNav } from '@/components/management/ScheduleNav'
@@ -71,6 +81,7 @@ export function ScheduleView({
   const [selectMode, setSelectMode] = useState(false)
   const [generateOpen, setGenerateOpen] = useState(false)
   const [viewOverride, setViewOverride] = useState<ScheduleViewMode | null>(null)
+  const [sortOverride, setSortOverride] = useState<ScheduleSortState | null>(null)
   const { editSchedule: canEdit, seeDashboard } = useCan()
 
   // Last-used view wins on open, so whichever one he actually lives in is the
@@ -102,6 +113,34 @@ export function ScheduleView({
       // Private mode or blocked storage — the choice just doesn't persist.
     }
   }
+
+  // Same resolve-don't-store shape as the view mode above, for the same reason:
+  // localStorage doesn't exist during the server render. Defaults to drive
+  // order — sort_order is the sequence the crew drive, and priority is the
+  // deliberate override an owner reaches for while planning.
+  const storedSort = useMemo<ScheduleSortState | null>(() => {
+    if (!hydrated) return null
+    try {
+      return parseScheduleSortState(window.localStorage.getItem(SCHEDULE_SORT_KEY))
+    } catch {
+      return null
+    }
+  }, [hydrated])
+
+  const sortState: ScheduleSortState = sortOverride ?? storedSort ?? DEFAULT_SCHEDULE_SORT
+
+  function persistSort(next: ScheduleSortState) {
+    setSortOverride(next)
+    try {
+      window.localStorage.setItem(SCHEDULE_SORT_KEY, JSON.stringify(next))
+    } catch {
+      // Private mode or blocked storage — the choice just doesn't persist.
+    }
+  }
+
+  const changeAllSort = (mode: ScheduleSortMode) => persistSort(setAllSortMode(mode))
+  const changeGroupSort = (groupKey: string, mode: ScheduleSortMode) =>
+    persistSort(setGroupSortMode(sortState, groupKey, mode))
 
   const weekStarts = useMemo(() => {
     const base = parseWeekParam(windowStart)
@@ -219,10 +258,24 @@ export function ScheduleView({
       </ScheduleStickyBar>
 
       {/* Under the sticky bar, not inside it — it scrolls away, because once
-          you're reading the week you don't need the switch pinned. */}
-      {seeDashboard && (
-        <div className="mb-2 max-w-xs lg:mb-3">
-          <ScheduleViewToggle value={viewMode} onChange={changeViewMode} />
+          you're reading the week you don't need these pinned. The sort switch
+          is here rather than in the header row: that row is already six targets
+          wide and the week label is what truncates first. */}
+      {(seeDashboard || viewMode !== 'today') && (
+        <div className="mb-2 flex items-center gap-2 lg:mb-3">
+          {seeDashboard && (
+            <div className="max-w-xs flex-1">
+              <ScheduleViewToggle value={viewMode} onChange={changeViewMode} />
+            </div>
+          )}
+          {viewMode !== 'today' && (
+            <ScheduleSortToggle
+              mode={sortState.all}
+              onChange={changeAllSort}
+              scope="Every route"
+              className="ml-auto"
+            />
+          )}
         </div>
       )}
 
@@ -261,6 +314,8 @@ export function ScheduleView({
             employees={employees}
             vehicles={vehicles}
             filtered={filtered}
+            sortState={sortState}
+            onGroupSortChange={changeGroupSort}
           />
         </div>
         {/* -mx-4 cancels the (padded) layout's p-4 so the route cards run to
@@ -275,6 +330,8 @@ export function ScheduleView({
             filtered={filtered}
             selectMode={selectMode}
             onExitSelectMode={() => setSelectMode(false)}
+            sortState={sortState}
+            onGroupSortChange={changeGroupSort}
           />
         </div>
         {/* Rendered once, outside both layouts — both are always mounted, so

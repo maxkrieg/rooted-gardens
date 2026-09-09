@@ -32,6 +32,10 @@ interface RouteGroupBandProps {
   hasNote: boolean
   /** The week's note, when there is one. Absent notes render nothing. */
   noteSlot?: React.ReactNode
+  /** The route's own sort switch. Lives on the plan line rather than the title
+   *  row: the title row has no width to spare, and "how this route is arranged"
+   *  is exactly what that line already says. */
+  sortSlot?: React.ReactNode
 }
 
 /**
@@ -60,6 +64,7 @@ export function RouteGroupBand({
   onEditNote,
   hasNote,
   noteSlot,
+  sortSlot,
 }: RouteGroupBandProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const { done, total, crew, vehicles, onSite } = stats
@@ -115,9 +120,11 @@ export function RouteGroupBand({
         )}
       </div>
 
-      {/* The standing plan, muted and secondary. Omitted rather than rendered
-          empty — an unplanned route shouldn't pay a row to say nothing. */}
-      {hasPlan && (
+      {/* The standing plan, muted and secondary. It used to be omitted entirely
+          when a route had no plan — an unplanned route shouldn't pay a row to
+          say nothing — but the sort switch belongs on this line, and every route
+          has a sort. So the row renders whenever it has either to show. */}
+      {(hasPlan || sortSlot) && (
         <div className="flex items-center gap-2 px-4 pb-2 pt-0.5 text-[11px] text-muted-foreground">
           {days.length > 0 && <span className="shrink-0 font-medium">{formatDays(days)}</span>}
 
@@ -143,10 +150,12 @@ export function RouteGroupBand({
               </span>
             </span>
           )}
+
+          {sortSlot && <span className="ml-auto -mr-1.5">{sortSlot}</span>}
         </div>
       )}
 
-      {!hasPlan && <div className="pb-1.5" />}
+      {!hasPlan && !sortSlot && <div className="pb-1.5" />}
 
       {noteSlot}
 

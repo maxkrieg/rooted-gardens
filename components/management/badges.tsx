@@ -4,7 +4,9 @@
  */
 
 import { AlertTriangle, CheckCircle2, Circle, MinusCircle, Receipt } from 'lucide-react'
+import { format, parseISO } from 'date-fns'
 import { Badge } from '@/components/ui/badge'
+import { cadenceFor, type Cadence, type CadenceProperty, type CadenceState } from '@/lib/utils/cadence'
 import type {
   Account,
   AccountStatus,
@@ -66,11 +68,11 @@ export function BillingTypeBadge({ billingType }: { billingType: string }) {
   )
 }
 
-// ─── Frequency ────────────────────────────────────────────────────────────────
+// ─── Cadence (frequency + how long this property has waited) ──────────────────
 
 // One neutral pill for every cadence — the colour used to differ per frequency,
 // but weekly's green was indistinguishable from a COMPLETED badge on the same
-// schedule row. Colour is reserved for visit status; this is a label.
+// schedule row. Colour here means one thing only: this property is running late.
 const FREQUENCY_LABELS: Record<Frequency, string> = {
   weekly:    'Weekly',
   biweekly:  'Bi-weekly',
@@ -78,6 +80,109 @@ const FREQUENCY_LABELS: Record<Frequency, string> = {
   as_needed: 'As Needed',
 }
 
+const CADENCE_STATE_CLASS: Record<CadenceState, string> = {
+  ok:   'freq-badge',
+  due:  'cadence-due',
+  over: 'cadence-over',
+}
+
+/**
+ * The cadence pill, optionally carrying days-since-last-visit: "WEEKLY · 12d".
+ *
+ * One badge and not two: the row has width for a single pill, and the day count
+ * is the numeric form of the cadence. The leading dot on due/over separates this
+ * from the status pills, which share the ochre and brick fills but never draw one.
+ */
+export function CadenceBadge({
+  property,
+  lastVisitOn,
+  showDays = false,
+}: {
+  property: CadenceProperty
+  lastVisitOn?: string | null
+  showDays?: boolean
+}) {
+  const label = FREQUENCY_LABELS[property.frequency as Frequency] ?? property.frequency
+  const cadence = cadenceFor(property, lastVisitOn)
+
+  // Nothing to count against: render exactly the old neutral frequency label.
+  if (!showDays || cadence.intervalDays === null) {
+    return (
+      <Badge variant="outline" className="border-transparent uppercase tracking-wide text-[10px] font-semibold freq-badge">
+        {label}
+      </Badge>
+    )
+  }
+
+  const marked = cadence.state !== 'ok'
+
+  return (
+    <Badge
+      variant="outline"
+      className={`border-transparent uppercase tracking-wide text-[10px] font-semibold ${CADENCE_STATE_CLASS[cadence.state]} ${marked ? 'gap-1' : ''}`}
+    >
+      {marked && <Circle className="h-1.5 w-1.5 shrink-0 fill-current" aria-hidden />}
+      {/* No completed visit yet reads as an em dash, never red — you can't be
+          overdue on work that never happened. The sentence goes to screen
+          readers, which is where "—" would be useless. */}
+      <span aria-hidden>
+        {label} · {cadence.daysSince === null ? '—' : `${cadence.daysSince}d`}
+      </span>
+      <span className="sr-only">{describeCadence(label, cadence)}</span>
+    </Badge>
+  )
+}
+
+function describeCadence(label: string, cadence: Cadence): string {
+  const every = `${label}, every ${cadence.intervalDays} days`
+  if (cadence.daysSince === null) return `${every}. No visits logged yet.`
+
+  const days = (n: number) => `${n} ${n === 1 ? 'day' : 'days'}`
+  const since = `${days(cadence.daysSince)} since last visit`
+  if (cadence.state === 'over') return `${every}. ${since} — ${days(cadence.overdueBy)} overdue. High priority.`
+  if (cadence.state === 'due') return `${every}. ${since} — coming due.`
+  return `${every}. ${since}.`
+}
+
+/**
+ * The same fact as CadenceBadge, spelled out, for surfaces with room for a
+ * sentence: the property card and the crew stop screen.
+ */
+export function CadenceSummary({
+  property,
+  lastVisitOn,
+  className,
+}: {
+  property: CadenceProperty
+  lastVisitOn?: string | null
+  className?: string
+}) {
+  const cadence = cadenceFor(property, lastVisitOn)
+  const every = cadence.intervalDays === null ? 'Scheduled by hand' : `Every ${cadence.intervalDays} days`
+
+  return (
+    <p className={`text-sm text-muted-foreground ${className ?? ''}`}>
+      {every}
+      {' · '}
+      {lastVisitOn ? (
+        <>
+          last visit {format(parseISO(lastVisitOn), 'EEE MMM d')}
+          {cadence.daysSince !== null && (
+            <span className={cadence.state === 'over' ? 'font-medium text-[var(--clay)]' : undefined}>
+              {' '}
+              ({cadence.daysSince} {cadence.daysSince === 1 ? 'day' : 'days'} ago
+              {cadence.state === 'over' ? `, ${cadence.overdueBy} past due` : ''})
+            </span>
+          )}
+        </>
+      ) : (
+        'no visits logged yet'
+      )}
+    </p>
+  )
+}
+
+/** Cadence label with no day count — for callers with no last-visit data to hand. */
 export function FrequencyBadge({ frequency }: { frequency: string }) {
   const label = FREQUENCY_LABELS[frequency as Frequency] ?? frequency
   return (

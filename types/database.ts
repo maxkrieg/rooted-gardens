@@ -486,6 +486,7 @@ export type Database = {
           lat: number | null
           lng: number | null
           parking_notes: string | null
+          preferred_interval_days: number | null
           updated_at: string
         }
         Insert: {
@@ -500,6 +501,7 @@ export type Database = {
           lat?: number | null
           lng?: number | null
           parking_notes?: string | null
+          preferred_interval_days?: number | null
           updated_at?: string
         }
         Update: {
@@ -514,6 +516,7 @@ export type Database = {
           lat?: number | null
           lng?: number | null
           parking_notes?: string | null
+          preferred_interval_days?: number | null
           updated_at?: string
         }
         Relationships: [

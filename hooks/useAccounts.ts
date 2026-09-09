@@ -96,9 +96,10 @@ export function useAccountPhotos(accountId: string, propertyIds: string[]) {
 }
 
 /**
- * Queue a notes-only property edit so an owner can correct a gate code from the
- * driveway. Address and frequency changes still go through updateProperty —
- * replaying those blindly could clobber an edit made meanwhile.
+ * Queue a property notes/interval edit so an owner can correct a gate code — or
+ * retune how often a property comes due — from the driveway. Address and
+ * frequency changes still go through updateProperty: replaying those blindly
+ * could clobber an edit made meanwhile.
  */
 export function useUpdatePropertyNotes(accountId: string) {
   const queryClient = useQueryClient()
@@ -118,6 +119,7 @@ export function useUpdatePropertyNotes(accountId: string) {
                         crew_notes: notes.crewNotes,
                         access_notes: notes.accessNotes,
                         parking_notes: notes.parkingNotes,
+                        preferred_interval_days: notes.preferredIntervalDays ?? null,
                       }
                     : p,
                 ),
@@ -138,6 +140,8 @@ export type PropertyNotes = {
   crewNotes: string | null
   accessNotes: string | null
   parkingNotes: string | null
+  /** null = follow the frequency default. */
+  preferredIntervalDays?: number | null
 }
 
 /**
