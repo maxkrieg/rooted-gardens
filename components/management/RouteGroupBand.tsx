@@ -125,7 +125,7 @@ export function OnSiteDot() {
   )
 }
 
-export function RouteDoneCount({ done, total }: { done: number; total: number }) {
+function RouteDoneCount({ done, total }: { done: number; total: number }) {
   return (
     <span
       className="flex shrink-0 items-baseline tabular-nums"
@@ -271,7 +271,7 @@ export function formatDays(days: string[]): string {
     .join('/')
 }
 
-export function initialsOf(name: string): string {
+function initialsOf(name: string): string {
   return name
     .split(' ')
     .map((part) => part[0])

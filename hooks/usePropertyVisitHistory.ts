@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client'
  * colocated here rather than in `types/app.ts`, matching how `useStopDetail`
  * defines `StopDetail` locally.
  */
-export type PropertyVisitHistoryRow = {
+type PropertyVisitHistoryRow = {
   id: string
   status: string
   week_start: string
@@ -18,7 +18,7 @@ export type PropertyVisitHistoryRow = {
   skip_reason: string | null
 }
 
-export type PropertyVisitHistoryResult = {
+type PropertyVisitHistoryResult = {
   rows: PropertyVisitHistoryRow[]
   total: number // exact count of past visits at this property (excludes the current one)
 }

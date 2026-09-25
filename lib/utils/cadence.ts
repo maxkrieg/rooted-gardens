@@ -92,8 +92,3 @@ export function cadencePriority(cadence: Cadence): number {
   if (cadence.intervalDays === null || cadence.daysSince === null) return -1
   return 1_000_000 * (cadence.state === 'due' ? 1 : 0) + cadence.daysSince / cadence.intervalDays
 }
-
-/** "Every 7 days" / "Every 10 days" / null when the property has no interval. */
-export function formatInterval(intervalDays: number | null): string | null {
-  return intervalDays === null ? null : `Every ${intervalDays} days`
-}

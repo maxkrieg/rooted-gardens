@@ -6,7 +6,7 @@ import { fetchWeekNotes } from '@/lib/schedule/fetch'
 import { enqueueMutation, flushMutationQueue } from '@/lib/offline/mutation-queue'
 import type { RouteGroupWeekNote } from '@/types/app'
 
-export const weekNotesKey = (weekStartISO: string) => ['schedule-week-notes', weekStartISO]
+const weekNotesKey = (weekStartISO: string) => ['schedule-week-notes', weekStartISO]
 
 /**
  * The dispatch notes for every route group in one week.

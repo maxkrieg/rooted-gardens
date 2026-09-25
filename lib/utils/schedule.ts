@@ -29,11 +29,6 @@ export function parseWeekParam(value: string | null | undefined): Date {
   return getWeekStart(parsed)
 }
 
-/** Serialize a week start for the `?week=` query param. */
-export function formatWeekParam(date: Date): string {
-  return format(getWeekStart(date), 'yyyy-MM-dd')
-}
-
 export function getWeeksInRange(start: Date, end: Date): Date[] {
   const weeks: Date[] = []
   let current = getWeekStart(start)

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { SITE_COLLECTIONS, SITE_CONTENT_KINDS, SITE_PAGES } from '@/types/app'
+import { SITE_COLLECTIONS, SITE_PAGES } from '@/types/app'
 
 /**
  * Zod schemas for the owner-editable public site content
@@ -11,13 +11,12 @@ import { SITE_COLLECTIONS, SITE_CONTENT_KINDS, SITE_PAGES } from '@/types/app'
 
 // ─── site_content slots ────────────────────────────────────────────────────────
 
-export const sitePageSchema = z.enum(SITE_PAGES)
-export const siteContentKindSchema = z.enum(SITE_CONTENT_KINDS)
+const sitePageSchema = z.enum(SITE_PAGES)
 
 /** `updateSiteSlot` (app/(public)/actions.ts) only ever handles a plain-string
  *  value — richtext goes through `updateRichTextSlotSchema` below instead,
  *  since its value is `{ doc, html }`, not a string. */
-export const simpleContentKindSchema = z.enum(['text', 'image', 'email', 'phone', 'url'])
+const simpleContentKindSchema = z.enum(['text', 'image', 'email', 'phone', 'url'])
 
 /** Per-kind format check on top of the base length cap — a bad edit fails
  *  fast in the editor rather than silently breaking a mailto:/tel:/href on
@@ -67,7 +66,7 @@ export type UpdateRichTextSlotValues = z.infer<typeof updateRichTextSlotSchema>
 
 export const siteCollectionSchema = z.enum(SITE_COLLECTIONS)
 
-export const faqItemDataSchema = z.object({
+const faqItemDataSchema = z.object({
   question: z.string().trim().min(1, 'Question is required').max(300),
   answer: z.string().trim().min(1, 'Answer is required').max(3000),
 })
@@ -78,7 +77,7 @@ export const jobItemDataSchema = z.object({
   blurb: z.string().trim().max(1000),
 })
 
-export const teamItemDataSchema = z.object({
+const teamItemDataSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(150),
   role: z.string().trim().max(150),
   bio: z.string().trim().max(2000),

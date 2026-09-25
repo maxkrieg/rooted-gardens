@@ -27,7 +27,7 @@ export type MutationType =
 
 /** 'failed' mutations are excluded from flushes, so a poisoned one stops burning
  *  a request on every app open, and surfaced so lost work can't stay invisible. */
-export type MutationStatus = 'pending' | 'failed'
+type MutationStatus = 'pending' | 'failed'
 
 export interface QueuedMutation {
   id: string

@@ -104,7 +104,7 @@ const GROUP_ORDER: PhotoGroupKey[] = [
 
 /** Maps a raw `photos.type` to its UI group. The default branch is why an
  *  unrecognized type still shows up in the gallery. */
-export function photoGroupForType(type: string): PhotoGroupKey {
+function photoGroupForType(type: string): PhotoGroupKey {
   switch (type) {
     case 'how_to':
       return 'how_to'

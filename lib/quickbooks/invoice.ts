@@ -32,7 +32,7 @@ async function getServiceItemId(qbo: QuickBooks): Promise<string> {
   return item.Id
 }
 
-export interface AccountInvoiceResult {
+interface AccountInvoiceResult {
   qboInvoiceId?: string
   error?: string
 }

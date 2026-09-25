@@ -9,7 +9,7 @@ export default function robots(): MetadataRoute.Robots {
       allow: '/',
       // The whole app behind auth, plus auth/API surfaces — nothing there is
       // marketing content, and it's all behind proxy.ts anyway.
-      disallow: ['/management/', '/crew/', '/api/', '/login', '/auth/'],
+      disallow: ['/app/', '/management/', '/api/', '/login', '/auth/'],
     },
     sitemap: `${APP_URL}/sitemap.xml`,
   }

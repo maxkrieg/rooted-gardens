@@ -10,8 +10,8 @@
  * before the file ever leaves the browser — the server-side check inside
  * the Server Action is the real backstop.
  */
-export const MAX_RESUME_BYTES = 4 * 1024 * 1024
-export const ALLOWED_RESUME_TYPES = [
+const MAX_RESUME_BYTES = 4 * 1024 * 1024
+const ALLOWED_RESUME_TYPES = [
   'application/pdf',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -19,7 +19,7 @@ export const ALLOWED_RESUME_TYPES = [
 
 /** Mirrors the `resumes` bucket's allowed_mime_types (migration
  *  20260806130000). */
-export function extensionForResumeMime(mime: string): 'pdf' | 'doc' | 'docx' {
+function extensionForResumeMime(mime: string): 'pdf' | 'doc' | 'docx' {
   if (mime === 'application/msword') return 'doc'
   if (mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return 'docx'
   return 'pdf'

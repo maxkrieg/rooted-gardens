@@ -1,10 +1,10 @@
-import { getDB, type MutationType, type QueuedMutation } from './idb'
+import { getDB, type QueuedMutation } from './idb'
 import { createClient } from '@/lib/supabase/client'
 import { toUserMessage } from '@/lib/errors'
 import type { PhotoType } from '@/types/app'
 
 // Payload types
-export interface CompletionPayload {
+interface CompletionPayload {
   visitId: string
   employeeId: string       // the logger (audit trail)
   presentEmployeeIds: string[]  // all crew confirmed on site
@@ -17,18 +17,18 @@ export interface CompletionPayload {
   endedAt: string
 }
 
-export interface JobStartPayload {
+interface JobStartPayload {
   visitId: string
   startedAt: string
 }
 
 /** Undoes an in-progress Start — clears started_at. Offered only while in
  *  progress, so ended_at is already null; start is the only column to undo. */
-export interface JobDiscardPayload {
+interface JobDiscardPayload {
   visitId: string
 }
 
-export interface PhotoPayload {
+interface PhotoPayload {
   visitId: string
   propertyId: string
   storagePath: string
@@ -40,12 +40,12 @@ export interface PhotoPayload {
 /** Caption edit for a photo row that ALREADY exists. A photo captured in the
  *  completion logger has no row until submit, so its caption rides along on the
  *  PhotoPayload above instead. */
-export interface PhotoCaptionPayload {
+interface PhotoCaptionPayload {
   photoId: string
   caption: string | null
 }
 
-export interface SkipPayload {
+interface SkipPayload {
   visitId: string
   skipReason?: string
   // If the visit was in progress when skipped, stop the on-site clock (set ended_at).
@@ -54,32 +54,32 @@ export interface SkipPayload {
 
 /** Schedule a property for a week. `id` is minted on the device so the drawer can
  *  open on the new visit offline, and so a replay upserts instead of duplicating. */
-export interface CreateVisitPayload {
+interface CreateVisitPayload {
   id: string
   accountId: string
   propertyId: string
   weekStart: string
 }
 
-export interface AssignCrewPayload {
+interface AssignCrewPayload {
   visitId: string
   employeeId: string
   action: 'add' | 'remove'
 }
 
-export interface SetVehiclePayload {
+interface SetVehiclePayload {
   visitId: string
   vehicleId: string | null
 }
 
-export interface CrewInstructionPayload {
+interface CrewInstructionPayload {
   visitId: string
   instruction: string | null
 }
 
 /** Revert skipped/completed → scheduled. Clears skip_reason only; completion
  *  fields are left as-is, matching the online hook it replaces. */
-export interface RevertStatusPayload {
+interface RevertStatusPayload {
   visitId: string
 }
 
@@ -91,7 +91,7 @@ export interface RevertStatusPayload {
  *  items queued before it existed — those must replay as a notes-only write, so
  *  the flush skips the column when the key is absent. The 'property_notes' type
  *  string is deliberately unchanged for the same reason. */
-export interface PropertyNotesPayload {
+interface PropertyNotesPayload {
   propertyId: string
   crewNotes: string | null
   accessNotes: string | null
@@ -102,7 +102,7 @@ export interface PropertyNotesPayload {
 /** One dispatch note per route group per week — the route sheet's group-header
  *  note. Upserts on (route_group_id, week_start), which is what makes a replay
  *  safe; an empty note deletes the row rather than storing a blank. */
-export interface RouteWeekNotePayload {
+interface RouteWeekNotePayload {
   routeGroupId: string
   weekStart: string
   note: string
@@ -112,14 +112,14 @@ export interface RouteWeekNotePayload {
  *  `routeGroupId` is null. property_route_groups has a UNIQUE index on
  *  property_id, so a property sits on at most one route — which is what lets
  *  this upsert rather than delete-then-insert, and makes a replay idempotent. */
-export interface AssignPropertyRoutePayload {
+interface AssignPropertyRoutePayload {
   propertyId: string
   routeGroupId: string | null
   /** Position within the route. Drive order — see buildScheduleWeek's sort. */
   sortOrder: number
 }
 
-export type MutationPayload =
+type MutationPayload =
   | { type: 'completion'; payload: CompletionPayload }
   | { type: 'job_start'; payload: JobStartPayload }
   | { type: 'job_discard'; payload: JobDiscardPayload }
@@ -140,7 +140,7 @@ export type MutationPayload =
  * incremented and never read, so an RLS denial retried forever while the banner
  * sat on "Syncing 1 change…" and the crew member believed it had saved.
  */
-export const MAX_ATTEMPTS = 5
+const MAX_ATTEMPTS = 5
 
 /**
  * Queue-change subscribers. Without this the banner only recounts on mount and
@@ -180,7 +180,7 @@ export async function enqueueMutation<T extends MutationPayload['type']>(
 }
 
 /** Mutations still awaiting sync. Excludes parked ('failed') ones. */
-export async function getPendingMutations(): Promise<QueuedMutation[]> {
+async function getPendingMutations(): Promise<QueuedMutation[]> {
   const db = await getDB()
   const all: QueuedMutation[] = await db.getAllFromIndex('mutations', 'by-timestamp')
   return all.filter((m) => m.status !== 'failed')
@@ -193,7 +193,7 @@ export async function getFailedMutations(): Promise<QueuedMutation[]> {
   return all.filter((m) => m.status === 'failed')
 }
 
-export interface QueueCounts {
+interface QueueCounts {
   pending: number
   failed: number
 }
@@ -207,12 +207,7 @@ export async function getQueueCounts(): Promise<QueueCounts> {
   }
 }
 
-/** Back-compat shim — pending-only count, as callers already expect. */
-export async function getPendingCount(): Promise<number> {
-  return (await getQueueCounts()).pending
-}
-
-export async function markMutationDone(id: string): Promise<void> {
+async function markMutationDone(id: string): Promise<void> {
   const db = await getDB()
   await db.delete('mutations', id)
   notifyQueueChanged()
@@ -255,7 +250,7 @@ async function recordFailure(mutation: QueuedMutation, err: unknown): Promise<bo
   return parked
 }
 
-export interface FlushResult {
+interface FlushResult {
   /** Mutations that reached Supabase on this run. */
   synced: number
   /** Mutations parked as 'failed' on this run. */

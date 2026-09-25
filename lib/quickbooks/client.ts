@@ -23,7 +23,7 @@ function qboEnvironment(): 'sandbox' | 'production' {
 
 /** Constructs the intuit-oauth client from env vars. All intuit-oauth specifics
  *  stay behind this file — route handlers never import it directly. */
-export function createQboOAuthClient(): OAuthClient {
+function createQboOAuthClient(): OAuthClient {
   return new OAuthClient({
     clientId: process.env.QBO_CLIENT_ID!,
     clientSecret: process.env.QBO_CLIENT_SECRET!,

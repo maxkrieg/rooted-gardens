@@ -9,7 +9,7 @@ import type { PhotoType } from '@/types/app'
  * is the stable identity, so the bytes are stored here instead and served as
  * object URLs.
  */
-export interface CachedPhoto {
+interface CachedPhoto {
   storagePath: string
   blob: Blob
   bytes: number
@@ -18,7 +18,7 @@ export interface CachedPhoto {
 
 /** ~100MB. Files can be 20MB each and property photos have no count cap, so
  *  without a ceiling one account could fill the device. */
-export const PHOTO_CACHE_MAX_BYTES = 100 * 1024 * 1024
+const PHOTO_CACHE_MAX_BYTES = 100 * 1024 * 1024
 
 /**
  * Only photos an owner needs while standing at a property. Completion and plan
@@ -73,10 +73,4 @@ async function evictToLimit(): Promise<void> {
     await db.delete('photo-blobs', row.storagePath)
     total -= row.bytes
   }
-}
-
-export async function getPhotoCacheBytes(): Promise<number> {
-  const db = await getDB()
-  const rows = (await db.getAll('photo-blobs')) as CachedPhoto[]
-  return rows.reduce((sum, row) => sum + row.bytes, 0)
 }

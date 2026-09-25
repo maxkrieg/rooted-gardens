@@ -18,7 +18,7 @@ export type PropertyPhotoRow = {
   uploaded_by: string | null
 }
 
-export type PropertyPhotosResult = {
+type PropertyPhotosResult = {
   rows: PropertyPhotoRow[]
   /** Exact count of matching photos, so the section can offer "Show all (N)". */
   total: number

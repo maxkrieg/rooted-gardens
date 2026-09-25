@@ -22,7 +22,7 @@ import { useStopDetail, type StopDetail } from '@/hooks/crew/useStopDetail'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { isVisitInProgress } from '@/lib/utils/visits'
 import { useApplyVisitUpdate } from '@/hooks/useManagementSchedule'
-import type { EmployeeRole, SchedulePropertyRow } from '@/types/app'
+import type { SchedulePropertyRow } from '@/types/app'
 
 // routeGroup is never read in this component — callers without route-group context
 // (e.g. the account detail page's Recent visits list) don't need to supply one.

@@ -33,7 +33,7 @@ interface QboInvoiceDetail {
  * client" pattern as lib/quickbooks/client.ts's upsertIntegrationTokens.
  */
 
-export interface DerivedInvoiceStatus {
+interface DerivedInvoiceStatus {
   status: InvoiceStatus
   qboBalance: number
   qboDueDate: string | null
@@ -56,7 +56,7 @@ export interface DerivedInvoiceStatus {
  * it reads as `paid`; a partial payment leaves Balance > 0, so it stays
  * sent/overdue with qbo_balance < amount. Neither is detected separately here.
  */
-export function deriveInvoiceStatus(
+function deriveInvoiceStatus(
   invoice: QboInvoiceDetail,
   todayISODate: string,
 ): DerivedInvoiceStatus {
@@ -142,7 +142,7 @@ export async function syncInvoiceStatus(
   return {}
 }
 
-export interface SyncResult {
+interface SyncResult {
   processed: number
   errors: number
 }

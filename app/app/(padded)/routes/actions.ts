@@ -229,7 +229,7 @@ export async function unassignProperty(
 
 // ─── Route group defaults ────────────────────────────────────────────────────
 
-export type RouteGroupDefaults = {
+type RouteGroupDefaults = {
   vehicleId: string | null
   days: string[]
   crewIds: string[]

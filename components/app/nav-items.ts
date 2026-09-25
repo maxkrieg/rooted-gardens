@@ -25,7 +25,7 @@ export interface NavItem {
  * desk routes. Access is not encoded here — it comes from `canAccessRoute`, so
  * the nav and the proxy gate can never disagree.
  */
-export const NAV_ITEMS: NavItem[] = [
+const NAV_ITEMS: NavItem[] = [
   {
     href: '/app/schedule',
     label: 'Schedule',

@@ -1,7 +1,6 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
 import { TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -34,7 +33,6 @@ interface UnroutedPanelProps {
  */
 export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
   const { data: lastVisitByProperty } = usePropertyLastVisit()
-  const router = useRouter()
   const refreshRoutes = useRefreshRoutes()
   const assignRoute = useAssignPropertyRoute()
   const { isOnline } = useOfflineStatus()

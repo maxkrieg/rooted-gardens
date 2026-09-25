@@ -13,9 +13,9 @@ import {
   type AccountDetail,
 } from '@/lib/accounts/fetch'
 
-export const accountsListKey = ['accounts-list'] as const
-export const accountDetailKey = (id: string) => ['account-detail', id]
-export const accountPhotosKey = (id: string) => ['account-photos', id]
+const accountsListKey = ['accounts-list'] as const
+const accountDetailKey = (id: string) => ['account-detail', id]
+const accountPhotosKey = (id: string) => ['account-photos', id]
 
 /**
  * The accounts list, client-side so it reads from the persisted cache in the
@@ -136,7 +136,7 @@ export function useUpdatePropertyNotes(accountId: string) {
   )
 }
 
-export type PropertyNotes = {
+type PropertyNotes = {
   crewNotes: string | null
   accessNotes: string | null
   parkingNotes: string | null

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Building2, ChevronsUpDown, MoreHorizontal, Trash2, Truck, X } from 'lucide-react'
+import { Building2, ChevronsUpDown, MoreHorizontal, Truck, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'

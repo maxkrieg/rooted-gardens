@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { findVisitInWeeks } from '@/lib/utils/schedule'
 import { syncVisitUrlParam } from '@/lib/utils/visit-url'
-import type { EmployeeRole, ScheduleWeek } from '@/types/app'
+import type { ScheduleWeek } from '@/types/app'
 
 interface DeepLinkedVisitSheetProps {
   /** The unfiltered window, so the link still resolves if a filter would have

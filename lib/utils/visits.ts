@@ -2,7 +2,7 @@ import { differenceInMinutes, parseISO } from 'date-fns'
 import type { Employee, Visit, VisitWithCrew } from '@/types/app'
 
 /** The on-site timing fields now live directly on the visit row. */
-export type VisitTiming = {
+type VisitTiming = {
   started_at: string | null
   ended_at: string | null
 }

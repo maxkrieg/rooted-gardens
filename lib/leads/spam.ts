@@ -45,7 +45,7 @@ export function hashIp(ip: string): string {
   return createHmac('sha256', process.env.SUPABASE_SERVICE_ROLE_KEY!).update(ip).digest('hex')
 }
 
-export type SpamSignal = 'honeypot' | 'too_fast'
+type SpamSignal = 'honeypot' | 'too_fast'
 
 /**
  * Cheap, no-DB checks against the two anti-spam fields every public lead

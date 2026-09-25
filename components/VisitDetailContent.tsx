@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { toast } from 'sonner'
 import {
   MapPin,
   Map as MapIcon,
@@ -45,10 +44,9 @@ import { useActiveVehicles } from '@/hooks/crew/useActiveVehicles'
 import { useUpdateVisitVehicle } from '@/hooks/useUpdateVisitVehicle'
 import { useRevertVisitToScheduled } from '@/hooks/useRevertVisitToScheduled'
 import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
-import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
-import type { EmployeeRole, VisitStatus } from '@/types/app'
+import type { VisitStatus } from '@/types/app'
 import { toastCrewError } from '@/lib/offline/errors'
 
 const VISIT_STATUS_OPTIONS: VisitStatus[] = ['scheduled', 'completed', 'skipped']

@@ -93,25 +93,3 @@ export function SectionError({
     </Alert>
   )
 }
-
-/**
- * Stale-data hairline for `/crew/*`. A refresh failure annotates the data crew
- * already have rather than replacing it (CLAUDE.md, "show stale data gracefully").
- */
-export function StaleNotice({ className }: { className?: string }) {
-  return (
-    <p
-      role="status"
-      className={cn(
-        'flex items-center justify-center gap-1.5 border-b border-[var(--ochre)]/25 bg-[var(--ochre)]/[0.08] px-4 py-1.5 text-xs text-muted-foreground',
-        className,
-      )}
-    >
-      <span
-        aria-hidden
-        className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--ochre)]"
-      />
-      Couldn&rsquo;t refresh &middot; showing what was last saved
-    </p>
-  )
-}

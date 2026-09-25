@@ -20,5 +20,3 @@ export const bulkAssignPropertiesSchema = z.object({
   propertyIds: z.array(z.guid()).min(1, 'Select at least one property'),
   routeGroupId: z.guid('Choose a route group'),
 })
-
-export type BulkAssignPropertiesValues = z.infer<typeof bulkAssignPropertiesSchema>

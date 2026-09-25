@@ -29,7 +29,7 @@ import type { Account, Invoice, InvoiceWithVisits, VisitWithLocation } from '@/t
  * Billing reads used to return `[]` on failure, which the accountant reads as
  * "nothing to invoice" — the most expensive false-empty in the app.
  */
-export interface LoadResult<T> {
+interface LoadResult<T> {
   data: T
   loadError?: boolean
 }
@@ -225,7 +225,7 @@ export async function pushInvoicesToQuickBooks(visitIds: string[]): Promise<Push
   return results
 }
 
-export interface DateRange {
+interface DateRange {
   start: Date
   end: Date
 }
@@ -366,7 +366,7 @@ export async function getContractAccountsOverview(): Promise<
   }
 }
 
-export interface CreateContractInvoiceInput {
+interface CreateContractInvoiceInput {
   accountId: string
   periodLabel: string
   periodStart: string // 'yyyy-MM-dd'
@@ -374,7 +374,7 @@ export interface CreateContractInvoiceInput {
   amount: number
 }
 
-export interface CreateContractInvoiceResult {
+interface CreateContractInvoiceResult {
   success: boolean
   qboInvoiceId?: string
   error?: string
@@ -484,7 +484,7 @@ export async function createContractInvoice(
   return { success: true, qboInvoiceId: invoiceRes.qboInvoiceId }
 }
 
-export interface RefreshInvoiceStatusesResult {
+interface RefreshInvoiceStatusesResult {
   processed: number
   errors: number
   /** Which invoices failed — a bare "3 failed" left nothing to act on. */

@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { format, parseISO } from 'date-fns'
-import { Building2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
@@ -10,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { VisitStatusBadge, InvoiceStatusBadge } from '@/components/management/badges'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { cn } from '@/lib/utils'
-import type { Account, EmployeeRole, RecentVisit, VisitWithCrew } from '@/types/app'
+import type { Account, RecentVisit, VisitWithCrew } from '@/types/app'
 
 interface RecentVisitsListProps {
   visits: RecentVisit[]

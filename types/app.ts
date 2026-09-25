@@ -4,7 +4,6 @@ import type { Tables } from './database'
 export type Account = Tables<'accounts'>
 export type Property = Tables<'properties'>
 export type RouteGroup = Tables<'route_groups'>
-export type PropertyRouteGroup = Tables<'property_route_groups'>
 export type Employee = Tables<'employees'>
 export type Vehicle = Tables<'vehicles'>
 export type RouteGroupWeekNote = Tables<'route_group_week_notes'>
@@ -14,14 +13,11 @@ export type RouteGroupDefaultCrew = Tables<'route_group_default_crew'> & {
 }
 export type Equipment = Tables<'equipment'>
 export type Visit = Tables<'visits'>
-export type VisitCrew = Tables<'visit_crew'>
+type VisitCrew = Tables<'visit_crew'>
 export type Photo = Tables<'photos'>
-export type Integration = Tables<'integrations'>
 export type Invoice = Tables<'invoices'>
 export type MaintenanceLog = Tables<'maintenance_logs'>
 export type Lead = Tables<'leads'>
-export type SiteContentRow = Tables<'site_content'>
-export type SiteCollectionItemRow = Tables<'site_collection_items'>
 
 // A property enriched with its account name and current route group — used by
 // the routes management page and its Assign Properties sheet.
@@ -49,18 +45,16 @@ export const ACCOUNT_STATUSES = ['active', 'inactive', 'prospective'] as const
 export type AccountStatus = (typeof ACCOUNT_STATUSES)[number]
 
 export const CONTRACT_PERIODS = ['monthly', 'seasonal'] as const
-export type ContractPeriod = (typeof CONTRACT_PERIODS)[number]
 
 export const EMPLOYEE_ROLES = ['owner', 'lead', 'crew', 'accountant'] as const
 export type EmployeeRole = (typeof EMPLOYEE_ROLES)[number]
 
 export const SERVICE_SIDES = ['lawn', 'garden', 'both'] as const
-export type ServiceSide = (typeof SERVICE_SIDES)[number]
 
 export const PROPERTY_FREQUENCIES = ['weekly', 'biweekly', 'monthly', 'as_needed'] as const
 export type Frequency = (typeof PROPERTY_FREQUENCIES)[number]
 
-export const VISIT_STATUSES = ['scheduled', 'completed', 'skipped'] as const
+const VISIT_STATUSES = ['scheduled', 'completed', 'skipped'] as const
 export type VisitStatus = (typeof VISIT_STATUSES)[number]
 
 export const INVOICE_STATUSES = ['draft', 'sent', 'paid', 'overdue'] as const
@@ -75,7 +69,6 @@ export const SERVICE_TYPES = [
   'cleanup',
   'other',
 ] as const
-export type ServiceType = (typeof SERVICE_TYPES)[number]
 
 export const SERVICE_TYPE_LABELS: Record<string, string> = {
   mow: 'Mow',
@@ -87,19 +80,14 @@ export const SERVICE_TYPE_LABELS: Record<string, string> = {
   other: 'Other',
 }
 
-export const CREW_RELATIONS = ['assigned', 'completed'] as const
-export type CrewRelation = (typeof CREW_RELATIONS)[number]
-
 export const VEHICLE_STATUSES = ['available', 'in_use', 'maintenance', 'retired'] as const
 export type VehicleStatus = (typeof VEHICLE_STATUSES)[number]
 
 // vehicles.type is free text at the DB level (no CHECK) — this tuple is a UI
 // convenience for the form dropdown, not an enforced constraint.
 export const VEHICLE_TYPES = ['truck', 'trailer', 'other'] as const
-export type VehicleType = (typeof VEHICLE_TYPES)[number]
 
 export const EQUIPMENT_TYPES = ['mower', 'trimmer', 'blower', 'edger', 'other'] as const
-export type EquipmentType = (typeof EQUIPMENT_TYPES)[number]
 
 // Equipment shares the vehicle status vocabulary (available/in_use/maintenance/retired).
 export const EQUIPMENT_STATUSES = ['available', 'in_use', 'maintenance', 'retired'] as const
@@ -120,7 +108,7 @@ export const PHOTO_TYPE_LABELS: Record<PhotoType, string> = {
 /** UI buckets for the property photo gallery. A superset of PHOTO_TYPES — the
  *  'other' bucket is the default branch so a type added to the DB CHECK ahead of
  *  the UI still renders somewhere instead of vanishing from the gallery. */
-export const PHOTO_GROUP_KEYS = [
+const PHOTO_GROUP_KEYS = [
   'how_to',
   'customer_request',
   'visit',
@@ -178,16 +166,6 @@ export type JobApplicationDetails = {
  *   'active'  — has signed in at least once
  */
 export type AppAccessStatus = 'none' | 'invited' | 'active'
-
-/** Employee record joined to its auth.users identity (user_id is always set). */
-export type EmployeeWithUser = Employee & {
-  user_id: string
-}
-
-/** Account with its properties. */
-export type AccountWithProperties = Account & {
-  properties: Property[]
-}
 
 /** Account with its properties (alias kept for call sites that joined deeper before zones were removed). */
 export type AccountWithDetails = Account & {
@@ -261,11 +239,6 @@ export type RecentVisit = VisitWithCrew & {
   property: Property | null
 }
 
-/** Route group with its assigned properties (via property_route_groups). */
-export type RouteGroupWithProperties = RouteGroup & {
-  properties: Property[]
-}
-
 /**
  * The top-level shape returned by getScheduleForWeek.
  * Route groups → properties → visit for the requested week.
@@ -326,16 +299,6 @@ export type AccountSearchResult = {
   contact_name: string | null
   status: AccountStatus
   addresses: string[]
-}
-
-// ─── Crew mobile helpers ──────────────────────────────────────────────────────
-
-/** A crew member's stop for today — what's shown on the Today list. */
-export type CrewStop = {
-  visit: Visit
-  property: Property
-  account: Account
-  isAssigned: boolean
 }
 
 // ─── Public marketing site content (Phase 9.2) ─────────────────────────────────

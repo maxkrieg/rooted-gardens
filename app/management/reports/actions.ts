@@ -45,7 +45,7 @@ export interface MonthlyRevenue {
  * carry the flat rate), so a plain sum is correct with no per-billing-type
  * special-casing — see docs/INVOICING.md.
  */
-export interface RevenueReport {
+interface RevenueReport {
   months: MonthlyRevenue[]
   /** True when the query failed — see the note on CrewVisitsReport.loadError. */
   loadError?: boolean

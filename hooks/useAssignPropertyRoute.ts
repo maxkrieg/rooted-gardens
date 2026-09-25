@@ -14,7 +14,7 @@ type AccountDetailLike = {
   routeGroupByPropertyId?: Record<string, { id: string; name: string }>
 }
 
-export type AssignPropertyRouteInput = {
+type AssignPropertyRouteInput = {
   propertyId: string
   /** null removes the property from every route group. */
   routeGroupId: string | null

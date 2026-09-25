@@ -8,7 +8,6 @@ import { format, parseISO } from 'date-fns'
 import { Badge } from '@/components/ui/badge'
 import { cadenceFor, type Cadence, type CadenceProperty, type CadenceState } from '@/lib/utils/cadence'
 import type {
-  Account,
   AccountStatus,
   BillingType,
   EmployeeRole,
@@ -24,7 +23,6 @@ import { LEAD_KIND_LABELS, LEAD_STATUS_LABELS } from '@/types/app'
 import type { ServiceDueState } from '@/lib/utils/fleet'
 import { serviceDueState } from '@/lib/utils/fleet'
 import type { QboConnectionStatus } from '@/lib/quickbooks/client'
-import { formatAccountPrice } from '@/lib/utils/accounts'
 
 // ─── Account status ──────────────────────────────────────────────────────────
 
@@ -180,32 +178,6 @@ export function CadenceSummary({
       )}
     </p>
   )
-}
-
-/** Cadence label with no day count — for callers with no last-visit data to hand. */
-export function FrequencyBadge({ frequency }: { frequency: string }) {
-  const label = FREQUENCY_LABELS[frequency as Frequency] ?? frequency
-  return (
-    <Badge variant="outline" className="border-transparent uppercase tracking-wide text-[10px] font-semibold freq-badge">
-      {label}
-    </Badge>
-  )
-}
-
-// ─── Account price / billing-type meta ────────────────────────────────────────
-
-// Price text already names the billing type ("$125.00 / visit", "$800.00 /
-// monthly"), so the billing badge would be redundant whenever there's a flat
-// price to show. It only earns its place as a fallback for an account with no
-// price set at all — a per_visit account missing its rate, or a legacy row
-// still carrying the retired 'as_needed' type. Shared by the schedule grid and
-// the mobile list so their fallback rules can't drift apart.
-export function AccountPriceMeta({ account }: { account: Account }) {
-  const price = formatAccountPrice(account)
-  if (price !== '—') {
-    return <span className="text-[11px] tabular-nums text-muted-foreground">{price}</span>
-  }
-  return <BillingTypeBadge billingType={account.billing_type} />
 }
 
 // ─── Visit status ─────────────────────────────────────────────────────────────

@@ -18,7 +18,7 @@ export const PUBLIC_ROUTES = [
   '/contact',
 ] as const
 
-export type PublicRoute = (typeof PUBLIC_ROUTES)[number]
+type PublicRoute = (typeof PUBLIC_ROUTES)[number]
 
 export const PUBLIC_NAV: { href: PublicRoute; label: string }[] = [
   { href: '/lawn', label: 'Lawn' },

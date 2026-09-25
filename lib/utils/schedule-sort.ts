@@ -30,7 +30,7 @@ export const SCHEDULE_SORT_KEY = 'rg-schedule-sort'
 
 export const DEFAULT_SCHEDULE_SORT: ScheduleSortState = { all: 'route', byGroup: {} }
 
-export function isScheduleSortMode(value: unknown): value is ScheduleSortMode {
+function isScheduleSortMode(value: unknown): value is ScheduleSortMode {
   return value === 'route' || value === 'priority'
 }
 

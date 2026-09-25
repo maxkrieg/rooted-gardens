@@ -5,7 +5,7 @@ import { Check, ChevronsUpDown, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
-export interface CrewOption {
+interface CrewOption {
   id: string
   name: string
   role: string

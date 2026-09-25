@@ -35,7 +35,7 @@ export const SCHEDULE_STATUS_FILTERS = [
   'skipped',
 ] as const
 
-export type ScheduleStatusFilter = (typeof SCHEDULE_STATUS_FILTERS)[number]
+type ScheduleStatusFilter = (typeof SCHEDULE_STATUS_FILTERS)[number]
 
 export const SCHEDULE_STATUS_FILTER_LABELS: Record<ScheduleStatusFilter, string> = {
   all: 'All statuses',

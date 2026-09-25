@@ -4,7 +4,7 @@ import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-export interface SelectionAction {
+interface SelectionAction {
   label: string
   onClick: () => void
   disabled?: boolean

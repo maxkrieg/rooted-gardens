@@ -4,14 +4,14 @@ import { useQuery } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
 
-export const propertyLastVisitKey = ['property-last-visit'] as const
+const propertyLastVisitKey = ['property-last-visit'] as const
 
 /**
  * A plain object, deliberately NOT a Map. This query is persisted, and the
  * persister serialises with JSON.stringify — which turns a Map into `{}`. It
  * would work until the first reload and then throw on every `.get`.
  */
-export type PropertyLastVisitMap = Record<string, string>
+type PropertyLastVisitMap = Record<string, string>
 
 /**
  * Most recent completed visit per property, as yyyy-MM-dd, keyed by property id.

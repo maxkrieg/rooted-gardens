@@ -6,7 +6,7 @@ import { patchScheduleVisit } from '@/hooks/useManagementSchedule'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
 import type { VisitCrewWithEmployee } from '@/types/app'
 
-export type ReassignCrewInput = {
+type ReassignCrewInput = {
   employeeId: string
   name: string
   action: 'add' | 'remove'

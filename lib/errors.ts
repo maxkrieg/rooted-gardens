@@ -109,16 +109,10 @@ export function toUserMessage(err: unknown, fallback: string, context?: string):
 }
 
 /** Online-only crew mutations throw this rather than attempt a doomed request. */
-export const OFFLINE_SENTINEL = 'offline'
+const OFFLINE_SENTINEL = 'offline'
 
 export function isOfflineError(err: unknown): boolean {
   return err instanceof Error && err.message === OFFLINE_SENTINEL
-}
-
-/** Crew variant: "needs a connection" reads very differently from "it failed". */
-export function toCrewMessage(err: unknown, fallback: string, context?: string): string {
-  if (isOfflineError(err)) return 'That needs a connection. Try again once you have signal.'
-  return toUserMessage(err, fallback, context)
 }
 
 /** Drives the React Query retry policy. Retrying an RLS denial or an expired
