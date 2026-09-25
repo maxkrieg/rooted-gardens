@@ -1,11 +1,14 @@
 import { startOfWeek, addDays, addWeeks, isAfter, isBefore, parseISO, format } from 'date-fns'
 import { cadenceFor, cadencePriority, intervalDaysFor } from '@/lib/utils/cadence'
+import { displayCrewFor, isVisitInProgress } from '@/lib/utils/visits'
 import type {
   Account,
+  Employee,
   Property,
   RouteGroup,
   ScheduleWeek,
   SchedulePropertyRow,
+  Vehicle,
   VisitWithCrew,
 } from '@/types/app'
 
@@ -291,4 +294,49 @@ export function sortRowsByPriority(
   }
 
   return [...rows].sort((a, b) => weight(b) - weight(a))
+}
+
+export interface RouteGroupStats {
+  /** Visits done (completed or skipped) — the week's work that's settled. */
+  done: number
+  /** Every property in this group this week, scheduled or not. */
+  total: number
+  /** Distinct crew across the group's visits, completed-over-assigned per visit. */
+  crew: Employee[]
+  /** Distinct vehicle names across the group's visits. */
+  vehicles: string[]
+  /** Any visit in the group currently on site. */
+  onSite: boolean
+}
+
+/**
+ * One route group's week at a glance. Takes each row's resolved visit (null when
+ * unscheduled) so the band reads exactly what the rows underneath it render.
+ */
+export function routeGroupStats(
+  visits: Array<VisitWithCrew | null>,
+  vehicles: Vehicle[],
+): RouteGroupStats {
+  const crewById = new Map<string, Employee>()
+  const vehicleNames = new Set<string>()
+  let done = 0
+  let onSite = false
+
+  for (const visit of visits) {
+    if (!visit) continue
+    // Skipped counts as settled: the decision is made and the week has moved on.
+    if (visit.status === 'completed' || visit.status === 'skipped') done += 1
+    if (isVisitInProgress(visit)) onSite = true
+    for (const emp of displayCrewFor(visit)) crewById.set(emp.id, emp)
+    const vehicleName = vehicles.find((v) => v.id === visit.vehicle_id)?.name
+    if (vehicleName) vehicleNames.add(vehicleName)
+  }
+
+  return {
+    done,
+    total: visits.length,
+    crew: [...crewById.values()],
+    vehicles: [...vehicleNames],
+    onSite,
+  }
 }

@@ -15,6 +15,13 @@ import type { Employee, SchedulePropertyRow, VisitCrewWithEmployee } from '@/typ
  * and there is no delete-visit mutation, and a visit crew may already have
  * started isn't safe to remove blind.
  */
+/** One stop to act on: a property row and the week its visit belongs to. The
+ *  desktop grid selects cells across weeks, so the week travels per target. */
+export interface BulkTarget {
+  row: SchedulePropertyRow
+  weekStart: string
+}
+
 export interface BulkResult {
   changed: number
   undo?: () => Promise<void>
@@ -33,26 +40,26 @@ export interface BulkResult {
  * Undo is built from the same primitives, so it queues and survives a dead zone
  * exactly like the change it reverses.
  */
-export function useBulkScheduleActions(weekStart: string) {
+export function useBulkScheduleActions() {
   const queryClient = useQueryClient()
   const createVisit = useCreateVisit()
 
   /** Rows with no visit yet get one, so crew/truck have something to attach to. */
   const ensureVisits = useCallback(
-    async (rows: SchedulePropertyRow[]): Promise<string[]> => {
+    async (targets: BulkTarget[]): Promise<string[]> => {
       const ids: string[] = []
-      for (const row of rows) {
+      for (const { row, weekStart } of targets) {
         if (row.visit) ids.push(row.visit.id)
         else ids.push((await createVisit(row, weekStart)).id)
       }
       return ids
     },
-    [createVisit, weekStart],
+    [createVisit],
   )
 
   const scheduleAll = useCallback(
-    async (rows: SchedulePropertyRow[]): Promise<BulkResult> => {
-      const pending = rows.filter((row) => !row.visit)
+    async (targets: BulkTarget[]): Promise<BulkResult> => {
+      const pending = targets.filter(({ row }) => !row.visit)
       await ensureVisits(pending)
       await flushMutationQueue()
       // No undo: reversing this means deleting visits, and there is no
@@ -64,13 +71,13 @@ export function useBulkScheduleActions(weekStart: string) {
   )
 
   const assignCrew = useCallback(
-    async (rows: SchedulePropertyRow[], employee: Employee): Promise<BulkResult> => {
-      const visitIds = await ensureVisits(rows)
+    async (targets: BulkTarget[], employee: Employee): Promise<BulkResult> => {
+      const visitIds = await ensureVisits(targets)
 
       // Only the visits this actually changed are undoable — reversing a visit
       // that already had them on it would remove an assignment we didn't make.
       const added = visitIds.filter((visitId) => {
-        const row = rows.find((r) => r.visit?.id === visitId)
+        const row = targets.find((t) => t.row.visit?.id === visitId)?.row
         return !row?.visit?.visit_crew.some(
           (vc) => vc.employee_id === employee.id && vc.relation === 'assigned',
         )
@@ -94,31 +101,31 @@ export function useBulkScheduleActions(weekStart: string) {
   )
 
   const setVehicle = useCallback(
-    async (rows: SchedulePropertyRow[], vehicleId: string | null): Promise<BulkResult> => {
+    async (targets: BulkTarget[], vehicleId: string | null): Promise<BulkResult> => {
       // Captured before the write: undo restores each visit's own previous
       // truck, not one shared value.
       const previous = new Map<string, string | null>()
-      for (const row of rows) {
+      for (const { row } of targets) {
         if (row.visit) previous.set(row.visit.id, row.visit.vehicle_id)
       }
 
-      const visitIds = await ensureVisits(rows)
-      const targets = visitIds.filter((id) => (previous.get(id) ?? null) !== vehicleId)
+      const visitIds = await ensureVisits(targets)
+      const changedIds = visitIds.filter((id) => (previous.get(id) ?? null) !== vehicleId)
 
       await applyVehicle(
         queryClient,
-        targets.map((visitId) => ({ visitId, vehicleId })),
+        changedIds.map((visitId) => ({ visitId, vehicleId })),
       )
       await flushMutationQueue()
 
       return {
-        changed: targets.length,
+        changed: changedIds.length,
         undo:
-          targets.length > 0
+          changedIds.length > 0
             ? async () => {
                 await applyVehicle(
                   queryClient,
-                  targets.map((visitId) => ({
+                  changedIds.map((visitId) => ({
                     visitId,
                     vehicleId: previous.get(visitId) ?? null,
                   })),
@@ -137,10 +144,10 @@ export function useBulkScheduleActions(weekStart: string) {
    * so it can't put a completion back.
    */
   const skipAll = useCallback(
-    async (rows: SchedulePropertyRow[], skipReason: string): Promise<BulkResult> => {
-      const targets = rows.filter((row) => row.visit?.status === 'scheduled')
+    async (targets: BulkTarget[], skipReason: string): Promise<BulkResult> => {
+      const rows = targets.map((t) => t.row).filter((row) => row.visit?.status === 'scheduled')
 
-      for (const row of targets) {
+      for (const row of rows) {
         const visitId = row.visit!.id
         await enqueueMutation('skip', { visitId, skipReason }, row.property.address)
         patchScheduleVisit(queryClient, visitId, (visit) => ({
@@ -152,9 +159,9 @@ export function useBulkScheduleActions(weekStart: string) {
       }
       await flushMutationQueue()
 
-      const visitIds = targets.map((row) => row.visit!.id)
+      const visitIds = rows.map((row) => row.visit!.id)
       return {
-        changed: targets.length,
+        changed: rows.length,
         undo:
           visitIds.length > 0
             ? async () => {
@@ -176,11 +183,16 @@ export function useBulkScheduleActions(weekStart: string) {
   )
 
   /** Drops locally-minted rows a failed batch left behind, on demand. */
-  const invalidateWeek = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: scheduleVisitsKey(weekStart) })
-  }, [queryClient, weekStart])
+  const invalidateWeeks = useCallback(
+    (targets: BulkTarget[]) => {
+      for (const weekStart of new Set(targets.map((t) => t.weekStart))) {
+        queryClient.invalidateQueries({ queryKey: scheduleVisitsKey(weekStart) })
+      }
+    },
+    [queryClient],
+  )
 
-  return { scheduleAll, assignCrew, setVehicle, skipAll, invalidateWeek }
+  return { scheduleAll, assignCrew, setVehicle, skipAll, invalidateWeeks }
 }
 
 /** Enqueue + optimistic patch for one crew change across many visits. */

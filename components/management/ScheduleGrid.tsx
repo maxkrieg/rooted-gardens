@@ -1,11 +1,16 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
 import { addDays, format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
+import { Camera, FilePen, Flag, Receipt } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { getWeekStart, groupRowsByAccount, sortRowsByPriority } from '@/lib/utils/schedule'
+import {
+  getWeekStart,
+  groupRowsByAccount,
+  routeGroupStats,
+  sortRowsByPriority,
+} from '@/lib/utils/schedule'
 import { usePropertyLastVisit } from '@/hooks/usePropertyLastVisit'
 import {
   DEFAULT_SCHEDULE_SORT,
@@ -16,22 +21,38 @@ import {
 } from '@/lib/utils/schedule-sort'
 import { ScheduleSortToggle } from '@/components/management/ScheduleSortToggle'
 import { syncVisitUrlParam } from '@/lib/utils/visit-url'
-import { formatAccountPrice } from '@/lib/utils/accounts'
 import { useCan } from '@/components/app/RoleProvider'
 import { useCreateVisit } from '@/hooks/useCreateVisit'
 import { toUserMessage } from '@/lib/errors'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
+import { RouteDefaultsSheet } from '@/components/management/RouteDefaultsSheet'
+import { RoutePicker } from '@/components/management/RoutePicker'
 import { ScheduleEmptyState } from '@/components/management/ScheduleEmptyState'
-import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
-import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { FilePen, Camera } from 'lucide-react'
-import { AccountPriceMeta, CadenceBadge, BillingTypeBadge, InvoiceStatusBadge } from '@/components/management/badges'
+import { ScheduleBulkControls } from '@/components/management/ScheduleBulkControls'
+import { WeekNoteRibbon } from '@/components/management/WeekNoteRibbon'
+import {
+  OnSiteDot,
+  RouteCrewTruck,
+  RouteGroupMenu,
+  RouteProgressBar,
+  formatDays,
+} from '@/components/management/RouteGroupBand'
+import { CheckIndicator } from '@/components/app/CheckIndicator'
+import { useScheduleReference } from '@/hooks/useManagementSchedule'
+import { useWeekNotesForWeeks, useSaveWeekNote } from '@/hooks/useWeekNotes'
+import { useRouteAllUngrouped } from '@/hooks/useRouteAllUngrouped'
+import type { BulkTarget } from '@/hooks/useBulkScheduleActions'
+import { isVisitInProgress, formatElapsed, displayCrewFor } from '@/lib/utils/visits'
+import {
+  CadenceBadge,
+  VisitStatusIcon,
+  invoiceStatusLabel,
+  visitRowTint,
+} from '@/components/management/badges'
 import type {
   Account,
   Employee,
-  EmployeeRole,
   Property,
   RouteGroup,
   ScheduleWeek,
@@ -41,9 +62,11 @@ import type {
 } from '@/types/app'
 
 // Shared width for the sticky label column — kept in one place so the header
-// `<th>`, the merged/nested label cells, and the pinned route-group banner
-// below can never drift out of sync.
+// `<th>`, the label cells, and the route header cells can never drift apart.
 const LABEL_COL_WIDTH = 'w-[260px] min-w-[260px]'
+
+/** Selection key for one property×week cell. */
+const cellKey = (propertyId: string, weekStart: string) => `${propertyId}|${weekStart}`
 
 interface ScheduleGridProps {
   weeks: ScheduleWeek[]
@@ -51,6 +74,9 @@ interface ScheduleGridProps {
   vehicles: Vehicle[]
   /** True when a filter is narrowing the view — changes the empty state's meaning. */
   filtered?: boolean
+  /** Cells become checkboxes and the bulk bar appears. Owned by ScheduleView. */
+  selectMode?: boolean
+  onExitSelectMode?: () => void
   /** Shared with the phone list so the two schedule views can't disagree. */
   sortState?: ScheduleSortState
   onGroupSortChange?: (groupKey: string, mode: ScheduleSortMode) => void
@@ -61,6 +87,8 @@ export function ScheduleGrid({
   employees,
   vehicles,
   filtered,
+  selectMode = false,
+  onExitSelectMode,
   sortState = DEFAULT_SCHEDULE_SORT,
   onGroupSortChange,
 }: ScheduleGridProps) {
@@ -83,18 +111,42 @@ export function ScheduleGrid({
     [sortState, lastVisitByProperty],
   )
 
+  // Tick elapsed time every 30s — one timer for the grid, not one per cell.
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 30_000)
+    return () => clearInterval(id)
+  }, [])
+
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sheetRow, setSheetRow] = useState<SchedulePropertyRow | null>(null)
   const [sheetWeek, setSheetWeek] = useState('')
   const [creatingKey, setCreatingKey] = useState<string | null>(null)
   // Visits created in this session, keyed by cell. Layered *under* the server
-  // props in renderWeekCell so a just-scheduled cell paints immediately instead
-  // of waiting on revalidatePath — and never cleared, since clearing it would
-  // race the props catching up (the routes-page freeze, commit f4e09e3).
+  // data so a just-scheduled cell paints immediately, and never cleared, since
+  // clearing it would race the data catching up (the routes-page freeze, f4e09e3).
   const [createdVisits, setCreatedVisits] = useState<Map<string, VisitWithCrew>>(new Map())
 
   const [assignOpen, setAssignOpen] = useState(false)
   const [assignGroup, setAssignGroup] = useState<RouteGroup | null>(null)
+  const [defaultsGroup, setDefaultsGroup] = useState<RouteGroup | null>(null)
+  // Which route×week note editor is open — a note belongs to one week column.
+  const [noteEditKey, setNoteEditKey] = useState<string | null>(null)
+
+  const weekStarts = useMemo(() => weeks.map((w) => w.weekStart), [weeks])
+  const notesByWeek = useWeekNotesForWeeks(weekStarts)
+  const saveWeekNote = useSaveWeekNote()
+  const { data: reference } = useScheduleReference()
+  const routeAllUngrouped = useRouteAllUngrouped()
+
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  // Leaving select mode drops the selection — adjusted during render, as the
+  // phone list does, so the stale selection never paints once.
+  const [selectModeSnapshot, setSelectModeSnapshot] = useState(selectMode)
+  if (selectModeSnapshot !== selectMode) {
+    setSelectModeSnapshot(selectMode)
+    if (selected.size > 0) setSelected(new Set())
+  }
 
   // Build visit lookup: property_id → week_start → visit
   const visitMap = useMemo(() => {
@@ -114,6 +166,16 @@ export function ScheduleGrid({
     return map
   }, [weeks])
 
+  /** The visit for one cell. Server data wins once it lands; the local map only
+   *  covers the gap between the insert and that data. */
+  function visitFor(row: SchedulePropertyRow, weekStart: string): VisitWithCrew | null {
+    return (
+      visitMap.get(row.property.id)?.get(weekStart) ??
+      createdVisits.get(`${row.property.id}-${weekStart}`) ??
+      null
+    )
+  }
+
   function openSheet(row: SchedulePropertyRow, visit: VisitWithCrew, weekStart: string) {
     setSheetRow({ ...row, visit })
     setSheetWeek(weekStart)
@@ -124,28 +186,26 @@ export function ScheduleGrid({
 
   /**
    * Schedule an empty cell. `openDrawer` is true for a click — the owner almost
-   * always wants to set crew or an instruction next, so opening straight away
-   * saves a second tap on a small target. The `S` shortcut passes false to keep
-   * a fast path for filling a week without a drawer each time.
+   * always wants to set crew or an instruction next. The `S` shortcut passes
+   * false to keep a fast path for filling a week without a drawer each time.
    *
    * Deliberately not wrapped in startTransition: the drawer state must be an
-   * urgent update, or it queues behind the revalidated RSC tree and reads as a
-   * frozen cell.
+   * urgent update, or it reads as a frozen cell.
    */
   async function scheduleCell(
     row: SchedulePropertyRow,
     weekStart: string,
     { openDrawer }: { openDrawer: boolean },
   ) {
-    const cellKey = `${row.property.id}-${weekStart}`
-    setCreatingKey(cellKey)
+    const key = `${row.property.id}-${weekStart}`
+    setCreatingKey(key)
     try {
       const visit = await createVisit(row, weekStart)
-      setCreatedVisits((prev) => new Map(prev).set(cellKey, visit))
+      setCreatedVisits((prev) => new Map(prev).set(key, visit))
       if (openDrawer) openSheet(row, visit, weekStart)
     } catch (err) {
-      // A thrown failure (dropped connection mid-action) never reaches the
-      // res.error branch, and would leave the cell stuck on its placeholder.
+      // A thrown failure (dropped connection mid-action) would otherwise leave
+      // the cell stuck on its placeholder.
       toast.error('Failed to create visit', {
         description: toUserMessage(err, 'Could not add the stop.', '[ScheduleGrid.scheduleCell]'),
       })
@@ -154,8 +214,22 @@ export function ScheduleGrid({
     }
   }
 
+  function toggleCells(keys: string[]) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      const allOn = keys.every((k) => next.has(k))
+      for (const k of keys) {
+        if (allOn) next.delete(k)
+        else next.add(k)
+      }
+      return next
+    })
+  }
+
   function handleCellClick(row: SchedulePropertyRow, weekStart: string, visit: VisitWithCrew | null) {
-    if (visit) {
+    if (selectMode) {
+      toggleCells([cellKey(row.property.id, weekStart)])
+    } else if (visit) {
       openSheet(row, visit, weekStart)
     } else {
       void scheduleCell(row, weekStart, { openDrawer: true })
@@ -174,8 +248,8 @@ export function ScheduleGrid({
     visit: VisitWithCrew | null,
   ) {
     // Schedule without opening the drawer — the fast path for filling several
-    // cells in a row. A click (or Enter/Space, below) opens it.
-    if ((e.key === 's' || e.key === 'S') && !visit) {
+    // cells in a row. Off while selecting, where a keypress shouldn't write.
+    if ((e.key === 's' || e.key === 'S') && !visit && !selectMode) {
       e.preventDefault()
       void scheduleCell(row, weekStart, { openDrawer: false })
     }
@@ -186,25 +260,16 @@ export function ScheduleGrid({
   }
 
   function renderWeekCell(row: SchedulePropertyRow, week: ScheduleWeek) {
-    const cellKey = `${row.property.id}-${week.weekStart}`
-    // Server data wins once the revalidated render lands; the local map only
-    // covers the gap between the insert and that render.
-    const base =
-      visitMap.get(row.property.id)?.get(week.weekStart) ?? createdVisits.get(cellKey) ?? null
-    // Layer the live overlay (realtime UPDATEs + the drawer's own writes) over
-    // the server row, so status, timing, and the instruction flag all repaint
-    // without waiting on a server render.
-    const visit = base
-    const inProgress = visit ? isVisitInProgress(visit) : false
+    const visit = visitFor(row, week.weekStart)
     // week.weekStart and currentWeekStart are both 'yyyy-MM-dd', so this sorts lexicographically.
     const isPastWeek = week.weekStart < currentWeekStart
     return (
-      <td key={week.weekStart} className={cn('px-2 py-2 align-top', isPastWeek && 'bg-foreground/[0.04]')}>
+      <td key={week.weekStart} className={cn('px-1.5 py-1.5 align-top', isPastWeek && 'bg-foreground/[0.04]')}>
         <ScheduleCell
           visit={visit}
-          inProgress={inProgress}
-          startedAt={visit?.started_at ?? null}
-          isCreating={creatingKey === cellKey}
+          isCreating={creatingKey === `${row.property.id}-${week.weekStart}`}
+          selectMode={selectMode}
+          isSelected={selected.has(cellKey(row.property.id, week.weekStart))}
           onClick={() => handleCellClick(row, week.weekStart, visit)}
           onKeyDown={(e) => handleCellKeyDown(e, row, week.weekStart, visit)}
         />
@@ -213,8 +278,7 @@ export function ScheduleGrid({
   }
 
   // Renders one account's rows within either a route group or the ungrouped
-  // bucket — shared so the "Not on a route" section gets the exact same
-  // merged/nested account-clustering treatment as a real route group.
+  // bucket — shared so "Not on a route" gets the same account clustering.
   function renderPropertyRows(keyPrefix: string, account: Account, acctRows: SchedulePropertyRow[]) {
     if (acctRows.length === 1) {
       const row = acctRows[0]
@@ -256,6 +320,109 @@ export function ScheduleGrid({
     ]
   }
 
+  /**
+   * One week's slice of a route's header: the phone band's progress, crew,
+   * truck and dispatch note, per column. In select mode the summary toggles
+   * every cell of this route in this week — the common "this route, this week"
+   * batch in one click.
+   */
+  function renderRouteWeekCell(routeGroup: RouteGroup, rows: SchedulePropertyRow[], week: ScheduleWeek) {
+    const stats = routeGroupStats(
+      rows.map((row) => visitFor(row, week.weekStart)),
+      vehicles,
+    )
+    const note =
+      notesByWeek.get(week.weekStart)?.find((n) => n.route_group_id === routeGroup.id)?.note ?? null
+    const editKey = `${routeGroup.id}|${week.weekStart}`
+    const editing = noteEditKey === editKey
+    const keys = rows.map((row) => cellKey(row.property.id, week.weekStart))
+    const allSelected = keys.length > 0 && keys.every((k) => selected.has(k))
+
+    const isCurrent = week.weekStart === currentWeekStart
+    const complete = stats.total > 0 && stats.done === stats.total
+
+    // The count is the cell's anchor — Fraunces numerals, like the dashboard's
+    // stat figures — and takes the column's green when it's this week.
+    const summary = (
+      <>
+        {selectMode && <CheckIndicator checked={allSelected} />}
+        <span
+          className="flex shrink-0 items-baseline tabular-nums"
+          aria-label={`${stats.done} of ${stats.total} stops done`}
+        >
+          <span
+            className={cn(
+              'font-display text-[15px] font-semibold leading-none',
+              isCurrent || complete ? 'text-primary' : 'text-foreground',
+            )}
+          >
+            {stats.done}
+          </span>
+          <span className="ml-0.5 text-[11px] font-medium text-accent-foreground/70">/{stats.total}</span>
+        </span>
+        {stats.onSite && <OnSiteDot />}
+        <span className="flex min-w-0 items-center gap-2 text-accent-foreground/80">
+          <RouteCrewTruck crew={stats.crew} vehicles={stats.vehicles} />
+        </span>
+      </>
+    )
+    const summaryClass =
+      'flex min-h-11 w-full min-w-0 items-center gap-2.5 px-3 py-2 text-[11px]'
+
+    return (
+      <td
+        key={week.weekStart}
+        className="group/rw relative bg-accent align-middle border-t border-t-primary/20 p-0"
+      >
+        {/* pb clears the progress bar, which is pinned to the cell's bottom
+            edge so it runs level across all four columns. */}
+        <div className="flex flex-col pb-[3px]">
+          <div className="flex items-center">
+            {selectMode ? (
+              <button
+                type="button"
+                aria-pressed={allSelected}
+                aria-label={`Select every stop on ${routeGroup.name} this week`}
+                onClick={() => toggleCells(keys)}
+                className={cn(summaryClass, 'text-left hover:bg-primary/10')}
+              >
+                {summary}
+              </button>
+            ) : (
+              <div className={summaryClass}>{summary}</div>
+            )}
+            {/* The "add a note" entry has to name a week, so it lives on the
+                column rather than in the route's ⋯. */}
+            {canEdit && !note && !editing && !selectMode && (
+              <button
+                type="button"
+                onClick={() => setNoteEditKey(editKey)}
+                aria-label={`Add a note for ${routeGroup.name}, week of ${format(parseISO(week.weekStart), 'MMM d')}`}
+                title="Add a note for this week"
+                className="mr-1.5 grid h-7 w-7 shrink-0 place-content-center rounded-md text-accent-foreground/70 opacity-0 transition-opacity hover:bg-primary/10 hover:text-accent-foreground focus-visible:opacity-100 group-hover/rw:opacity-100"
+              >
+                <Flag className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+          <WeekNoteRibbon
+            note={note}
+            canEdit={canEdit}
+            editing={editing}
+            onEditingChange={(open) => setNoteEditKey(open ? editKey : null)}
+            onSave={(next) => saveWeekNote(week.weekStart, routeGroup.id, next)}
+          />
+          <RouteProgressBar
+            done={stats.done}
+            total={stats.total}
+            name={routeGroup.name}
+            className="absolute inset-x-0 bottom-0 bg-primary/15"
+          />
+        </div>
+      </td>
+    )
+  }
+
   if (
     weeks.length === 0 ||
     weeks.every((w) => w.routeGroups.length === 0 && w.ungrouped.length === 0)
@@ -264,26 +431,40 @@ export function ScheduleGrid({
   }
 
   const structure = weeks[0]
+  const structureRows = [
+    ...structure.routeGroups.flatMap((g) => g.rows),
+    ...structure.ungrouped,
+  ]
+  const selectableCount = structureRows.length * weeks.length
+  // Each target carries its own week's visit — a structure row's `visit` is
+  // only ever week 0's.
+  const selectedTargets: BulkTarget[] = selectMode
+    ? weeks.flatMap((week) =>
+        structureRows
+          .filter((row) => selected.has(cellKey(row.property.id, week.weekStart)))
+          .map((row) => ({
+            row: { ...row, visit: visitFor(row, week.weekStart) },
+            weekStart: week.weekStart,
+          })),
+      )
+    : []
 
   return (
     <>
       <div className="rounded-xl border border-border overflow-clip bg-card shadow-warm">
-        {/* A bounded, internally-scrolling pane rather than relying on page
-            scroll — CSS won't allow a horizontally-scrollable ancestor (needed
-            for narrow viewports) to also host a <thead> that's sticky to the
-            *page* (any ancestor with overflow-x set becomes a scroll container
-            on both axes, which hijacks position:sticky's reference frame away
-            from the real viewport). Giving this div its own bounded height +
-            overflow-auto sidesteps that entirely: it's a genuine scroll
-            container, so `sticky top-0` on the header works as the ordinary,
-            well-supported case. Height caps at the viewport minus the sticky
-            filter bar above it (--schedule-sticky-h, published by
-            ScheduleStickyBar) and a fixed allowance for the title/padding
-            above that and breathing room below; shorter schedules just don't
-            reach the cap and never show a scrollbar. */}
+        {/* A bounded, internally-scrolling pane rather than page scroll: an
+            ancestor with overflow-x becomes a scroll container on both axes and
+            breaks a page-sticky <thead>, so this div is its own scroll container
+            and `sticky top-0` works as the ordinary case. The cap leaves room for
+            the sticky filter bar (--schedule-sticky-h) above and, while
+            selecting, the selection bar below. */}
         <div
           className="overflow-auto"
-          style={{ maxHeight: 'calc(100dvh - var(--schedule-sticky-h, 0px) - 6.5rem)' }}
+          style={{
+            maxHeight: selectMode
+              ? 'calc(100dvh - var(--schedule-sticky-h, 0px) - 15rem)'
+              : 'calc(100dvh - var(--schedule-sticky-h, 0px) - 6.5rem)',
+          }}
         >
           <table className="min-w-full border-collapse">
             <thead className="sticky top-0 z-20 bg-card border-b border-border shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)]">
@@ -306,30 +487,24 @@ export function ScheduleGrid({
                     <th
                       key={week.weekStart}
                       className={cn(
-                        'min-w-[160px] px-3 py-2 text-center',
+                        'min-w-[176px] px-3 py-2 text-center',
                         isCurrent ? 'text-primary' : 'text-muted-foreground',
                         isPastWeek && 'bg-foreground/[0.04]'
                       )}
                     >
-                      <Link
-                        href={`/app/schedule?week=${week.weekStart}`}
-                        className="block rounded-md px-1 py-0.5 hover:bg-accent/40 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        title={`Open the crew schedule for ${format(start, 'MMM d')} – ${format(addDays(start, 6), 'MMM d')}`}
-                      >
-                        <span
-                          className={cn(
-                            'block text-sm tabular-nums',
-                            isCurrent ? 'font-bold' : 'font-semibold'
-                          )}
-                        >
-                          {format(start, 'MMM d')} – {format(addDays(start, 6), 'MMM d')}
-                        </span>
-                        {isCurrent && (
-                          <span className="block text-[10px] font-medium text-primary/70 mt-0.5">
-                            This week
-                          </span>
+                      <span
+                        className={cn(
+                          'block text-sm tabular-nums',
+                          isCurrent ? 'font-bold' : 'font-semibold'
                         )}
-                      </Link>
+                      >
+                        {format(start, 'MMM d')} – {format(addDays(start, 6), 'MMM d')}
+                      </span>
+                      {isCurrent && (
+                        <span className="block text-[10px] font-medium text-primary/70 mt-0.5">
+                          This week
+                        </span>
+                      )}
                     </th>
                   )
                 })}
@@ -339,51 +514,65 @@ export function ScheduleGrid({
               {[
                 ...structure.routeGroups.flatMap(({ routeGroup, rows }) => [
                   <tr key={`rg-${routeGroup.id}`}>
+                    {/* The route opens a section, so it reads as a heading: sage
+                        band, Fraunces name, and a forest spine down the label. */}
                     <td
-                      colSpan={1 + weeks.length}
-                      className="bg-secondary text-secondary-foreground text-xs font-semibold uppercase tracking-widest py-2 border-b border-border"
+                      className={cn(
+                        'sticky left-0 z-10 bg-accent text-accent-foreground align-middle border-t border-t-primary/20 pl-5 pr-4 py-2.5',
+                        'shadow-[inset_3px_0_0_0_var(--primary),inset_-1px_0_0_0_var(--border)]',
+                        LABEL_COL_WIDTH,
+                      )}
                     >
-                      <div className="flex items-center justify-between">
-                        <span className={cn('sticky left-0 flex items-center gap-2 px-4', LABEL_COL_WIDTH)}>
-                          <span className="truncate">{routeGroup.name}</span>
-                          {onGroupSortChange && (
+                      <div className="flex items-center gap-2">
+                        <span className="min-w-0 flex-1 truncate font-display text-[15px] font-semibold leading-tight text-foreground">
+                          {routeGroup.name}
+                        </span>
+                        {canEdit && (
+                          <RouteGroupMenu
+                            name={routeGroup.name}
+                            items={[
+                              {
+                                label: 'Assign route…',
+                                onClick: () => {
+                                  setAssignGroup(routeGroup)
+                                  setAssignOpen(true)
+                                },
+                              },
+                              { label: 'Route defaults…', onClick: () => setDefaultsGroup(routeGroup) },
+                            ]}
+                          />
+                        )}
+                      </div>
+                      <div className="mt-1 flex items-center gap-2 text-[11px] text-accent-foreground">
+                        {(routeGroup.default_days ?? []).length > 0 && (
+                          <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 font-semibold">
+                            {formatDays(routeGroup.default_days ?? [])}
+                          </span>
+                        )}
+                        {onGroupSortChange && (
+                          <span className="ml-auto -mr-1.5">
                             <ScheduleSortToggle
                               size="compact"
                               scope={routeGroup.name}
                               mode={sortModeForGroup(sortState, routeGroup.id)}
                               onChange={(mode) => onGroupSortChange(routeGroup.id, mode)}
-                              className="normal-case tracking-normal"
                             />
-                          )}
-                        </span>
-                        {canEdit && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="mr-4 px-2 text-xs font-medium text-secondary-foreground/70 hover:text-foreground hover:bg-secondary-foreground/10 normal-case tracking-normal shrink-0"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setAssignGroup(routeGroup)
-                              setAssignOpen(true)
-                            }}
-                          >
-                            Assign Route
-                          </Button>
+                          </span>
                         )}
                       </div>
                     </td>
+                    {weeks.map((week) => renderRouteWeekCell(routeGroup, rows, week))}
                   </tr>,
                   // ~99% of accounts have exactly one property — merge the account
-                  // identity and its single site into one label cell instead of a
-                  // separate spanning header row. Only accounts with multiple sites
-                  // get a real header row + indented, railed property rows below it.
+                  // identity and its single site into one label cell. Only accounts
+                  // with multiple sites get a header row + railed property rows.
                   ...groupRowsByAccount(orderRows(routeGroup.id, rows)).flatMap(({ account, rows: acctRows }) =>
                     renderPropertyRows(routeGroup.id, account, acctRows)
                   ),
                 ]),
                 // "Not on a route" — properties with no property_route_groups row.
-                // Rendered last, in clay, with a link back to Routes to fix it;
-                // these used to be silently dropped from the schedule entirely.
+                // Rendered last, in clay, with the same inline route picker the
+                // phone has, so fixing it doesn't mean leaving the schedule.
                 ...(structure.ungrouped.length > 0
                   ? [
                       <tr key="ungrouped-header">
@@ -404,12 +593,18 @@ export function ScheduleGrid({
                                 />
                               )}
                             </span>
-                            <Link
-                              href="/app/routes"
-                              className="mr-4 px-2 text-xs font-medium normal-case tracking-normal text-[var(--clay)]/80 hover:text-[var(--clay)] shrink-0"
-                            >
-                              Put on a route →
-                            </Link>
+                            {canEdit && (
+                              <span className="mr-4 shrink-0 normal-case tracking-normal">
+                                <RoutePicker
+                                  routeGroups={reference?.routeGroups ?? []}
+                                  label={`Route all ${structure.ungrouped.length}`}
+                                  className="h-8 border-[var(--clay)]/40 text-[var(--clay)]"
+                                  onSelect={(routeGroupId) =>
+                                    void routeAllUngrouped(structure.ungrouped, routeGroupId)
+                                  }
+                                />
+                              </span>
+                            )}
                           </div>
                         </td>
                       </tr>,
@@ -424,12 +619,45 @@ export function ScheduleGrid({
         </div>
       </div>
 
+      {selectMode && (
+        <ScheduleBulkControls
+          targets={selectedTargets}
+          selectableCount={selectableCount}
+          onSelectAll={() =>
+            setSelected(
+              new Set(
+                weeks.flatMap((week) =>
+                  structureRows.map((row) => cellKey(row.property.id, week.weekStart)),
+                ),
+              ),
+            )
+          }
+          onClearSelection={() => setSelected(new Set())}
+          onExitSelectMode={onExitSelectMode}
+          employees={employees}
+          vehicles={vehicles}
+        />
+      )}
+
       {sheetRow && (
         <VisitDetailSheet
           open={sheetOpen}
           onOpenChange={handleSheetOpenChange}
           row={sheetRow}
           weekStart={sheetWeek}
+        />
+      )}
+
+      {defaultsGroup && (
+        <RouteDefaultsSheet
+          open
+          onOpenChange={(open) => !open && setDefaultsGroup(null)}
+          routeGroup={defaultsGroup}
+          employees={employees}
+          vehicles={vehicles}
+          currentCrewIds={(reference?.defaultCrew ?? [])
+            .filter((c) => c.route_group_id === defaultsGroup.id)
+            .map((c) => c.employee_id)}
         />
       )}
 
@@ -451,12 +679,12 @@ export function ScheduleGrid({
 //
 // Three shapes share one sticky, fixed-width column so its right edge and
 // hover highlight stay continuous no matter which shape a given row uses:
-//   - `merged`  — the ~99% case: one account with one property. Account name,
-//                 full address, and frequency/price all live in a single cell.
+//   - `merged`  — the ~99% case: one account with one property.
 //   - `nested`  — a property row under a multi-property account header. Only
-//                 these carry the sage rail — it means "a site of the account
-//                 above," not "this is a property row."
+//                 these carry the sage rail — "a site of the account above."
 //   - the multi-property account header itself (`AccountHeaderLabelCell`).
+// No rate, matching the phone: the schedule is a dispatch screen, and pricing
+// is the accountant's question.
 
 function PropertyLabelCell({
   account,
@@ -486,19 +714,17 @@ function PropertyLabelCell({
       <div className={cn('text-[13px] leading-snug text-muted-foreground', !isNested && 'mt-0.5')}>
         {property.address}
       </div>
-      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
         {/* Always counted here, unlike the phone list: this cell is the label for
             all four week columns at once, so it can't take its cue from any one
             week's visit. Days-since is a property fact, so it reads the same. */}
         <CadenceBadge property={property} lastVisitOn={lastVisitOn} showDays />
-        {!isNested && <AccountPriceMeta account={account} />}
       </div>
     </td>
   )
 }
 
 function AccountHeaderLabelCell({ account, propertyCount }: { account: Account; propertyCount: number }) {
-  const price = formatAccountPrice(account)
   return (
     <td
       className={cn(
@@ -509,47 +735,39 @@ function AccountHeaderLabelCell({ account, propertyCount }: { account: Account; 
       <div className="font-display text-[15px] font-semibold leading-snug text-foreground truncate">
         {account.name}
       </div>
-      <div className="mt-0.5 flex items-center gap-2">
-        {price !== '—' ? (
-          <span className="text-[11px] tabular-nums text-muted-foreground">{price}</span>
-        ) : (
-          <BillingTypeBadge billingType={account.billing_type} />
-        )}
-        <span className="text-[11px] text-muted-foreground ml-auto shrink-0">{propertyCount} sites</span>
-      </div>
+      <div className="mt-0.5 text-[11px] text-muted-foreground">{propertyCount} sites</div>
     </td>
   )
 }
 
+/**
+ * One property×week. Same vocabulary as the phone's stop row: a status glyph and
+ * a settled-visit wash rather than a status word, crew on a muted line, the
+ * invoice as a quiet label, and the crew instruction readable inline. Desktop
+ * keeps what it has room for — the completed date and the photo count.
+ */
 function ScheduleCell({
   visit,
-  inProgress,
-  startedAt,
   isCreating,
+  selectMode,
+  isSelected,
   onClick,
   onKeyDown,
 }: {
   visit: VisitWithCrew | null
-  inProgress: boolean
-  startedAt: string | null
   isCreating: boolean
+  selectMode: boolean
+  isSelected: boolean
   onClick: () => void
   onKeyDown: (e: React.KeyboardEvent) => void
 }) {
-  // Tick elapsed time every 30s while in progress
-  const [, setTick] = useState(0)
-  useEffect(() => {
-    if (!inProgress) return
-    const id = setInterval(() => setTick((t) => t + 1), 30_000)
-    return () => clearInterval(id)
-  }, [inProgress])
-
   const base =
-    'min-h-[48px] rounded-lg px-2 py-2 flex flex-col justify-center gap-0.5 outline-none focus-visible:ring-2 focus-visible:ring-ring transition-opacity select-none'
+    'relative min-h-[52px] rounded-lg px-2 py-1.5 flex gap-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring select-none'
+  const selection = selectMode && isSelected && 'ring-2 ring-primary bg-accent/40'
 
   if (isCreating) {
     return (
-      <div className={cn(base, 'bg-muted/50 opacity-50 cursor-wait items-center')}>
+      <div className={cn(base, 'bg-muted/50 opacity-50 cursor-wait items-center justify-center')}>
         <span className="text-muted-foreground/50 text-sm">…</span>
       </div>
     )
@@ -560,138 +778,99 @@ function ScheduleCell({
       <div
         role="button"
         tabIndex={0}
+        aria-pressed={selectMode ? isSelected : undefined}
         onClick={onClick}
         onKeyDown={onKeyDown}
-        className={cn(base, 'bg-muted/30 cursor-cell hover:bg-muted/60 items-center')}
-        title="Click or press S to schedule"
+        className={cn(
+          base,
+          'items-center justify-center border border-dashed border-border/70 hover:bg-muted/50',
+          selectMode ? 'cursor-pointer' : 'cursor-cell',
+          selection,
+        )}
+        title={selectMode ? undefined : 'Click to schedule, or press S to schedule without opening it'}
       >
-        <span className="text-muted-foreground/30 text-lg leading-none">+</span>
+        {selectMode && <CheckIndicator checked={isSelected} className="absolute left-2 top-2" />}
+        <span className="text-muted-foreground/40 text-lg leading-none">+</span>
+        <span className="sr-only">Not scheduled</span>
       </div>
     )
   }
 
-  const hasInstruction = Boolean(visit.crew_instruction)
-
-  // Once a visit is completed, show who actually did the work rather than who was
-  // planned — falls back to assigned crew if no completion crew was recorded.
-  const assignedCrew = visit.visit_crew
-    .filter((vc) => vc.relation === 'assigned' && vc.employee)
-    .map((vc) => vc.employee!)
-  const completedCrew = visit.visit_crew
-    .filter((vc) => vc.relation === 'completed' && vc.employee)
-    .map((vc) => vc.employee!)
-  const displayCrew = visit.status === 'completed' && completedCrew.length > 0 ? completedCrew : assignedCrew
-  const displayedCrew = displayCrew.slice(0, 2)
+  const inProgress = isVisitInProgress(visit)
+  const settled = visit.status === 'completed' || visit.status === 'skipped'
+  const displayCrew = displayCrewFor(visit)
+  const crewLabel = displayCrew.slice(0, 2).map((emp) => emp.name.split(' ')[0]).join(', ')
   const overflow = displayCrew.length - 2
 
   return (
     <div
       role="button"
       tabIndex={0}
+      aria-pressed={selectMode ? isSelected : undefined}
       onClick={onClick}
       onKeyDown={onKeyDown}
       className={cn(
         base,
-        'relative',
-        `status-${visit.status}`,
-        'cursor-pointer hover:brightness-95',
+        'items-start cursor-pointer border border-border/60 transition-[filter] hover:brightness-[0.97]',
+        visitRowTint(visit.status),
+        settled && 'border-transparent',
+        selection,
       )}
     >
-      {/* Hover tooltip on a pointer device; on touch the tooltip never opens,
-          so the icon keeps a title and the cell's own tap opens the drawer,
-          which shows the instruction in full. It must NOT stop propagation —
-          that turned the one part of the cell most worth tapping into a
-          dead zone. */}
-      {hasInstruction && (
-        <TooltipProvider delayDuration={200}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span
-                className="absolute top-1 right-1 text-[var(--clay)] leading-none"
-                title={visit.crew_instruction ?? undefined}
-                aria-label="Has a crew instruction"
-              >
-                <FilePen className="w-4 h-4" />
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-[200px] text-xs whitespace-pre-wrap">
-              {visit.crew_instruction}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      )}
+      {selectMode && <CheckIndicator checked={isSelected} className="mt-0.5" />}
 
-      {inProgress && startedAt ? (
-        /* On-site overlay — replaces status text when crew is active */
-        <div className="flex flex-col gap-0.5">
-          <div className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-[var(--clay)] animate-pulse shrink-0" />
-            <span className="text-[11px] font-semibold text-[var(--clay)] leading-tight">
-              On site
-            </span>
-          </div>
-          <span className="text-[11px] text-[var(--clay)]/80 tabular-nums leading-tight">
-            {formatElapsed(startedAt)}
-          </span>
-          {assignedCrew[0] && (
-            <span className="text-[10px] bg-[var(--clay)]/15 rounded px-1 leading-4 truncate max-w-[52px]">
-              {assignedCrew[0].name.split(' ')[0]}
-            </span>
-          )}
-        </div>
-      ) : (
-        <>
-          <div className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider leading-tight">
-              {visit.status}
-            </span>
-          </div>
-          {visit.status === 'completed' && visit.ended_at && (
-            <span className="flex items-center gap-1">
-              <span className="text-[11px] opacity-80 tabular-nums">
-                {format(parseISO(visit.ended_at), 'MMM d')}
+      <div className={cn('flex min-w-0 flex-1 flex-col gap-0.5 text-[11px] leading-snug', settled ? 'text-muted-foreground' : 'text-foreground')}>
+        <span className="truncate">
+          {crewLabel || <span className="text-muted-foreground/70">No crew</span>}
+          {overflow > 0 && ` +${overflow}`}
+        </span>
+
+        {visit.status === 'completed' && (visit.ended_at || Boolean(visit.photo_count) || visit.invoice) && (
+          <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-muted-foreground">
+            {visit.ended_at && (
+              <span className="tabular-nums">{format(parseISO(visit.ended_at), 'MMM d')}</span>
+            )}
+            {Boolean(visit.photo_count) && (
+              <span
+                className="inline-flex items-center gap-0.5"
+                title={visit.photo_count === 1 ? '1 photo' : `${visit.photo_count} photos`}
+              >
+                <Camera className="h-3 w-3" aria-hidden />
+                <span className="tabular-nums">{visit.photo_count}</span>
               </span>
-              {Boolean(visit.photo_count) && (
-                <TooltipProvider delayDuration={200}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span
-                        className="inline-flex items-center gap-0.5 opacity-70"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Camera className="w-3 h-3" />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="text-xs">
-                      {visit.photo_count === 1 ? '1 photo' : `${visit.photo_count} photos`}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-            </span>
-          )}
-          {visit.status === 'completed' && visit.invoice && (
-            <span className="mt-0.5">
-              <InvoiceStatusBadge status={visit.invoice.status} withIcon />
-            </span>
-          )}
-          {displayCrew.length > 0 && (
-            <div className="flex flex-wrap gap-0.5 mt-0.5">
-              {displayedCrew.map((emp) => (
-                <span
-                  key={emp.id}
-                  className="text-[10px] bg-background/60 rounded px-1 leading-4 truncate max-w-[52px]"
-                >
-                  {emp.name.split(' ')[0]}
-                </span>
-              ))}
-              {overflow > 0 && (
-                <span className="text-[10px] opacity-70 leading-4">+{overflow}</span>
-              )}
-            </div>
-          )}
-        </>
+            )}
+            {visit.invoice && (
+              <span className="ink-invoiced flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide">
+                <Receipt className="h-2.5 w-2.5 shrink-0" aria-hidden />
+                {invoiceStatusLabel(visit.invoice.status)}
+              </span>
+            )}
+          </span>
+        )}
+
+        {/* The spreadsheet's orange cell, readable inline rather than behind a
+            hover-only tooltip; the title carries the full text past the clamp. */}
+        {visit.crew_instruction && (
+          <span
+            className="mt-0.5 flex items-start gap-1 text-[var(--clay)]"
+            title={visit.crew_instruction}
+          >
+            <FilePen className="mt-px h-3 w-3 shrink-0" aria-hidden />
+            <span className="line-clamp-2">{visit.crew_instruction}</span>
+          </span>
+        )}
+      </div>
+
+      {/* Right: the live clock or the status mark — never both. */}
+      {inProgress && visit.started_at ? (
+        <span className="flex shrink-0 items-center gap-1 text-[11px] font-semibold tabular-nums text-[var(--clay)]">
+          <VisitStatusIcon status={visit.status} inProgress />
+          {formatElapsed(visit.started_at)}
+        </span>
+      ) : (
+        <span className="flex shrink-0">
+          <VisitStatusIcon status={visit.status} />
+        </span>
       )}
     </div>
   )

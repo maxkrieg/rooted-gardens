@@ -10,19 +10,18 @@ import { toUserMessage } from '@/lib/errors'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
 import { ScheduleEmptyState } from '@/components/management/ScheduleEmptyState'
-import { RouteGroupBand, type RouteGroupStats } from '@/components/management/RouteGroupBand'
-import { SelectionBar } from '@/components/app/SelectionBar'
-import { BulkActionSheet, type BulkActionKind } from '@/components/management/BulkActionSheet'
-import { useBulkScheduleActions, type BulkResult } from '@/hooks/useBulkScheduleActions'
+import { RouteGroupBand } from '@/components/management/RouteGroupBand'
+import { ScheduleBulkControls } from '@/components/management/ScheduleBulkControls'
+import type { BulkTarget } from '@/hooks/useBulkScheduleActions'
 import { CheckIndicator } from '@/components/app/CheckIndicator'
 import { WeekNoteRibbon } from '@/components/management/WeekNoteRibbon'
 import { RouteDefaultsSheet } from '@/components/management/RouteDefaultsSheet'
 import { RoutePicker } from '@/components/management/RoutePicker'
-import { useAssignPropertyRoute } from '@/hooks/useAssignPropertyRoute'
+import { useRouteAllUngrouped } from '@/hooks/useRouteAllUngrouped'
 import { useScheduleReference } from '@/hooks/useManagementSchedule'
 import { useWeekNotes, useSaveWeekNote } from '@/hooks/useWeekNotes'
-import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
-import { groupRowsByAccount, sortRowsByPriority } from '@/lib/utils/schedule'
+import { isVisitInProgress, formatElapsed, displayCrewFor } from '@/lib/utils/visits'
+import { groupRowsByAccount, routeGroupStats, sortRowsByPriority } from '@/lib/utils/schedule'
 import { usePropertyLastVisit } from '@/hooks/usePropertyLastVisit'
 import {
   DEFAULT_SCHEDULE_SORT,
@@ -116,17 +115,14 @@ export function ScheduleListMobile({
   const [assignGroup, setAssignGroup] = useState<RouteGroup | null>(null)
 
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [bulkKind, setBulkKind] = useState<BulkActionKind | null>(null)
-  const [busyLabel, setBusyLabel] = useState<string | null>(null)
-  const bulk = useBulkScheduleActions(week?.weekStart ?? '')
   const { data: weekNotes = [] } = useWeekNotes(week?.weekStart ?? '')
   const { data: reference } = useScheduleReference()
   const [defaultsGroup, setDefaultsGroup] = useState<RouteGroup | null>(null)
   // Which group's note editor is open. Lifted here because the band's ⋯ opens
   // it and the ribbon renders it — there's no permanent "add a note" row.
   const [noteEditGroupId, setNoteEditGroupId] = useState<string | null>(null)
-  const assignRoute = useAssignPropertyRoute()
-  const saveWeekNote = useSaveWeekNote(week?.weekStart ?? '')
+  const routeAllUngrouped = useRouteAllUngrouped()
+  const saveWeekNote = useSaveWeekNote()
 
   // Leaving select mode must drop the selection, or re-entering it resumes with
   // stale property ids that may no longer be on screen. Adjusted during render
@@ -140,41 +136,13 @@ export function ScheduleListMobile({
 
   /**
    * What the route group band summarises. Reads the same merged visit the rows
-   * do — overlay included — so the progress bar and the on-site dot can't
-   * disagree with the rows underneath them.
+   * do so the progress bar and the on-site dot can't disagree with the rows.
    */
-  function statsFor(rows: SchedulePropertyRow[], weekStart: string): RouteGroupStats {
-    const crewById = new Map<string, Employee>()
-    const vehicleNames = new Set<string>()
-    let done = 0
-    let onSite = false
-
-    for (const row of rows) {
-      const base = row.visit ?? createdVisits.get(`${row.property.id}-${weekStart}`) ?? null
-      const visit = base
-      if (!visit) continue
-
-      // Skipped counts as settled: the decision is made and the week has moved
-      // on, which is what the bar is reporting.
-      if (visit.status === 'completed' || visit.status === 'skipped') done += 1
-      if (isVisitInProgress(visit)) onSite = true
-
-      const completed = visit.visit_crew.filter((vc) => vc.relation === 'completed' && vc.employee)
-      const assigned = visit.visit_crew.filter((vc) => vc.relation === 'assigned' && vc.employee)
-      const source = visit.status === 'completed' && completed.length > 0 ? completed : assigned
-      for (const vc of source) crewById.set(vc.employee!.id, vc.employee!)
-
-      const vehicleName = vehicles.find((v) => v.id === visit.vehicle_id)?.name
-      if (vehicleName) vehicleNames.add(vehicleName)
-    }
-
-    return {
-      done,
-      total: rows.length,
-      crew: [...crewById.values()],
-      vehicles: [...vehicleNames],
-      onSite,
-    }
+  function statsFor(rows: SchedulePropertyRow[], weekStart: string) {
+    return routeGroupStats(
+      rows.map((row) => row.visit ?? createdVisits.get(`${row.property.id}-${weekStart}`) ?? null),
+      vehicles,
+    )
   }
 
   function handleSheetOpenChange(next: boolean) {
@@ -233,10 +201,9 @@ export function ScheduleListMobile({
     ...currentWeek.routeGroups.flatMap((g) => g.rows),
     ...currentWeek.ungrouped,
   ]
-  const selectedRows = allRows.filter((row) => selected.has(row.property.id))
-  // Skip only touches scheduled visits, so the sheet must count those, not the
-  // whole selection — "Skip 12 stops" on a selection where 4 are skippable lies.
-  const skippableCount = selectedRows.filter((row) => row.visit?.status === 'scheduled').length
+  const selectedTargets: BulkTarget[] = allRows
+    .filter((row) => selected.has(row.property.id))
+    .map((row) => ({ row, weekStart: currentWeek.weekStart }))
 
   function toggleSelected(propertyId: string) {
     setSelected((prev) => {
@@ -245,93 +212,6 @@ export function ScheduleListMobile({
       else next.add(propertyId)
       return next
     })
-  }
-
-  /**
-   * Put every unrouted property on one route.
-   *
-   * A loop over the queued per-property mutation, not the `assignProperties`
-   * Server Action: that one is a delete-then-insert that clobbers concurrent
-   * edits and is deliberately online-only, and this is a band on a page used
-   * from a truck. Same reasoning as the R2.4 bulk actions.
-   */
-  async function routeAllUngrouped(routeGroupId: string) {
-    const rows = currentWeek.ungrouped
-    const name = reference?.routeGroups.find((rg) => rg.id === routeGroupId)?.name ?? 'the route'
-    try {
-      for (const [index, row] of rows.entries()) {
-        await assignRoute.mutateAsync({
-          propertyId: row.property.id,
-          routeGroupId,
-          sortOrder: index,
-          label: row.property.address,
-        })
-      }
-      toast.success(`${rows.length} added to ${name}.`, {
-        action: {
-          label: 'Undo',
-          onClick: () => {
-            void Promise.all(
-              rows.map((row) =>
-                assignRoute.mutateAsync({
-                  propertyId: row.property.id,
-                  routeGroupId: null,
-                  label: row.property.address,
-                }),
-              ),
-            ).catch(() => toast.error('Could not undo'))
-          },
-        },
-      })
-    } catch (err) {
-      toast.error('Some properties were not routed', {
-        description: toUserMessage(err, 'They are queued and will retry.', '[routeAllUngrouped]'),
-      })
-    }
-  }
-
-  /**
-   * One wrapper for every bulk apply: it owns the busy label, the toast, and
-   * dropping the selection on success. A failure keeps the selection so the
-   * owner can retry the same set rather than reselecting it.
-   */
-  async function runBulk(
-    label: string,
-    fn: () => Promise<BulkResult>,
-    done: (n: number) => string,
-  ) {
-    setBulkKind(null)
-    setBusyLabel(label)
-    try {
-      const { changed, undo } = await fn()
-      setSelected(new Set())
-      if (changed === 0) {
-        toast('Nothing to change', { description: 'Those stops were already set that way.' })
-        return
-      }
-      // Undo goes through the same queue as the change, so it works in a dead
-      // zone too. Scheduling has none — see BulkResult.
-      toast.success(done(changed), {
-        action: undo
-          ? {
-              label: 'Undo',
-              onClick: () => {
-                void undo().catch(() =>
-                  toast.error('Could not undo', {
-                    description: 'The reversal is queued and will retry.',
-                  }),
-                )
-              },
-            }
-          : undefined,
-      })
-    } catch (err) {
-      toast.error('Some changes did not save', {
-        description: toUserMessage(err, 'They are queued and will retry.', '[ScheduleListMobile.runBulk]'),
-      })
-    } finally {
-      setBusyLabel(null)
-    }
   }
 
   // Renders one stop button. Shared by both label shapes so the status/crew/
@@ -369,17 +249,7 @@ export function ScheduleListMobile({
     // Once a visit is completed, show who actually did the work rather than
     // who was planned — falls back to assigned crew if no completion crew
     // was recorded.
-    const assigned = visit
-      ? visit.visit_crew
-          .filter((vc) => vc.relation === 'assigned' && vc.employee)
-          .map((vc) => vc.employee!)
-      : []
-    const completed = visit
-      ? visit.visit_crew
-          .filter((vc) => vc.relation === 'completed' && vc.employee)
-          .map((vc) => vc.employee!)
-      : []
-    const displayCrew = visit?.status === 'completed' && completed.length > 0 ? completed : assigned
+    const displayCrew = visit ? displayCrewFor(visit) : []
     const displayedCrew = displayCrew.slice(0, 2)
     const overflow = displayCrew.length - 2
 
@@ -558,7 +428,7 @@ export function ScheduleListMobile({
                     onEditingChange={(open) =>
                       setNoteEditGroupId(open ? routeGroup.id : null)
                     }
-                    onSave={(note) => saveWeekNote(routeGroup.id, note)}
+                    onSave={(note) => saveWeekNote(currentWeek.weekStart, routeGroup.id, note)}
                   />
                 }
               />
@@ -606,7 +476,9 @@ export function ScheduleListMobile({
                   routeGroups={reference?.routeGroups ?? []}
                   label={`Route all ${currentWeek.ungrouped.length}`}
                   className="h-8 border-[var(--clay)]/40 text-[var(--clay)]"
-                  onSelect={(routeGroupId) => void routeAllUngrouped(routeGroupId)}
+                  onSelect={(routeGroupId) =>
+                    void routeAllUngrouped(currentWeek.ungrouped, routeGroupId)
+                  }
                 />
               )}
             </div>
@@ -628,75 +500,16 @@ export function ScheduleListMobile({
       </div>
 
       {selectMode && (
-        <SelectionBar
-          count={selected.size}
-          busyLabel={busyLabel}
-          onSelectAll={
-            selected.size < allRows.length
-              ? () => setSelected(new Set(allRows.map((r) => r.property.id)))
-              : undefined
-          }
-          onClear={() => (selected.size > 0 ? setSelected(new Set()) : onExitSelectMode?.())}
-          actions={[
-            {
-              label: 'Crew',
-              disabled: selected.size === 0,
-              onClick: () => setBulkKind('crew'),
-            },
-            {
-              label: 'Truck',
-              disabled: selected.size === 0,
-              onClick: () => setBulkKind('vehicle'),
-            },
-            {
-              label: 'Schedule',
-              disabled: selected.size === 0 || selectedRows.every((r) => r.visit),
-              onClick: () =>
-                runBulk(
-                  'Scheduling…',
-                  () => bulk.scheduleAll(selectedRows),
-                  (n) => `${n} ${n === 1 ? 'stop' : 'stops'} scheduled.`,
-                ),
-            },
-            {
-              label: 'Skip',
-              disabled:
-                selected.size === 0 ||
-                skippableCount === 0,
-              onClick: () => setBulkKind('skip'),
-            },
-          ]}
+        <ScheduleBulkControls
+          targets={selectedTargets}
+          selectableCount={allRows.length}
+          onSelectAll={() => setSelected(new Set(allRows.map((r) => r.property.id)))}
+          onClearSelection={() => setSelected(new Set())}
+          onExitSelectMode={onExitSelectMode}
+          employees={employees}
+          vehicles={vehicles}
         />
       )}
-
-      <BulkActionSheet
-        kind={bulkKind}
-        onOpenChange={(open) => !open && setBulkKind(null)}
-        count={bulkKind === 'skip' ? skippableCount : selected.size}
-        employees={employees}
-        vehicles={vehicles}
-        onPickCrew={(employee) =>
-          runBulk(
-            `Assigning ${employee.name.split(' ')[0]}…`,
-            () => bulk.assignCrew(selectedRows, employee),
-            (n) => `${employee.name.split(' ')[0]} assigned to ${n} ${n === 1 ? 'stop' : 'stops'}.`,
-          )
-        }
-        onPickVehicle={(vehicleId) =>
-          runBulk(
-            'Setting truck…',
-            () => bulk.setVehicle(selectedRows, vehicleId),
-            (n) => `Truck set on ${n} ${n === 1 ? 'stop' : 'stops'}.`,
-          )
-        }
-        onSkip={(reason) =>
-          runBulk(
-            'Skipping…',
-            () => bulk.skipAll(selectedRows, reason),
-            (n) => `${n} ${n === 1 ? 'stop' : 'stops'} skipped.`,
-          )
-        }
-      />
 
       {sheetRow && (
         <VisitDetailSheet

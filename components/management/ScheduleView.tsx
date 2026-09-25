@@ -29,6 +29,7 @@ import { ScheduleSortToggle } from '@/components/management/ScheduleSortToggle'
 import { ScheduleGrid } from '@/components/management/ScheduleGrid'
 import { ScheduleListMobile } from '@/components/management/ScheduleListMobile'
 import { ScheduleNav } from '@/components/management/ScheduleNav'
+import { Button } from '@/components/ui/button'
 import { ScheduleFilterBar } from '@/components/management/ScheduleFilterBar'
 import { ScheduleFilterSheet } from '@/components/management/ScheduleFilterSheet'
 import { ScheduleHeaderMobile } from '@/components/management/ScheduleHeaderMobile'
@@ -253,7 +254,26 @@ export function ScheduleView({
             employees={employees}
             onChange={setFilters}
           />
-          <ScheduleNav windowStart={windowStart} onWeekChange={goToWeek} />
+          <div className="flex flex-wrap items-center gap-1.5">
+            {/* The phone keeps these in its header's ⋯; a laptop has the room
+                to show them outright. Generate works on the leftmost week. */}
+            {canEdit && viewMode !== 'today' && (
+              <>
+                <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setGenerateOpen(true)}>
+                  Generate week…
+                </Button>
+                <Button
+                  variant={selectMode ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-9 text-xs"
+                  onClick={() => setSelectMode((on) => !on)}
+                >
+                  {selectMode ? 'Done selecting' : 'Select stops'}
+                </Button>
+              </>
+            )}
+            <ScheduleNav windowStart={windowStart} onWeekChange={goToWeek} />
+          </div>
         </div>
       </ScheduleStickyBar>
 
@@ -314,6 +334,8 @@ export function ScheduleView({
             employees={employees}
             vehicles={vehicles}
             filtered={filtered}
+            selectMode={selectMode && isWide}
+            onExitSelectMode={() => setSelectMode(false)}
             sortState={sortState}
             onGroupSortChange={changeGroupSort}
           />
@@ -328,7 +350,7 @@ export function ScheduleView({
             employees={employees}
             vehicles={vehicles}
             filtered={filtered}
-            selectMode={selectMode}
+            selectMode={selectMode && !isWide}
             onExitSelectMode={() => setSelectMode(false)}
             sortState={sortState}
             onGroupSortChange={changeGroupSort}

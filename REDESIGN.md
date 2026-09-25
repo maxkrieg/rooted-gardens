@@ -356,7 +356,11 @@ tested under `npm run dev`; Serwist's `defaultCache` degrades to a single `Netwo
 - [x] **R2.5 — Desktop grid stays, demoted**
   *Depends on: R2.3*
   `ScheduleGrid.tsx` (the 4-week `<table>`, `hidden lg:block`) keeps working for the rare
-  laptop session. Do not invest further in it. Fix only the touch-dead `Tooltip`s and the bare
+  laptop session. ~~Do not invest further in it.~~ **Superseded 2026-09-24:** the grid was
+  brought to parity with the phone list (cell select + bulk, per-week route band and notes,
+  route defaults, route-all, the glyph/tint cell). Both now share `ScheduleBulkControls`,
+  `routeGroupStats`, `displayCrewFor` and the `RouteGroupBand` pieces, so a feature added to
+  one is a small wiring job on the other. Fix only the touch-dead `Tooltip`s and the bare
   `<FilePen>` icon in `ScheduleListMobile.tsx` that signals a crew instruction exists while
   giving no way to read it.
 

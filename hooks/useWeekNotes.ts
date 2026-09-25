@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { fetchWeekNotes } from '@/lib/schedule/fetch'
 import { enqueueMutation, flushMutationQueue } from '@/lib/offline/mutation-queue'
 import type { RouteGroupWeekNote } from '@/types/app'
@@ -23,15 +23,29 @@ export function useWeekNotes(weekStartISO: string) {
   })
 }
 
+/** Notes for several weeks at once — the desktop grid's four columns. Keyed by
+ *  week so a column reads only its own week's notes. */
+export function useWeekNotesForWeeks(weekStarts: string[]) {
+  return useQueries({
+    queries: weekStarts.map((weekStart) => ({
+      queryKey: weekNotesKey(weekStart),
+      queryFn: () => fetchWeekNotes(weekStart),
+      staleTime: 60_000,
+    })),
+    combine: (results) =>
+      new Map(weekStarts.map((weekStart, i) => [weekStart, results[i]?.data ?? []])),
+  })
+}
+
 /**
  * Save (or clear) one route group's note for a week, through the offline queue —
  * this is written from the same truck as everything else on the schedule.
  */
-export function useSaveWeekNote(weekStartISO: string) {
+export function useSaveWeekNote() {
   const queryClient = useQueryClient()
 
   return useCallback(
-    async (routeGroupId: string, note: string) => {
+    async (weekStartISO: string, routeGroupId: string, note: string) => {
       const trimmed = note.trim()
 
       // Optimistic, because the band renders straight from this cache and
@@ -63,6 +77,6 @@ export function useSaveWeekNote(weekStartISO: string) {
       })
       await flushMutationQueue()
     },
-    [queryClient, weekStartISO],
+    [queryClient],
   )
 }

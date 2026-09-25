@@ -5,20 +5,10 @@ import { MoreHorizontal, Truck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
+import type { RouteGroupStats } from '@/lib/utils/schedule'
 import type { Employee } from '@/types/app'
 
-export interface RouteGroupStats {
-  /** Visits done (completed or skipped) — the week's work that's settled. */
-  done: number
-  /** Every property in this group this week, scheduled or not. */
-  total: number
-  /** Distinct crew across the group's visits, completed-over-assigned per visit. */
-  crew: Employee[]
-  /** Distinct vehicle names across the group's visits. */
-  vehicles: string[]
-  /** Any visit in the group currently on site. */
-  onSite: boolean
-}
+export type { RouteGroupStats }
 
 interface RouteGroupBandProps {
   name: string
@@ -66,57 +56,34 @@ export function RouteGroupBand({
   noteSlot,
   sortSlot,
 }: RouteGroupBandProps) {
-  const [menuOpen, setMenuOpen] = useState(false)
   const { done, total, crew, vehicles, onSite } = stats
-  const pct = total > 0 ? Math.round((done / total) * 100) : 0
-  const shownCrew = crew.slice(0, 3)
-  const overflow = crew.length - shownCrew.length
   const hasPlan = days.length > 0 || crew.length > 0 || vehicles.length > 0
 
   return (
-    <div className="bg-secondary text-secondary-foreground">
-      <div className="flex items-center gap-2 px-4 pt-2">
-        <span className="min-w-0 flex-1 truncate text-xs font-semibold uppercase tracking-widest">
+    // Same heading treatment as the desktop grid's route row: sage band, a
+    // forest spine, and the name in Fraunces rather than a tracked caps label.
+    <div className="bg-accent text-accent-foreground shadow-[inset_3px_0_0_0_var(--primary)]">
+      <div className="flex items-center gap-2 pl-5 pr-4 pt-2.5">
+        <span className="min-w-0 flex-1 truncate font-display text-[15px] font-semibold leading-tight text-foreground">
           {name}
         </span>
 
-        {onSite && (
-          <span
-            className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-[var(--clay)]"
-            aria-label="A stop on this route is in progress"
-          />
-        )}
+        {onSite && <OnSiteDot />}
 
-        <span
-          className="shrink-0 text-[11px] font-semibold tabular-nums text-muted-foreground"
-          aria-label={`${done} of ${total} stops done`}
-        >
-          {done}/{total}
-        </span>
+        <RouteDoneCount done={done} total={total} />
 
-        {/* Popover, not a dropdown-menu — the repo has no dropdown-menu
-            primitive and one overflow menu doesn't justify a new dependency. */}
         {canEdit && (
-          <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="-mr-2 h-7 w-7 shrink-0 text-secondary-foreground/70 hover:bg-secondary-foreground/10 hover:text-foreground"
-                aria-label={`Actions for ${name}`}
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-52 p-1">
-              <MenuItem label="Assign route…" onClick={() => { setMenuOpen(false); onAssignRoute() }} />
-              <MenuItem
-                label={hasNote ? 'Edit this week’s note…' : 'Add a note for this week…'}
-                onClick={() => { setMenuOpen(false); onEditNote() }}
-              />
-              <MenuItem label="Route defaults…" onClick={() => { setMenuOpen(false); onEditDefaults() }} />
-            </PopoverContent>
-          </Popover>
+          <RouteGroupMenu
+            name={name}
+            items={[
+              { label: 'Assign route…', onClick: onAssignRoute },
+              {
+                label: hasNote ? 'Edit this week’s note…' : 'Add a note for this week…',
+                onClick: onEditNote,
+              },
+              { label: 'Route defaults…', onClick: onEditDefaults },
+            ]}
+          />
         )}
       </div>
 
@@ -125,32 +92,13 @@ export function RouteGroupBand({
           say nothing — but the sort switch belongs on this line, and every route
           has a sort. So the row renders whenever it has either to show. */}
       {(hasPlan || sortSlot) && (
-        <div className="flex items-center gap-2 px-4 pb-2 pt-0.5 text-[11px] text-muted-foreground">
-          {days.length > 0 && <span className="shrink-0 font-medium">{formatDays(days)}</span>}
-
-          {shownCrew.length > 0 && (
-            <span
-              className="flex shrink-0 items-center gap-1"
-              aria-label={crew.map((c) => c.name).join(', ')}
-            >
-              {shownCrew.map((emp) => (
-                <span key={emp.id} title={emp.name}>
-                  {initialsOf(emp.name)}
-                </span>
-              ))}
-              {overflow > 0 && <span>+{overflow}</span>}
+        <div className="flex items-center gap-2 pl-5 pr-4 pb-2 pt-1 text-[11px] text-accent-foreground">
+          {days.length > 0 && (
+            <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 font-semibold">
+              {formatDays(days)}
             </span>
           )}
-
-          {vehicles.length > 0 && (
-            <span className="flex min-w-0 items-center gap-1">
-              <Truck className="h-3 w-3 shrink-0" aria-hidden />
-              <span className="truncate">
-                {vehicles.length === 1 ? vehicles[0] : `${vehicles.length} trucks`}
-              </span>
-            </span>
-          )}
-
+          <RouteCrewTruck crew={crew} vehicles={vehicles} />
           {sortSlot && <span className="ml-auto -mr-1.5">{sortSlot}</span>}
         </div>
       )}
@@ -161,23 +109,140 @@ export function RouteGroupBand({
 
       {/* The progress bar IS the divider. A full row for a bar plus a number was
           the most expensive whitespace on the screen. */}
-      <div
-        className="h-[3px] w-full bg-secondary-foreground/15"
-        role="progressbar"
-        aria-valuenow={done}
-        aria-valuemin={0}
-        aria-valuemax={total}
-        aria-label={`${done} of ${total} stops done on ${name}`}
-      >
-        <div
-          className={cn(
-            'h-full transition-[width] duration-300',
-            done === total && total > 0 ? 'bg-primary' : 'bg-[var(--sap)]',
-          )}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
+      <RouteProgressBar done={done} total={total} name={name} className="bg-primary/15" />
     </div>
+  )
+}
+
+// ─── Pieces shared with the desktop grid's per-week route header cells ──────
+
+export function OnSiteDot() {
+  return (
+    <span
+      className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-[var(--clay)]"
+      aria-label="A stop on this route is in progress"
+    />
+  )
+}
+
+export function RouteDoneCount({ done, total }: { done: number; total: number }) {
+  return (
+    <span
+      className="flex shrink-0 items-baseline tabular-nums"
+      aria-label={`${done} of ${total} stops done`}
+    >
+      <span
+        className={cn(
+          'font-display text-[15px] font-semibold leading-none',
+          total > 0 && done === total ? 'text-primary' : 'text-foreground',
+        )}
+      >
+        {done}
+      </span>
+      <span className="ml-0.5 text-[11px] font-medium text-accent-foreground/70">/{total}</span>
+    </span>
+  )
+}
+
+/** Crew initials and truck. Renders nothing when neither is set. */
+export function RouteCrewTruck({ crew, vehicles }: { crew: Employee[]; vehicles: string[] }) {
+  const shownCrew = crew.slice(0, 3)
+  const overflow = crew.length - shownCrew.length
+  return (
+    <>
+      {shownCrew.length > 0 && (
+        <span
+          className="flex shrink-0 items-center gap-1"
+          aria-label={crew.map((c) => c.name).join(', ')}
+        >
+          {shownCrew.map((emp) => (
+            <span key={emp.id} title={emp.name}>
+              {initialsOf(emp.name)}
+            </span>
+          ))}
+          {overflow > 0 && <span>+{overflow}</span>}
+        </span>
+      )}
+
+      {vehicles.length > 0 && (
+        <span className="flex min-w-0 items-center gap-1">
+          <Truck className="h-3 w-3 shrink-0" aria-hidden />
+          <span className="truncate">
+            {vehicles.length === 1 ? vehicles[0] : `${vehicles.length} trucks`}
+          </span>
+        </span>
+      )}
+    </>
+  )
+}
+
+export function RouteProgressBar({
+  done,
+  total,
+  name,
+  className,
+}: {
+  done: number
+  total: number
+  name: string
+  className?: string
+}) {
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0
+  return (
+    <div
+      className={cn('h-[3px] w-full bg-secondary-foreground/15', className)}
+      role="progressbar"
+      aria-valuenow={done}
+      aria-valuemin={0}
+      aria-valuemax={total}
+      aria-label={`${done} of ${total} stops done on ${name}`}
+    >
+      <div
+        className={cn(
+          'h-full transition-[width] duration-300',
+          done === total && total > 0 ? 'bg-primary' : 'bg-[var(--sap)]',
+        )}
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  )
+}
+
+/** The route's ⋯ menu. Popover, not a dropdown-menu — the repo has no
+ *  dropdown-menu primitive and one overflow menu doesn't justify a dependency. */
+export function RouteGroupMenu({
+  name,
+  items,
+}: {
+  name: string
+  items: Array<{ label: string; onClick: () => void }>
+}) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  return (
+    <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="-mr-2 h-7 w-7 shrink-0 text-accent-foreground/70 hover:bg-primary/10 hover:text-accent-foreground"
+          aria-label={`Actions for ${name}`}
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-52 p-1">
+        {items.map((item) => (
+          <MenuItem
+            key={item.label}
+            label={item.label}
+            onClick={() => {
+              setMenuOpen(false)
+              item.onClick()
+            }}
+          />
+        ))}
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -206,7 +271,7 @@ export function formatDays(days: string[]): string {
     .join('/')
 }
 
-function initialsOf(name: string): string {
+export function initialsOf(name: string): string {
   return name
     .split(' ')
     .map((part) => part[0])

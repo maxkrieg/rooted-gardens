@@ -1,5 +1,5 @@
 import { differenceInMinutes, parseISO } from 'date-fns'
-import type { Visit } from '@/types/app'
+import type { Employee, Visit, VisitWithCrew } from '@/types/app'
 
 /** The on-site timing fields now live directly on the visit row. */
 export type VisitTiming = {
@@ -66,4 +66,15 @@ export function formatDuration(startedAt: string, endedAt: string): string {
   const h = Math.floor(mins / 60)
   const m = mins % 60
   return h > 0 ? `${h}h ${m}m` : `${m}m`
+}
+
+/**
+ * Who to show on a visit: the people who actually did it once it's completed,
+ * else who was planned. Never dedupe or merge the two — see visit_crew notes.
+ */
+export function displayCrewFor(visit: VisitWithCrew): Employee[] {
+  const pick = (relation: 'assigned' | 'completed') =>
+    visit.visit_crew.filter((vc) => vc.relation === relation && vc.employee).map((vc) => vc.employee)
+  const completed = pick('completed')
+  return visit.status === 'completed' && completed.length > 0 ? completed : pick('assigned')
 }
