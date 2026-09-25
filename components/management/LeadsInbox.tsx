@@ -42,23 +42,13 @@ interface LeadsInboxProps {
   initialLeadId?: string
 }
 
-/**
- * Leads inbox (task 9.8) — structural port of AccountsTable.tsx: client-side
- * search/filter state (this inbox is short at the company's volume, unlike
- * the schedule's URL-state filters which exist to make a filtered *week*
- * shareable), a table on desktop and cards on phone, and a detail Sheet
- * rather than a route (there's no /management/leads/[id] page).
- */
+/** Leads inbox: client-side search/filter, table on desktop, cards on phone, detail in a Sheet. */
 export function LeadsInbox({ leads, initialLeadId }: LeadsInboxProps) {
   const [search, setSearch] = useState('')
   const [kindFilter, setKindFilter] = useState<LeadKind | 'all'>('all')
   const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all')
 
-  // Selection persists after the sheet closes (only `sheetOpen` flips) so the
-  // Sheet's own exit animation has content to animate away — same reasoning
-  // as DeepLinkedVisitSheet's mount-only resolution, but here the id is a
-  // plain useState seeded from the prop rather than a separate component,
-  // since rows can be reopened repeatedly within one page load.
+  // Selection outlives the close so the Sheet has content to animate out.
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(initialLeadId ?? null)
   const [sheetOpen, setSheetOpen] = useState(Boolean(initialLeadId))
 
@@ -96,9 +86,7 @@ export function LeadsInbox({ leads, initialLeadId }: LeadsInboxProps) {
     setStatusFilter('all')
   }
 
-  // Two different problems, same as AccountsTable: a genuinely empty inbox
-  // needs no action (leads only ever arrive from the public site), one
-  // hidden by filters needs them cleared.
+  // An empty inbox needs no action; one emptied by filters needs them cleared.
   const emptyState =
     leads.length === 0 ? (
       <EmptyState
@@ -239,13 +227,7 @@ export function LeadsInbox({ leads, initialLeadId }: LeadsInboxProps) {
   )
 }
 
-/**
- * Mirror the open lead into the leads page's `?lead=` param — the same
- * native-history idiom as lib/utils/visit-url.ts's syncVisitUrlParam, and for
- * the same reason: `?lead=` lives on a Server Component page, so a
- * router.replace would re-run its leads query on every sheet open/close.
- * `replaceState` (not `push`) means no extra history entry.
- */
+/** Mirror the open lead into `?lead=` with replaceState: router.replace would rerun the page query. */
 function syncLeadUrlParam(leadId: string | null) {
   if (typeof window === 'undefined') return
 
@@ -260,11 +242,7 @@ function syncLeadUrlParam(leadId: string | null) {
   window.history.replaceState(null, '', url)
 }
 
-/**
- * Mobile card for the leads inbox (task 9.8) — structural port of
- * AccountCard.tsx. Takes `onClick` rather than wrapping in a `<Link>`: lead
- * detail is a Sheet (LeadDetailSheet), not its own route.
- */
+/** Phone card. Takes `onClick` because lead detail is a Sheet, not a route. */
 function LeadCard({ lead, onClick }: { lead: LeadWithConverted; onClick: () => void }) {
   const interestOrPosition = leadInterestOrPosition(lead)
 

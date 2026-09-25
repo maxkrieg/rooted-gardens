@@ -20,16 +20,8 @@ interface UnroutedPanelProps {
 }
 
 /**
- * The staging strip for properties that belong to no route group. Pinned
- * above the route list, always visible — never behind a modal or a filter
- * toggle, unlike the old "Unassigned only" switch buried in each route
- * group's Assign Properties sheet. Returns null when there's nothing to
- * stage; the page renders the sage "all routed" tally in that case instead.
- *
- * Like the assignment sheet, this does NOT wait on the server round-trip to
- * update: a routed row leaves the list as soon as its write succeeds, and busy
- * state is tracked per row in `inFlight` rather than via the transition's
- * pending flag (which gated every row at once and could stay stuck true).
+ * Properties on no route group, pinned above the route list; null when there are none. A row
+ * leaves as soon as its write succeeds, with busy state per row in `inFlight`.
  */
 export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
   const { data: lastVisitByProperty } = usePropertyLastVisit()
@@ -44,9 +36,7 @@ export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
   // for the page to re-render.
   const [routed, setRouted] = useState<Set<string>>(new Set())
 
-  // Fresh props are authoritative, so drop the local hiding whenever the server
-  // sends a new list (React's sanctioned "adjust state during render" pattern —
-  // an effect here would just cause a second render pass).
+  // New server props are authoritative: drop local hiding (adjusted during render, not an effect).
   const [propsSnapshot, setPropsSnapshot] = useState(properties)
   if (propsSnapshot !== properties) {
     setPropsSnapshot(properties)
@@ -116,10 +106,7 @@ export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
     })
   }
 
-  // Putting the rows back is what "Undo" means here, so it has to clear the
-  // local hiding as well as reverse the write.
-  // No routeGroupId needed: property_route_groups holds at most one row per
-  // property, so taking one off any route is a single delete.
+  // Undo clears the local hiding too. One route per property, so removal is a single delete.
   async function undoAssign(ids: string[]) {
     markInFlight(ids, true)
     try {
@@ -136,10 +123,7 @@ export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
     }
   }
 
-  /**
-   * Queued, not a Server Action: routing one property is the small correction
-   * made standing in front of it, which is exactly when there's no signal.
-   */
+  /** Queued: routing one property is a field correction, often made with no signal. */
   async function handleAssignSingle(property: PropertyWithAccount, routeGroupId: string) {
     const name = routeGroupName(routeGroupId)
     markInFlight([property.id], true)
@@ -169,9 +153,7 @@ export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
   function handleAssignBulk(routeGroupId: string) {
     const ids = [...selected]
     if (ids.length === 0) return
-    // Deliberately not queued: assignProperties is a bulk upsert that overwrites
-    // whatever each property was on, so replaying it later could undo an edit
-    // made in between. Single assignment above is queued and covers the field.
+    // Not queued: a bulk overwrite replayed late could undo an edit made in between.
     if (!isOnline) {
       toast.error('Assigning several at once needs a connection', {
         description: 'One at a time still works offline.',

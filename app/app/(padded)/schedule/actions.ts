@@ -4,12 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { toUserMessage } from '@/lib/errors'
 
-/**
- * The last Server Action on this page. getScheduleForWeek and createVisit moved
- * client-side (hooks/useManagementSchedule, hooks/useCreateVisit) so the schedule
- * works offline; this one stays server-side because its delete-then-insert can't
- * be replayed safely from the queue.
- */
+/** Server-side because its delete-then-insert can't be replayed safely from the queue. */
 export async function bulkAssignRoute(
   routeGroupId: string,
   weekStart: string,

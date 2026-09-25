@@ -22,10 +22,10 @@ interface FieldDef {
   multiline?: boolean
 }
 
-/** Every collection's editable shape, in one place — mirrors
- *  `collectionItemDataSchema` in lib/validators/site-content.ts, which is
- *  the actual source of truth these fields must stay in sync with. The
- *  first field in each list doubles as the collapsed-row title. */
+/**
+ * Editable fields per collection; keep in sync with collectionItemDataSchema. The first field
+ * is the collapsed-row title.
+ */
 const FIELD_CONFIG: Record<SiteCollection, FieldDef[]> = {
   faq: [
     { key: 'question', label: 'Question' },
@@ -123,14 +123,7 @@ function ItemSummary({ data, fields }: { data: Record<string, unknown>; fields: 
   )
 }
 
-/**
- * The expandable body of an open item card — a separate component so its
- * `draft`/`confirmingDelete` state initializes fresh from `item.data` on
- * every mount, with no reset effect needed: the parent only renders this
- * (`{open && <CollectionItemForm .../>}`) while `open` is true, so it fully
- * unmounts on close and remounts clean the next time (same fix as
- * EditableText.tsx's EditableTextForm).
- */
+/** Mounted only while open, so its draft state starts fresh from `item.data` each time. */
 function CollectionItemForm({
   collection,
   item,
@@ -315,13 +308,8 @@ function CollectionItemCard({
 }
 
 /**
- * Owner-only add/edit/reorder/remove for a `site_collection_items` list —
- * FAQ, jobs, or team (task 9.2.5). Only ever mounted when in edit mode: the
- * page renders `editing ? <CollectionEditor .../> : items.map(<plain
- * read-only card>)`, so this whole subtree (including EditableImage) never
- * loads for a non-owner. Only one item is open for editing at a time
- * (existing or the in-progress "Add"), matching EditableText/
- * EditableRichText's one-field-at-a-time model.
+ * Owner-only add/edit/reorder/remove for a collection. Mounted only in edit mode; one item
+ * open at a time.
  */
 export function CollectionEditor({
   collection,

@@ -21,9 +21,7 @@ export type StopDetail = {
      *  schedule's cache with a comparable timestamp (applyVisitUpdate). */
     updated_at: string
   }
-  // The invoice this visit was billed on, if any (null when uninvoiced, or under
-  // RLS for roles that can't read invoices — e.g. crew). Only surfaced in the
-  // management drawer for owner/lead.
+  // The visit's invoice, if any (null under RLS for crew). Shown only in the management drawer.
   invoice: VisitInvoiceInfo | null
   property: {
     id: string

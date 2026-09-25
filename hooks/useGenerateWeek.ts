@@ -16,13 +16,7 @@ import type {
   VisitCrewWithEmployee,
 } from '@/types/app'
 
-/**
- * The generate-week plan for one week: every property the owner could schedule,
- * with a due/not-due verdict and the reason.
- *
- * Read-only by construction — this is what the preview renders, and R3.5's
- * confirm step writes exactly the subset the owner leaves ticked.
- */
+/** The generate-week plan: every property with a due verdict and reason. Read-only. */
 export function useWeekPlan(weekStart: string, week: ScheduleWeek | undefined) {
   const reference = useScheduleReference()
   const lastVisit = usePropertyLastVisit()
@@ -51,14 +45,8 @@ export function useWeekPlan(weekStart: string, week: ScheduleWeek | undefined) {
 }
 
 /**
- * Create the visits the owner confirmed, pre-filled from each route group's
- * defaults.
- *
- * One `create_visit` per property plus `assign_crew` / `set_vehicle` from the
- * group defaults — all existing mutation types, so this queues and replays like
- * anything else and needs no online-only gate. `create_visit` mints its id on
- * the device and upserts on (property_id, week_start), which is what makes a
- * second run a no-op rather than a duplicate.
+ * Create the confirmed visits with route defaults, using existing queue types. create_visit
+ * upserts on (property_id, week_start), so a second run is a no-op.
  */
 export function useGenerateWeek(weekStart: string) {
   const queryClient = useQueryClient()

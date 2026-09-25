@@ -6,15 +6,8 @@ import { crewProfileSchema, type CrewProfileValues } from '@/lib/validators/empl
 import { toUserMessage } from '@/lib/errors'
 
 /**
- * Crew self-service profile update (crew /profile) — online-only.
- *
- * employees UPDATE RLS is owner-only (migration 20260724000000), so a crew
- * member cannot write their own row via the normal client. This writes through
- * the service-role client, but safety comes from two hard constraints, not RLS:
- *   1. the update is scoped to `.eq('user_id', user.id)` — only their own row, and
- *   2. only the { phone, sms_opt_out } columns are ever set — role / active /
- *      hourly_rate / side / email can never be escalated.
- * Same service-client-with-ownership-check shape as inviteEmployee.
+ * Self-service profile update, online-only. Service client (employees RLS is owner-only), made
+ * safe by scoping to the caller's own row and only { phone, sms_opt_out }.
  */
 export async function updateMyProfile(values: CrewProfileValues): Promise<{ error?: string }> {
   const parsed = crewProfileSchema.safeParse(values)

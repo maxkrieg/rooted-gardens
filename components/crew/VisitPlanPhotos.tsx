@@ -28,10 +28,8 @@ interface VisitPlanPhotosProps {
 }
 
 /**
- * Owner/lead-managed reference photos on the Visit Plan (photos.type = 'plan') —
- * distinct from crew's completion photos (type = 'visit', shown in the Completion
- * Log). Visible to every role; add/delete is gated to owner/lead and locks once
- * the visit is final, same treatment as the sibling Plan rows.
+ * Owner/lead reference photos on the Plan (type 'plan'). Everyone sees them; add/delete is
+ * owner/lead-only and locks once the visit is final.
  */
 export function VisitPlanPhotos({
   visitId,
@@ -124,9 +122,7 @@ export function VisitPlanPhotos({
               const url = urlByPath.get(photo.storage_path)
               return (
                 <div key={photo.id} className="relative">
-                  {/* Opens the shared lightbox rather than dumping a raw signed
-                      URL into a new tab — crew are on a phone and need to page
-                      through photos with the caption and date in view. */}
+                  {/* Opens the shared lightbox so crew can page with caption and date in view. */}
                   <button
                     type="button"
                     onClick={() => onOpenPhoto(i)}
@@ -184,9 +180,7 @@ export function VisitPlanPhotos({
               onChange={handleFileChange}
             />
             <div className="flex items-center gap-2 flex-wrap">
-              {/* Camera-only on touch devices: `pointer-coarse` means the primary
-                  pointer is a finger, so a touchscreen laptop still gets the
-                  single desktop button. CSS, not JS — no hydration flash. */}
+              {/* Camera-only when the primary pointer is a finger; CSS, so no hydration flash. */}
               <Button
                 type="button"
                 variant="outline"
@@ -231,11 +225,8 @@ export function VisitPlanPhotos({
 }
 
 /**
- * Upload an owner/lead reference photo onto a visit's Plan (type='plan') — distinct
- * from crew's completion photos (type='visit'). Direct-client, online-only, same
- * pattern as the other visit-detail mutation hooks. Unlike those, this can't be
- * optimistic in onMutate (the photo's id/storage_path don't exist until the upload
- * and insert complete), so the new photo is appended to the cache in onSuccess.
+ * Upload a plan photo. Online-only, and appended in onSuccess since its id doesn't exist until
+ * the insert completes.
  */
 function useAddVisitPlanPhoto(visitId: string, propertyId: string) {
   const queryClient = useQueryClient()
@@ -268,9 +259,7 @@ function useAddVisitPlanPhoto(visitId: string, propertyId: string) {
 
       const photo = data as StopDetail['photos'][number]
 
-      // Sign it here so the caller can display the photo immediately — the
-      // shared ['photo-urls'] query won't have refetched yet, and the drawer
-      // opens the lightbox on the new photo so it can be captioned right away.
+      // Sign it now so the lightbox can open on the new photo for captioning.
       const { data: signed } = await supabase.storage
         .from('photos')
         .createSignedUrl(storagePath, 3600)
@@ -291,11 +280,7 @@ function useAddVisitPlanPhoto(visitId: string, propertyId: string) {
   })
 }
 
-/**
- * Delete an owner/lead reference photo from a visit's Plan — removes both the
- * storage object and the `photos` row (row-only would orphan the blob). Direct-
- * client, online-only, optimistic like the other visit-detail mutation hooks.
- */
+/** Delete a plan photo's storage object and row (row-only would orphan the blob). Online-only. */
 function useDeleteVisitPlanPhoto(visitId: string) {
   const queryClient = useQueryClient()
 

@@ -17,11 +17,7 @@ interface EditAccountSheetProps {
   account: Account
 }
 
-/**
- * Client island that owns the Edit sheet's open state.
- * The account detail page is a Server Component and can't own useState itself,
- * so this small wrapper handles the trigger + sheet lifecycle.
- */
+/** Edit-account trigger and Sheet with its own open state. */
 export function EditAccountSheet({ account }: EditAccountSheetProps) {
   const [open, setOpen] = useState(false)
 

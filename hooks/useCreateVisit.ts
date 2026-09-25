@@ -7,11 +7,8 @@ import { scheduleVisitsKey } from '@/hooks/useManagementSchedule'
 import type { SchedulePropertyRow, VisitWithCrew } from '@/types/app'
 
 /**
- * Schedule a property for a week through the offline queue.
- *
- * The id is minted here rather than by the database: single-click scheduling
- * opens the drawer on the new visit, and offline there is no round-trip to
- * return one. It also makes a queue replay upsert instead of duplicating.
+ * Schedule a property for a week via the offline queue. The id is minted on the device, so the
+ * drawer can open offline and a replay upserts instead of duplicating.
  */
 export function useCreateVisit() {
   const queryClient = useQueryClient()

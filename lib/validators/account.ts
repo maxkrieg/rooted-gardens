@@ -2,15 +2,8 @@ import { z } from 'zod'
 import { BILLING_TYPES, ACCOUNT_STATUSES, CONTRACT_PERIODS } from '@/types/app'
 
 /**
- * Zod schema for the account create/edit form.
- * Single source of truth — used by both AccountForm (client) and
- * createAccount / updateAccount (Server Actions) to prevent drift.
- *
- * Numeric fields (price_per_visit, contract_rate) are typed as
- * `number | undefined`. The AccountForm converts empty input strings to
- * `undefined` before handing the value to RHF, so the schema never
- * receives a raw string — avoid z.preprocess() to keep the inferred
- * types clean and compatible with @hookform/resolvers.
+ * Account form schema, shared by AccountForm and the actions. The form converts empty numeric
+ * inputs to undefined, so there's no z.preprocess.
  */
 export const accountFormSchema = z
   .object({
@@ -39,7 +32,7 @@ export const accountFormSchema = z
     // status always has a value (Select defaults to 'active' via defaultValues)
     status: z.enum(ACCOUNT_STATUSES),
     notes: z.string().trim().optional(),
-    // QuickBooks customer ID — normally set by the QBO sync (Phase 7), but editable here.
+    // Normally set by the QBO sync, but editable here.
     qbo_customer_id: z.string().trim().optional(),
   })
   // Conditional requirements based on billing type

@@ -10,12 +10,7 @@ export type RoutesData = {
   sortOrderByPropertyId: Record<string, number>
 }
 
-/**
- * Everything the routes page renders, in three queries merged in JS.
- *
- * The properties select is narrowed to the six columns the UI reads — the RSC
- * version shipped every column of every property to each of N route-group cards.
- */
+/** Everything the routes page renders, in three queries merged in JS. */
 export async function fetchRoutesData(): Promise<RoutesData> {
   const supabase = createClient()
 

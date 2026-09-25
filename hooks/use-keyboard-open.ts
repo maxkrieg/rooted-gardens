@@ -2,11 +2,7 @@
 
 import { useSyncExternalStore } from 'react'
 
-/**
- * `date`/`time`/`month`/`week` are deliberately absent — Android opens a picker
- * for those, not a keyboard, so hiding the nav for them just makes the bar
- * flicker.
- */
+/** No date/time types: Android opens a picker, not a keyboard. */
 const KEYBOARD_INPUT_TYPES = new Set([
   'text',
   'search',
@@ -68,17 +64,8 @@ function subscribe(onChange: () => void) {
 }
 
 /**
- * True while a field that raises the on-screen keyboard holds focus.
- *
- * Paired with `interactiveWidget: 'resizes-content'` (app/layout.tsx): that key
- * makes Android shrink the *layout* viewport for the keyboard, which is what
- * un-strands every `bottom-0` fixed element — but it also floats the bottom nav
- * directly onto the keyboard, eating 56px and swallowing taps on its top row.
- * Consumers hide themselves while this is true.
- *
- * Focus, not `visualViewport` geometry: the viewport tells you the keyboard's
- * size in one resize mode and nothing in the other, whereas focus is the actual
- * signal and reads the same on both platforms.
+ * True while a keyboard-raising field has focus. With interactiveWidget 'resizes-content',
+ * fixed bottom bars would ride on the keyboard, so they hide. Focus is the reliable signal.
  */
 export function useKeyboardOpen(): boolean {
   return useSyncExternalStore(

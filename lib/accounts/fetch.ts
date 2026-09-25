@@ -7,11 +7,7 @@ import type {
   RecentVisit,
 } from '@/types/app'
 
-/**
- * The accounts list. Last-visit dates come from the account_last_visit view —
- * one row per account — rather than scanning every completed visit ever, which
- * both truncated at PostgREST's row cap and was far too large to cache.
- */
+/** The accounts list, with last-visit dates from the account_last_visit view. */
 export async function fetchAccountsList(): Promise<AccountListRow[]> {
   const supabase = createClient()
 

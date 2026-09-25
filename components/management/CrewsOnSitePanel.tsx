@@ -20,11 +20,7 @@ const IN_PROGRESS_SELECT =
 
 const inProgressKey = ['crews-on-site'] as const
 
-/**
- * Who is on site right now. Deliberately NOT cached offline: a frozen list with
- * a pulsing dot and a timer that keeps counting for a crew who stopped an hour
- * ago is worse than saying we don't know.
- */
+/** Who's on site now. Not cached offline: a frozen list with a ticking timer would mislead. */
 export function CrewsOnSitePanel() {
   const isOnline = useIsOnline()
   const queryClient = useQueryClient()

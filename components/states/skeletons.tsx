@@ -1,11 +1,7 @@
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 
-/**
- * Route-shaped skeletons for the management `loading.tsx` files. Dimensions are
- * copied from the real components so nothing shifts when data arrives — owners
- * open these on a phone, where a reflow costs them the tap they'd started.
- */
+/** Route-shaped skeletons sized like the real components, so nothing shifts on load. */
 
 /** `<h1 className="font-display text-2xl">` plus an optional right-hand control. */
 export function PageHeaderSkeleton({

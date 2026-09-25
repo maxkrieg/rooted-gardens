@@ -89,9 +89,7 @@ export function RoutesView() {
       ) : (
         <div className="space-y-4 pb-8">
           {routeGroups.map((group, idx) => {
-            // Drive order, not alphabetical: assignedIdsByGroup arrives sorted by
-            // sort_order, so mapping through it preserves the route's own order.
-            // Sorting by account name here would hide every reorder made below.
+            // Drive order: assignedIdsByGroup is already sorted by sort_order.
             const byId = new Map(allProperties.map((p) => [p.id, p]))
             const assignedProperties = (data?.assignedIdsByGroup[group.id] ?? [])
               .map((id) => byId.get(id))

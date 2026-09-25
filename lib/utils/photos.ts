@@ -10,20 +10,11 @@ import {
   type PropertyPhotos,
 } from '@/types/app'
 
-/** Shared client-side validation for photo capture/upload — used by the crew
- *  completion logger (VisitLogger), owner/lead Visit Plan reference photos
- *  (VisitPlanPhotos), and the management property gallery upload dropzone, all
- *  of which upload directly to the `photos` storage bucket.
- *
- *  This module is imported by BOTH client and server components, so it must stay
- *  isomorphic — no `next/headers`, no `lib/supabase/server`. `signPhotoUrls`
- *  takes a storage client as an argument rather than constructing one. */
+/** Photo validation for every upload to the `photos` bucket. Isomorphic: no server-only imports. */
 export const MAX_PHOTO_BYTES = 20 * 1024 * 1024
 export const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 
-/** Mirrors the bucket's allowed_mime_types (migration 20260625142525).
- *  Exported for reuse by lib/utils/site-media.ts — the site-media bucket
- *  (task 9.2) was deliberately given the same size/type limits as `photos`. */
+/** Mirrors the bucket's allowed_mime_types; the site-media bucket reuses these limits. */
 export function extensionForMimeType(mime: string): 'jpg' | 'png' | 'webp' {
   if (mime === 'image/png') return 'png'
   if (mime === 'image/webp') return 'webp'
@@ -31,16 +22,8 @@ export function extensionForMimeType(mime: string): 'jpg' | 'png' | 'webp' {
 }
 
 /**
- * Storage path for a property-level photo (how-to guides, customer requests) —
- * these have no `visit_id`, so they can't use the visit path shape.
- *
- * Visit photos use `photos/{propertyId}/{visitId}/{Date.now()}.jpg`. Two warts
- * there are deliberately NOT repeated: the extension is derived from the real
- * mime type instead of always `.jpg`, and the filename is a UUID rather than a
- * timestamp so a multi-file drag-and-drop can't collide (there is no storage
- * UPDATE policy, so a collision is a hard 403, not an overwrite). The redundant
- * `photos/` prefix inside the `photos` bucket IS kept, so everything for a
- * property still lists under one prefix.
+ * Storage path for a property-level photo (no visit). UUID filename so a multi-file drop can't
+ * collide — there's no UPDATE policy, so a collision is a 403.
  */
 export function propertyPhotoPath(propertyId: string, mimeType: string): string {
   return `photos/${propertyId}/property/${crypto.randomUUID()}.${extensionForMimeType(mimeType)}`
@@ -53,14 +36,7 @@ export function validatePhotoFile(file: File): string | null {
   return null
 }
 
-/**
- * Batch-sign storage paths in a single round trip. The rest of the app signs one
- * at a time (`createSignedUrl` per photo), which is fine for the 1–4 photos on a
- * visit but would be N requests for a whole property gallery.
- *
- * Returns a Map keyed by storage path; paths that fail to sign are simply absent,
- * so callers should treat a miss as "no URL" rather than an error.
- */
+/** Batch-sign paths in one round trip. Failed paths are absent from the Map. */
 export async function signPhotoUrls(
   storage: SupabaseClient<Database>['storage'],
   paths: string[],
@@ -83,9 +59,7 @@ export async function signPhotoUrls(
   return urlByPath
 }
 
-/** Ordered group definitions for the property gallery. `before`/`after` sit with
- *  visit photos (they're field photos); `plan` is owner-authored so it gets its
- *  own group rather than being mistaken for crew work. */
+/** Gallery groups. before/after sit with visit photos; owner-authored `plan` gets its own. */
 const GROUP_LABELS: Record<PhotoGroupKey, string> = {
   how_to: 'How-To Guide',
   customer_request: 'Customer Requests',
@@ -131,12 +105,7 @@ export function photoTypeLabel(type: string): string {
   return PHOTO_TYPE_LABELS[type as PhotoType] ?? 'Other'
 }
 
-/**
- * Partition photos by property, then by group. Pure and order-preserving —
- * photos must already be sorted (the gallery sorts `created_at DESC` in SQL).
- * Properties with no photos are omitted; the gallery's upload card carries its
- * own property selector so an empty property is still reachable.
- */
+/** Partition pre-sorted photos by property, then group. Properties with no photos are omitted. */
 export function groupPhotosByProperty(
   properties: Pick<Property, 'id' | 'address'>[],
   photos: PhotoWithUrl[],

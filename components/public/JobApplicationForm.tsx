@@ -23,25 +23,13 @@ import { jobApplicationFormSchema, type JobApplicationFormValues } from '@/lib/v
 import { validateResumeFile } from '@/lib/utils/resumes'
 
 interface JobApplicationFormProps {
-  /** Prefilled from the job title an "Apply" button was clicked from
-   *  (`/jobs?position=...#apply`) — still a plain editable field, since
-   *  open positions are a dynamic, owner-edited list and a visitor should
-   *  be able to apply generally with no specific opening in mind. */
+  /** Prefilled from the clicked listing, but editable: visitors may apply generally. */
   initialPosition?: string
 }
 
 /**
- * The public job application form (task 9.6) — reachable at `/jobs`
- * (id="apply" so each listing's "Apply" button can deep-link to `#apply`).
- * Submits through `submitJobApplication` (app/(public)/jobs/actions.ts),
- * the second consumer — after InquiryForm/submitInquiry (9.5) — of the
- * spam-protected public-lead pattern: a hidden honeypot field, a minimum-
- * time-on-form check (`useElapsedMs`), and a per-IP rate limit, all
- * re-checked server-side since a bypassed client proves nothing.
- *
- * Submits as `FormData`, not a typed object like `submitInquiry` — that's
- * the well-supported way to carry the optional resume `File` alongside the
- * text fields through a Server Action.
+ * Public job application at /jobs#apply. Same spam protection as InquiryForm (honeypot,
+ * time-on-form, rate limit, all rechecked server-side). Submits FormData for the resume File.
  */
 export function JobApplicationForm({ initialPosition }: JobApplicationFormProps) {
   const [submitted, setSubmitted] = useState(false)
@@ -123,9 +111,8 @@ export function JobApplicationForm({ initialPosition }: JobApplicationFormProps)
     <div id="apply" className="rounded-2xl border border-border bg-card shadow-warm p-5 sm:p-8">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-          {/* Honeypot — off-screen, not display:none (some bots skip hidden
-              fields), unreachable by tab order, unread by screen readers.
-              A real visitor never sees or fills this. */}
+          {/* Honeypot: off-screen (not display:none, which some bots skip), untabbable, hidden from
+             screen readers. */}
           <div className="absolute left-[-9999px] top-auto w-px h-px overflow-hidden" aria-hidden="true">
             <label htmlFor="job-website">Leave this field blank</label>
             <input

@@ -20,14 +20,8 @@ interface SelectionBarProps {
 }
 
 /**
- * The bar that appears once you've selected something. Generalized from
- * UnroutedPanel, which is the only bulk-select precedent in the repo and the
- * one the owners already use.
- *
- * Sticks to the bottom above the nav bar rather than floating over the middle
- * of the list, so the thumb reaches it without covering what's selected. No
- * long-press and no swipe to enter select mode: the repo has no gesture
- * infrastructure, and this would be the first dependency added for it.
+ * Bottom bar shown while items are selected, above the nav where the thumb reaches. No
+ * long-press or swipe: there's no gesture infrastructure.
  */
 export function SelectionBar({
   count,

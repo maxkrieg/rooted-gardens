@@ -8,11 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { StateMark } from '@/components/states/StateMark'
 import { cn } from '@/lib/utils'
 
-/**
- * Full-surface failure — neither `title` nor `hint` ever carries an error
- * message. With no `onRetry` the button refreshes the route; client surfaces
- * holding their own cache pass `refetch` so retrying doesn't discard it.
- */
+/** Full-surface failure; never shows the raw error. Without `onRetry` it refreshes the route. */
 export function ErrorState({
   title = "That didn't load.",
   hint = 'Check your connection, then try again.',
@@ -58,11 +54,7 @@ export function ErrorState({
   )
 }
 
-/**
- * One section of an otherwise-healthy page failed. Blanking the dashboard because
- * the fleet query timed out would hide the schedule the owner came for, so
- * failures report at section granularity and the rest still renders.
- */
+/** One section failed; the rest of the page still renders. */
 export function SectionError({
   title = "This didn't load.",
   hint = 'Refresh to try again.',

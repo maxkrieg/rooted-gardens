@@ -75,10 +75,7 @@ export async function updateRouteGroup(
   return {}
 }
 
-/**
- * Move a route group up or down by swapping sort_order with its neighbor.
- * Same pattern as moveZone in property-actions.ts.
- */
+/** Move a route group up or down by swapping sort_order with its neighbor. */
 export async function moveRouteGroup(
   id: string,
   direction: 'up' | 'down',
@@ -122,10 +119,7 @@ export async function moveRouteGroup(
   return {}
 }
 
-/**
- * Delete a route group.
- * Assignments in property_route_groups cascade via FK ON DELETE CASCADE.
- */
+/** Delete a route group; its property_route_groups rows cascade. */
 export async function deleteRouteGroup(id: string): Promise<{ error?: string }> {
   const supabase = await createClient()
   const { error } = await supabase.from('route_groups').delete().eq('id', id)
@@ -141,13 +135,8 @@ export async function deleteRouteGroup(id: string): Promise<{ error?: string }> 
 // ─── Property assignments ────────────────────────────────────────────────────
 
 /**
- * Assign a property to a route group.
- * A property belongs to at most one route group
- * (property_route_groups_property_idx) — onConflict targets that unique index,
- * so assigning a property already in a different group *moves* it (the
- * upsert replaces the conflicting row's route_group_id) rather than erroring.
- * The Assign Properties sheet confirms with the user before calling this for
- * a property that's assigned elsewhere.
+ * Assign a property to a route group. One route per property, so this upsert moves it if it's
+ * already elsewhere (the sheet confirms first).
  */
 export async function assignProperty(
   propertyId: string,
@@ -170,12 +159,7 @@ export async function assignProperty(
   return {}
 }
 
-/**
- * Assign several properties to a route group at once — the Unrouted panel's
- * "N selected → Put on a route" bulk action. Same upsert/onConflict shape as
- * assignProperty, one row per id, so it also moves any of the ids that were
- * already assigned elsewhere.
- */
+/** Bulk assign for the Unrouted panel. Same upsert, so it also moves already-routed ids. */
 export async function assignProperties(
   propertyIds: string[],
   routeGroupId: string,
@@ -205,9 +189,6 @@ export async function assignProperties(
   return {}
 }
 
-/**
- * Remove a property from a route group.
- */
 export async function unassignProperty(
   propertyId: string,
   routeGroupId: string,
@@ -238,15 +219,8 @@ type RouteGroupDefaults = {
 const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 
 /**
- * Set a route group's default crew, truck, and days — what "Wilder - Mon/Tues"
- * has been encoding in a string on the route sheet all along. A generated week
- * (R3.5) pre-fills from these.
- *
- * A Server Action rather than a queued mutation: this is seasonal configuration
- * set once and rarely touched, not field work, and the same call has to replace
- * a set of join rows atomically. Callers must invalidate `schedule-reference`
- * themselves — the schedule is client-first, so revalidatePath alone repaints a
- * shell holding no data.
+ * Set a route group's default crew, truck and days, which a generated week pre-fills from.
+ * A Server Action (it replaces join rows atomically); callers must invalidate schedule-reference.
  */
 export async function setRouteGroupDefaults(
   routeGroupId: string,
@@ -267,10 +241,7 @@ export async function setRouteGroupDefaults(
     return { error: toUserMessage(updateError, 'Could not save the route defaults.') }
   }
 
-  // Replace the crew set. Delete-then-insert clobbers a concurrent edit, which
-  // is acceptable here and nowhere near the visit data: two owners editing the
-  // same route's regulars in the same minute is not a real scenario, and the
-  // whole set is visible in the sheet before saving.
+  // Delete-then-insert could clobber a concurrent edit; acceptable for seasonal config.
   const { error: deleteError } = await supabase
     .from('route_group_default_crew')
     .delete()

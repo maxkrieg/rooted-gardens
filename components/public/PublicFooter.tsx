@@ -7,12 +7,8 @@ import { EditableRichText } from '@/components/public/editing/EditableRichText'
 import { CredentialsLine } from '@/components/public/CredentialsLine'
 
 /**
- * Public site footer. Every contact detail, social link, and the mission
- * line below is a `site_content` slot (page='global') — the 9.2.5 inline
- * editor makes all of it owner-editable in place, so nothing here should
- * ever become a hardcoded string again. `org_name`/`parent_company` are
- * deliberately left plain (not Editable) — the root layout's title template
- * and this footer's own copyright line assume a stable brand name.
+ * Public footer. Every contact, social link and mission line is an editable `global` slot;
+ * org_name and parent_company stay fixed.
  */
 export async function PublicFooter() {
   const content = await getPageContent('global')

@@ -18,9 +18,6 @@ function parseInterval(value: string | undefined): number | null {
 
 // ─── Properties ───────────────────────────────────────────────────────────────
 
-/**
- * Create a property for the given account.
- */
 export async function createProperty(
   accountId: string,
   values: PropertyFormValues,
@@ -50,9 +47,6 @@ export async function createProperty(
   return {}
 }
 
-/**
- * Update an existing property's address, frequency, service interval, and notes.
- */
 export async function updateProperty(
   id: string,
   accountId: string,
@@ -84,22 +78,14 @@ export async function updateProperty(
   return {}
 }
 
-/**
- * Archive (soft-delete) a single property.
- *
- * Kept as a row rather than deleted because visits and photos FK back here with
- * NO ACTION — see archiveAccount in ./actions.ts for the full rationale. Owner-only,
- * enforced by the enforce_owner_only_archive trigger.
- */
+/** Archive (soft delete) one property; see archiveAccount. */
 export async function archiveProperty(
   id: string,
   accountId: string,
 ): Promise<{ error?: string }> {
   const supabase = await createClient()
 
-  // Drop the route-group assignment first — see archiveAccount in ./actions.ts: the
-  // join table carries no history, and a leftover row under-counts the "unrouted
-  // properties" nav badge, which is (properties − property_route_groups).
+  // Drop its route assignment too; see archiveAccount.
   const { error: assignmentError } = await supabase
     .from('property_route_groups')
     .delete()

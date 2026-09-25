@@ -1,12 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-// Explicit /server subpath, not the package root: the root's "node" export
-// condition *should* resolve here automatically under Next's server bundling,
-// but this file's only job is generating trusted HTML server-side, so there's
-// no reason to depend on that resolution being right — see the "Key design
-// decision" in the 9.2.5 plan for why this (and happy-dom) live ONLY here,
-// never in a page or a client component.
+// Explicit /server subpath: trusted HTML is generated only here, never in a page or client code.
 import { generateHTML } from '@tiptap/html/server'
 import type { JSONContent } from '@tiptap/core'
 import type { Database } from '@/types/database'
@@ -29,12 +24,7 @@ import {
 } from '@/lib/validators/site-content'
 
 function revalidate() {
-  // Invalidates every page under the public layout in one call — correct for
-  // a `global` slot (footer/contact info appears on all seven pages) without
-  // needing a page→path lookup table. Currently a no-op safety net: 9.2 made
-  // every public route render dynamically (no cache), so `router.refresh()`
-  // client-side is what actually pulls fresh data — this is here so adding
-  // `unstable_cache` later doesn't also require remembering to add this.
+  // Invalidates every public page (global slots appear on all). A safety net for future caching.
   revalidatePath('/(public)', 'layout')
 }
 
@@ -74,11 +64,8 @@ export async function updateSiteSlot(values: UpdateSiteSlotValues): Promise<{ er
 }
 
 /**
- * Updates a richtext slot from the editor's Tiptap JSON. Renders the HTML
- * once, here, server-side — never on a page read (see lib/content/site.ts
- * and the 9.2.5 plan's "Key design decision"). `getSchema`/`Node.fromJSON`
- * throws on a doc that doesn't match `RICHTEXT_EXTENSIONS`'s schema, which
- * the try/catch turns into a normal `{error}` return instead of a 500.
+ * Saves a richtext slot, rendering its HTML once here (never on read). A doc that doesn't match
+ * the schema throws, returned as `{ error }`.
  */
 export async function updateRichTextSlot(
   values: UpdateRichTextSlotValues,
@@ -93,11 +80,8 @@ export async function updateRichTextSlot(
 
   let html: string
   try {
-    // generateHTML builds the schema from RICHTEXT_EXTENSIONS and parses
-    // `doc` against it (Node.fromJSON) internally — it throws on a doc that
-    // doesn't match, which the catch below turns into a normal error return.
-    // The cast is safe: richTextDocSchema already checked the top-level
-    // shape, and generateHTML's own parse is the real structural validation.
+    // generateHTML parses `doc` against the real schema and throws on mismatch, so the cast is
+    // safe.
     html = generateHTML(parsed.data.doc as unknown as JSONContent, RICHTEXT_EXTENSIONS)
   } catch (err) {
     console.error('[updateRichTextSlot] invalid doc', err)
@@ -110,10 +94,7 @@ export async function updateRichTextSlot(
       page: parsed.data.page,
       key: parsed.data.key,
       kind: 'richtext',
-      // `parsed.data.doc`'s content array is `unknown[]` (richTextDocSchema
-      // only shape-checks the top level — see that schema's comment); the
-      // cast is safe, `generateHTML` above already parsed it successfully
-      // against the real Tiptap schema.
+      // Safe: generateHTML above already parsed this doc.
       value: { doc: parsed.data.doc, html } as Database['public']['Tables']['site_content']['Row']['value'],
       updated_by: auth.employeeId,
     },
@@ -130,11 +111,10 @@ export async function updateRichTextSlot(
 
 // ─── site_collection_items ──────────────────────────────────────────────────────
 
-/** Creates (no `id`) or updates (`id`) a collection item's `data` only —
- *  `sort_order` is server-computed on insert (append at max+1, same as
- *  `createRouteGroup`) and otherwise untouched; reordering is
- *  `moveCollectionItem`, matching `updateRouteGroup`'s "only touches the
- *  edited field, never sort_order" split. */
+/**
+ * Creates (no `id`) or updates `data` only. sort_order is set on insert; reorder via
+ * moveCollectionItem.
+ */
 export async function upsertCollectionItem(
   values: UpsertCollectionItemValues,
 ): Promise<{ error?: string; id?: string }> {
@@ -223,11 +203,7 @@ export async function deleteCollectionItem(
   return {}
 }
 
-/**
- * Move a collection item up or down by swapping `sort_order` with its
- * neighbor — verbatim port of `moveRouteGroup`
- * (app/app/(padded)/routes/actions.ts), scoped by `collection`.
- */
+/** Move a collection item up or down by swapping sort_order, like moveRouteGroup. */
 export async function moveCollectionItem(
   values: MoveCollectionItemValues,
 ): Promise<{ error?: string }> {

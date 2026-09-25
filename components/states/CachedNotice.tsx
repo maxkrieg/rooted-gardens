@@ -1,11 +1,7 @@
 import { WifiOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-/**
- * Marks a view as rendering from the last saved copy. Shown when a fetch failed
- * but cached data exists — the alternative is erroring over data the owner can
- * still act on.
- */
+/** Flags a view rendering from cache after a failed fetch. */
 export function CachedNotice({ className }: { className?: string }) {
   return (
     <p

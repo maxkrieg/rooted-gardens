@@ -5,21 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 /**
- * Implicit-flow landing page — the client-side half of `/auth/callback`.
- *
- * Magic links the app itself requests (`signInWithOtp` on the login page) use
- * PKCE and come back as `?code=`, which `/auth/callback` exchanges server-side.
- * Admin-generated links do not: `auth.admin.inviteUserByEmail` (the Team page's
- * "Invite to App") has no browser-side code verifier, so GoTrue falls back to
- * the implicit flow and returns the session in the URL *fragment*:
- *
- *   /auth/confirm#access_token=…&refresh_token=…&type=invite
- *
- * Fragments are never transmitted to the server, so no Route Handler, Server
- * Component, or proxy can read one — only the browser can. This page reads it,
- * installs the session (which `@supabase/ssr`'s browser client writes to
- * cookies, so the proxy and every Server Component see it on the next request),
- * then hands off to the destination.
+ * Implicit-flow landing page. Admin invite links have no PKCE verifier, so the session arrives
+ * in the URL fragment, which only the browser can read. This installs it and moves on.
  */
 export default function AuthConfirmPage() {
   useEffect(() => {
@@ -72,9 +59,7 @@ export default function AuthConfirmPage() {
       // navigating on, so they aren't left sitting in the URL or back-stack.
       window.history.replaceState(null, '', window.location.pathname)
 
-      // Full navigation rather than a client-side push: the session cookies were
-      // just written, and this guarantees the proxy re-runs and role-gates with
-      // them present.
+      // Full navigation so the proxy re-runs with the new cookies.
       window.location.replace(next)
     }
 

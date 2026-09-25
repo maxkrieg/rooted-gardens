@@ -33,14 +33,8 @@ interface RouteDefaultsSheetProps {
 }
 
 /**
- * A route group's standing plan: who normally runs it, in what, on which days.
- *
- * The route sheet has encoded this in the group's *name* ("Wilder - Mon/Tues")
- * because there was nowhere else to put it. A generated week pre-fills from
- * here, which is what makes generating worth doing at all.
- *
- * Online-only, and says so: it replaces a set of join rows in one go, which is
- * the same reason bulkAssignRoute isn't queued either.
+ * A route's standing plan (crew, truck, days), which generated weeks pre-fill from.
+ * Online-only: it replaces a set of join rows at once.
  */
 export function RouteDefaultsSheet({
   open,

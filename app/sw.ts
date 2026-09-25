@@ -13,13 +13,8 @@ declare global {
 declare const self: ServiceWorkerGlobalScope
 
 /**
- * Owners and crew both work from the field on weak signal, so these sit ahead of
- * defaultCache: its NetworkFirst rules never time out (one bar hangs instead of
- * serving cache) and share one 32-entry LRU across the whole origin.
- *
- * Covers `/app` (the merged field surface) and `/management` (the desk routes,
- * which owners still reach from a phone). Cache names changed with the paths —
- * the old `management-*` caches only held URLs that no longer exist.
+ * Ahead of defaultCache, whose NetworkFirst rules never time out on weak signal and share one
+ * small LRU. Covers /app and /management.
  */
 const isAppPath = (pathname: string) =>
   pathname.startsWith('/app') || pathname.startsWith('/management')

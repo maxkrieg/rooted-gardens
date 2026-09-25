@@ -22,12 +22,8 @@ export interface RichTextEditorProps {
 }
 
 /**
- * The actual Tiptap-powered editor for a richtext slot — loaded via a plain
- * `import()` from `EditableRichText.tsx`'s click handler (deliberately NOT
- * `next/dynamic`, whose App Router preloading defeats the point — see that
- * file's comment) and only ever requested once both `canEdit` and `editing`
- * are true and the owner actually opens the editor, so this module (and
- * Tiptap itself) never reaches the bundle an anonymous visitor loads.
+ * The Tiptap editor for a richtext slot, loaded via import() only when an owner opens it, so
+ * Tiptap never reaches an anonymous visitor's bundle.
  */
 export function RichTextEditor({ page, slotKey, initialContent, onDone }: RichTextEditorProps) {
   const router = useRouter()
@@ -71,9 +67,7 @@ export function RichTextEditor({ page, slotKey, initialContent, onDone }: RichTe
         <EditorContent editor={editor} />
       </div>
 
-      {/* Mobile: a fixed bottom bar instead of a selection bubble — a floating
-          bubble is unreliable above an on-screen keyboard, and owners are
-          phone-primary (CLAUDE.md). */}
+      {/* Mobile: a fixed bottom bar, since a floating bubble is unreliable above the keyboard. */}
       <div
         className="md:hidden flex items-center gap-1 border-t border-border bg-card px-2 py-2"
         style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))' }}

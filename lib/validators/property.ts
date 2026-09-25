@@ -4,9 +4,8 @@ import { PROPERTY_FREQUENCIES } from '@/types/app'
 export const propertyFormSchema = z.object({
   address: z.string().trim().min(1, 'Address is required'),
   frequency: z.enum(PROPERTY_FREQUENCIES),
-  // Kept as a string field so react-hook-form's number input round-trips an
-  // empty box cleanly. Empty means "follow the frequency default"; the action
-  // is what turns it into a number or null. Upper bound mirrors the DB CHECK.
+  // A string so an empty number input round-trips. Empty = frequency default. Max mirrors the
+  // CHECK.
   preferred_interval_days: z
     .string()
     .trim()

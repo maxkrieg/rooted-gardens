@@ -1,13 +1,7 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 import type { MaintenanceLog } from '@/types/app'
 
-/**
- * Service-due state derived from a maintenance log's next_service_due date.
- * Drives the ServiceDueBadge on the fleet cards (and, later, the dashboard):
- *   - 'overdue'  → next_service_due is in the past
- *   - 'due_soon' → within the next 14 days
- *   - null       → no due date, or comfortably in the future (no badge)
- */
+/** Service-due state: 'overdue' if past, 'due_soon' within 14 days, else null. */
 export type ServiceDueState = 'overdue' | 'due_soon'
 
 const DUE_SOON_DAYS = 14

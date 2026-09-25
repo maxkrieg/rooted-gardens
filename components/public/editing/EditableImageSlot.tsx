@@ -22,14 +22,8 @@ interface EditableImageSlotProps {
 }
 
 /**
- * Standalone-slot counterpart to `EditableImage` (task 9.2.5 wired that one
- * only into the `team` collection, where the parent — `CollectionEditor` —
- * owns persisting the path into the item's `data`). A page-level `image`
- * slot has no such parent, so this component persists the upload itself via
- * `updateSiteSlot({ kind: 'image' })`, same save/toast/refresh idiom as
- * `EditableText`'s form. Not editing with no path set: renders a quiet
- * botanical placeholder instead of nothing, so a hero section never looks
- * broken before an owner uploads a first photo.
+ * Page-level image slot that saves itself via updateSiteSlot. Shows a botanical placeholder
+ * before the first upload.
  */
 export function EditableImageSlot({ page, slotKey, path, scope, alt, className }: EditableImageSlotProps) {
   const { canEdit, editing } = useEditMode()

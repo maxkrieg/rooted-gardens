@@ -5,11 +5,7 @@ interface Props {
   searchParams: Promise<{ view?: string }>
 }
 
-/**
- * Thin shell — the detail body is client-first (AccountDetailView) so gate codes,
- * access notes, and customer numbers are readable in the field. Capabilities come
- * from the shell's RoleProvider, so nothing role-related is read here.
- */
+/** Thin shell for the client-first AccountDetailView. */
 export default async function AccountDetailPage({ params, searchParams }: Props) {
   const { id } = await params
   const { view } = await searchParams

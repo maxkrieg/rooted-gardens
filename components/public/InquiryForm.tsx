@@ -40,12 +40,8 @@ const DEFAULT_VALUES: InquiryFormValues = {
 }
 
 /**
- * The public inquiry form (task 9.5) — reachable at `/contact` (id="inquiry"
- * so the home CTA can deep-link to `#inquiry`). Submits through the
- * `submitInquiry` Server Action, which is deliberately unauthenticated
- * (app/(public)/contact/actions.ts) and carries its own spam protection
- * (lib/leads/spam.ts): a hidden honeypot field plus a minimum-time-on-form
- * check, both re-checked server-side since a bypassed client proves nothing.
+ * Public inquiry form at /contact#inquiry. Honeypot and time-on-form checks, both rechecked
+ * server-side (lib/leads/spam.ts).
  */
 export function InquiryForm() {
   const [submitted, setSubmitted] = useState(false)
@@ -92,9 +88,8 @@ export function InquiryForm() {
     <div id="inquiry" className="rounded-2xl border border-border bg-card shadow-warm p-5 sm:p-8">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-          {/* Honeypot — off-screen, not display:none (some bots skip hidden
-              fields), unreachable by tab order, unread by screen readers.
-              A real visitor never sees or fills this. */}
+          {/* Honeypot: off-screen (not display:none, which some bots skip), untabbable, hidden from
+             screen readers. */}
           <div className="absolute left-[-9999px] top-auto w-px h-px overflow-hidden" aria-hidden="true">
             <label htmlFor="website">Leave this field blank</label>
             <input

@@ -64,31 +64,15 @@ interface VisitDetailContentProps {
   /** False when the container already shows the address in its own header (the
    *  management Sheet) — avoids showing it twice. Defaults to true (crew page). */
   showAddress?: boolean
-  /** Show the invoice status + QBO link section. Set true only by the management
-   *  VisitDetailSheet; the crew stop page leaves it off, so invoice info never
-   *  surfaces on the crew route (even for an owner/lead viewing it there). Still
-   *  gated on owner/lead + a completed, invoiced visit inside. Defaults to false. */
+  /** Show invoice status + QBO link. Only the management sheet sets it; still gated on owner/lead. */
   showInvoice?: boolean
-  /** Fires as the photo lightbox opens and closes. A container that is itself a
-   *  modal (the management Sheet) needs this to ignore close requests while a
-   *  photo is open — two stacked Radix overlays both portal to <body>, so
-   *  dismissing the inner one can reach the outer one as an outside click and
-   *  close it too. */
+  /** Lets a modal container ignore close requests while the stacked photo lightbox is open. */
   onPhotoViewerChange?: (open: boolean) => void
 }
 
 /**
- * The shared visit-detail content — rendered inside both the management Sheet
- * and the crew stop page, styled after the crew page's design. Every edit is
- * immediate-write (no batch "Save Changes" form): each control persists on
- * change via a small direct-client mutation hook, same pattern as crew
- * reassignment (`useReassignCrew`) already used.
- *
- * Capabilities come from the shell's RoleProvider rather than a `role` prop —
- * this sits at the bottom of a long chain (schedule grid → sheet → here, and
- * account detail → visit list → sheet → here) that existed only to carry it.
- * While role is still resolving every capability is false, so the most
- * restrictive state renders until it lands.
+ * Visit detail shared by the management sheet and the stop page. Every control writes on change.
+ * Capabilities come from RoleProvider and stay false until the role resolves.
  */
 export function VisitDetailContent({
   data,
@@ -112,9 +96,7 @@ export function VisitDetailContent({
   const [instructionOpen, setInstructionOpen] = useState(false)
   const [planOpen, setPlanOpen] = useState(false)
 
-  // One lightbox for all three photo surfaces below (plan, completion, property
-  // history). Paging stays WITHIN the set that was opened — mixing them into one
-  // strip would make "next" meaningless.
+  // One lightbox for all three photo sets; paging stays within the set that was opened.
   const [lightbox, setLightbox] = useState<{ photos: LightboxPhoto[]; index: number } | null>(null)
 
   function openPhoto(photos: LightboxPhoto[], index: number) {
@@ -127,9 +109,7 @@ export function VisitDetailContent({
     onPhotoViewerChange?.(false)
   }
 
-  // The lightbox holds a snapshot of the photo list, so a saved caption is
-  // patched in directly — the query invalidation behind it refreshes the grids,
-  // but wouldn't reach this array.
+  // The lightbox holds a snapshot of the list, so patch the saved caption in directly.
   function handleCaptionSaved(photoId: string, caption: string | null) {
     setLightbox((prev) =>
       prev
@@ -152,16 +132,11 @@ export function VisitDetailContent({
     return !!employeeId && photo.uploaded_by === employeeId
   }
 
-  // A final visit's plan (instruction/crew/vehicle) is historical, not actionable —
-  // the Plan card collapses to a glance summary and its inputs lock, same treatment
-  // for completed and skipped.
+  // A completed or skipped visit's plan is history: collapse it and lock the inputs.
   const isFinalVisit = visit.status === 'completed' || visit.status === 'skipped'
 
   const inProgress = isVisitInProgress({ started_at: visit.started_at, ended_at: visit.ended_at })
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(property.address)}`
-  // The Property Notes card used to be gated on having at least one note. It now
-  // always hosts the property Photos section, so it always has something to show
-  // — and it stays collapsed by default, so an empty one costs nothing.
 
   const { data: vehicles = [] } = useActiveVehicles()
   const updateVehicle = useUpdateVisitVehicle(data.visitId)
@@ -193,9 +168,7 @@ export function VisitDetailContent({
     staleTime: 50 * 60 * 1000, // 50 min — well under the 1-hr signed URL expiry
   })
 
-  // Signed URLs come back positional (aligned to photoStoragePaths), but the two
-  // photo sections below each render a filtered subset — resolve by path so a
-  // filtered subset stays correctly aligned with its URLs.
+  // Resolve signed URLs by path so each filtered photo subset stays aligned.
   const urlByPath = new Map<string, string | null | undefined>(
     photoStoragePaths.map((path, i) => [path, signedPhotoUrls?.[i]])
   )
@@ -250,10 +223,7 @@ export function VisitDetailContent({
                 Open in Maps
               </a>
             </Button>
-            {/* The return trip for the sheet's "Crew view" — carries the week so
-                the schedule loads the right window, and the visit id so the
-                detail sheet opens on arrival. Only owner/lead can reach
-                /management/*, so it's pointless for crew. */}
+            {/* Back to the schedule with the week and visit, so the sheet reopens there. */}
             {canManage && (
               <Button asChild variant="outline" className="h-11 gap-1.5">
                 <Link
@@ -320,9 +290,7 @@ export function VisitDetailContent({
         />
       )}
 
-      {/* Invoice — the billing outcome that follows completion. Management-only
-          (showInvoice) and owner/lead-only (canManage); shown once the visit is on
-          an invoice. Links out to the invoice in QuickBooks. */}
+      {/* Invoice: management-only, owner/lead-only, shown once the visit is billed. */}
       {showInvoice && canManage && visit.status === 'completed' && data.invoice && (
         <div className="rounded-2xl border border-[--border] bg-card px-4 py-3 shadow-[0_1px_2px_rgba(43,42,36,.04),_0_6px_16px_-4px_rgba(43,42,36,.08)]">
           <div className="flex items-center justify-between gap-3">
@@ -345,11 +313,7 @@ export function VisitDetailContent({
         </div>
       )}
 
-      {/* Plan — crew instruction, assigned crew, vehicle: what was arranged for this
-          visit. Peer of Completion Log (stone header vs green/amber = "intent" vs
-          "outcome"). Once the visit is final, collapses to a glance summary and every
-          input locks — the plan is historical at that point, still worth a look but
-          no longer actionable. */}
+      {/* Plan: instruction, crew, vehicle. Collapses and locks once the visit is final. */}
       <div className="rounded-2xl border border-[--border] bg-card overflow-hidden shadow-[0_1px_2px_rgba(43,42,36,.04),_0_6px_16px_-4px_rgba(43,42,36,.08)]">
         {isFinalVisit ? (
           <button
@@ -408,11 +372,8 @@ export function VisitDetailContent({
               </div>
             </div>
 
-            {/* Assigned crew — unlike the sibling rows, the label shares a line
-                with a full-height button, so the icon sits *inside* that row and
-                centers with the label. Pinning it outside at mt-0.5 left it
-                floating above (and `size="sm"` is taller again on touch, so a
-                fixed nudge wouldn't hold). */}
+            {/* Icon sits inside the row so it centers with the label next to the full-height
+               button. */}
             <div>
               <div className="flex items-center justify-between gap-2 mb-1">
                 <div className="flex items-center gap-3 min-w-0">
@@ -643,11 +604,7 @@ export function VisitDetailContent({
   )
 }
 
-/**
- * Toast an error from a crew mutation. "This needs a connection" and "this
- * failed" are different messages in the field — one means wait, the other means
- * something is wrong. Was hand-written across six hooks and four components.
- */
+/** "Needs a connection" and "failed" are different messages in the field. */
 function toastCrewError(err: unknown, fallback: string) {
   if (isOfflineError(err)) {
     toast.error('This needs a connection. It’ll work once you have signal.')

@@ -8,38 +8,27 @@ import { ROLE_HOME, canAccessRoute, isProtectedRoute } from '@/lib/auth/access'
 import type { EmployeeRole } from '@/types/app'
 
 const ROLE_COOKIE = 'rg-role'
-// 12h, not 1h: past expiry a cached page renders with no role and silently
-// falls back to read-only. Cost is that a role change takes up to a workday to
-// apply; signing out clears it immediately.
+// 12h: past expiry a cached page renders roleless and read-only. Sign-out clears it at once.
 const ROLE_COOKIE_MAX_AGE = 60 * 60 * 12
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Magic-link fallback: Supabase's configured Site URL is the app root, so a
-  // sign-in link can land on `/` with `?code=` (this used to be handled by
-  // app/page.tsx, before `/` became the public marketing home — task 9.2).
-  // clone() preserves the rest of the query string.
+  // Magic links can land on `/?code=` (Supabase Site URL is the root).
   if (pathname === '/' && request.nextUrl.searchParams.has('code')) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/callback'
     return NextResponse.redirect(url)
   }
 
-  // Public marketing pages (task 9.2) — no session needed, so skip the
-  // getUser() round-trip below entirely. `/login` is deliberately NOT on this
-  // list: it still needs the session check just below to redirect an
-  // already-signed-in user to their dashboard.
+  // Public pages skip the getUser() round-trip. /login doesn't: signed-in users get redirected.
   if (PUBLIC_ROUTES.includes(pathname as (typeof PUBLIC_ROUTES)[number])) {
     return NextResponse.next({ request })
   }
 
   let supabaseResponse = NextResponse.next({ request })
 
-  // Use anon key with cookies to refresh and validate the session.
-  // IMPORTANT: for every route reaching this point, always call getUser() —
-  // never skip; it keeps the auth session alive. (Public marketing routes
-  // return above and never reach here.)
+  // Always call getUser() past this point — it keeps the session alive.
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -64,15 +53,11 @@ export async function proxy(request: NextRequest) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
   const isProtected = isProtectedRoute(pathname)
-  // An authenticated user sitting on the login page. Exempt ?error= — that's the
-  // dead-end the no-role branch redirects to, and bouncing away from it would
-  // recreate the loop it exists to break.
+  // Exempt ?error=, the no-role dead end, or the redirect loop returns.
   const isLoginWithSession =
     !!user && pathname === '/login' && !request.nextUrl.searchParams.has('error')
 
-  // Owners work from the field on weak signal, where getUser() returns a null
-  // user rather than throwing. Treat an unreachable auth server as "keep going"
-  // — signing someone out onto a login page they also can't load is worse.
+  // On weak signal getUser() returns null rather than throwing. Don't sign people out for it.
   const authUnreachable =
     !user &&
     (isNetworkError(authError) ||
@@ -87,9 +72,7 @@ export async function proxy(request: NextRequest) {
     return response
   }
 
-  // Resolve the role once. Both the login redirect and the route gate need it —
-  // resolving it for /login too is what stops a crew member being bounced to a
-  // management page and then immediately re-bounced; they land on their own home.
+  // Resolve the role once so /login redirects straight to the right home.
   let role: EmployeeRole | undefined
   if (user && (isProtected || isLoginWithSession)) {
     // Cookie stores "<userId>_<role>" so a stale cookie from a different user is ignored.
@@ -126,10 +109,7 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // No employee record linked to this auth user — a terminal dead-end rather
-  // than a bounce, because any redirect into the app re-enters this same check
-  // and loops. Reached whenever SUPABASE_SERVICE_ROLE_KEY is unset or the auth
-  // user has no employees row. ?error= is what isLoginWithSession exempts.
+  // No employee row for this user: a dead end, since any redirect into the app would loop.
   if (user && !role && (isProtected || isLoginWithSession)) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
@@ -147,9 +127,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Role-based access control. One allowlist in lib/auth/access.ts drives both
-  // this gate and the nav, so a destination can't appear in one and not the
-  // other. Affordance only goes as far as the UI — RLS is the real boundary.
+  // One allowlist (lib/auth/access.ts) drives this gate and the nav. RLS is the real boundary.
   if (user && role && isProtected && !canAccessRoute(pathname, role)) {
     const url = request.nextUrl.clone()
     url.pathname = ROLE_HOME[role]
@@ -162,15 +140,8 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Run on all routes except Next.js internals and static assets.
-    // `_next/` (not just `_next/static|_next/image`) excludes every internal
-    // request — RSC payloads, HMR-adjacent fetches, etc. — from paying a
-    // Supabase getUser() round-trip; those still ran the proxy before and were
-    // measured contributing to a Turbopack dev-server livelock (900%+ CPU).
-    // Session refresh still happens on ordinary page navigations, which match.
-    // `serwist` and `manifest.json` are excluded so the service-worker and
-    // manifest fetches don't each pay for a Supabase getUser() round-trip —
-    // and so the worker can never be redirected to /login.
+    // Skip all of _next/, the service worker and the manifest: none of them should pay a getUser()
+    // round-trip (it fed a dev-server livelock), and the worker must never redirect to /login.
     '/((?!_next/|favicon.ico|serwist/|manifest[\\w-]*\\.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

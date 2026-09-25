@@ -7,9 +7,7 @@ import { EditModeProvider } from '@/components/public/editing/EditModeProvider'
 import { PublicHeader } from '@/components/public/PublicHeader'
 import { PublicFooter } from '@/components/public/PublicFooter'
 
-// Per-page metadata (generateMetadata in each page.tsx) supplies the real
-// title/description; this is the fallback + the Open Graph defaults every
-// public page inherits.
+// Fallback title plus Open Graph defaults; each page's generateMetadata supplies the rest.
 export const metadata: Metadata = {
   description:
     'Eco-minded lawn care and garden design serving Norwich, VT and the Upper Valley.',
@@ -21,26 +19,15 @@ export const metadata: Metadata = {
 }
 
 /**
- * Is this request's cookie jar even worth a `getUser()` round-trip? Every
- * `@supabase/ssr` session cookie name contains `-auth-token` (chunked long
- * tokens add a numeric suffix, e.g. `-auth-token.0`) — anonymous visitors,
- * the overwhelming majority of public-site traffic, have none of these and
- * skip straight to `canEdit = false` with zero Supabase calls (task 9.2.5).
- * A false positive (a stale cookie with no valid session) just costs one
- * wasted `getUser()` call, never a security issue — RLS is the real gate.
+ * Only call getUser() if a Supabase auth cookie exists, so anonymous visitors cost no
+ * Supabase calls. A stale cookie just wastes one call; RLS is the gate.
  */
 async function hasAuthCookie(): Promise<boolean> {
   const store = await cookies()
   return store.getAll().some((c) => c.name.includes('-auth-token'))
 }
 
-/**
- * Resolves who's viewing the public site: `canEdit` gates the owner-only
- * inline WYSIWYG editor (task 9.2.5); `staffHome` is non-null for *any*
- * signed-in employee (owner/lead/crew/accountant) and points the header's
- * "Staff log in" link at their actual landing page instead, once they're
- * already signed in.
- */
+/** `canEdit` gates the owner's inline editor; `staffHome` points signed-in staff at their home. */
 async function resolveViewer(): Promise<{ canEdit: boolean; staffHome: string | null }> {
   if (!(await hasAuthCookie())) return { canEdit: false, staffHome: null }
 
@@ -63,12 +50,7 @@ async function resolveViewer(): Promise<{ canEdit: boolean; staffHome: string | 
   }
 }
 
-/**
- * Chrome for the public marketing site (task 9.2) — top nav + footer, no
- * management sidebar or crew bottom nav. Also resolves `canEdit` for the
- * inline editor (task 9.2.5) so every page under this layout can offer
- * owner-only edit affordances without each one re-deriving it.
- */
+/** Public site chrome (top nav + footer). Resolves `canEdit` once for every page. */
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
   const { canEdit, staffHome } = await resolveViewer()
 

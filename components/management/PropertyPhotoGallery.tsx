@@ -21,12 +21,8 @@ interface PropertyPhotoGalleryProps {
 }
 
 /**
- * The account Photos tab — every photo across the account's properties, grouped
- * by property and then by kind (How-To Guide, Customer Requests, Visit Photos,
- * Visit Plan Reference).
- *
- * Photos arrive pre-signed from the server, so this component does no fetching.
- * Mutations go through Server Actions and are reflected by `router.refresh()`.
+ * The account Photos tab: every property's photos, grouped by property then kind. Photos arrive
+ * pre-signed; mutations are Server Actions followed by router.refresh().
  */
 export function PropertyPhotoGallery({
   accountId,
@@ -35,11 +31,8 @@ export function PropertyPhotoGallery({
   canManage,
   loadError,
 }: PropertyPhotoGalleryProps) {
-  // Tracked by photo id rather than position, for two reasons: a freshly
-  // uploaded photo can be named before the refreshed server data has arrived
-  // (the lightbox simply opens once it does), and recategorizing a photo
-  // reshuffles the groups without the open photo silently becoming a different
-  // one.
+  // Tracked by id, not position: a new upload can be opened before refreshed data arrives, and
+  // recategorizing reshuffles groups.
   const [openPhotoId, setOpenPhotoId] = useState<string | null>(null)
 
   // Lightbox navigation walks one property's photos, flattened across its groups
@@ -122,8 +115,7 @@ export function PropertyPhotoGallery({
                         className="group relative aspect-square w-full rounded-xl overflow-hidden border border-border bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         {photo.url ? (
-                          // Plain <img> — see the note in PhotoLightbox: signed
-                          // URLs rotate hourly, so next/image buys nothing here.
+                          // Plain <img>: signed URLs rotate hourly.
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={photo.url}

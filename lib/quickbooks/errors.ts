@@ -1,8 +1,4 @@
-/**
- * Shared shaping of node-quickbooks / axios errors. Extracted from
- * invoiceStatus.ts, where this was private and log-only — so the invoice push
- * discarded the Intuit fault the accountant needed to see.
- */
+/** Shaping for node-quickbooks / axios errors. */
 
 interface QboFaultError {
   Message?: string
@@ -22,10 +18,7 @@ function firstFault(err: unknown): QboFaultError | undefined {
   return (e?.response?.data?.Fault ?? e?.Fault)?.Error?.[0]
 }
 
-/**
- * One-line summary for the server log. Avoids `console.error(err)` on the raw
- * AxiosError, which dumps hundreds of lines and embeds the QBO access token.
- */
+/** One-line log summary. Never log the raw AxiosError: it's huge and embeds the access token. */
 export function describeQboError(err: unknown): string {
   const e = err as QboErrorShape
   const status = e?.response?.status
@@ -37,11 +30,7 @@ export function describeQboError(err: unknown): string {
   return 'unknown error'
 }
 
-/**
- * The Intuit fault alone, for the accountant. A QBO business-validation fault
- * ("Duplicate Document Number") is written for a bookkeeper, so it's the one
- * upstream message the app forwards. Null when there's no readable fault.
- */
+/** The Intuit fault text for the accountant, or null when there's none. */
 export function qboFaultMessage(err: unknown): string | null {
   const first = firstFault(err)
   const msg = first?.Detail ?? first?.Message

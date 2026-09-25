@@ -18,11 +18,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { firstName } from '@/lib/utils/team'
 
-/**
- * Client-first dashboard. Adds no queries for the week: the schedule already
- * caches this week's visits and the property/account reference data, so the
- * stats are derived from that same cache.
- */
+/** Client-first dashboard, derived from the schedule's cached week; no extra queries. */
 export function DashboardView() {
   const hydrated = useIsHydrated()
   const today = useMemo(() => new Date(), [])

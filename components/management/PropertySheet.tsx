@@ -19,11 +19,7 @@ interface PropertySheetProps {
   property?: Property
 }
 
-/**
- * Client island that owns the add/edit property Sheet's open state.
- * When property is undefined → "Add Property" trigger + create form.
- * When property is provided → "Edit" icon trigger + edit form.
- */
+/** Add (no `property`) or edit property Sheet with its own open state. */
 export function PropertySheet({ accountId, property }: PropertySheetProps) {
   const [open, setOpen] = useState(false)
   const isEdit = Boolean(property)

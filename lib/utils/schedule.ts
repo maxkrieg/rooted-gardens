@@ -16,12 +16,7 @@ export function getWeekStart(date: Date): Date {
   return startOfWeek(date, { weekStartsOn: 1 })
 }
 
-/**
- * Parse a `?week=YYYY-MM-DD` query param into the Monday of that week.
- * Falls back to the current week when the param is missing or unparseable —
- * shared by the management schedule (server) and crew schedule (client) so a
- * week link works in both directions.
- */
+/** Parse `?week=YYYY-MM-DD` to its Monday; falls back to the current week. */
 export function parseWeekParam(value: string | null | undefined): Date {
   if (!value) return getWeekStart(new Date())
   const parsed = parseISO(value)
@@ -48,14 +43,8 @@ export type ScheduleAssignment = {
 }
 
 /**
- * Assembles the route group → property → visit grid for a single week.
- * Pure (no I/O), and now called from exactly one place — useManagementSchedule's
- * `combine`, which every role's schedule goes through.
- *
- * `ungroupedProperties` is optional and defaults to empty. It stays optional
- * because the shape is useful without it, but the live caller always passes it:
- * a property on no route group would otherwise be silently dropped from the
- * schedule rather than landing in the "Not on a route" bucket.
+ * Builds the route group → property → visit grid for one week. Pure.
+ * Pass `ungroupedProperties` or unrouted properties vanish from the schedule.
  */
 export function buildScheduleWeek(
   weekStart: string,
@@ -108,14 +97,7 @@ export function buildScheduleWeek(
   return { weekStart, routeGroups: scheduleRouteGroups, ungrouped }
 }
 
-/**
- * Clusters a route group's rows by account, preserving each account's first-
- * occurrence order (rows arrive pre-sorted by sort_order, so this naturally
- * keeps the route's drive order). Presentation-only — does not reshape
- * ScheduleWeek, so it doesn't touch buildScheduleWeek's crew-shared output.
- * An account whose properties span multiple route groups will legitimately
- * appear once per route group when this is applied per-group.
- */
+/** Clusters a route group's rows by account, keeping first-occurrence (drive) order. */
 export function groupRowsByAccount(
   rows: SchedulePropertyRow[]
 ): Array<{ account: SchedulePropertyRow['account']; rows: SchedulePropertyRow[] }> {
@@ -135,15 +117,7 @@ export function groupRowsByAccount(
   return groups
 }
 
-/**
- * Locate a visit within a loaded schedule window, so a `?visit=<id>` deep link
- * can open its detail sheet directly. Returns the row with `visit` narrowed to
- * the matching one — the shape VisitDetailSheet expects.
- *
- * Callers pass the weeks they already hold, so a visit outside the loaded window
- * simply isn't found; the link carries `week` alongside `visit` to make sure the
- * right window is fetched in the first place.
- */
+/** Find a visit in the loaded weeks for a `?visit=` deep link; the link also carries `week`. */
 export function findVisitInWeeks(
   weeks: ScheduleWeek[],
   visitId: string | undefined,
@@ -188,33 +162,12 @@ export type PlanDecision = {
 }
 
 /**
- * Decide which properties are due for a given week.
- *
- * Pure, and deliberately separate from anything that writes: R3.5's preview
- * renders exactly this output, so what the owner confirms is what gets created.
- *
- * A property is due when its next-due date — last completed visit plus its
- * interval — lands on or before the target week's Sunday. The interval is
- * intervalDaysFor(): the owner's per-property override, else the frequency
- * default. Sharing that one function with the cadence badge is the point; the
- * generator and the overdue chip can't disagree about the same property.
- *
- * Always phased from the property's own last visit, never from a fixed calendar
- * parity. The real route sheet's biweekly rows drift constantly (5/12, 5/18,
- * skip, 6/10) as weather and crew availability move them, so a parity rule would
- * fight the way the work actually happens.
- *
- * `as_needed` with no override has no interval at all and is never due — those
- * are scheduled by hand, by definition.
- *
- * Never returns a property that already has a visit that week, and never an
- * archived one. The UNIQUE (property_id, week_start) index makes the whole thing
- * idempotent regardless, so a double-run can't duplicate.
+ * Which properties are due in a week: last completed visit + intervalDaysFor() lands by Sunday.
+ * Phased from each property's own last visit, never calendar parity. Pure, so the preview shows
+ * exactly what gets created; skips existing visits and archived properties.
  */
 export function planWeek(weekStart: string, candidates: PlanCandidate[]): PlanDecision[] {
-  // Compared against the week's Sunday, not its Monday: a property that comes
-  // due on Thursday belongs on Thursday's week, and anchoring on the Monday
-  // would push it a week late.
+  // Compare against Sunday, or a property due Thursday lands a week late.
   const weekEnd = addDays(parseISO(weekStart), 6)
 
   return candidates.map((candidate) => {
@@ -230,9 +183,7 @@ export function planWeek(weekStart: string, candidates: PlanCandidate[]): PlanDe
     const label = frequencyLabel(property.frequency)
     const intervalDays = intervalDaysFor(property)
 
-    // No interval at all — as_needed with no override. Not silently dropped: an
-    // unrecognised frequency lands here too, and the owner sees it in the
-    // preview's skipped list and can schedule it by hand.
+    // No interval (as_needed, or an unknown frequency): surfaced in the preview's skipped list.
     if (intervalDays === null) {
       return property.frequency === 'as_needed'
         ? { candidate, due: false, reason: 'As needed — schedule by hand' }
@@ -265,17 +216,8 @@ function frequencyLabel(frequency: string): string {
 // ─── Priority ordering ──────────────────────────────────────────────────────────
 
 /**
- * Reorder a route group's rows so the properties that have waited longest come
- * first, most overdue at the top.
- *
- * A *view* over the rows, never a write. property_route_groups.sort_order is the
- * order the crew physically drive the route, so this is opt-in and the schedule
- * defaults to leaving it alone. Ties keep the incoming drive order — Array.sort
- * is stable — so within a band of equally-urgent stops the route still reads in
- * driving sequence.
- *
- * Settled visits sink to the bottom: work that's done needs no attention, and
- * leaving them interleaved buries the stops the mode exists to surface.
+ * Longest-waiting first, as a view only (sort_order is the drive order). Stable, so ties keep
+ * drive order; settled visits sink to the bottom.
  */
 export function sortRowsByPriority(
   rows: SchedulePropertyRow[],
@@ -304,10 +246,7 @@ export interface RouteGroupStats {
   onSite: boolean
 }
 
-/**
- * One route group's week at a glance. Takes each row's resolved visit (null when
- * unscheduled) so the band reads exactly what the rows underneath it render.
- */
+/** One route group's week at a glance, from the same resolved visits the rows render. */
 export function routeGroupStats(
   visits: Array<VisitWithCrew | null>,
   vehicles: Vehicle[],

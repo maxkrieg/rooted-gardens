@@ -10,9 +10,7 @@ interface CompletionPayload {
   presentEmployeeIds: string[]  // all crew confirmed on site
   serviceTypes: string[]
   completionNote?: string
-  // On-site timing now lives on the visit row. endedAt is always set on completion
-  // (it's the completion timestamp, and the source of the visit's "date"). startedAt
-  // is set only when the crew started the job (Start tap or a manual start time).
+  // endedAt is always set on completion; startedAt only if the job was started.
   startedAt?: string
   endedAt: string
 }
@@ -37,9 +35,7 @@ interface PhotoPayload {
   caption?: string
 }
 
-/** Caption edit for a photo row that ALREADY exists. A photo captured in the
- *  completion logger has no row until submit, so its caption rides along on the
- *  PhotoPayload above instead. */
+/** Caption edit for an existing photo row. New photos carry their caption in PhotoPayload. */
 interface PhotoCaptionPayload {
   photoId: string
   caption: string | null
@@ -83,14 +79,10 @@ interface RevertStatusPayload {
   visitId: string
 }
 
-/** Narrow column patch, NOT the whole property form: updateProperty also writes
- *  address and frequency, and replaying that would clobber an address changed
- *  meanwhile. These columns are safe to replay.
- *
- *  `preferredIntervalDays` is optional because a crew phone may still be holding
- *  items queued before it existed — those must replay as a notes-only write, so
- *  the flush skips the column when the key is absent. The 'property_notes' type
- *  string is deliberately unchanged for the same reason. */
+/**
+ * Narrow patch, not the whole property form, so a replay can't clobber an address edit.
+ * `preferredIntervalDays` is optional: phones may hold items queued before it existed.
+ */
 interface PropertyNotesPayload {
   propertyId: string
   crewNotes: string | null
@@ -99,19 +91,17 @@ interface PropertyNotesPayload {
   preferredIntervalDays?: number | null
 }
 
-/** One dispatch note per route group per week — the route sheet's group-header
- *  note. Upserts on (route_group_id, week_start), which is what makes a replay
- *  safe; an empty note deletes the row rather than storing a blank. */
+/** Upserts on (route_group_id, week_start) so replay is safe; empty note deletes the row. */
 interface RouteWeekNotePayload {
   routeGroupId: string
   weekStart: string
   note: string
 }
 
-/** Move one property onto a route group, or off every route group when
- *  `routeGroupId` is null. property_route_groups has a UNIQUE index on
- *  property_id, so a property sits on at most one route — which is what lets
- *  this upsert rather than delete-then-insert, and makes a replay idempotent. */
+/**
+ * Move a property onto a route (or off all, if null). UNIQUE property_id makes the upsert
+ * idempotent.
+ */
 interface AssignPropertyRoutePayload {
   propertyId: string
   routeGroupId: string | null
@@ -135,18 +125,10 @@ type MutationPayload =
   | { type: 'route_week_note'; payload: RouteWeekNotePayload }
   | { type: 'assign_property_route'; payload: AssignPropertyRoutePayload }
 
-/**
- * Retries before a mutation is parked as 'failed'. `attempts` used to be
- * incremented and never read, so an RLS denial retried forever while the banner
- * sat on "Syncing 1 change…" and the crew member believed it had saved.
- */
+/** Retries before a mutation is parked as 'failed' and shown in "Changes that didn't save". */
 const MAX_ATTEMPTS = 5
 
-/**
- * Queue-change subscribers. Without this the banner only recounts on mount and
- * on online/offline, so a mutation queued mid-session is invisible and the
- * "Syncing N changes…" state can never render.
- */
+/** Queue-change subscribers, so the banner recounts when something is queued mid-session. */
 const queueListeners = new Set<() => void>()
 
 export function subscribeToQueue(listener: () => void): () => void {
@@ -261,11 +243,7 @@ interface FlushResult {
   offline: boolean
 }
 
-/**
- * Dispatches pending mutations to Supabase, on reconnect and on app mount.
- * Returns a summary rather than void so callers can report what actually
- * happened — SkipSheet and VisitLogger used to claim success unconditionally.
- */
+/** Flushes pending mutations to Supabase; returns a summary so callers can report failures. */
 export async function flushMutationQueue(): Promise<FlushResult> {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     const counts = await getQueueCounts()
@@ -322,9 +300,7 @@ export async function flushMutationQueue(): Promise<FlushResult> {
             })
             .eq('id', p.visitId)
             .throwOnError()
-          // Replace all completed rows atomically: clear the old set, then insert
-          // the new set from presentEmployeeIds. This handles initial completion and
-          // edits (adding / removing crew) in one idempotent operation.
+          // Replace all completed rows (delete then insert): idempotent for first logs and edits.
           await supabase
             .from('visit_crew')
             .delete()
@@ -516,9 +492,7 @@ export async function flushMutationQueue(): Promise<FlushResult> {
           break
         }
         default:
-          // Throw, don't warn-and-continue: falling through marked an unknown type
-          // as synced and deleted it, so a queue written by a newer bundle and
-          // flushed by an older one lost the write silently.
+          // Throw on unknown types: an older bundle must not mark a newer write as synced.
           throw new Error(`Unknown mutation type: ${(mutation as QueuedMutation).type}`)
       }
       await markMutationDone(mutation.id)

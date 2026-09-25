@@ -20,15 +20,7 @@ interface MoreSheetProps {
   onSignOut: () => void
 }
 
-/**
- * The bottom-bar overflow, and the home of everything the deleted crew Profile
- * page used to own: the SMS opt-out toggle and sign-out. Those need somewhere
- * to live; they don't need a page.
- *
- * A bottom sheet rather than the old left drawer — this opens from a bottom-bar
- * tab, and the top-left hamburger it replaces was the hardest target to reach
- * one-handed on a phone.
- */
+/** Bottom-bar overflow, plus the SMS toggle, profile edit and sign-out. */
 export function MoreSheet({
   open,
   onOpenChange,

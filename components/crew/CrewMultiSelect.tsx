@@ -18,10 +18,7 @@ interface CrewMultiSelectProps {
   placeholder?: string
 }
 
-// Inline (non-portaled) dropdown. A Radix Popover portals its content to
-// document.body — outside the completion Sheet's modal Dialog — so the Dialog's
-// modal layer swallows taps and the list is non-interactive. Rendering the panel
-// inline within the Sheet's DOM keeps every row tappable.
+// Inline, not a portaled Popover: outside the Sheet's modal layer, taps would be swallowed.
 export function CrewMultiSelect({
   options,
   value,

@@ -55,11 +55,7 @@ interface ScheduleViewProps {
 
 const VIEW_MODE_KEY = 'rg-schedule-view'
 
-/**
- * Client-first schedule. Week and filter state live here rather than in the URL's
- * server round-trip, so paging and filtering work with no signal; the URL is kept
- * in sync with replaceState purely so a view stays shareable.
- */
+/** Client-first schedule. Week and filters live in state, mirrored to the URL for sharing. */
 export function ScheduleView({
   initialWeek,
   initialFilters,
@@ -68,9 +64,8 @@ export function ScheduleView({
 }: ScheduleViewProps) {
   const [windowStart, setWindowStart] = useState(initialWeek)
   const [filters, setFilters] = useState<ScheduleFilterValues>(initialFilters)
-  // Must stay equal to the `lg:` breakpoint the two layouts switch on (see the
-  // breakpoint rule in CLAUDE.md): if this and the CSS disagree, a phone either
-  // fetches three weeks it never renders or renders a grid it never fetched.
+  // Must match the `lg:` breakpoint the layouts switch on, or a phone fetches weeks it never
+  // renders.
   const isWide = useMediaQuery('(min-width: 1024px)')
   const weekCount = isWide ? 4 : 1
   const hydrated = useIsHydrated()
@@ -81,11 +76,8 @@ export function ScheduleView({
   const [sortOverride, setSortOverride] = useState<ScheduleSortState | null>(null)
   const { editSchedule: canEdit, seeDashboard } = useCan()
 
-  // Last-used view wins on open, so whichever one he actually lives in is the
-  // default. Resolved rather than stored in state: localStorage doesn't exist
-  // during the server render, and syncing it into state in an effect would
-  // render the wrong tab once before correcting it. Precedence is
-  // explicit tap → explicit ?view= → last used → Week.
+  // Resolved, not stored: localStorage doesn't exist on the server. Precedence: tap → ?view= →
+  // last used → Week.
   const storedViewMode = useMemo<ScheduleViewMode | null>(() => {
     if (!hydrated) return null
     try {
@@ -96,9 +88,7 @@ export function ScheduleView({
     }
   }, [hydrated])
 
-  // Crew never had a dashboard and shouldn't get one here — it carries
-  // company-wide stats and uninvoiced counts. No toggle, no Today, no
-  // 44px of chrome they'd never use.
+  // Crew get no Today view: it carries company-wide stats.
   const requested = viewOverride ?? initialViewMode ?? storedViewMode ?? 'week'
   const viewMode: ScheduleViewMode = seeDashboard ? requested : 'week'
 
@@ -111,10 +101,7 @@ export function ScheduleView({
     }
   }
 
-  // Same resolve-don't-store shape as the view mode above, for the same reason:
-  // localStorage doesn't exist during the server render. Defaults to drive
-  // order — sort_order is the sequence the crew drive, and priority is the
-  // deliberate override an owner reaches for while planning.
+  // Resolved like the view mode. Defaults to drive order; priority is the planning override.
   const storedSort = useMemo<ScheduleSortState | null>(() => {
     if (!hydrated) return null
     try {
@@ -273,10 +260,7 @@ export function ScheduleView({
         </div>
       </ScheduleStickyBar>
 
-      {/* Under the sticky bar, not inside it — it scrolls away, because once
-          you're reading the week you don't need these pinned. The sort switch
-          is here rather than in the header row: that row is already six targets
-          wide and the week label is what truncates first. */}
+      {/* Under the sticky bar so it scrolls away; the header row has no room left. */}
       {(seeDashboard || viewMode !== 'today') && (
         <div className="mb-2 flex items-center gap-2 lg:mb-3">
           {seeDashboard && (
@@ -336,9 +320,7 @@ export function ScheduleView({
             onGroupSortChange={changeGroupSort}
           />
         </div>
-        {/* -mx-4 cancels the (padded) layout's p-4 so the route cards run to
-            both viewport edges — the phone list needs every pixel for the
-            account name and address. Desktop keeps the page padding. */}
+        {/* -mx-4 cancels page padding so the phone list runs edge to edge. */}
         <div className="lg:hidden -mx-4">
           <ScheduleListMobile
             week={mobileWeek}
@@ -399,11 +381,7 @@ function ScheduleSkeleton() {
 
 type ScheduleViewMode = 'today' | 'week'
 
-/**
- * `Today | Week` — the segmented control that folded the dashboard into the
- * schedule. It removes a destination rather than adding one: the snapshot is on
- * screen the moment the app opens, with no navigation.
- */
+/** `Today | Week` — the dashboard folded into the schedule. */
 function ScheduleViewToggle({
   value,
   onChange,
@@ -439,21 +417,8 @@ function ScheduleViewToggle({
 }
 
 /**
- * Pins its children (the route/account/crew/status filters + week nav) to the
- * top of the viewport as the page scrolls, so a long route-group list never
- * loses that context. Measures its own rendered height and publishes it as
- * `--schedule-sticky-h` on the document root — ScheduleGrid's <thead> reads
- * that var to sit flush beneath this bar instead of overlapping it. A ref +
- * ResizeObserver (rather than a hardcoded offset) keeps the two in sync
- * across breakpoints/zoom/font-size, where this bar's height isn't fixed.
- *
- * `top-0` on every breakpoint: the mobile offset used to clear the management
- * shell's 56px fixed header, which the bottom bar replaced — it survived the
- * merge as a gap the page scrolled through.
- *
- * On a phone it cancels the page padding and re-applies it as its own, so the
- * background reaches both screen edges: the schedule list below is full-bleed,
- * and a bar inset by 16px let the rows scroll visibly through the gutters.
+ * Sticks the filters and week nav to the top, publishing its height as --schedule-sticky-h for
+ * ScheduleGrid's header. On a phone it re-applies page padding itself so it spans edge to edge.
  */
 function ScheduleStickyBar({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)

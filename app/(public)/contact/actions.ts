@@ -5,22 +5,14 @@ import { createPublicClient } from '@/lib/supabase/public'
 import { checkLeadSpamSignals, enforceLeadRateLimit, getClientIp, hashIp } from '@/lib/leads/spam'
 import { inquiryFormSchema, type InquiryFormValues } from '@/lib/validators/lead'
 
-/**
- * Public, unauthenticated Server Action backing InquiryForm (task 9.5).
- * Deliberately a separate file from app/(public)/actions.ts — that file is
- * the owner-only content editor and every action in it starts with
- * `requireOwner()`; this one is the opposite by design, since the whole
- * point is that an anonymous visitor can reach it.
- */
+/** Public inquiry form action, anonymous by design (unlike the owner-only ../actions.ts). */
 export async function submitInquiry(values: InquiryFormValues): Promise<{ error?: string }> {
   const parsed = inquiryFormSchema.safeParse(values)
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Please check the form and try again.' }
   }
 
-  // Honeypot / too-fast bot signals: pretend success without writing a row.
-  // Telling a bot it was caught just teaches it to adapt; a silent no-op
-  // costs it nothing to learn from.
+  // Bot signals: pretend success and write nothing.
   const spamSignal = checkLeadSpamSignals({
     website: parsed.data.website,
     elapsedMs: parsed.data.elapsedMs,
@@ -40,11 +32,7 @@ export async function submitInquiry(values: InquiryFormValues): Promise<{ error?
   }
 
   const supabase = createPublicClient()
-  // No `.select()` chained — `anon` has INSERT but no SELECT on `leads`
-  // (task 9.1), and PostgREST needs SELECT visibility to return a row via
-  // RETURNING even from an INSERT. `status`/`source` come from their DB
-  // defaults ('new' / 'website'), matching the `leads_insert_anon` policy's
-  // WITH CHECK exactly.
+  // No `.select()`: anon can't SELECT leads, so RETURNING fails. status/source use DB defaults.
   const { error } = await supabase.from('leads').insert({
     kind: 'service_inquiry',
     name: parsed.data.name,

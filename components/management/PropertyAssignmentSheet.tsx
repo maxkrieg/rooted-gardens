@@ -49,26 +49,9 @@ function groupByAccount(properties: PropertyWithAccount[]): AccountGroup[] {
 }
 
 /**
- * Sheet that lets owners assign/unassign properties to a route group.
- * Properties are grouped by account for scanability, but every property gets
- * its own toggle — no account-level bulk control. A property already assigned
- * to a DIFFERENT route group can still be toggled here; flipping it prompts a
- * confirmation dialog (moving it out of its current group) rather than being
- * disabled outright.
- *
- * The list is split into three always-visible sections — In this route / Not
- * on a route / In other routes — rather than the old "Unassigned only"
- * filter toggle, so an unrouted property doesn't require knowing a toggle
- * exists. The Routes page's UnroutedPanel is now the primary place to catch
- * these company-wide; this sheet's job is curating one route at a time.
- *
- * Toggling is deliberately NOT gated on the server round-trip. A switch that
- * can only move once `revalidatePath` re-renders this dynamic page will sit
- * there looking broken whenever that refresh is slow or never propagates —
- * the owner clicks, nothing happens, and the write has actually landed. So we
- * keep a local `overrides` layer (what the user asked for) over the server
- * prop, and our own `inFlight` set for disabled state rather than the
- * transition's pending flag, which can stay stuck true and wedge the list.
+ * Assign properties to one route group, grouped by account, in three sections: this route,
+ * unrouted, other routes (moving prompts a confirm). Toggles use a local overrides layer and
+ * an inFlight set, never the transition's pending flag, so a slow refresh can't wedge them.
  */
 export function PropertyAssignmentSheet({
   routeGroupId,
@@ -83,21 +66,11 @@ export function PropertyAssignmentSheet({
   const [, startTransition] = useTransition()
   const [reassignTarget, setReassignTarget] = useState<PropertyWithAccount | null>(null)
   const [query, setQuery] = useState('')
-  // propertyId → assigned-to-this-route, as the user last asked for it.
-  // Absent = defer to the server prop. Held for the life of the open sheet and
-  // reset on close; clearing on action-resolve would race the props catching
-  // up and visibly flick the switch back.
+  // propertyId → assigned here, as last asked. Absent defers to the server; reset on close.
   const [overrides, setOverrides] = useState<Map<string, boolean>>(new Map())
   const [inFlight, setInFlight] = useState<Set<string>>(new Set())
 
-  /**
-   * Which route group each property should render under right now — the local
-   * override if the user has touched it, otherwise the server prop. Overridden
-   * -off means unrouted rather than "back to its old group": unassigning only
-   * ever happens from *this* route, and assigning *moves* a property here (one
-   * route group per property, enforced by property_route_groups_property_idx),
-   * so a mid-flight property is never in two sections at once.
-   */
+  /** Where each property renders now: override, else server. Overridden-off means unrouted. */
   const effectiveGroupIds = useMemo(() => {
     const map = new Map<string, string | null>()
     for (const property of allProperties) {
@@ -150,10 +123,7 @@ export function PropertyAssignmentSheet({
     setOverrides((prev) => new Map(prev).set(propertyId, assignedHere))
   }
 
-  // Rollback drops the override rather than writing the previous boolean back:
-  // for a failed *move*, "not assigned here" would render as unrouted, losing
-  // the route group the property is in fact still in. The server prop is the
-  // pre-click truth, so defer to it.
+  // Rollback drops the override so a failed move shows its real, unchanged route.
   function clearOverride(propertyId: string) {
     setOverrides((prev) => {
       const next = new Map(prev)
@@ -193,9 +163,7 @@ export function PropertyAssignmentSheet({
         refreshRoutes()
         router.refresh()
       } catch {
-        // A *thrown* failure (network drop mid-action) never reaches the
-        // `res.error` branch. Without this the row would stay flipped and
-        // wedged in-flight, silently — the very bug being fixed.
+        // A thrown failure skips `res.error`; without this the row stays flipped and stuck.
         clearOverride(propertyId)
         toast.error('Could not update assignment', {
           description: 'The change did not reach the server. Check your connection and try again.',
@@ -354,12 +322,7 @@ export function PropertyAssignmentSheet({
           </div>
 
           {reassignTarget && (
-            // Rendered inline within the Sheet (not a separate Radix Dialog)
-            // deliberately — nesting a second Radix Dialog/Sheet root here
-            // causes their dismissable-layer stacks to cross-dismiss each
-            // other on outside clicks (well-documented Radix issue), closing
-            // this Sheet whenever the confirmation is dismissed. A plain
-            // absolutely-positioned overlay sidesteps that entirely.
+            // Inline overlay, not a nested Radix Dialog: nested dismissable layers cross-dismiss.
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 p-6">
               <div className="w-full max-w-sm rounded-xl border border-border bg-card p-5 shadow-lg">
                 <h3 className="font-display text-lg font-semibold text-foreground">

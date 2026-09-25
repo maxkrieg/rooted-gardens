@@ -6,20 +6,8 @@ import { useApplyVisitUpdate } from '@/hooks/useManagementSchedule'
 import type { VisitOverlay } from '@/lib/utils/visits'
 
 /**
- * Live `visits` updates for the schedule on screen.
- *
- * Covers changes made anywhere — most importantly crew completing a stop or
- * starting the on-site clock on another device, which is what the terracotta
- * "On site" indicator reads.
- *
- * Was `SessionsProvider`, which kept its own `Map<visitId, VisitOverlay>` and
- * made every consumer merge it over the query data. That map existed because
- * the grid used to read server props; it reads the React Query cache now, so
- * the third store bought nothing but a merge each consumer could forget. Events
- * are written into the cache directly, version-guarded (see `applyVisitUpdate`).
- *
- * Renders nothing. It takes no children so it can't accidentally become a
- * context boundary again.
+ * Live `visits` updates (e.g. crew starting the on-site clock elsewhere), written into the
+ * query cache via the version-guarded applyVisitUpdate. Renders nothing.
  */
 export function ScheduleRealtime({ visitIds }: { visitIds: string[] }) {
   const applyVisitUpdate = useApplyVisitUpdate()

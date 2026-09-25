@@ -27,17 +27,8 @@ interface PhotoUploadDropzoneProps {
 }
 
 /**
- * Owner/lead upload for property-level how-to photos.
- *
- * One card for the whole tab rather than one per property section: the gallery
- * skips properties with no photos, so a per-section control would leave a brand
- * new property with no way to receive its first photo. The property selector
- * covers every property, empty or not.
- *
- * Image bytes go straight from the browser to Supabase Storage (gated by the
- * bucket's INSERT policy); only the resulting row is written through a Server
- * Action. Routing 20 MB through a Server Action would exceed both Next's default
- * body limit and the serverless request ceiling in production.
+ * Owner/lead how-to photo upload with a property selector, so empty properties can get a
+ * first photo. Bytes go browser → Storage; only the row goes through a Server Action.
  */
 export function PhotoUploadDropzone({
   accountId,
@@ -59,9 +50,7 @@ export function PhotoUploadDropzone({
   const isUploading = progress !== null
   const singleProperty = properties.length === 1
 
-  /** Takes a materialized File[] rather than a FileList: `input.files` is live,
-   *  so resetting the input (which the change handler must do to allow re-picking
-   *  the same file) would empty a FileList captured beforehand. */
+  /** Takes a File[]: `input.files` is live and empties when the input resets. */
   async function uploadFiles(files: File[]) {
     if (files.length === 0) return
     if (!propertyId) {

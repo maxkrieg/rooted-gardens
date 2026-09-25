@@ -245,12 +245,7 @@ export function ScheduleGrid({
     ]
   }
 
-  /**
-   * One week's slice of a route's header: the phone band's progress, crew,
-   * truck and dispatch note, per column. In select mode the summary toggles
-   * every cell of this route in this week — the common "this route, this week"
-   * batch in one click.
-   */
+  /** A route's header for one week. In select mode it toggles every cell of that route-week. */
   function renderRouteWeekCell(routeGroup: RouteGroup, rows: SchedulePropertyRow[], week: ScheduleWeek) {
     const stats = routeGroupStats(
       rows.map((row) => visitFor(row, week.weekStart)),
@@ -377,12 +372,8 @@ export function ScheduleGrid({
   return (
     <>
       <div className="rounded-xl border border-border overflow-clip bg-card shadow-warm">
-        {/* A bounded, internally-scrolling pane rather than page scroll: an
-            ancestor with overflow-x becomes a scroll container on both axes and
-            breaks a page-sticky <thead>, so this div is its own scroll container
-            and `sticky top-0` works as the ordinary case. The cap leaves room for
-            the sticky filter bar (--schedule-sticky-h) above and, while
-            selecting, the selection bar below. */}
+        {/* Its own scroll container so the <thead> can stick; the cap leaves room for the sticky
+           filter bar and the selection bar. */}
         <div
           className="overflow-auto"
           style={{
@@ -487,16 +478,12 @@ export function ScheduleGrid({
                     </td>
                     {weeks.map((week) => renderRouteWeekCell(routeGroup, rows, week))}
                   </tr>,
-                  // ~99% of accounts have exactly one property — merge the account
-                  // identity and its single site into one label cell. Only accounts
-                  // with multiple sites get a header row + railed property rows.
+                  // One-property accounts (~99%) merge account and site into one label cell.
                   ...groupRowsByAccount(orderRows(routeGroup.id, rows)).flatMap(({ account, rows: acctRows }) =>
                     renderPropertyRows(routeGroup.id, account, acctRows)
                   ),
                 ]),
-                // "Not on a route" — properties with no property_route_groups row.
-                // Rendered last, in clay, with the same inline route picker the
-                // phone has, so fixing it doesn't mean leaving the schedule.
+                // "Not on a route": last, in clay, with an inline route picker.
                 ...(structure.ungrouped.length > 0
                   ? [
                       <tr key="ungrouped-header">
@@ -601,14 +588,8 @@ export function ScheduleGrid({
 
 // ─── Label column cells ────────────────────────────────────────────────────
 //
-// Three shapes share one sticky, fixed-width column so its right edge and
-// hover highlight stay continuous no matter which shape a given row uses:
-//   - `merged`  — the ~99% case: one account with one property.
-//   - `nested`  — a property row under a multi-property account header. Only
-//                 these carry the sage rail — "a site of the account above."
-//   - the multi-property account header itself (`AccountHeaderLabelCell`).
-// No rate, matching the phone: the schedule is a dispatch screen, and pricing
-// is the accountant's question.
+// `merged` (one-property account), `nested` (under a multi-property header, sage rail), and the
+// account header share one sticky column. No rate — this is a dispatch screen.
 
 function PropertyLabelCell({
   account,
@@ -639,9 +620,7 @@ function PropertyLabelCell({
         {property.address}
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-        {/* Always counted here, unlike the phone list: this cell is the label for
-            all four week columns at once, so it can't take its cue from any one
-            week's visit. Days-since is a property fact, so it reads the same. */}
+        {/* Always counted here: this label spans all four weeks. */}
         <CadenceBadge property={property} lastVisitOn={lastVisitOn} showDays />
       </div>
     </td>
@@ -664,12 +643,7 @@ function AccountHeaderLabelCell({ account, propertyCount }: { account: Account; 
   )
 }
 
-/**
- * One property×week. Same vocabulary as the phone's stop row: a status glyph and
- * a settled-visit wash rather than a status word, crew on a muted line, the
- * invoice as a quiet label, and the crew instruction readable inline. Desktop
- * keeps what it has room for — the completed date and the photo count.
- */
+/** One property×week cell, matching the phone row, plus completed date and photo count. */
 function ScheduleCell({
   visit,
   isCreating,

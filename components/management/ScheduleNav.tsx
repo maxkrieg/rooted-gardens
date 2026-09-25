@@ -10,9 +10,7 @@ import { getWeekStart } from '@/lib/utils/schedule'
 
 interface ScheduleNavProps {
   windowStart: string // ISO date — first Monday of the 4-week window
-  /** Client state, not a router push — a navigation here is a network
-   *  round-trip, and owners page between weeks from the field. Filters are no
-   *  longer carried here; ScheduleView owns both and syncs the URL. */
+  /** Week paging as client state: a router push would be a network round-trip. */
   onWeekChange: (weekStart: string) => void
 }
 

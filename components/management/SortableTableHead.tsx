@@ -6,12 +6,7 @@ import { cn } from '@/lib/utils'
 
 export type SortDir = 'asc' | 'desc'
 
-/**
- * A clickable table-header cell that drives a `{ key, dir }` sort state — shared
- * by the Billing Queue (accounts) and Invoices (invoices) tables. Shows a neutral
- * up/down glyph until active, then the current direction; clicking cycles
- * asc→desc (the parent decides how a fresh column starts).
- */
+/** Clickable header cell driving a `{ key, dir }` sort. */
 export function SortableTableHead<K extends string>({
   label,
   sortKey,

@@ -1,21 +1,9 @@
 import { createSerwistRoute } from '@serwist/turbopack'
 
 /**
- * Serves the compiled service worker at `/serwist/sw.js`.
- *
- * Turbopack doesn't support build plugins, so Serwist compiles `app/sw.ts` with
- * esbuild inside a Route Handler instead of at bundle time. This runs at build
- * time (`dynamic: 'force-static'`), so a broken worker or a bad option fails
- * `npm run build` rather than shipping silently.
- *
- * The segment is `[path]`, not `[...path]` — esbuild is configured with flat
- * output names and the package can't resolve anything deeper than one level.
- *
- * The handler sets `Service-Worker-Allowed: /`, which is what lets
- * `ServiceWorkerRegistration` claim root scope from this non-root URL.
- *
- * Options are validated by a zod `strictObject`: an unrecognised key throws
- * `SerwistConfigError` at build. Notably there is no `swDest`.
+ * Serves the compiled worker at /serwist/sw.js. Turbopack has no build plugins, so Serwist
+ * compiles app/sw.ts here at build time; a broken worker fails the build. `[path]`, not
+ * `[...path]`. Sets `Service-Worker-Allowed: /` for root scope. Unknown options throw.
  */
 export const { dynamic, dynamicParams, revalidate, generateStaticParams, GET } =
   createSerwistRoute({

@@ -23,21 +23,14 @@ export type Lead = Tables<'leads'>
 // the routes management page and its Assign Properties sheet.
 export interface PropertyWithAccount extends Property {
   accountName: string
-  /** The route group this property currently belongs to, if any — null means
-   *  unassigned everywhere. At most one, enforced by
-   *  property_route_groups_property_idx. */
+  /** At most one route group (property_route_groups_property_idx); null = unrouted. */
   currentRouteGroup: { id: string; name: string } | null
 }
 
 // ─── Domain constants ─────────────────────────────────────────────────────────
 
-// Two billing types only. 'as_needed' was removed — it described a visit cadence,
-// not a billing arrangement, and that cadence already lives on
-// properties.frequency (which keeps its own 'as_needed' value — different concept,
-// don't conflate them). Per-visit accounts are invoiced monthly by the accountant,
-// sweeping the prior month's completed visits onto one invoice; contract accounts
-// bill a flat rate per period. The DB CHECK still permits 'as_needed' for legacy
-// rows, so code that reads billing_type keeps its defensive fallbacks.
+// 'as_needed' is retired as a billing type (it's a cadence, on properties.frequency). The DB
+// CHECK still allows it, so billing_type readers keep defensive fallbacks.
 export const BILLING_TYPES = ['per_visit', 'contract'] as const
 export type BillingType = (typeof BILLING_TYPES)[number]
 
@@ -105,9 +98,7 @@ export const PHOTO_TYPE_LABELS: Record<PhotoType, string> = {
   plan: 'Visit Plan Reference',
 }
 
-/** UI buckets for the property photo gallery. A superset of PHOTO_TYPES — the
- *  'other' bucket is the default branch so a type added to the DB CHECK ahead of
- *  the UI still renders somewhere instead of vanishing from the gallery. */
+/** Gallery buckets. 'other' catches any photo type the UI doesn't know yet. */
 const PHOTO_GROUP_KEYS = [
   'how_to',
   'customer_request',
@@ -117,9 +108,7 @@ const PHOTO_GROUP_KEYS = [
 ] as const
 export type PhotoGroupKey = (typeof PHOTO_GROUP_KEYS)[number]
 
-// `Lead`/`LEAD_*` below is the Phase 9 CRM entity (a prospect from the public
-// marketing site) — unrelated to the `'lead'` value in EMPLOYEE_ROLES above,
-// which is a crew lead's job title. The names collide; the concepts don't.
+// The CRM lead (a public-site prospect), unrelated to the 'lead' employee role.
 export const LEAD_KINDS = ['service_inquiry', 'job_application'] as const
 export type LeadKind = (typeof LEAD_KINDS)[number]
 
@@ -143,12 +132,7 @@ export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
   lost: 'Lost',
 }
 
-/** Shape of a `job_application` lead's `details` jsonb (task 9.6) —
- *  `details` itself is a totally free-form column with no DB constraint,
- *  shaped by app code only, same convention as `site_collection_items.data`
- *  (see JobItemData below). `resume_path` is null when no file was
- *  attached; when set it's a path in the private `resumes` Storage bucket,
- *  readable only by owner/lead via a signed URL. */
+/** A job_application lead's `details` jsonb. `resume_path` points into the private `resumes` bucket. */
 export type JobApplicationDetails = {
   position: string
   resume_path: string | null
@@ -156,15 +140,7 @@ export type JobApplicationDetails = {
 
 // ─── Joined / composite types ─────────────────────────────────────────────────
 
-/**
- * How far an employee actually got into the app — `employees.user_id` alone only
- * proves an invite was *sent*, since inviteEmployee links the auth user the
- * moment the email goes out. Resolved against auth.users; see
- * lib/team/app-access.ts.
- *   'none'    — never invited (no user_id)
- *   'invited' — invite sent, never signed in (link may have expired)
- *   'active'  — has signed in at least once
- */
+/** 'invited' means an invite went out but the user never signed in (user_id alone can't tell). */
 export type AppAccessStatus = 'none' | 'invited' | 'active'
 
 /** Account with its properties (alias kept for call sites that joined deeper before zones were removed). */
@@ -183,11 +159,6 @@ export type VisitCrewWithEmployee = VisitCrew & {
   employee: Employee
 }
 
-/** A lead joined to the account it became, once converted (task 9.9) — null
- *  until set. Embedded via the real FK constraint name
- *  (`leads_converted_account_id_fkey`) for clarity, even though `leads` now
- *  has only the one FK (the `assigned_to` → `employees` FK was dropped —
- *  migration 20260807090000_drop_leads_assigned_to.sql). */
 export type LeadWithConverted = Lead & {
   converted?: Pick<Account, 'id' | 'name'> | null
 }
@@ -198,9 +169,7 @@ export type VisitWithLocation = Visit & {
   account: Account
 }
 
-/** An invoice joined to its account and the visits it billed (empty for a
- *  contract invoice with no visits in the period). Backs the Billing → History
- *  tab, which renders one row per invoice with its status. See docs/INVOICING.md. */
+/** An invoice with its account and billed visits (empty for most contract invoices). */
 export type InvoiceWithVisits = Invoice & {
   account: Account
   visits: (Visit & { property: Property })[]
@@ -210,13 +179,7 @@ export type InvoiceWithVisits = Invoice & {
  *  QBO link — embedded via the visits.invoice_id FK (`invoice:invoices(...)`). */
 export type VisitInvoiceInfo = Pick<Invoice, 'status' | 'qbo_invoice_id'>
 
-/** Visit with crew assignment/completion rows and the associated employees.
- *  `invoice` is optional: only queries that embed it (schedule grid, account
- *  recent-visits) populate it; it's null for uninvoiced visits or under RLS for
- *  roles that can't read invoices.
- *  `photo_count` is likewise optional: only the schedule grid query attaches
- *  it (count of completion-log photos, i.e. `photos.type = 'visit'`, for the
- *  Photos indicator on completed cells) — undefined elsewhere. */
+/** `invoice` and `photo_count` are only populated by queries that embed them. */
 export type VisitWithCrew = Visit & {
   visit_crew: VisitCrewWithEmployee[]
   invoice?: VisitInvoiceInfo | null
@@ -231,18 +194,10 @@ export type VisitWithDetails = Visit & {
   vehicle: Vehicle | null
 }
 
-/**
- * Visit with crew and a (possibly missing) property — used by account-scoped
- * visit history views, e.g. the account detail page's Recent visits list.
- */
 export type RecentVisit = VisitWithCrew & {
   property: Property | null
 }
 
-/**
- * The top-level shape returned by getScheduleForWeek.
- * Route groups → properties → visit for the requested week.
- */
 export type SchedulePropertyRow = {
   property: Property
   account: Account
@@ -257,23 +212,13 @@ export type ScheduleWeek = {
     routeGroup: RouteGroup
     rows: SchedulePropertyRow[]
   }>
-  /**
-   * Properties with no property_route_groups row — invisible on the schedule
-   * until this bucket existed (buildScheduleWeek used to only iterate route
-   * groups, so an unrouted property, and any visit on it, was silently
-   * dropped). Always present here, even when empty, unlike route group rows
-   * which are omitted entirely when a group has none.
-   */
+  /** Properties on no route group. Always present, even when empty. */
   ungrouped: SchedulePropertyRow[]
 }
 
 // ─── Photos ───────────────────────────────────────────────────────────────────
 
-/** A photo row with its resolved signed URL. The `photos` bucket is private, so
- *  every render needs a signed URL; the account Photos tab signs them in a single
- *  batch server-side and denormalizes the result onto each row. `url` is null when
- *  signing failed (e.g. the object is missing) — render a placeholder, not a
- *  broken image. */
+/** `url` is null when signing failed; render a placeholder. */
 export type PhotoWithUrl = Photo & { url: string | null }
 
 export interface PhotoGroup {
@@ -301,10 +246,7 @@ export type AccountSearchResult = {
   addresses: string[]
 }
 
-// ─── Public marketing site content (Phase 9.2) ─────────────────────────────────
-// `site_content` slots and `site_collection_items` back the owner-editable public
-// site (app/(public)/*) — see lib/content/site.ts for the read layer and
-// lib/validators/site-content.ts for the Zod schemas these types line up with.
+// ─── Public marketing site content ─────────────────────────────────────────────
 
 export const SITE_PAGES = [
   'global',
@@ -324,14 +266,10 @@ export type SiteContentKind = (typeof SITE_CONTENT_KINDS)[number]
 export const SITE_COLLECTIONS = ['faq', 'job', 'team'] as const
 export type SiteCollection = (typeof SITE_COLLECTIONS)[number]
 
-/** A resolved content slot — `value` is already unwrapped from the DB's jsonb
- *  column and merged with lib/content/defaults.ts when no row exists yet, so
- *  callers never see a missing slot, only an empty string. For `kind:
- *  'richtext'`, `value` is always a pre-rendered, safe-to-inject HTML string
- *  (see lib/content/site.ts) — never raw Tiptap JSON. `doc` carries that raw
- *  Tiptap JSON for the editor to resume editing from; it's only present for a
- *  richtext slot backed by an actual DB row (task 9.2.5) — undefined for
- *  every other kind and for the still-default, no-row-yet case. */
+/**
+ * A resolved slot, falling back to lib/content/defaults.ts. Richtext `value` is sanitized HTML;
+ * `doc` is the raw Tiptap JSON, present only when a DB row exists.
+ */
 export type SiteSlot = {
   page: SitePage
   key: string

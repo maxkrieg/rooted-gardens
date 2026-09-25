@@ -26,15 +26,8 @@ interface ConfirmDialogProps {
 }
 
 /**
- * Destructive-action confirmation.
- *
- * Built on the Dialog primitive rather than shadcn's AlertDialog because
- * @radix-ui/react-alert-dialog isn't a dependency of this project and a delete
- * confirmation isn't worth adding one for.
- *
- * The dialog stays open while `pending` is true and is closed by the caller's
- * revalidate/redirect on success — so a failed action leaves the dialog up with the
- * error toast, rather than dismissing and looking like it worked.
+ * Destructive-action confirm (Dialog, not AlertDialog, to avoid a dependency). Stays open while
+ * `pending`; the caller closes it on success, so a failure leaves it up with the toast.
  */
 export function ConfirmDialog({
   trigger,

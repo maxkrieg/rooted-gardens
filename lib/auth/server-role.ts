@@ -4,12 +4,8 @@ import { parseRoleCookie } from '@/lib/utils/role-cookie'
 import type { EmployeeRole } from '@/types/app'
 
 /**
- * The `rg-role` cookie, read server-side, for seeding RoleProvider.
- *
- * The cookie stores `<userId>_<role>` so a stale cookie from a previously
- * signed-in user is ignored — hence the explicit `userId` compare. Writing this
- * as `parsed?.userId === user?.id` looks equivalent and is not: with no cookie
- * and no user, both sides are `undefined` and the check passes.
+ * The `rg-role` cookie (`<userId>_<role>`), a RoleProvider seed. Compare userId explicitly:
+ * `parsed?.userId === user?.id` passes when both are undefined.
  */
 export async function getSeedRole(
   userId: string | undefined | null,

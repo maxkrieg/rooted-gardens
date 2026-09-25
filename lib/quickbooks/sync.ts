@@ -6,9 +6,7 @@ import { toUserMessage } from '@/lib/errors'
 export interface SyncCustomerResult {
   error?: string
   qboCustomerId?: string
-  /** Distinguishes what actually happened, so the UI can show a message that
-   *  matches — 'recreated' in particular is a meaningful surprise (the
-   *  previous link was stale) worth calling out, not a plain success. */
+  /** What happened, so the UI can say so. 'recreated' means the old link was stale. */
   action?: 'created' | 'updated' | 'recreated'
 }
 
@@ -43,9 +41,7 @@ function isQboNotFoundError(err: unknown): boolean {
   return code === '610'
 }
 
-/** Builds QBO's BillAddr from the five local columns — omitted entirely when
- *  nothing is set, so a sparse update never clears an address on QBO's side
- *  by sending an empty object. */
+/** Omitted when empty, so a sparse update never clears QBO's address. */
 function buildBillAddr(account: AccountForSync): QboBillAddr | undefined {
   if (!account.billing_address_line1 && !account.billing_city) return undefined
   return {
@@ -74,20 +70,9 @@ async function createQboCustomer(qbo: QuickBooks, account: AccountForSync): Prom
 }
 
 /**
- * Ensures accounts.qbo_customer_id points to a real, existing QBO customer,
- * and keeps that customer's mapped fields (name, email, phone, billing
- * address) in sync with the local account row.
- *
- * null qbo_customer_id → create a new QBO customer, store the returned Id.
- * Existing → fetch it (also gets the current SyncToken QBO's optimistic-
- * concurrency model requires for updates), then push local field values via
- * updateCustomer (sparse — only sent fields change). If QBO reports "Object
- * Not Found" (the stored id is stale/deleted on QBO's side), transparently
- * create a replacement and update the stored id instead.
- *
- * Writes to accounts.qbo_customer_id go through the normal RLS client (never
- * the service client) — the accounts_update RLS policy already permits
- * owner/lead/accountant to make this write.
+ * Make accounts.qbo_customer_id point at a real QBO customer and push name/email/phone/address.
+ * Creates one if unset or stale ("Object Not Found"); otherwise sparse-updates with the
+ * SyncToken. Writes the id via the RLS client.
  */
 export async function syncCustomer(accountId: string): Promise<SyncCustomerResult> {
   const supabase = await createClient()

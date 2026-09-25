@@ -9,12 +9,7 @@ import type { JobItemData } from '@/types/app'
 
 export const generateMetadata = () => pageMetadata('jobs')
 
-/**
- * The careers page — the `job` collection rendered as cards, plus the real
- * application form (task 9.6, `id="apply"`). Each listing's "Apply" button
- * deep-links to `/jobs?position=<title>#apply`, prefilling (but not
- * locking) the form's position field.
- */
+/** Careers: job cards plus the application form. "Apply" links to `?position=<title>#apply`. */
 export default async function JobsPage({
   searchParams,
 }: {

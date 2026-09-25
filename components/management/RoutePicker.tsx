@@ -27,13 +27,7 @@ interface RoutePickerProps {
   onClear?: () => void
 }
 
-/**
- * Searchable route-group combobox — the same Popover + Command shape as the
- * account filter in ScheduleFilterBar.tsx, reused wherever a property needs
- * to be pointed at a route group (the Unrouted panel's per-slip picker and
- * its bulk selection bar). Portaling is safe here: unlike CrewMultiSelect,
- * this never renders inside a modal Sheet.
- */
+/** Searchable route-group combobox. Portaling is safe: it never renders inside a modal Sheet. */
 export function RoutePicker({
   routeGroups,
   value,

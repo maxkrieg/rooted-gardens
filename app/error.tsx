@@ -3,10 +3,7 @@
 import { useEffect } from 'react'
 import { ErrorState } from '@/components/states/ErrorState'
 
-/**
- * Catches anything thrown by a segment with no closer `error.tsx` — login, the
- * auth callback, the root redirect. The error is logged, never rendered.
- */
+/** Catch-all for segments with no closer error.tsx. Logged, never rendered. */
 export default function AppError({
   error,
   reset,

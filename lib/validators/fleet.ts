@@ -6,13 +6,7 @@ import {
   EQUIPMENT_TYPES,
 } from '@/types/app'
 
-/**
- * Zod schemas for the Fleet page forms (task 6.1 vehicles/equipment, 6.3
- * maintenance logs). Single source of truth — shared by the client forms and the
- * server actions to prevent drift, following lib/validators/account.ts:
- * strings are .trim().optional(), numeric fields stay z.number() (the form
- * converts '' → undefined on change), enums come from types/app.
- */
+/** Fleet form schemas, shared by the forms and the actions. */
 
 export const vehicleFormSchema = z.object({
   name: z.string().trim().min(1, 'Name is required'),

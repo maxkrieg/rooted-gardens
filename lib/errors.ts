@@ -1,7 +1,6 @@
 /**
- * The single boundary between machine errors and words a user reads. Maps on the
- * error *code*, not the message text — message text leaks schema details like
- * `visits_property_id_week_start_key`. The original is always logged.
+ * Maps machine errors to user-facing copy by error code (message text leaks schema details).
+ * The original is always logged.
  */
 
 /** Shape of a PostgREST / Supabase error. Not exported by supabase-js in a usable form. */
@@ -72,11 +71,7 @@ export function isNetworkError(err: unknown): boolean {
   )
 }
 
-/**
- * Turn any error into copy a user can act on; never returns the underlying
- * message. Write `fallback` per call site and make it specific — "Could not save
- * the account." beats "Something went wrong." `context` labels the server log.
- */
+/** Any error → actionable copy; never the raw message. Make `fallback` specific per call site. */
 export function toUserMessage(err: unknown, fallback: string, context?: string): string {
   if (err) console.error(context ?? '[error]', err)
 

@@ -3,11 +3,8 @@
 import { useCallback, useSyncExternalStore } from 'react'
 
 /**
- * Subscribe to a CSS media query. `useSyncExternalStore` rather than
- * useEffect+setState: the media query *is* an external store, and reading it
- * this way keeps the first client render consistent instead of flashing a
- * default and then correcting it. The server snapshot is always `false`, so
- * SSR renders the wide / full-motion / not-installed variant.
+ * Subscribe to a media query via useSyncExternalStore, so the first render doesn't flash a
+ * default. The server snapshot is always `false`.
  */
 export function useMediaQuery(query: string): boolean {
   const subscribe = useCallback(
@@ -26,10 +23,7 @@ export function useMediaQuery(query: string): boolean {
   )
 }
 
-/**
- * True when the OS asks for reduced motion. Recharts animates bars in by
- * default; every chart gates `isAnimationActive` on this.
- */
+/** OS reduced-motion preference; charts gate `isAnimationActive` on it. */
 export function usePrefersReducedMotion(): boolean {
   return useMediaQuery('(prefers-reduced-motion: reduce)')
 }
@@ -39,12 +33,7 @@ export function useIsNarrow(): boolean {
   return useMediaQuery('(max-width: 639px)')
 }
 
-/**
- * True when the app is running as an installed PWA rather than a browser tab.
- * `display-mode: standalone` covers Android/desktop; `navigator.standalone` is
- * the iOS Safari equivalent, which predates the media query and still doesn't
- * match it.
- */
+/** Running as an installed PWA. `navigator.standalone` covers iOS Safari. */
 export function useIsStandalone(): boolean {
   const displayMode = useMediaQuery('(display-mode: standalone)')
   return (

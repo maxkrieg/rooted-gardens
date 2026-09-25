@@ -1,10 +1,6 @@
 import { EmptyState } from '@/components/states/EmptyState'
 
-/**
- * An empty grid means two different things — nothing set up yet, or filters
- * matched nothing — so they get different marks and copy. The "Clear" control
- * already lives in the filter bar above, so the filtered case only explains.
- */
+/** Nothing set up vs. filtered out get different copy. "Clear" lives in the filter bar. */
 export function ScheduleEmptyState({ filtered }: { filtered?: boolean }) {
   return filtered ? (
     <EmptyState

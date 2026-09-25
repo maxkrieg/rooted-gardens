@@ -2,16 +2,8 @@ import { Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 /**
- * A checkbox that only *looks* like one.
- *
- * The shadcn `Checkbox` is a Radix Root, which renders a real `<button>`. Inside
- * a row that is itself a `<button>` — the pattern every select list here uses,
- * where the whole row is the tap target — that nests a button in a button:
- * invalid HTML, and React reports it as a hydration error.
- *
- * So where the box is decorative and the row owns the interaction, render this
- * instead. It carries no role, no tab stop, and no click handler; the row's
- * `aria-pressed` is what announces the state.
+ * A decorative checkbox for rows that are themselves buttons: a real Checkbox would nest a
+ * button in a button. The row's `aria-pressed` carries the state.
  */
 export function CheckIndicator({
   checked,

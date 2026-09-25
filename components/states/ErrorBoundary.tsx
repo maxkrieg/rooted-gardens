@@ -16,9 +16,8 @@ interface State {
 }
 
 /**
- * The outermost net. Next's `error.tsx` only covers render errors inside a route
- * segment; `/crew/*` is client-first, so an exception in a React Query consumer
- * would otherwise blank the tree. The caught error is logged, never rendered.
+ * Outermost net: error.tsx misses errors in client-first React Query consumers. Logged, never
+ * rendered.
  */
 export class ErrorBoundary extends Component<Props, State> {
   state: State = { error: null }

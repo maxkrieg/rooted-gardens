@@ -99,10 +99,7 @@ export function ScheduleListMobile({
   } = useScheduleInteractions({ selectMode, sortState, windowStart: week?.weekStart })
   const { data: weekNotes = [] } = useWeekNotes(week?.weekStart ?? '')
 
-  /**
-   * What the route group band summarises. Reads the same merged visit the rows
-   * do so the progress bar and the on-site dot can't disagree with the rows.
-   */
+  /** Band stats read the same merged visits as the rows, so they can't disagree. */
   function statsFor(rows: SchedulePropertyRow[], weekStart: string) {
     return routeGroupStats(
       rows.map((row) => row.visit ?? createdVisits.get(`${row.property.id}-${weekStart}`) ?? null),
@@ -141,20 +138,9 @@ export function ScheduleListMobile({
     })
   }
 
-  // Renders one stop button. Shared by both label shapes so the status/crew/
-  // on-site content can never drift between them:
-  //   - `merged` — the ~99% case: one account with one property. Account
-  //     name, address, and frequency/price all live in this one button.
-  //   - `nested` — a property row under a multi-property account header.
-  //     Only these carry the sage rail — it means "a site of the account
-  //     above," not "this is a property row."
-  //
-  // Status is a glyph in the left gutter plus a row-wide tint, not a badge: the
-  // row used to carry up to five pills (status, frequency, invoice, two crew
-  // chips) and the account name was truncating to make room for them. Settled
-  // visits recede behind a wash with muted text; an outstanding one keeps the
-  // plain paper surface and full-strength ink, which is what makes it the thing
-  // your eye lands on.
+  // One stop button for both shapes: `merged` (one-property account) and `nested` (under a
+  // multi-property header, with the sage rail). Status is a gutter glyph plus row tint; settled
+  // visits recede, so outstanding work stands out.
   function renderStopRow(
     account: Account,
     row: SchedulePropertyRow,
@@ -164,18 +150,10 @@ export function ScheduleListMobile({
     const isNested = variant === 'nested'
     const cellKey = `${row.property.id}-${currentWeek.weekStart}`
     const isCreating = creatingKey === cellKey
-    // Server data wins once the revalidated render lands; the local map only
-    // covers the gap between the insert and that render.
-    const base = row.visit ?? createdVisits.get(cellKey) ?? null
-    // Layer the live overlay (realtime UPDATEs + the drawer's own writes) over
-    // the server row, so status, timing, and the instruction flag all repaint
-    // without waiting on a server render.
-    const visit = base
+    // Server data wins; the local map only covers the gap after an insert.
+    const visit = row.visit ?? createdVisits.get(cellKey) ?? null
     const effectiveStartedAt = visit?.started_at ?? null
     const inProgress = visit ? isVisitInProgress(visit) : false
-    // Once a visit is completed, show who actually did the work rather than
-    // who was planned — falls back to assigned crew if no completion crew
-    // was recorded.
     const displayCrew = visit ? displayCrewFor(visit) : []
     const displayedCrew = displayCrew.slice(0, 2)
     const overflow = displayCrew.length - 2
@@ -228,9 +206,7 @@ export function ScheduleListMobile({
           <span className="text-[13px] leading-snug text-muted-foreground truncate">
             {row.property.address}
           </span>
-          {/* One meta line carries what used to be pills on the right: cadence,
-              who worked it, and where the invoice is. No rate — the schedule is
-              a dispatch screen, and pricing is the accountant's question. */}
+          {/* One meta line: cadence, crew, invoice. No rate — this is a dispatch screen. */}
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
             {/* Settled work needs no countdown — the row already carries its
                 status wash and glyph. Outstanding work is where the wait matters. */}
@@ -252,9 +228,7 @@ export function ScheduleListMobile({
               </span>
             )}
           </div>
-          {/* The spreadsheet's orange cell. It used to be a bare icon on the
-              right that said an instruction existed without showing it — on a
-              phone there's no hover to reveal it, so it reads here. */}
+          {/* The crew instruction (the sheet's orange cell), shown inline — phones have no hover. */}
           {visit?.crew_instruction && (
             <span className="mt-1 flex items-start gap-1 text-[12px] leading-snug text-[var(--clay)]">
               <FilePen className="mt-px h-3 w-3 shrink-0" aria-hidden />
@@ -263,9 +237,7 @@ export function ScheduleListMobile({
           )}
         </div>
 
-        {/* Right: the status mark, the live clock, or the schedule action —
-            never more than one. A scheduled stop renders nothing here but its
-            screen-reader label; an undecorated row IS the outstanding one. */}
+        {/* At most one of: status mark, live clock, schedule action. Scheduled shows nothing. */}
         {visit && inProgress && effectiveStartedAt ? (
           <span className="mt-0.5 flex shrink-0 items-center gap-1.5 text-[11px] font-semibold tabular-nums text-[var(--clay)]">
             <VisitStatusIcon status={visit.status} inProgress />
@@ -284,9 +256,7 @@ export function ScheduleListMobile({
     )
   }
 
-  // Multi-property account header — its own row above the nested, railed
-  // property rows. ~99% of accounts skip this entirely (see renderStopRow's
-  // `merged` variant).
+  // Multi-property account header above its nested property rows.
   function AccountHeaderRow({
     account,
     propertyCount,
@@ -318,10 +288,8 @@ export function ScheduleListMobile({
                there are no side edges to round or shadow — just hairlines. */
             className="border-y border-border bg-card"
           >
-            {/* Sticky under the compact header, whose height it reads from
-                --schedule-sticky-h. Knowing which route you're scrolling
-                through is most of what the sheet's frozen rows gave him.
-                The card can't clip its overflow or this stops sticking. */}
+            {/* Sticks under the header (height from --schedule-sticky-h). The card must not clip
+               overflow. */}
             <div className="sticky z-10" style={{ top: 'var(--schedule-sticky-h, 0px)' }}>
               <RouteGroupBand
                 name={routeGroup.name}

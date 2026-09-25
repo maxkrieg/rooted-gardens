@@ -23,10 +23,8 @@ interface CrewInstructionSheetProps {
 }
 
 /**
- * Focused editor for a visit's crew instruction (the "orange cell") — owner/lead
- * only. Cross-surface (used by VisitDetailContent on both management and crew),
- * mirrors the CrewAssignSheet/SkipSheet bottom-sheet pattern. Saves immediately
- * through the offline queue, so an owner can write one from the field.
+ * Editor for a visit's crew instruction (the orange cell), owner/lead only. Saves through the
+ * offline queue.
  */
 export function CrewInstructionSheet({
   visitId,

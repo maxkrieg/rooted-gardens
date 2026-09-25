@@ -61,13 +61,8 @@ export async function exchangeCodeForTokens(callbackUrl: string): Promise<Stored
 }
 
 /**
- * Select-then-insert-or-update against `integrations` — there's no unique
- * constraint on `service`, so no `onConflict` upsert shortcut (same
- * pre-check-then-write convention as assignProperty in
- * app/app/(padded)/routes/actions.ts). Caller supplies the Supabase
- * client: the OAuth callback passes the normal RLS client (owner-gated write,
- * defense-in-depth alongside its own explicit role check); the token-refresh
- * path below passes the service client.
+ * Select then insert/update: no unique constraint on `service` to upsert against. The caller
+ * supplies the client (RLS for OAuth callback, service for refresh).
  */
 export async function upsertIntegrationTokens(
   supabase: SupabaseClient<Database>,
@@ -103,14 +98,8 @@ interface IntegrationRow {
 }
 
 /**
- * Returns fresh tokens for `row`, refreshing against Intuit first if the
- * stored access token is expired or expiring within `REFRESH_BUFFER_MS`.
- * Persists a successful refresh via `upsertIntegrationTokens`. Shared by
- * `getQuickBooksClient` (needs a usable client) and `getQboConnectionStatus`
- * (needs to know whether the *refresh token* — not just the short-lived
- * access token — still works). Throws if Intuit rejects the refresh (e.g. the
- * refresh token itself was revoked or expired) — that's the one case that
- * actually requires the user to reconnect.
+ * Fresh tokens for `row`, refreshing if within REFRESH_BUFFER_MS of expiry. Throws only when
+ * Intuit rejects the refresh token, the one case that needs a reconnect.
  */
 async function ensureFreshTokens(
   supabase: SupabaseClient<Database>,
@@ -136,17 +125,9 @@ async function ensureFreshTokens(
 }
 
 /**
- * Connection status for the billing page's status badge — visible to every
- * role, so this goes through the service client (integrations RLS is
- * owner-only). Actually attempts a refresh when the stored access token looks
- * expired, rather than just reading the stale `token_expires_at` column: a
- * QBO access token expires every ~hour regardless of activity, so a purely
- * passive read would show "Expired" (with a "Connect QuickBooks" button)
- * after any hour of inactivity even though the long-lived refresh token is
- * still perfectly valid and the next real action would refresh it silently
- * anyway. Reporting that as "Expired" — the same label/button shown for a
- * truly broken connection — was confusing. Only a failed refresh (the
- * *refresh* token itself no longer works) is reported as 'expired' now.
+ * Connection status for the billing badge, via the service client (RLS is owner-only). Tries
+ * a refresh rather than trusting token_expires_at: access tokens expire hourly, but only a
+ * failed refresh means 'expired'.
  */
 export async function getQboConnectionStatus(): Promise<QboConnectionStatus> {
   const supabase = createServiceClient()
@@ -172,13 +153,7 @@ export async function getQboConnectionStatus(): Promise<QboConnectionStatus> {
   }
 }
 
-/**
- * Returns an authenticated node-quickbooks client, refreshing the token first
- * if it's expired or expiring within the next 5 minutes. Uses the service
- * client throughout so it works under any calling role (an
- * accountant-triggered sync must still be able to read the tokens, which the
- * owner-only integrations RLS would otherwise block).
- */
+/** Authenticated node-quickbooks client, via the service client so any role can sync. */
 export async function getQuickBooksClient(): Promise<QuickBooks> {
   const supabase = createServiceClient()
   const { data: row, error } = await supabase
@@ -212,12 +187,7 @@ export async function getQuickBooksClient(): Promise<QuickBooks> {
   )
 }
 
-/**
- * Wraps a node-quickbooks callback-style method as a Promise — node-quickbooks
- * predates promises entirely (every method takes a final `(err, result) => void`
- * callback). Shared adapter reused by lib/quickbooks/sync.ts and, later,
- * invoice push (5.4), instead of each call site hand-rolling its own.
- */
+/** Promisifies a node-quickbooks callback method. */
 export function qboPromise<T>(
   fn: (callback: (err: unknown, result: T) => void) => void,
 ): Promise<T> {

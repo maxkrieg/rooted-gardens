@@ -3,11 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { REPORTS_MIN_YEAR } from '@/lib/utils/reports'
 
-/**
- * The reports page's single filter row. Plain `<Link>`s, so this stays a
- * server component (same trick as the billing tab strip). It sits above every
- * chart and scopes all of them — never one filter per card.
- */
+/** The reports year filter. Plain Links, so it stays a server component. */
 export function ReportsYearNav({ year }: { year: number }) {
   const currentYear = new Date().getFullYear()
   const canGoBack = year > REPORTS_MIN_YEAR

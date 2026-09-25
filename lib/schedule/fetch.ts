@@ -9,11 +9,7 @@ import type {
   VisitWithCrew,
 } from '@/types/app'
 
-/**
- * Route groups, assignments, and properties — everything the schedule needs that
- * does NOT vary by week. The RSC version refetched all of this per week, so a
- * 4-week load pulled the whole property+account set eight times.
- */
+/** Everything the schedule needs that doesn't vary by week, fetched once. */
 export type ScheduleReference = {
   routeGroups: RouteGroup[]
   assignments: ScheduleAssignment[]
@@ -74,12 +70,7 @@ export async function fetchWeekNotes(weekStartISO: string): Promise<RouteGroupWe
   return (data ?? []) as RouteGroupWeekNote[]
 }
 
-/**
- * One week's visits. `withInvoices` adds the billing embed; it's on for every
- * role because `invoices` grants SELECT to `authenticated` and RLS filters by
- * role, so crew get an empty embed rather than the error this comment used to
- * claim. That false premise is what kept a second crew-only hook alive.
- */
+/** One week's visits. `withInvoices` is safe for every role: RLS gives crew an empty embed. */
 export async function fetchWeekVisits(
   weekStartISO: string,
   { withInvoices = false }: { withInvoices?: boolean } = {},

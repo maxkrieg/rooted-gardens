@@ -60,9 +60,7 @@ export function RouteGroupCard({
   // Index of the property picked up and waiting for a destination.
   const [lifted, setLifted] = useState<number | null>(null)
   const reorder = useReorderRouteProperties()
-  // Own busy flag, not a transition's pending: a shared pending flag disabled
-  // every control on the card and could stay stuck true (see commit f4e09e3,
-  // which fixed the same shape in the assignment sheets).
+  // Own busy flag: a shared transition pending flag could stick and disable the whole card.
   const [busy, setBusy] = useState(false)
   const refreshRoutes = useRefreshRoutes()
 
@@ -111,8 +109,7 @@ export function RouteGroupCard({
         setConfirmDelete(false)
         return
       }
-      // Refreshing the cache is what removes this card now — revalidatePath only
-      // refreshes an RSC shell that no longer holds the list.
+      // The cache refresh removes the card; revalidatePath can't reach this client-first page.
       refreshRoutes()
     } catch (err) {
       toast.error('Could not delete route group', {
@@ -144,9 +141,7 @@ export function RouteGroupCard({
           <div className="flex shrink-0 items-center gap-0.5">
           <RouteGroupSheet routeGroup={routeGroup} />
 
-          {/* One overflow instead of five targets crowding a truncating
-              title: reorder, rename, defaults and delete are all occasional,
-              and the title is what has to stay readable on a phone. */}
+          {/* One overflow menu so the title stays readable on a phone. */}
           <Popover open={menuOpen} onOpenChange={setMenuOpen}>
             <PopoverTrigger asChild>
               <Button
@@ -287,12 +282,8 @@ export function RouteGroupCard({
                       </div>
                     </div>
 
-                    {/* Tap to lift, tap a gap to place. Chevrons cost one tap per
-                        position — moving a stop three places was three precise
-                        taps on a 20px target — and this is two taps at any
-                        distance. Still not drag: the repo has no gesture
-                        infrastructure, and a drag inside a scrolling page is the
-                        case that actually needs it. */}
+                    {/* Tap to lift, tap a gap to place: two taps at any distance, no drag
+                       infrastructure needed. */}
                     {assignedProperties.length > 1 && (
                       <button
                         type="button"
@@ -353,15 +344,8 @@ export function RouteGroupCard({
 }
 
 /**
- * A tappable landing strip between two rows, shown only while something is
- * lifted.
- *
- * Carries an explicit "Move here" pill rather than just a rule. A dashed line on
- * its own reads as a divider — the first version used `border-primary/40`, which
- * on warm paper is a grey hairline indistinguishable from the row separators,
- * and it was reported as "not showing" even though it was rendering.
- *
- * 36px tall and full width: you tap roughly between two rows, no aiming.
+ * A tap target between rows while something is lifted. The explicit pill matters: a bare
+ * dashed line read as a row divider.
  */
 function DropGap({
   show,
@@ -462,22 +446,8 @@ function RouteDefaultsSummary({
 }
 
 /**
- * Move one property up or down within its route — the route's drive order.
- *
- * `property_route_groups.sort_order` has existed all along, is already fetched,
- * and `buildScheduleWeek` already sorts by it. It was simply always written as
- * `0`, so every route rendered in whatever order Postgres returned. This writes
- * a real value, which is what makes the crew's stop list match the order they
- * actually drive — the thing the spreadsheet's row order has always meant.
- *
- * The batch owns its own optimistic state and each write runs `silent`. Letting
- * the per-row mutation patch and invalidate made a single move visibly bounce:
- * the row jumped, a mid-flight refetch returned the pre-move order, then the
- * next write moved it again.
- *
- * Only rows whose position actually changes are written. On a route that has
- * never been ordered every `sort_order` is 0, so the first move renumbers the
- * whole group once and every move after it touches two rows.
+ * Reorder a property within its route (sort_order = drive order). The batch owns its optimistic
+ * state and writes `silent`, or a mid-flight refetch bounces the row. Only moved rows are written.
  */
 function useReorderRouteProperties() {
   const assign = useAssignPropertyRoute()
@@ -547,14 +517,8 @@ function useReorderRouteProperties() {
 }
 
 /**
- * Move the item at `from` into the gap at `gap`, where gap `g` means "before the
- * item currently at index `g`" — so gaps run 0…length inclusive.
- *
- * The index shifts once the item is lifted out, which is the whole subtlety: a
- * gap *after* the original position is one lower by the time we insert.
- *
- * Returns the same array reference for a no-op (the gaps either side of the
- * item), so callers can skip the write with an identity check.
+ * Move the item at `from` into gap `gap` (before the item at that index; 0…length). Returns the
+ * same array for a no-op.
  */
 function moveToGap<T>(items: T[], from: number, gap: number): T[] {
   if (gap === from || gap === from + 1) return items

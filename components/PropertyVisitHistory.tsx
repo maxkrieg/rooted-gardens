@@ -9,16 +9,7 @@ import { SERVICE_TYPE_LABELS } from '@/types/app'
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 
-/**
- * Secondary "what's happened at this property before" section for a visit's
- * detail view. Shared by the management VisitDetailSheet and the crew stop
- * page — deliberately cross-surface, so it lives at the components/ root
- * rather than under management/ or crew/ (mirroring the existing precedent of
- * the crew stop row importing VisitStatusBadge from management/badges).
- *
- * Collapsed by default and renders nothing when there's no history — this is
- * meant to stay quiet and secondary, never a dense table.
- */
+/** Past visits at this property, for the visit detail view. Collapsed, and silent when empty. */
 export function PropertyVisitHistory({
   propertyId,
   beforeWeekStart,
@@ -102,11 +93,6 @@ export function PropertyVisitHistory({
   )
 }
 
-/**
- * A small projection of `visits` used only by the Visit History section — kept
- * colocated here rather than in `types/app.ts`, matching how `useStopDetail`
- * defines `StopDetail` locally.
- */
 type PropertyVisitHistoryRow = {
   id: string
   status: string
@@ -124,16 +110,7 @@ type PropertyVisitHistoryResult = {
 
 const PAGE_SIZE = 5
 
-/**
- * Past visits at a property, for the "Visit History" section on a visit's detail
- * view (management Sheet + crew stop page). Filters strictly BEFORE the current
- * visit's week — not just by excluding its id — so a visit being viewed ahead of
- * schedule never shows other future-scheduled visits at the same property as
- * "history." Because visits has a UNIQUE(property_id, week_start) index, ordering
- * by week_start alone is deterministic (no duplicate-week ties to break). Only
- * completed/skipped visits count as history — scheduled ones (e.g. a property
- * whose next visit already exists but hasn't happened) aren't real history yet.
- */
+/** Completed/skipped visits strictly before the current visit's week, newest first. */
 function usePropertyVisitHistory(
   propertyId: string | undefined,
   beforeWeekStart: string | undefined

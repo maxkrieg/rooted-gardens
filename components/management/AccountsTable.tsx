@@ -295,11 +295,7 @@ function AccountCard({ account }: { account: AccountListRow }) {
   )
 }
 
-/**
- * Client-first accounts list, so the "who is this customer, what's their number"
- * lookup works in the field. AccountsTable already owns its own filtering, so it
- * takes the same prop it always did.
- */
+/** Client-first accounts list, readable from cache in the field. */
 export function AccountsView() {
   const hydrated = useIsHydrated()
   const { accounts, isLoading, isError, isStale, hasData } = useAccountsList()

@@ -1,21 +1,12 @@
 /**
- * How the schedule orders stops within a route group.
- *
- * 'route' is property_route_groups.sort_order — the sequence the crew physically
- * drive, and the default for exactly that reason. 'priority' is a view over the
- * same rows that floats the longest-waiting properties to the top; it writes
- * nothing, and the owner flips back before dispatch.
+ * Stop order within a route group: 'route' is sort_order, the drive order (the default);
+ * 'priority' floats the longest-waiting first and writes nothing.
  */
 export type ScheduleSortMode = 'route' | 'priority'
 
 /**
- * One schedule-wide default plus per-group overrides.
- *
- * Two levels because the two questions are different: "show me everything by
- * how late it is" is a planning sweep, while "this one route has drifted" is
- * about a single band. Changing the schedule-wide setting CLEARS the overrides —
- * a control labelled as applying to every route has to actually apply to every
- * route, or it silently does nothing on the group you were just looking at.
+ * A schedule-wide default plus per-group overrides. Changing the default clears the overrides,
+ * so "all routes" really applies to all.
  */
 export type ScheduleSortState = {
   all: ScheduleSortMode
@@ -43,11 +34,7 @@ export function setAllSortMode(mode: ScheduleSortMode): ScheduleSortState {
   return { all: mode, byGroup: {} }
 }
 
-/**
- * Override one group. An override equal to the schedule-wide mode is deleted
- * rather than stored, so state that reads as "default" is stored as default —
- * otherwise a later change to `all` would silently skip that group.
- */
+/** Override one group. An override matching the default is deleted, not stored. */
 export function setGroupSortMode(
   state: ScheduleSortState,
   groupKey: string,

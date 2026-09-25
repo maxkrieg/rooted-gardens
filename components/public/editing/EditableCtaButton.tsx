@@ -7,13 +7,8 @@ import { EditableText } from './EditableText'
 import { useEditMode } from './EditModeProvider'
 
 /**
- * A CTA button whose *label* is an editable `site_content` slot (task
- * 9.2.5) — e.g. `home.cta_label`. Nesting `EditableText`'s click-to-edit
- * affordance directly inside a `<Link>`/`<Button>` would put one
- * interactive element inside another (and clicking to edit would also
- * navigate away), so this instead shows a non-interactive preview of the
- * real button plus a separate, genuinely clickable text field beneath it —
- * only while editing. Not editing (the common case): just the real button.
+ * CTA whose label is an editable slot. In edit mode: a preview button plus a separate text
+ * field, since click-to-edit inside a Link would navigate away.
  */
 export function EditableCtaButton({
   page,

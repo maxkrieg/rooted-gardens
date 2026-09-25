@@ -10,9 +10,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useEditMode } from './editing/EditModeProvider'
 
-/** The "Edit" / "Editing" toggle — only ever rendered for a signed-in owner
- *  (task 9.2.5). Shared between the desktop bar and the mobile drawer so the
- *  two don't drift in styling. */
+/** The owner's Edit toggle, shared by the desktop bar and the mobile drawer. */
 function EditToggle({ className }: { className?: string }) {
   const { canEdit, editing, setEditing } = useEditMode()
   if (!canEdit) return null
@@ -35,11 +33,7 @@ function EditToggle({ className }: { className?: string }) {
   )
 }
 
-/**
- * Sticky top nav for the public marketing site (`app/(public)/*`). Mirrors the
- * active-link and mobile-drawer idiom of `components/app/AppShell.tsx`,
- * but there's no role gating — every link here is reachable signed-out.
- */
+/** Sticky top nav for the public site. No role gating. */
 export function PublicHeader({ staffHome }: { staffHome: string | null }) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)

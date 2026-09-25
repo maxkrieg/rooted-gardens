@@ -6,11 +6,8 @@ import type { Employee, AppAccessStatus } from '@/types/app'
 import { createServiceClient } from '@/lib/supabase/service'
 
 /**
- * Team management page (task 7.1). Owner-only — the proxy gates /management/team
- * to owner, and this re-checks as defense-in-depth (Server Components aren't
- * covered by RLS the way writes are, and the employees SELECT policy also allows
- * lead/accountant to read). Server Component: fetches the roster and hands it to
- * the interactive TeamView.
+ * Team page, owner-only. Rechecked here since the employees SELECT policy also allows lead
+ * and accountant.
  */
 export default async function TeamPage() {
   const supabase = await createClient()
@@ -50,17 +47,8 @@ export default async function TeamPage() {
 }
 
 /**
- * Resolve real app-access state for the Team page.
- *
- * `employees.user_id` is set by inviteEmployee the instant the invite email is
- * sent, so on its own it means "was invited", not "can get in" — an employee
- * whose invite link expired unclicked looks identical to one using the app
- * daily. The truth lives in auth.users, which only the admin API can read, so
- * this runs on the service client. Server-only: never import from a Client
- * Component.
- *
- * Degrades to `'active'` for any linked employee if the admin call fails — a
- * wrong-but-familiar label beats an error page on the roster.
+ * Real app-access state from auth.users (user_id only proves an invite was sent). Uses the
+ * service client; falls back to 'active' if the admin call fails.
  */
 async function getAppAccessStatuses(
   employees: Employee[],
@@ -87,12 +75,7 @@ async function getAppAccessStatuses(
   return statuses
 }
 
-/**
- * IDs of auth users who have signed in at least once. Paged rather than a single
- * large call — a silent truncation would mislabel someone as never-signed-in,
- * which is the exact bug this is meant to fix. At ~20 employees this is one
- * request; the cap is a runaway guard, not a real limit.
- */
+/** Auth user ids that have signed in. Paged so a truncated list can't mislabel anyone. */
 async function fetchSignedInUserIds(): Promise<Set<string>> {
   const service = createServiceClient()
   const perPage = 200

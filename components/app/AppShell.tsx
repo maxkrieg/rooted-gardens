@@ -38,13 +38,7 @@ function badgeToneClass(href: string): string {
   return href === '/app/routes' ? 'bg-[var(--clay)] text-white' : 'bg-primary text-primary-foreground'
 }
 
-/**
- * The one shell for every signed-in surface, replacing CrewShell,
- * ManagementShell, and ManagementNav.
- *
- * `initialRole` is the httpOnly `rg-role` cookie read server-side — see
- * RoleProvider for why it's a seed rather than the truth.
- */
+/** The one shell for every signed-in surface. `initialRole` is the `rg-role` cookie, a seed only. */
 export function AppShell({
   initialRole,
   userId,
@@ -115,7 +109,7 @@ function AppShellInner({
     return () => document.removeEventListener('keydown', handler)
   }, [canSearch])
 
-  // New-lead toast (task 9.7, in-app half only). Invalidates the count rather
+  // New-lead toast. Invalidates the count rather
   // than tracking a delta, so it stays correct when another owner triages.
   useEffect(() => {
     if (!can.seeLeads) return
@@ -154,10 +148,8 @@ function AppShellInner({
   async function handleSignOut() {
     const supabase = createClient()
     await supabase.auth.signOut()
-    // Wipe the cache before leaving, in that order: `current-employee` is
-    // persisted to IndexedDB, so leaving it behind hands the next person to
-    // sign in on this phone the previous person's role and cached accounts.
-    // The offline mutation queue lives in a different store and is untouched.
+    // Clear the persisted cache first, or the next person on this phone inherits the role and data.
+    // The offline mutation queue is a separate store and survives.
     queryClient.clear()
     await clearPersistedQueryCache()
     // replace, not push — Back after signing out shouldn't re-enter the
@@ -230,12 +222,8 @@ function AppShellInner({
         {children}
       </main>
 
-      {/* Bottom bar — phone only; desktop uses the sidebar above. Hidden while
-          a keyboard is up: under 'resizes-content' it would otherwise ride on
-          top of the keyboard, covering its top row. `main`'s bottom padding
-          deliberately does NOT collapse with it — reclaiming that space
-          mid-focus would shift the scroll position out from under the field
-          the browser just scrolled into view. */}
+      {/* Phone-only bottom bar, hidden while the keyboard is up. `main`'s padding stays, so the
+         focused field doesn't shift. */}
       <nav
         className={cn(
           'lg:hidden fixed bottom-0 inset-x-0 z-50 bg-card border-t border-border',
@@ -379,11 +367,7 @@ function SidebarLinks({
   )
 }
 
-/**
- * The crew member's own employee record couldn't load. This used to fail
- * silently while degrading realtime sync, "My stops", History, and Profile all at
- * once. Only shown with no cached employee — a cached one still works offline.
- */
+/** Shown when the user's own employee record fails to load and none is cached. */
 function SessionNotice() {
   return (
     <div

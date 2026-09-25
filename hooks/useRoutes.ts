@@ -25,12 +25,7 @@ export function useRoutesData() {
   }
 }
 
-/**
- * Refresh after a route write. The actions' revalidatePath only refreshes an RSC
- * shell that no longer holds data — and route membership changes what the
- * schedule renders (its ungrouped bucket, and which group a row falls under),
- * so the schedule's reference data has to go too.
- */
+/** Refresh after a route write, including schedule-reference: membership changes the schedule. */
 export function useRefreshRoutes() {
   const queryClient = useQueryClient()
 

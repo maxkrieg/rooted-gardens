@@ -20,10 +20,10 @@ interface QuickBooksConnectProps {
   feedback?: { qbo: string; reason?: string }
 }
 
-/** Connection status + "Connect QuickBooks" trigger for the billing page.
- *  The button is a plain anchor (not a Link or Server Action) — it's a full
- *  top-level navigation to a Route Handler that immediately redirects to
- *  Intuit, not client-side routing. */
+/**
+ * QBO connection status and connect button. A plain anchor: it's a full navigation to a Route
+ * Handler that redirects to Intuit.
+ */
 export function QuickBooksConnect({ status, canManage, feedback }: QuickBooksConnectProps) {
   useEffect(() => {
     if (!feedback) return

@@ -14,17 +14,11 @@ import type { Account, RecentVisit, VisitWithCrew } from '@/types/app'
 interface RecentVisitsListProps {
   visits: RecentVisit[]
   account: Account
-  /** The visits query failed. Without this, an outage renders "No visits yet" on
-   *  an account that may have plenty (task 8.5). */
+  /** The visits query failed, so don't claim "No visits yet". */
   loadError?: boolean
 }
 
-/**
- * The account detail page's "Recent visits" list — same rendering as before, but
- * each row now opens the same VisitDetailSheet used by the schedule grid. Owns the
- * sheet's open/row state itself (mirroring ScheduleGrid/ScheduleListMobile), since
- * the sheet is a client-only concern the server-rendered account page can't hold.
- */
+/** Recent visits on the account page; each row opens the shared VisitDetailSheet. */
 export function RecentVisitsList({ visits, account, loadError }: RecentVisitsListProps) {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sheetVisit, setSheetVisit] = useState<RecentVisit | null>(null)

@@ -12,14 +12,7 @@ import { SlotList } from '@/components/public/SlotList'
 
 export const generateMetadata = () => pageMetadata('about')
 
-/**
- * About page (task 9.4) — the 9.2 shell had just heading/intro/team grid;
- * this adds the "how a project starts" process steps (SlotList, numbered)
- * and the empty state the team grid was missing at 9.2 (the `team`
- * collection ships with real bios as of the 9.4 seed migration, but a
- * signed-out visitor should never see a blank hole if it's ever emptied out
- * again through the editor).
- */
+/** About: intro, process steps, and a team grid with an empty state. */
 export default async function AboutPage() {
   const [content, team] = await Promise.all([
     getPageContent('about'),

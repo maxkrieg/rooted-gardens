@@ -15,19 +15,9 @@ interface DeepLinkedVisitSheetProps {
 }
 
 /**
- * Opens a visit's detail sheet on arrival from a `?visit=<id>` deep link (the
- * crew stop page's "Manager view" button).
- *
- * Owned here rather than by the grid or the phone list because **both of those
- * are always mounted** — `hidden lg:block` / `lg:hidden` only hides their
- * containers, and a Sheet portals to `document.body` regardless. Letting each
- * one honor the deep link opened two identical sheets stacked on top of each
- * other, with the two overlays compounding into a near-black scrim.
- *
- * Resolves once, on the first render where the visit is actually findable, then
- * latches. It used to resolve at mount, which stopped working when the schedule
- * became client-fetched and `weeks` arrived empty on the first render. The latch
- * is what keeps a later `weeks` change from reopening a sheet the user closed.
+ * Opens the sheet for a `?visit=` deep link. Lives here because the grid and phone list are
+ * both always mounted (CSS-hidden), and each opening it stacked two sheets. Latches on the first
+ * render where the visit is found, so closing it sticks.
  */
 export function DeepLinkedVisitSheet({ weeks, visitId }: DeepLinkedVisitSheetProps) {
   // Derived, not latched at mount: `weeks` is empty on the first render now that

@@ -10,13 +10,8 @@ const MODE_META: Record<ScheduleSortMode, { label: string; Icon: typeof Route }>
 }
 
 /**
- * The sort switch, used unchanged at the top of the schedule and on every route
- * group band. One component so the two levels read identically — a control that
- * looked different per level would imply it did something different.
- *
- * Both states are named and iconed rather than showing only the non-default:
- * each band has its own value now, so "what is this one doing" has to be
- * answerable without comparing it to anything else.
+ * The sort switch, shared by the schedule header and every route band so both read the same.
+ * Both states are labelled, since each band has its own value.
  */
 export function ScheduleSortToggle({
   mode,
@@ -50,10 +45,7 @@ export function ScheduleSortToggle({
       className={cn(
         'inline-flex shrink-0 items-center gap-1.5 rounded-full font-medium transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        // The compact chip is a deliberate opt-out from the 44px floor: one per
-        // route band, a full-size target would add ~20px of chrome per group to
-        // the phone schedule. 32px matches the band's other controls and stays
-        // clear of the ⋯ above it, which extending the hit area would overlap.
+        // Deliberately under the 44px floor: a full-size chip would add ~20px per route band.
         compact ? 'h-8 px-2.5 text-[11px]' : 'h-9 px-3 text-xs',
         // Primary, not clay: clay is the on-site pulse, and the band it sits on
         // can be showing one. Green here reads as "this control is engaged".

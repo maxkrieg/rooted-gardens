@@ -8,16 +8,7 @@ import { jobApplicationFormSchema } from '@/lib/validators/lead'
 import { resumePath, validateResumeFile } from '@/lib/utils/resumes'
 import type { JobApplicationDetails } from '@/types/app'
 
-/**
- * Public, unauthenticated Server Action backing JobApplicationForm (task
- * 9.6) — the second, and last for this phase, consumer of the spam-
- * protected public-lead pattern app/(public)/contact/actions.ts (9.5)
- * established. Same shape as `submitInquiry`, but takes `FormData` rather
- * than a typed object: FormData is the well-supported way to carry an
- * optional binary `File` (the resume) alongside the text fields through a
- * Server Action, which `submitInquiry`'s all-string/number payload never
- * needed.
- */
+/** Public job application. Takes FormData to carry the optional resume File. */
 export async function submitJobApplication(formData: FormData): Promise<{ error?: string }> {
   const parsed = jobApplicationFormSchema.safeParse({
     name: formData.get('name'),
@@ -32,9 +23,7 @@ export async function submitJobApplication(formData: FormData): Promise<{ error?
     return { error: parsed.error.issues[0]?.message ?? 'Please check the form and try again.' }
   }
 
-  // Honeypot / too-fast bot signals: pretend success without writing a row
-  // or uploading anything. Telling a bot it was caught just teaches it to
-  // adapt; a silent no-op costs it nothing to learn from.
+  // Bot signals: pretend success and write nothing.
   const spamSignal = checkLeadSpamSignals({
     website: parsed.data.website,
     elapsedMs: parsed.data.elapsedMs,
@@ -53,14 +42,8 @@ export async function submitJobApplication(formData: FormData): Promise<{ error?
     }
   }
 
-  // Resume upload, if attached — runs server-side via the service-role
-  // client, never a direct browser-to-Storage write. There's no `anon`
-  // Storage policy on the `resumes` bucket at all (migration
-  // 20260806130000): a public applicant has no session to scope one by, so
-  // an anon INSERT policy could only constrain bucket_id, letting anyone
-  // upload directly via the Storage REST API and bypass the honeypot/rate-
-  // limit above entirely. Routing it through this action keeps the resume
-  // upload gated by the same spam checks as the rest of the application.
+  // Resume uploads go through here, never browser-to-Storage: `resumes` has no anon policy, so
+  // uploads stay behind the spam checks.
   let uploadedPath: string | null = null
   const resumeEntry = formData.get('resume')
   const resumeFile = resumeEntry instanceof File && resumeEntry.size > 0 ? resumeEntry : null
@@ -88,9 +71,7 @@ export async function submitJobApplication(formData: FormData): Promise<{ error?
   }
 
   const supabase = createPublicClient()
-  // No `.select()` chained — same 9.1 carry-forward as submitInquiry:
-  // `anon` has INSERT but no SELECT on `leads`, so `RETURNING` fails RLS
-  // even from an INSERT.
+  // No `.select()`: anon can't SELECT leads, so RETURNING fails RLS.
   const { error } = await supabase.from('leads').insert({
     kind: 'job_application',
     name: parsed.data.name,
@@ -101,9 +82,7 @@ export async function submitJobApplication(formData: FormData): Promise<{ error?
   })
 
   if (error) {
-    // The blob landed but the row didn't — clean it up so we don't leave an
-    // object nothing references (mirrors PhotoUploadDropzone's cleanup).
-    // Service-role client, so this doesn't depend on any Storage policy.
+    // The row failed after the upload; remove the orphaned object.
     if (uploadedPath) {
       await createServiceClient().storage.from('resumes').remove([uploadedPath])
     }

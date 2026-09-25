@@ -49,11 +49,7 @@ interface AccountDetailViewProps {
   initialView: AccountView
 }
 
-/**
- * Client-first account detail — the "standing in the driveway" lookup, so it has
- * to render from cache. Tabs are client state rather than `?view=` links, which
- * were an RSC round-trip per switch.
- */
+/** Client-first account detail that renders from cache. Tabs are client state. */
 export function AccountDetailView({ accountId, initialView }: AccountDetailViewProps) {
   const { archive: canArchive } = useCan()
   const hydrated = useIsHydrated()
@@ -260,11 +256,8 @@ function DetailsTab({ detail }: { detail: AccountDetail }) {
                       </div>
                     </div>
 
-                    {/* Unrouted means this property is skipped on the schedule
-                        entirely, so it gets the clay "needs attention" treatment.
-                        The picker is inline: this used to link to /app/routes
-                        carrying no property context, so you arrived at a list of
-                        every route with no memory of what you came to route. */}
+                    {/* Unrouted properties are skipped by the schedule, so: clay treatment plus an
+                       inline picker. */}
                     <CadenceSummary
                       property={property}
                       lastVisitOn={lastVisitByProperty?.[property.id] ?? null}
@@ -371,17 +364,12 @@ function AccountDetailSkeleton() {
 type CacheablePhoto = { storage_path: string; type: string | null }
 
 /**
- * Object URLs for photos whose bytes are cached on the device, plus a warm pass
- * that caches new ones while a signed URL is available.
- *
- * Signed URLs win when present — they cost nothing and avoid holding blobs in
- * memory. These are the fallback that makes a gate-code photo readable offline.
+ * Object URLs for photos cached on the device, used when no signed URL is available — so a
+ * gate-code photo stays readable offline. Also caches new photos while online.
  */
 function useCachedPhotoUrls(
   photos: CacheablePhoto[],
-  // Pass React Query's `data` straight through, undefined and all: its identity
-  // is stable between renders, whereas a `?? {}` default at the call site would
-  // be a fresh object every render and re-run the warm pass forever.
+  // Pass `data` through as-is: a `?? {}` here would be a new object each render and loop.
   signedUrls: Record<string, string> | undefined,
 ): Record<string, string> {
   const [objectUrls, setObjectUrls] = useState<Record<string, string>>({})

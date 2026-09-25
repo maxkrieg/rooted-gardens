@@ -3,14 +3,7 @@
 import { EditableText } from '@/components/public/editing/EditableText'
 import { useEditMode } from '@/components/public/editing/EditModeProvider'
 
-/**
- * The footer's credentials line ("Fully Insured · Equal Opportunity
- * Employer · ...") — a single `site_content` string split into pill badges
- * for display, but edited as one plain text field (task 9.2.5). A separate
- * small client component because the display/edit split needs
- * `useEditMode()`, which the (async, server-only) PublicFooter can't call
- * itself.
- */
+/** Footer credentials: one slot shown as pills, edited as plain text. */
 export function CredentialsLine({ value }: { value: string }) {
   const { canEdit, editing } = useEditMode()
 

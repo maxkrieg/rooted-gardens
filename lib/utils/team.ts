@@ -1,5 +1,3 @@
-// Display labels for the Team page (task 7.1), mirroring lib/utils/fleet.ts.
-
 export const EMPLOYEE_ROLE_LABELS: Record<string, string> = {
   owner: 'Owner',
   lead: 'Lead',

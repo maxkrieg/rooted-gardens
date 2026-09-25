@@ -1,11 +1,6 @@
 /**
- * The fixed public marketing route set (task 9.2). Owners can edit every
- * page's *content* (site_content / site_collection_items) but not add new
- * pages or nav items — the route list itself is code, not data.
- *
- * Deliberately isomorphic: no React, no `next/headers`, no Supabase import.
- * `proxy.ts` imports PUBLIC_ROUTES directly (Edge runtime), and
- * PublicHeader/PublicFooter import PUBLIC_NAV client-side.
+ * The fixed public route set: owners edit content, not pages. Isomorphic, since proxy.ts
+ * (Edge) imports it.
  */
 
 export const PUBLIC_ROUTES = [

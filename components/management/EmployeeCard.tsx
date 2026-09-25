@@ -40,9 +40,7 @@ export function EmployeeCard({
   const [editOpen, setEditOpen] = useState(false)
   const [invitePending, startInvite] = useTransition()
   const [smsPending, startSms] = useTransition()
-  // Plain state, not useTransition: resending writes nothing, so there is no
-  // revalidate to wait on, and the button should free up the moment the email is
-  // away.
+  // Plain state: resending writes nothing, so there's no revalidate to wait on.
   const [resending, setResending] = useState(false)
 
   // 'invited' still counts as linked — the auth user exists, so the recoverable

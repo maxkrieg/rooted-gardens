@@ -30,12 +30,8 @@ interface GenerateWeekSheetProps {
 }
 
 /**
- * The preview between "generate this week" and anything being written.
- *
- * This is the whole safety story for R3.5: the owner confirms a *number* and can
- * untick any row, so a rule that misjudges a property costs one tap rather than
- * sixty stray visits. The skipped list is shown too, with its reason — a
- * property missing from a generated week is the failure he'd notice last.
+ * Preview before anything is written: the owner confirms a count and can untick any row.
+ * Skipped properties are listed with a reason, since a missing one is easy to overlook.
  */
 export function GenerateWeekSheet({
   open,

@@ -4,13 +4,7 @@ import { LeadsInbox } from '@/components/management/LeadsInbox'
 import { ErrorState } from '@/components/states/ErrorState'
 import type { LeadWithConverted } from '@/types/app'
 
-/**
- * Leads inbox (task 9.8). Owner/lead only — the proxy gates /management/leads
- * to owner/lead (matching leads RLS exactly), and this re-checks as
- * defense-in-depth, the same posture as app/management/team/page.tsx.
- * Server Component: fetches leads (joined to the account each converted
- * into, if any) and hands them to the interactive LeadsInbox.
- */
+/** Leads inbox, owner/lead only (rechecked here, matching the proxy and RLS). */
 export default async function LeadsPage({
   searchParams,
 }: {

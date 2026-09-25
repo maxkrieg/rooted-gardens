@@ -23,13 +23,8 @@ const requireManagingEmployee = () =>
 // ─── Property photos ──────────────────────────────────────────────────────────
 
 /**
- * Record a property-level photo that has ALREADY been uploaded to storage.
- *
- * The image bytes deliberately do not pass through this action: Server Action
- * bodies are capped (1 MB by default in Next, and lower still by the serverless
- * request limit in production), while photos run up to 20 MB. The client uploads
- * straight to Supabase Storage with its own session — gated by the bucket's
- * INSERT policy — and then calls this to write the row.
+ * Record a property photo already uploaded to Storage by the client (Server Action bodies are
+ * capped far below 20MB).
  */
 export async function createPropertyPhoto(
   accountId: string,
@@ -100,16 +95,8 @@ export async function updatePropertyPhoto(
 }
 
 /**
- * Delete a photo — both the storage object and the row.
- *
- * Takes only the photo id: the storage path is re-read from the row server-side
- * rather than trusted from the caller, since a client-supplied path would let
- * any owner/lead delete an arbitrary object anywhere in the bucket.
- *
- * If the storage remove fails we still delete the row — an orphaned blob is a
- * bit of wasted space, while an orphaned row renders as a permanently broken
- * photo. The reverse (row-only delete) is the bug `useDeleteVisitPlanPhoto`
- * calls out.
+ * Delete a photo's object and row. The path is re-read server-side, never trusted. The row is
+ * deleted even if the storage remove fails: an orphan row renders broken.
  */
 export async function deletePropertyPhoto(
   accountId: string,

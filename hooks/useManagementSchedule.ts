@@ -28,11 +28,7 @@ export function useScheduleReference() {
   })
 }
 
-/**
- * The management schedule for `weekStarts`, composed client-side so it reads from
- * the persisted cache offline. Replaces four `getScheduleForWeek` Server Action
- * calls (~22-26 queries) with 3 shared + 1-2 per week.
- */
+/** The schedule for `weekStarts`, composed client-side from the persisted cache. */
 export function useManagementSchedule(weekStarts: string[]) {
   const reference = useScheduleReference()
 
@@ -88,13 +84,7 @@ export function useManagementSchedule(weekStarts: string[]) {
   }
 }
 
-/**
- * Patch one visit wherever it sits in the cached weeks.
- *
- * Drawer writes only touch `['stop-detail']`, and the realtime overlay carries a
- * `visits` row — so nothing propagates `visit_crew` (a different table) to the
- * grid. Works offline, unlike an invalidate.
- */
+/** Patch one visit in every cached week. Needed for visit_crew, which realtime doesn't carry. */
 export function patchScheduleVisit(
   queryClient: QueryClient,
   visitId: string,
@@ -154,22 +144,9 @@ export function useQueuedVisitMutation<TInput>(
 }
 
 /**
- * Apply a live visit update — a Realtime UPDATE, or a write the drawer just
- * made — straight into the query cache.
- *
- * This replaces the separate overlay `Map` that used to sit beside React Query.
- * That map existed because the grid once read server props and had nowhere else
- * to put live data; it now reads the cache, so a third store only meant every
- * consumer had to remember to merge.
- *
- * The `updated_at` guard is the part that has to survive: applied
- * unconditionally, a dropped or out-of-order Realtime message would pin a stale
- * status on a cell and beat fresher server data on every later render. Compared
- * numerically via `visitVersion` because PostgREST and Realtime don't format
- * timestamps identically ('…Z' vs '…+00:00'), which breaks string ordering.
- *
- * Returning the previous data object unchanged when the incoming row is not
- * newer is load-bearing: a new object identity here re-renders the whole grid.
+ * Write a live visit update into the cache, guarded on updated_at so an out-of-order message
+ * can't pin stale data. Compared numerically (formats differ). Returns the old object when not
+ * newer: a new identity re-renders the grid.
  */
 export function applyVisitUpdate(queryClient: QueryClient, incoming: VisitOverlay): void {
   const incomingVersion = visitVersion(incoming)
@@ -212,16 +189,7 @@ export function useApplyVisitUpdate() {
   )
 }
 
-/**
- * Repaint the schedule after a Server Action wrote to it.
- *
- * The schedule is client-first: `revalidatePath` refreshes an RSC shell holding
- * no data, so without this a write lands in Postgres and the screen never
- * changes. The realtime overlay hides half of it — a `visits` UPDATE (a vehicle,
- * say) arrives on its own, while `visit_crew` rows do not, because the
- * management subscription only covers `visits`. That asymmetry makes the bug
- * look like a rendering glitch rather than a missing invalidation.
- */
+/** Repaint after a Server Action: revalidatePath can't reach this client-first page. */
 export function useRefreshSchedule() {
   const queryClient = useQueryClient()
 

@@ -8,10 +8,7 @@ import { useIsStandalone } from '@/hooks/use-media-query'
 const DISMISSED_KEY = 'rg-install-dismissed'
 
 
-/**
- * The `beforeinstallprompt` event, which TypeScript's DOM lib doesn't ship
- * because it isn't in any standard — it's Chromium-only.
- */
+/** Chromium-only event, missing from TypeScript's DOM lib. */
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
@@ -28,34 +25,22 @@ function isIosSafari(): boolean {
 const noopSubscribe = () => () => {}
 
 /**
- * `useSyncExternalStore`, not state-in-an-effect: the UA string can't be read
- * during SSR, but unlike `dismissed` below, computing it eagerly on the first
- * client render would flip which of the two early returns fires — server
- * renders null, client would render the bar — a real hydration mismatch.
- * `useSyncExternalStore` is the sanctioned escape hatch for a value that's
- * allowed to differ between the server and client snapshots.
+ * useSyncExternalStore: the UA differs between server and client snapshots, and reading it
+ * eagerly would cause a hydration mismatch.
  */
 function useIsIosSafari(): boolean {
   return useSyncExternalStore(noopSubscribe, isIosSafari, () => false)
 }
 
 /**
- * Nudges crew to install the PWA to their home screen — the crew side is
- * phone-only and offline-tolerant, and both work better installed.
- *
- * Two paths, because the platforms differ: Chromium fires an event we can turn
- * into a one-tap install, while iOS Safari requires the user to go through the
- * Share sheet, so all we can do is tell them how. Dismissal sticks.
+ * Prompts installing the PWA: one-tap on Chromium, Share-sheet instructions on iOS. Dismissal
+ * sticks.
  */
 export function InstallPrompt({ dismissKey = DISMISSED_KEY }: { dismissKey?: string } = {}) {
   const isStandalone = useIsStandalone()
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null)
   const showIosHint = useIsIosSafari()
-  // Lazy initializer, not a setState-in-effect: `deferred` and `showIosHint`
-  // both still default to their SSR values on this same first client render,
-  // so the two early returns below already yield `null` regardless of what
-  // this reads — there's no window where a stale `dismissed` could show
-  // through, so reading localStorage here can't desync hydration.
+  // Safe as a lazy initializer: the early returns below yield null on first render regardless.
   const [dismissed, setDismissed] = useState(
     () => typeof window !== 'undefined' && window.localStorage.getItem(dismissKey) === '1',
   )

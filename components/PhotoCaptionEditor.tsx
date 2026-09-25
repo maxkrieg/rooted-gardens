@@ -15,11 +15,8 @@ interface PhotoCaptionEditorProps {
 }
 
 /**
- * Caption editing inside the visit drawer's lightbox — the crew-safe counterpart
- * to management's PhotoEditor. Caption only: correcting a photo's category or
- * deleting it stays on the account Photos page.
- *
- * Mount keyed by photo id so the draft resets when paging between photos.
+ * Caption editing in the visit drawer's lightbox. Caption only; category and delete stay on
+ * the account Photos page. Keyed by photo id so the draft resets on paging.
  */
 export function PhotoCaptionEditor({
   photoId,
@@ -80,16 +77,8 @@ export function PhotoCaptionEditor({
 }
 
 /**
- * Caption a photo from the visit drawer.
- *
- * Deliberately a direct-client mutation rather than the `updatePropertyPhoto`
- * Server Action the account gallery uses: this runs on `/app/stop/[visitId]`,
- * where CLAUDE.md forbids Server Actions. Same online-only pattern as the other
- * drawer mutations (useUpdateCrewInstruction, useAddVisitPlanPhoto) — captions
- * are typed deliberately, so failing loudly beats silently queueing.
- *
- * Authorization is RLS's job: owner/lead may caption any photo, crew only the
- * photos they uploaded, and a trigger stops crew changing anything but caption.
+ * Caption a photo from the drawer. Direct-client and online-only: no Server Actions on the stop
+ * page, and a deliberate caption should fail loudly. RLS limits crew to their own photos.
  */
 function useUpdatePhotoCaption() {
   const queryClient = useQueryClient()

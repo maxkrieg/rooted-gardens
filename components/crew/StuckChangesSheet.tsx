@@ -39,9 +39,8 @@ const TYPE_LABELS: Record<QueuedMutation['type'], string> = {
 }
 
 /**
- * Review sheet for changes that never reached the server. A completion that
- * silently fails to sync is a visit that never gets invoiced, so this is the one
- * failure surface that's interactive: retry it, or discard it deliberately.
+ * Changes that never reached the server: retry or discard. An unsynced completion is never
+ * invoiced, so this has to be actionable.
  */
 export function StuckChangesSheet({
   open,

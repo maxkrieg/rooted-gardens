@@ -23,12 +23,7 @@ interface HistoryDateRangeFilterProps {
   customEnd?: string
 }
 
-/**
- * The History tab's date-range filter — replaces the old prev/next month
- * paging (BillingMonthNav) with presets plus a custom range, since "invoiced
- * this calendar month" isn't the only window an accountant wants to audit.
- * Lives in the filter row next to the account filter, not the page header.
- */
+/** History tab date range: presets plus custom. */
 export function HistoryDateRangeFilter({ preset, customStart, customEnd }: HistoryDateRangeFilterProps) {
   const router = useRouter()
   const now = new Date()
