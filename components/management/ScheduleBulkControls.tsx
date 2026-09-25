@@ -11,6 +11,7 @@ import {
   type BulkTarget,
 } from '@/hooks/useBulkScheduleActions'
 import type { Employee, Vehicle } from '@/types/app'
+import { firstName } from '@/lib/utils/team'
 
 interface ScheduleBulkControlsProps {
   /** What's selected, resolved to the visit for its own week. */
@@ -121,9 +122,9 @@ export function ScheduleBulkControls({
         vehicles={vehicles}
         onPickCrew={(employee) =>
           runBulk(
-            `Assigning ${employee.name.split(' ')[0]}…`,
+            `Assigning ${firstName(employee.name)}…`,
             () => bulk.assignCrew(targets, employee),
-            (n) => `${employee.name.split(' ')[0]} assigned to ${stops(n)}.`,
+            (n) => `${firstName(employee.name)} assigned to ${stops(n)}.`,
           )
         }
         onPickVehicle={(vehicleId) =>

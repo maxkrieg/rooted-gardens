@@ -11,6 +11,7 @@ import { generateHTML } from '@tiptap/html/server'
 import type { JSONContent } from '@tiptap/core'
 import type { Database } from '@/types/database'
 import { createClient } from '@/lib/supabase/server'
+import { requireRole } from '@/lib/auth/server-role'
 import { toUserMessage } from '@/lib/errors'
 import { RICHTEXT_EXTENSIONS } from '@/lib/content/richtext-schema'
 import {
@@ -37,37 +38,7 @@ function revalidate() {
   revalidatePath('/(public)', 'layout')
 }
 
-/**
- * Resolve the acting employee and assert they're an owner.
- *
- * Same shape as `requireManagingEmployee` in
- * app/app/(padded)/accounts/photo-actions.ts, restricted to `owner` only —
- * editing the public site is owner-only per the site_content /
- * site_collection_items RLS policies (migration 20260804140000). RLS is the
- * actual security boundary; this exists purely to return a better error
- * message than a raw RLS-denial would.
- */
-async function requireOwner(): Promise<
-  { employeeId: string; error?: undefined } | { employeeId?: undefined; error: string }
-> {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-
-  const { data: employee } = await supabase
-    .from('employees')
-    .select('id, role')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!employee) return { error: 'No employee record for this login' }
-  if (employee.role !== 'owner') return { error: 'Only owners can edit the public site' }
-
-  return { employeeId: employee.id }
-}
+const requireOwner = () => requireRole(['owner'], 'Only owners can edit the public site')
 
 // ─── site_content slots ────────────────────────────────────────────────────────
 

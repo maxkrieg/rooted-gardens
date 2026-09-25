@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { format, parseISO } from 'date-fns'
-import { Search } from 'lucide-react'
+import { Search, Calendar, Mail, Phone } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -20,19 +20,20 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { LeadCard } from '@/components/management/LeadCard'
 import { LeadDetailSheet } from '@/components/management/LeadDetailSheet'
 import { LeadKindBadge, LeadStatusBadge } from '@/components/management/badges'
 import { EmptyState } from '@/components/states/EmptyState'
-import { syncLeadUrlParam } from '@/lib/utils/lead-url'
 import { leadInterestOrPosition } from '@/lib/utils/leads'
 import {
   LEAD_KINDS,
   LEAD_KIND_LABELS,
   LEAD_STATUSES,
   LEAD_STATUS_LABELS,
+  type LeadKind,
+  type LeadStatus,
+  type LeadWithConverted,
 } from '@/types/app'
-import type { LeadKind, LeadStatus, LeadWithConverted } from '@/types/app'
+import { Card, CardContent } from '@/components/ui/card'
 
 interface LeadsInboxProps {
   leads: LeadWithConverted[]
@@ -235,5 +236,79 @@ export function LeadsInbox({ leads, initialLeadId }: LeadsInboxProps) {
         onOpenChange={handleSheetOpenChange}
       />
     </>
+  )
+}
+
+/**
+ * Mirror the open lead into the leads page's `?lead=` param — the same
+ * native-history idiom as lib/utils/visit-url.ts's syncVisitUrlParam, and for
+ * the same reason: `?lead=` lives on a Server Component page, so a
+ * router.replace would re-run its leads query on every sheet open/close.
+ * `replaceState` (not `push`) means no extra history entry.
+ */
+function syncLeadUrlParam(leadId: string | null) {
+  if (typeof window === 'undefined') return
+
+  const url = new URL(window.location.href)
+  const current = url.searchParams.get('lead')
+  const next = leadId ?? null
+  if (current === next) return
+
+  if (next) url.searchParams.set('lead', next)
+  else url.searchParams.delete('lead')
+
+  window.history.replaceState(null, '', url)
+}
+
+/**
+ * Mobile card for the leads inbox (task 9.8) — structural port of
+ * AccountCard.tsx. Takes `onClick` rather than wrapping in a `<Link>`: lead
+ * detail is a Sheet (LeadDetailSheet), not its own route.
+ */
+function LeadCard({ lead, onClick }: { lead: LeadWithConverted; onClick: () => void }) {
+  const interestOrPosition = leadInterestOrPosition(lead)
+
+  return (
+    <button type="button" onClick={onClick} className="block w-full text-left">
+      <Card className="rounded-2xl border border-border shadow-warm hover:shadow-warm-lg transition-shadow">
+        <CardContent className="p-4">
+          {/* Header row */}
+          <div className="flex items-start justify-between gap-2 mb-3">
+            <div className="min-w-0">
+              <p className="font-display text-base font-semibold text-foreground truncate">
+                {lead.name}
+              </p>
+              {interestOrPosition && (
+                <p className="text-sm text-muted-foreground truncate">{interestOrPosition}</p>
+              )}
+            </div>
+            <div className="shrink-0 flex flex-col items-end gap-1.5">
+              <LeadStatusBadge status={lead.status} />
+              <LeadKindBadge kind={lead.kind} />
+            </div>
+          </div>
+
+          {/* Meta row */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+            {lead.email && (
+              <span className="flex items-center gap-1 min-w-0">
+                <Mail className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{lead.email}</span>
+              </span>
+            )}
+            {lead.phone && (
+              <span className="flex items-center gap-1 tabular-nums">
+                <Phone className="h-3.5 w-3.5 shrink-0" />
+                {lead.phone}
+              </span>
+            )}
+            <span className="flex items-center gap-1">
+              <Calendar className="h-3.5 w-3.5 shrink-0" />
+              {format(parseISO(lead.created_at), 'EEE MMM d')}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+    </button>
   )
 }

@@ -1,12 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { toast } from 'sonner'
 import { FilePen, Receipt } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useCan } from '@/components/app/RoleProvider'
-import { useCreateVisit } from '@/hooks/useCreateVisit'
-import { toUserMessage } from '@/lib/errors'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
 import { ScheduleEmptyState } from '@/components/management/ScheduleEmptyState'
@@ -17,12 +12,10 @@ import { CheckIndicator } from '@/components/app/CheckIndicator'
 import { WeekNoteRibbon } from '@/components/management/WeekNoteRibbon'
 import { RouteDefaultsSheet } from '@/components/management/RouteDefaultsSheet'
 import { RoutePicker } from '@/components/management/RoutePicker'
-import { useRouteAllUngrouped } from '@/hooks/useRouteAllUngrouped'
-import { useScheduleReference } from '@/hooks/useManagementSchedule'
-import { useWeekNotes, useSaveWeekNote } from '@/hooks/useWeekNotes'
+import { useScheduleInteractions } from '@/hooks/useScheduleInteractions'
+import { useWeekNotes } from '@/hooks/useWeekNotes'
 import { isVisitInProgress, formatElapsed, displayCrewFor } from '@/lib/utils/visits'
-import { groupRowsByAccount, routeGroupStats, sortRowsByPriority } from '@/lib/utils/schedule'
-import { usePropertyLastVisit } from '@/hooks/usePropertyLastVisit'
+import { groupRowsByAccount, routeGroupStats } from '@/lib/utils/schedule'
 import {
   DEFAULT_SCHEDULE_SORT,
   UNGROUPED_SORT_KEY,
@@ -31,7 +24,6 @@ import {
   type ScheduleSortState,
 } from '@/lib/utils/schedule-sort'
 import { ScheduleSortToggle } from '@/components/management/ScheduleSortToggle'
-import { syncVisitUrlParam } from '@/lib/utils/visit-url'
 import {
   VisitStatusIcon,
   visitRowTint,
@@ -41,12 +33,12 @@ import {
 import type {
   Account,
   Employee,
-  RouteGroup,
   ScheduleWeek,
   SchedulePropertyRow,
   Vehicle,
   VisitWithCrew,
 } from '@/types/app'
+import { firstName } from '@/lib/utils/team'
 
 interface ScheduleListMobileProps {
   /** The single week on screen, already filtered. */
@@ -78,61 +70,34 @@ export function ScheduleListMobile({
   sortState = DEFAULT_SCHEDULE_SORT,
   onGroupSortChange,
 }: ScheduleListMobileProps) {
-  const { editSchedule: canEdit } = useCan()
-  const createVisit = useCreateVisit()
-
-  const { data: lastVisitByProperty } = usePropertyLastVisit()
-
-  // Each band resolves its own mode — its override, else the schedule-wide
-  // default. Applied before groupRowsByAccount so a multi-property account still
-  // clusters; the cluster just moves to wherever its most urgent property lands.
-  const orderRows = useCallback(
-    (groupKey: string, rows: SchedulePropertyRow[]) =>
-      sortModeForGroup(sortState, groupKey) === 'priority'
-        ? sortRowsByPriority(rows, lastVisitByProperty)
-        : rows,
-    [sortState, lastVisitByProperty],
-  )
-
-  // Tick elapsed time every 30s
-  const [, setTick] = useState(0)
-  useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 30_000)
-    return () => clearInterval(id)
-  }, [])
-
-  const [sheetOpen, setSheetOpen] = useState(false)
-  const [sheetRow, setSheetRow] = useState<SchedulePropertyRow | null>(null)
-  const [sheetWeek, setSheetWeek] = useState('')
-  const [creatingKey, setCreatingKey] = useState<string | null>(null)
-  // Visits created in this session, keyed by row. Layered *under* the server
-  // props in renderStopRow so a just-scheduled row paints immediately instead of
-  // waiting on revalidatePath — and never cleared, since clearing it would race
-  // the props catching up (the routes-page freeze, commit f4e09e3).
-  const [createdVisits, setCreatedVisits] = useState<Map<string, VisitWithCrew>>(new Map())
-
-  const [assignOpen, setAssignOpen] = useState(false)
-  const [assignGroup, setAssignGroup] = useState<RouteGroup | null>(null)
-
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const {
+    canEdit,
+    lastVisitByProperty,
+    reference,
+    routeAllUngrouped,
+    saveWeekNote,
+    orderRows,
+    sheetOpen,
+    sheetRow,
+    sheetWeek,
+    openSheet,
+    handleSheetOpenChange,
+    creatingKey,
+    createdVisits,
+    scheduleVisit,
+    assignOpen,
+    setAssignOpen,
+    assignGroup,
+    openAssign,
+    defaultsGroup,
+    setDefaultsGroup,
+    // Lifted here because the band's ⋯ opens the note editor and the ribbon renders it.
+    noteEditKey: noteEditGroupId,
+    setNoteEditKey: setNoteEditGroupId,
+    selected,
+    setSelected,
+  } = useScheduleInteractions({ selectMode, sortState, windowStart: week?.weekStart })
   const { data: weekNotes = [] } = useWeekNotes(week?.weekStart ?? '')
-  const { data: reference } = useScheduleReference()
-  const [defaultsGroup, setDefaultsGroup] = useState<RouteGroup | null>(null)
-  // Which group's note editor is open. Lifted here because the band's ⋯ opens
-  // it and the ribbon renders it — there's no permanent "add a note" row.
-  const [noteEditGroupId, setNoteEditGroupId] = useState<string | null>(null)
-  const routeAllUngrouped = useRouteAllUngrouped()
-  const saveWeekNote = useSaveWeekNote()
-
-  // Leaving select mode must drop the selection, or re-entering it resumes with
-  // stale property ids that may no longer be on screen. Adjusted during render
-  // (React's sanctioned pattern, as in UnroutedPanel) rather than in an effect,
-  // which would render the stale selection once before clearing it.
-  const [selectModeSnapshot, setSelectModeSnapshot] = useState(selectMode)
-  if (selectModeSnapshot !== selectMode) {
-    setSelectModeSnapshot(selectMode)
-    if (selected.size > 0) setSelected(new Set())
-  }
 
   /**
    * What the route group band summarises. Reads the same merged visit the rows
@@ -145,50 +110,12 @@ export function ScheduleListMobile({
     )
   }
 
-  function handleSheetOpenChange(next: boolean) {
-    setSheetOpen(next)
-    if (!next) syncVisitUrlParam(null)
-  }
-
-  function openSheet(row: SchedulePropertyRow, visit: VisitWithCrew, weekStart: string) {
-    setSheetRow({ ...row, visit })
-    setSheetWeek(weekStart)
-    setSheetOpen(true)
-    // The phone list renders a single week — that IS the window start.
-    syncVisitUrlParam(visit.id, weekStart)
-  }
-
-  /**
-   * Tapping an unscheduled row both schedules it and opens the drawer — one tap
-   * instead of two on a phone, where the owner is almost always about to set
-   * crew or an instruction. Not wrapped in startTransition: the drawer state
-   * must be urgent, or it queues behind the revalidated RSC tree and reads as a
-   * frozen row.
-   */
-  async function scheduleRow(row: SchedulePropertyRow, weekStart: string) {
-    const cellKey = `${row.property.id}-${weekStart}`
-    setCreatingKey(cellKey)
-    try {
-      const visit = await createVisit(row, weekStart)
-      setCreatedVisits((prev) => new Map(prev).set(cellKey, visit))
-      openSheet(row, visit, weekStart)
-    } catch (err) {
-      // A thrown failure (dropped connection mid-action) never reaches the
-      // res.error branch, and would leave the row stuck on its placeholder.
-      toast.error('Failed to create visit', {
-        description: toUserMessage(err, 'Could not add the stop.', '[ScheduleListMobile.scheduleRow]'),
-      })
-    } finally {
-      setCreatingKey(null)
-    }
-  }
-
   function handleRowClick(row: SchedulePropertyRow, visit: VisitWithCrew | null) {
     if (!week) return
     if (visit) {
       openSheet(row, visit, week.weekStart)
     } else {
-      void scheduleRow(row, week.weekStart)
+      void scheduleVisit(row, week.weekStart, { openDrawer: true })
     }
   }
 
@@ -255,7 +182,7 @@ export function ScheduleListMobile({
 
     const isSelected = selected.has(row.property.id)
     const settled = visit?.status === 'completed' || visit?.status === 'skipped'
-    const crewLabel = displayedCrew.map((emp) => emp.name.split(' ')[0]).join(', ')
+    const crewLabel = displayedCrew.map((emp) => firstName(emp.name)).join(', ')
 
     return (
       <button
@@ -412,8 +339,7 @@ export function ScheduleListMobile({
                 stats={statsFor(rows, currentWeek.weekStart)}
                 canEdit={canEdit}
                 onAssignRoute={() => {
-                  setAssignGroup(routeGroup)
-                  setAssignOpen(true)
+                  openAssign(routeGroup)
                 }}
                 onEditDefaults={() => setDefaultsGroup(routeGroup)}
                 onEditNote={() => setNoteEditGroupId(routeGroup.id)}

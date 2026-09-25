@@ -28,7 +28,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { CadenceBadge, CadenceSummary, VisitStatusBadge, InvoiceStatusBadge } from '@/components/management/badges'
+import {
+  CadenceBadge,
+  CadenceSummary,
+  VisitStatusBadge,
+  InvoiceStatusBadge,
+} from '@/components/management/badges'
 import { usePropertyLastVisit } from '@/hooks/usePropertyLastVisit'
 import { qboInvoiceUrl } from '@/lib/utils/billing'
 import { PropertyVisitHistory } from '@/components/PropertyVisitHistory'
@@ -41,13 +46,14 @@ import { CrewInstructionSheet } from '@/components/CrewInstructionSheet'
 import { VisitPlanPhotos } from '@/components/crew/VisitPlanPhotos'
 import { useCan, useRole } from '@/components/app/RoleProvider'
 import { useActiveVehicles } from '@/hooks/crew/useActiveVehicles'
-import { useUpdateVisitVehicle } from '@/hooks/useUpdateVisitVehicle'
-import { useRevertVisitToScheduled } from '@/hooks/useRevertVisitToScheduled'
-import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
+import { isVisitInProgress, formatElapsed, nextVisitVersion } from '@/lib/utils/visits'
 import { createClient } from '@/lib/supabase/client'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
 import type { VisitStatus } from '@/types/app'
-import { toastCrewError } from '@/lib/offline/errors'
+import { toast } from 'sonner'
+import { isOfflineError } from '@/lib/errors'
+import { enqueueMutation } from '@/lib/offline/mutation-queue'
+import { useQueuedVisitMutation } from '@/hooks/useManagementSchedule'
 
 const VISIT_STATUS_OPTIONS: VisitStatus[] = ['scheduled', 'completed', 'skipped']
 
@@ -635,4 +641,59 @@ export function VisitDetailContent({
       )}
     </div>
   )
+}
+
+/**
+ * Toast an error from a crew mutation. "This needs a connection" and "this
+ * failed" are different messages in the field — one means wait, the other means
+ * something is wrong. Was hand-written across six hooks and four components.
+ */
+function toastCrewError(err: unknown, fallback: string) {
+  if (isOfflineError(err)) {
+    toast.error('This needs a connection. It’ll work once you have signal.')
+    return
+  }
+  console.error('[crew]', err)
+  toast.error(fallback)
+}
+
+function useUpdateVisitVehicle(visitId: string) {
+  return useQueuedVisitMutation(visitId, {
+    enqueue: (vehicleId: string | null) => enqueueMutation('set_vehicle', { visitId, vehicleId }),
+    patchVisit: (visit, vehicleId) => ({
+      ...visit,
+      vehicle_id: vehicleId,
+      updated_at: nextVisitVersion(visit.updated_at),
+    }),
+    patchStop: (stop, vehicleId) => ({
+      ...stop,
+      visit: {
+        ...stop.visit,
+        vehicle_id: vehicleId,
+        updated_at: nextVisitVersion(stop.visit.updated_at),
+      },
+    }),
+  })
+}
+
+// Clears only skip_reason; completion fields are left as-is when reverting from completed.
+function useRevertVisitToScheduled(visitId: string) {
+  return useQueuedVisitMutation(visitId, {
+    enqueue: () => enqueueMutation('revert_status', { visitId }),
+    patchVisit: (visit) => ({
+      ...visit,
+      status: 'scheduled',
+      skip_reason: null,
+      updated_at: nextVisitVersion(visit.updated_at),
+    }),
+    patchStop: (stop) => ({
+      ...stop,
+      visit: {
+        ...stop.visit,
+        status: 'scheduled',
+        skip_reason: null,
+        updated_at: nextVisitVersion(stop.visit.updated_at),
+      },
+    }),
+  })
 }

@@ -4,11 +4,10 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
-import { Leaf, LogOut, MoreHorizontal, Search } from 'lucide-react'
+import { Leaf, LogOut, MoreHorizontal, Search, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { OfflineBanner } from '@/components/crew/OfflineBanner'
 import { InstallPrompt } from '@/components/crew/InstallPrompt'
-import { SessionNotice } from '@/components/crew/SessionNotice'
 import { CommandPalette } from '@/components/management/CommandPalette'
 import { MoreSheet } from '@/components/app/MoreSheet'
 import { RoleProvider, useRole } from '@/components/app/RoleProvider'
@@ -377,5 +376,28 @@ function SidebarLinks({
         })}
       </ul>
     </nav>
+  )
+}
+
+/**
+ * The crew member's own employee record couldn't load. This used to fail
+ * silently while degrading realtime sync, "My stops", History, and Profile all at
+ * once. Only shown with no cached employee — a cached one still works offline.
+ */
+function SessionNotice() {
+  return (
+    <div
+      role="alert"
+      className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 border-b border-[var(--clay)]/25 bg-[var(--clay)]/[0.08] px-4 py-2 text-sm text-foreground"
+    >
+      <TriangleAlert className="h-4 w-4 shrink-0 text-[var(--clay)]" aria-hidden />
+      <span>We couldn&rsquo;t confirm who you are.</span>
+      <Link
+        href="/login"
+        className="inline-flex min-h-11 items-center font-medium underline underline-offset-4"
+      >
+        Sign in again
+      </Link>
+    </div>
   )
 }

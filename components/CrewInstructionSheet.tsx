@@ -11,7 +11,9 @@ import {
   SheetTitle,
   SheetFooter,
 } from '@/components/ui/sheet'
-import { useUpdateCrewInstruction } from '@/hooks/useUpdateCrewInstruction'
+import { enqueueMutation } from '@/lib/offline/mutation-queue'
+import { nextVisitVersion } from '@/lib/utils/visits'
+import { useQueuedVisitMutation } from '@/hooks/useManagementSchedule'
 
 interface CrewInstructionSheetProps {
   visitId: string
@@ -91,4 +93,24 @@ export function CrewInstructionSheet({
       </SheetContent>
     </Sheet>
   )
+}
+
+function useUpdateCrewInstruction(visitId: string) {
+  return useQueuedVisitMutation(visitId, {
+    enqueue: (instruction: string) =>
+      enqueueMutation('crew_instruction', { visitId, instruction: instruction.trim() || null }),
+    patchVisit: (visit, instruction) => ({
+      ...visit,
+      crew_instruction: instruction.trim() || null,
+      updated_at: nextVisitVersion(visit.updated_at),
+    }),
+    patchStop: (stop, instruction) => ({
+      ...stop,
+      visit: {
+        ...stop.visit,
+        crew_instruction: instruction.trim() || null,
+        updated_at: nextVisitVersion(stop.visit.updated_at),
+      },
+    }),
+  })
 }

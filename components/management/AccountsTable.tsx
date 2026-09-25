@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, parseISO } from 'date-fns'
-import { Plus, Search } from 'lucide-react'
+import { Plus, Search, Building2, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -28,12 +28,19 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { AccountCard } from '@/components/management/AccountCard'
 import { AccountForm } from '@/components/management/AccountForm'
 import { AccountStatusBadge, BillingTypeBadge } from '@/components/management/badges'
 import { EmptyState } from '@/components/states/EmptyState'
 import { formatAccountPrice } from '@/lib/utils/accounts'
 import type { AccountListRow, AccountStatus, BillingType } from '@/types/app'
+import Link from 'next/link'
+import { Card, CardContent } from '@/components/ui/card'
+import { CachedNotice } from '@/components/states/CachedNotice'
+import { ErrorState } from '@/components/states/ErrorState'
+import { CardListSkeleton, PageHeaderSkeleton } from '@/components/states/skeletons'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useAccountsList } from '@/hooks/useAccounts'
+import { useIsHydrated } from '@/hooks/use-hydrated'
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -41,7 +48,7 @@ interface AccountsTableProps {
   accounts: AccountListRow[]
 }
 
-export function AccountsTable({ accounts }: AccountsTableProps) {
+function AccountsTable({ accounts }: AccountsTableProps) {
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<AccountStatus | 'all'>('all')
@@ -243,5 +250,82 @@ export function AccountsTable({ accounts }: AccountsTableProps) {
         </SheetContent>
       </Sheet>
     </>
+  )
+}
+
+function AccountCard({ account }: { account: AccountListRow }) {
+  return (
+    <Link href={`/app/accounts/${account.id}`} className="block">
+      <Card className="rounded-2xl border border-border shadow-warm hover:shadow-warm-lg transition-shadow">
+        <CardContent className="p-4">
+          {/* Header row */}
+          <div className="flex items-start justify-between gap-2 mb-3">
+            <div className="min-w-0">
+              <p className="font-display text-base font-semibold text-foreground truncate">
+                {account.name}
+              </p>
+              {account.contact_name && (
+                <p className="text-sm text-muted-foreground truncate">{account.contact_name}</p>
+              )}
+            </div>
+            <AccountStatusBadge status={account.status} />
+          </div>
+
+          {/* Meta row */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+            <BillingTypeBadge billingType={account.billing_type} />
+
+            <span className="tabular-nums">{formatAccountPrice(account)}</span>
+
+            <span className="flex items-center gap-1">
+              <Building2 className="h-3.5 w-3.5 shrink-0" />
+              {account.propertyCount} {account.propertyCount === 1 ? 'property' : 'properties'}
+            </span>
+
+            <span className="flex items-center gap-1">
+              <Calendar className="h-3.5 w-3.5 shrink-0" />
+              {account.lastVisitDate
+                ? format(parseISO(account.lastVisitDate), 'EEE MMM d')
+                : 'No visits yet'}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
+  )
+}
+
+/**
+ * Client-first accounts list, so the "who is this customer, what's their number"
+ * lookup works in the field. AccountsTable already owns its own filtering, so it
+ * takes the same prop it always did.
+ */
+export function AccountsView() {
+  const hydrated = useIsHydrated()
+  const { accounts, isLoading, isError, isStale, hasData } = useAccountsList()
+
+  // The server has no React Query cache, so anything but the skeleton here is a
+  // guaranteed hydration mismatch.
+  if (!hydrated || (isLoading && !hasData)) return <AccountsSkeleton />
+  if (isError && !hasData) {
+    return <ErrorState title="Accounts didn't load." hint="Check your connection, then try again." />
+  }
+
+  return (
+    <>
+      {isStale && <CachedNotice />}
+      <AccountsTable accounts={accounts} />
+    </>
+  )
+}
+
+/** Mirrors app/app/(padded)/accounts/loading.tsx, which now only covers the shell. */
+function AccountsSkeleton() {
+  return (
+    <div className="space-y-6">
+      <PageHeaderSkeleton />
+      <Skeleton className="h-10 w-full max-w-sm rounded-md" />
+      <CardListSkeleton rows={8} height="h-16" />
+    </div>
   )
 }

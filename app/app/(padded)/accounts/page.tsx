@@ -1,4 +1,4 @@
-import { AccountsView } from '@/components/management/AccountsView'
+import { AccountsView } from '@/components/management/AccountsTable'
 
 /**
  * Thin shell — the list is client-first (AccountsView) so it reads from the

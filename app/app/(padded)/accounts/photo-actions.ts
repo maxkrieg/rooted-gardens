@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { requireRole } from '@/lib/auth/server-role'
 import {
   createPhotoSchema,
   updatePhotoSchema,
@@ -16,38 +17,8 @@ function revalidateAccount(accountId: string) {
   revalidatePath(`/app/accounts/${accountId}`)
 }
 
-/**
- * Resolve the acting employee and assert they can manage photos.
- *
- * The sibling account/property actions lean purely on RLS, but these need the
- * employee id anyway so `uploaded_by` comes from the session rather than a
- * client-supplied value — once we're doing the auth lookup, the role assertion
- * is free. RLS (`photos_insert` / `photos_update` / `photos_delete`) remains the
- * actual security boundary; this just produces a better error message.
- */
-async function requireManagingEmployee(): Promise<
-  { employeeId: string; error?: undefined } | { employeeId?: undefined; error: string }
-> {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-
-  const { data: employee } = await supabase
-    .from('employees')
-    .select('id, role')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!employee) return { error: 'No employee record for this login' }
-  if (employee.role !== 'owner' && employee.role !== 'lead') {
-    return { error: 'Only owners and leads can manage photos' }
-  }
-
-  return { employeeId: employee.id }
-}
+const requireManagingEmployee = () =>
+  requireRole(['owner', 'lead'], 'Only owners and leads can manage photos')
 
 // ─── Property photos ──────────────────────────────────────────────────────────
 

@@ -1,10 +1,18 @@
 'use client'
 
-import { useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import {
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { fetchScheduleReference, fetchWeekVisits } from '@/lib/schedule/fetch'
 import { buildScheduleWeek } from '@/lib/utils/schedule'
 import { visitVersion, type VisitOverlay } from '@/lib/utils/visits'
+import { flushMutationQueue } from '@/lib/offline/mutation-queue'
+import type { StopDetail } from '@/hooks/crew/useStopDetail'
 import type { ScheduleWeek, VisitWithCrew } from '@/types/app'
 
 export const scheduleReferenceKey = ['schedule-reference'] as const
@@ -100,6 +108,49 @@ export function patchScheduleVisit(
       data.map((v) => (v.id === visitId ? update(v) : v)),
     )
   }
+}
+
+/** A queued visit edit, patched into both the schedule and stop-detail caches up front.
+ *  `networkMode: 'always'`: the default pauses offline, running onMutate but never enqueuing. */
+export function useQueuedVisitMutation<TInput>(
+  visitId: string,
+  {
+    enqueue,
+    patchVisit,
+    patchStop,
+  }: {
+    enqueue: (input: TInput) => Promise<unknown>
+    patchVisit: (visit: VisitWithCrew, input: TInput) => VisitWithCrew
+    patchStop: (stop: StopDetail, input: TInput) => StopDetail
+  },
+) {
+  const queryClient = useQueryClient()
+  const stopKey = ['stop-detail', visitId]
+
+  return useMutation({
+    networkMode: 'always',
+    mutationFn: async (input: TInput) => {
+      await enqueue(input)
+      const result = await flushMutationQueue()
+      if (result.failed > 0) throw new Error('Change did not save')
+    },
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: stopKey })
+      const previous = queryClient.getQueryData<StopDetail | null>(stopKey)
+      patchScheduleVisit(queryClient, visitId, (visit) => patchVisit(visit, input))
+      queryClient.setQueryData<StopDetail | null>(stopKey, (old) =>
+        old ? patchStop(old, input) : old,
+      )
+      return { previous }
+    },
+    onError: (_err, _input, context) => {
+      if (context?.previous !== undefined) queryClient.setQueryData(stopKey, context.previous)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: stopKey })
+      queryClient.invalidateQueries({ queryKey: ['schedule-visits'] })
+    },
+  })
 }
 
 /**

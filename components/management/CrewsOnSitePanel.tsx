@@ -6,6 +6,7 @@ import { WifiOff } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useIsOnline } from '@/hooks/use-hydrated'
 import { formatElapsed } from '@/lib/utils/visits'
+import { firstName } from '@/lib/utils/team'
 
 type InProgressVisit = {
   id: string
@@ -125,7 +126,7 @@ export function CrewsOnSitePanel() {
         {visits.map((v) => {
           const assignedNames = v.visit_crew
             .filter((vc) => vc.relation === 'assigned' && vc.employee)
-            .map((vc) => vc.employee!.name.split(' ')[0])
+            .map((vc) => firstName(vc.employee!.name))
             .join(', ')
 
           return (

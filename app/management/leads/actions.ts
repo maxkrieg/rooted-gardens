@@ -2,34 +2,15 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { requireRole } from '@/lib/auth/server-role'
 import { leadStatusSchema } from '@/lib/validators/lead'
 import { accountFormSchema, type AccountFormValues } from '@/lib/validators/account'
 import { buildAccountPayload } from '@/lib/utils/accounts'
 import { toUserMessage } from '@/lib/errors'
 import type { JobApplicationDetails } from '@/types/app'
 
-/**
- * Leads inbox Server Actions (task 9.8). Owner/lead only — matches the
- * `leads` RLS policies (migration 20260804130000_leads.sql) exactly, so this
- * check is defense-in-depth the same way requireOwner() is in
- * app/management/team/actions.ts, not the real boundary.
- */
-async function requireLeadAccess(): Promise<{ error?: string }> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-  const { data: employee } = await supabase
-    .from('employees')
-    .select('role')
-    .eq('user_id', user.id)
-    .single()
-  if (employee?.role !== 'owner' && employee?.role !== 'lead') {
-    return { error: 'Only owners and leads can manage the leads inbox' }
-  }
-  return {}
-}
+const requireLeadAccess = () =>
+  requireRole(['owner', 'lead'], 'Only owners and leads can manage the leads inbox')
 
 export async function updateLeadStatus(id: string, status: string): Promise<{ error?: string }> {
   const auth = await requireLeadAccess()

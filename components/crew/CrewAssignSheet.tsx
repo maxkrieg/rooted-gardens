@@ -11,7 +11,9 @@ import {
 } from '@/components/ui/sheet'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useActiveEmployees } from '@/hooks/crew/useActiveEmployees'
-import { useReassignCrew } from '@/hooks/useReassignCrew'
+import { enqueueMutation } from '@/lib/offline/mutation-queue'
+import { useQueuedVisitMutation } from '@/hooks/useManagementSchedule'
+import type { VisitCrewWithEmployee } from '@/types/app'
 
 interface CrewAssignSheetProps {
   visitId: string
@@ -86,4 +88,41 @@ export function CrewAssignSheet({
       </SheetContent>
     </Sheet>
   )
+}
+
+type ReassignCrewInput = {
+  employeeId: string
+  name: string
+  action: 'add' | 'remove'
+}
+
+function useReassignCrew(visitId: string) {
+  return useQueuedVisitMutation(visitId, {
+    enqueue: ({ employeeId, action }: ReassignCrewInput) =>
+      enqueueMutation('assign_crew', { visitId, employeeId, action }),
+    patchVisit: (visit, { employeeId, name, action }) => {
+      const isThis = (vc: VisitCrewWithEmployee) =>
+        vc.employee_id === employeeId && vc.relation === 'assigned'
+      if (action === 'remove') {
+        return { ...visit, visit_crew: visit.visit_crew.filter((vc) => !isThis(vc)) }
+      }
+      if (visit.visit_crew.some(isThis)) return visit
+      const added = {
+        visit_id: visitId,
+        employee_id: employeeId,
+        relation: 'assigned',
+        created_at: new Date().toISOString(),
+        employee: { id: employeeId, name },
+      } as VisitCrewWithEmployee
+      return { ...visit, visit_crew: [...visit.visit_crew, added] }
+    },
+    patchStop: (stop, { employeeId, name, action }) => {
+      if (action === 'remove') {
+        const assignedCrew = stop.assignedCrew.filter((c) => c.employee_id !== employeeId)
+        return { ...stop, assignedCrew }
+      }
+      if (stop.assignedCrew.some((c) => c.employee_id === employeeId)) return stop
+      return { ...stop, assignedCrew: [...stop.assignedCrew, { employee_id: employeeId, name }] }
+    },
+  })
 }

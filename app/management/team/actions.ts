@@ -6,6 +6,7 @@ import { headers } from 'next/headers'
 // on why the @supabase/ssr client can't send that email.
 import { createClient as createAnonClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
+import { requireRole } from '@/lib/auth/server-role'
 import { createServiceClient } from '@/lib/supabase/service'
 import { employeeFormSchema, type EmployeeFormValues } from '@/lib/validators/employee'
 import { toUserMessage } from '@/lib/errors'
@@ -21,20 +22,7 @@ import { toUserMessage } from '@/lib/errors'
  * returned auth user — so it is NOT covered by the RLS gate.
  */
 
-async function requireOwner(): Promise<{ error?: string }> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-  const { data: employee } = await supabase
-    .from('employees')
-    .select('role')
-    .eq('user_id', user.id)
-    .single()
-  if (employee?.role !== 'owner') return { error: 'Only owners can manage the team' }
-  return {}
-}
+const requireOwner = () => requireRole(['owner'], 'Only owners can manage the team')
 
 function employeePayload(data: EmployeeFormValues) {
   return {

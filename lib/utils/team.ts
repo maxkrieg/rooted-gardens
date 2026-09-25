@@ -12,3 +12,7 @@ export const SERVICE_SIDE_LABELS: Record<string, string> = {
   garden: 'Garden',
   both: 'Both',
 }
+
+export function firstName(name: string): string {
+  return name.split(' ')[0]
+}
