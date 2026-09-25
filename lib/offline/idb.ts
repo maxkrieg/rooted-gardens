@@ -6,7 +6,7 @@ const DB_VERSION = 3
 
 // Management schedule types (create_visit…revert_status) were added when owners
 // went phone-primary in the field; `payload` is untyped here, so no DB_VERSION bump.
-export type MutationType =
+type MutationType =
   | 'completion'
   | 'photo'
   | 'photo_caption'

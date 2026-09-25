@@ -36,7 +36,7 @@ export const updateSiteSlotSchema = z
 export type UpdateSiteSlotValues = z.infer<typeof updateSiteSlotSchema>
 
 /** `doc` is only shape-checked here; the action's generateHTML does the real validation. */
-export const richTextDocSchema = z.object({
+const richTextDocSchema = z.object({
   type: z.literal('doc'),
   content: z.array(z.unknown()),
 })
@@ -58,7 +58,7 @@ const faqItemDataSchema = z.object({
   answer: z.string().trim().min(1, 'Answer is required').max(3000),
 })
 
-export const jobItemDataSchema = z.object({
+const jobItemDataSchema = z.object({
   title: z.string().trim().min(1, 'Title is required').max(150),
   location: z.string().trim().max(150),
   blurb: z.string().trim().max(1000),

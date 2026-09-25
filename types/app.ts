@@ -116,7 +116,7 @@ export const LEAD_STATUSES = ['new', 'contacted', 'qualified', 'won', 'lost'] as
 export type LeadStatus = (typeof LEAD_STATUSES)[number]
 
 // Derived from SERVICE_SIDES so the two can't drift apart.
-export const LEAD_SERVICE_INTERESTS = [...SERVICE_SIDES, 'other'] as const
+const LEAD_SERVICE_INTERESTS = [...SERVICE_SIDES, 'other'] as const
 export type LeadServiceInterest = (typeof LEAD_SERVICE_INTERESTS)[number]
 
 export const LEAD_KIND_LABELS: Record<LeadKind, string> = {
@@ -260,7 +260,7 @@ export const SITE_PAGES = [
 ] as const
 export type SitePage = (typeof SITE_PAGES)[number]
 
-export const SITE_CONTENT_KINDS = ['text', 'richtext', 'image', 'email', 'phone', 'url'] as const
+const SITE_CONTENT_KINDS = ['text', 'richtext', 'image', 'email', 'phone', 'url'] as const
 export type SiteContentKind = (typeof SITE_CONTENT_KINDS)[number]
 
 export const SITE_COLLECTIONS = ['faq', 'job', 'team'] as const
