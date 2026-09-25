@@ -20,11 +20,7 @@ interface BulkActionSheetProps {
   onSkip: (reason: string) => void
 }
 
-/**
- * The picker behind each bulk action. One sheet with three modes rather than
- * three sheets, because they differ only in what they list — and the phone has
- * room for exactly one sheet at a time anyway.
- */
+/** The picker behind each bulk action: one sheet, three modes. */
 export function BulkActionSheet({
   kind,
   onOpenChange,

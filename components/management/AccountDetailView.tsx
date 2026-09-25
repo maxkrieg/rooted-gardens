@@ -1,8 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useTransition } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Mail, Phone, TriangleAlert } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { ArrowLeft, Mail, Phone, Trash2, TriangleAlert } from 'lucide-react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   AccountStatusBadge,
@@ -11,8 +14,9 @@ import {
   CadenceSummary,
 } from '@/components/management/badges'
 import { EditAccountSheet } from '@/components/management/EditAccountSheet'
-import { DeleteAccountButton } from '@/components/management/DeleteAccountButton'
-import { DeletePropertyButton } from '@/components/management/DeletePropertyButton'
+import { ConfirmDialog } from '@/components/management/ConfirmDialog'
+import { archiveAccount } from '@/app/app/(padded)/accounts/actions'
+import { archiveProperty } from '@/app/app/(padded)/accounts/property-actions'
 import { PropertySheet } from '@/components/management/PropertySheet'
 import { PropertyPhotoGallery } from '@/components/management/PropertyPhotoGallery'
 import { QboLinkStatus } from '@/components/management/QboLinkStatus'
@@ -21,9 +25,13 @@ import { CachedNotice } from '@/components/states/CachedNotice'
 import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
 import { CardListSkeleton, PageHeaderSkeleton } from '@/components/states/skeletons'
-import { useAccountDetail, useAccountPhotos, useSignedPhotoUrls } from '@/hooks/useAccounts'
+import {
+  useAccountDetail,
+  useAccountPhotos,
+  useRefreshAccounts,
+  useSignedPhotoUrls,
+} from '@/hooks/useAccounts'
 import { usePropertyLastVisit } from '@/hooks/usePropertyLastVisit'
-import { useCachedPhotoUrls } from '@/hooks/useCachedPhotoUrls'
 import { useIsHydrated } from '@/hooks/use-hydrated'
 import { cn } from '@/lib/utils'
 import { formatAccountPrice } from '@/lib/utils/accounts'
@@ -32,6 +40,7 @@ import type { AccountDetail } from '@/lib/accounts/fetch'
 import { useCan } from '@/components/app/RoleProvider'
 import { PropertyRoutePicker } from '@/components/management/PropertyRoutePicker'
 import type { PhotoWithUrl } from '@/types/app'
+import { getCachedPhoto, isCacheablePhoto, putCachedPhoto } from '@/lib/offline/photo-blobs'
 
 type AccountView = 'details' | 'photos'
 
@@ -40,11 +49,7 @@ interface AccountDetailViewProps {
   initialView: AccountView
 }
 
-/**
- * Client-first account detail — the "standing in the driveway" lookup, so it has
- * to render from cache. Tabs are client state rather than `?view=` links, which
- * were an RSC round-trip per switch.
- */
+/** Client-first account detail that renders from cache. Tabs are client state. */
 export function AccountDetailView({ accountId, initialView }: AccountDetailViewProps) {
   const { archive: canArchive } = useCan()
   const hydrated = useIsHydrated()
@@ -251,11 +256,8 @@ function DetailsTab({ detail }: { detail: AccountDetail }) {
                       </div>
                     </div>
 
-                    {/* Unrouted means this property is skipped on the schedule
-                        entirely, so it gets the clay "needs attention" treatment.
-                        The picker is inline: this used to link to /app/routes
-                        carrying no property context, so you arrived at a list of
-                        every route with no memory of what you came to route. */}
+                    {/* Unrouted properties are skipped by the schedule, so: clay treatment plus an
+                       inline picker. */}
                     <CadenceSummary
                       property={property}
                       lastVisitOn={lastVisitByProperty?.[property.id] ?? null}
@@ -356,5 +358,189 @@ function AccountDetailSkeleton() {
       <PageHeaderSkeleton />
       <CardListSkeleton rows={3} height="h-32" />
     </div>
+  )
+}
+
+type CacheablePhoto = { storage_path: string; type: string | null }
+
+/**
+ * Object URLs for photos cached on the device, used when no signed URL is available — so a
+ * gate-code photo stays readable offline. Also caches new photos while online.
+ */
+function useCachedPhotoUrls(
+  photos: CacheablePhoto[],
+  // Pass `data` through as-is: a `?? {}` here would be a new object each render and loop.
+  signedUrls: Record<string, string> | undefined,
+): Record<string, string> {
+  const [objectUrls, setObjectUrls] = useState<Record<string, string>>({})
+  // Source of truth for what we've created, so a re-run can't mint a second URL
+  // for the same blob and leak the first.
+  const createdRef = useRef(new Map<string, string>())
+  const cacheablePaths = photos
+    .filter((p) => isCacheablePhoto(p.type))
+    .map((p) => p.storage_path)
+    .sort()
+    .join(',')
+  useEffect(() => {
+    let cancelled = false
+    const paths = cacheablePaths ? cacheablePaths.split(',') : []
+
+    async function run() {
+      for (const path of paths) {
+        if (cancelled) return
+        if (createdRef.current.has(path)) continue
+
+        let blob = await getCachedPhoto(path)
+
+        // Not cached yet — pull the bytes while a signed URL exists.
+        if (!blob) {
+          const signed = signedUrls?.[path]
+          if (!signed) continue
+          try {
+            const res = await fetch(signed)
+            if (!res.ok) continue
+            blob = await res.blob()
+            await putCachedPhoto(path, blob)
+          } catch {
+            // Offline, or the URL expired. Nothing to cache and nothing to say.
+            continue
+          }
+        }
+        if (cancelled || createdRef.current.has(path)) continue
+
+        const url = URL.createObjectURL(blob)
+        createdRef.current.set(path, url)
+        setObjectUrls((prev) => ({ ...prev, [path]: url }))
+      }
+    }
+
+    run()
+    return () => {
+      cancelled = true
+    }
+  }, [cacheablePaths, signedUrls])
+
+  useEffect(() => {
+    const created = createdRef.current
+    return () => {
+      for (const url of created.values()) URL.revokeObjectURL(url)
+      created.clear()
+    }
+  }, [])
+
+  return objectUrls
+}
+
+// Archive (soft delete) keeps visits, invoices and photos. Owner-only: callers gate on
+// role, and the enforce_owner_only_archive trigger enforces it.
+function DeleteButton({
+  noun,
+  description,
+  onDelete,
+}: {
+  noun: 'account' | 'property'
+  description: React.ReactNode
+  onDelete: () => Promise<{ error?: string }>
+}) {
+  const [pending, startTransition] = useTransition()
+
+  return (
+    <ConfirmDialog
+      trigger={
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-muted-foreground hover:text-destructive shrink-0"
+          aria-label={`Delete ${noun}`}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      }
+      title={`Delete this ${noun}?`}
+      description={description}
+      confirmLabel={`Delete ${noun}`}
+      pending={pending}
+      onConfirm={() =>
+        startTransition(async () => {
+          const res = await onDelete()
+          if (res.error) toast.error(`Could not delete ${noun}`, { description: res.error })
+        })
+      }
+    />
+  )
+}
+
+function DeleteAccountButton({
+  accountId,
+  accountName,
+  propertyCount,
+}: {
+  accountId: string
+  accountName: string
+  propertyCount: number
+}) {
+  const router = useRouter()
+  const refreshAccounts = useRefreshAccounts()
+
+  return (
+    <DeleteButton
+      noun="account"
+      onDelete={async () => {
+        const res = await archiveAccount(accountId)
+        if (res.error) return res
+        toast.success(`Deleted ${accountName}`)
+        refreshAccounts(accountId)
+        router.push('/app/accounts')
+        return {}
+      }}
+      description={
+        <>
+          <span className="font-medium text-foreground">{accountName}</span> will be removed from
+          accounts, the schedule, and route groups
+          {propertyCount > 0 && (
+            <>
+              , along with{' '}
+              <span className="font-medium text-foreground">
+                {propertyCount} {propertyCount === 1 ? 'property' : 'properties'}
+              </span>
+            </>
+          )}
+          . Completed visits and invoices are kept for your records, and any work that hasn&apos;t
+          been invoiced yet stays in the billing queue.
+        </>
+      }
+    />
+  )
+}
+
+function DeletePropertyButton({
+  propertyId,
+  accountId,
+  address,
+}: {
+  propertyId: string
+  accountId: string
+  address: string
+}) {
+  const refreshAccounts = useRefreshAccounts()
+
+  return (
+    <DeleteButton
+      noun="property"
+      onDelete={async () => {
+        const res = await archiveProperty(propertyId, accountId)
+        if (res.error) return res
+        toast.success('Property deleted')
+        refreshAccounts(accountId)
+        return {}
+      }}
+      description={
+        <>
+          <span className="font-medium text-foreground">{address}</span> will be removed from the
+          schedule and its route group. Past visits and photos are kept for your records, and any
+          work that hasn&apos;t been invoiced yet stays in the billing queue.
+        </>
+      }
+    />
   )
 }

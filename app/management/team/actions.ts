@@ -6,35 +6,17 @@ import { headers } from 'next/headers'
 // on why the @supabase/ssr client can't send that email.
 import { createClient as createAnonClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
+import { requireRole } from '@/lib/auth/server-role'
 import { createServiceClient } from '@/lib/supabase/service'
 import { employeeFormSchema, type EmployeeFormValues } from '@/lib/validators/employee'
 import { toUserMessage } from '@/lib/errors'
 
 /**
- * Team Server Actions (task 7.1). Owner-only.
- *
- * Enforcement is layered: the proxy gates /management/team to owner, the
- * employees RLS write policies are owner-only (migration
- * 20260724000000_employees_owner_only_writes), and every action here re-checks
- * via requireOwner(). The re-check matters most for inviteEmployee, which uses
- * the service-role client (RLS-bypassing) to send the magic link and link the
- * returned auth user — so it is NOT covered by the RLS gate.
+ * Team actions, owner-only. The proxy and RLS gate this too, but inviteEmployee uses the service
+ * client, so requireOwner() is its only check.
  */
 
-async function requireOwner(): Promise<{ error?: string }> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-  const { data: employee } = await supabase
-    .from('employees')
-    .select('role')
-    .eq('user_id', user.id)
-    .single()
-  if (employee?.role !== 'owner') return { error: 'Only owners can manage the team' }
-  return {}
-}
+const requireOwner = () => requireRole(['owner'], 'Only owners can manage the team')
 
 function employeePayload(data: EmployeeFormValues) {
   return {
@@ -76,10 +58,7 @@ export async function updateEmployee(
 
   const supabase = await createClient()
 
-  // employees.email and the Supabase Auth login email (auth.users.email) are
-  // independent — magic-link login only uses the auth email. For an already-
-  // invited employee (user_id set), keep them in sync: an owner is an admin, so
-  // push the change to auth immediately via updateUserById (no confirmation).
+  // Login uses the auth email, not employees.email; keep an invited user's auth email in sync.
   const { data: existing, error: fetchErr } = await supabase
     .from('employees')
     .select('user_id, email')
@@ -117,10 +96,7 @@ export async function updateEmployee(
   return {}
 }
 
-/**
- * SMS notification consent (used by the Phase 8.2 send-sms path). The DB column
- * is sms_opt_*out*, the UI toggle is opt-*in* — so store the inverse.
- */
+/** SMS consent (inert until SMS ships). The column is opt-out, the toggle opt-in. */
 export async function setEmployeeSmsOptIn(id: string, optIn: boolean): Promise<{ error?: string }> {
   const auth = await requireOwner()
   if (auth.error) return { error: auth.error }
@@ -143,10 +119,8 @@ async function resolveOrigin(): Promise<string> {
 }
 
 /**
- * Send a magic-link invite to an employee and link the returned auth user to
- * their employees row. Uses the service client because (a) inviteUserByEmail is
- * an admin API and (b) the freshly-created auth user has no employees row yet,
- * so get_my_role() is NULL and the RLS write would fail.
+ * Invite and link the new auth user. Service client: an admin API, and the new user has no
+ * role yet for RLS.
  */
 export async function inviteEmployee(id: string): Promise<{ error?: string }> {
   const auth = await requireOwner()
@@ -191,22 +165,8 @@ export async function inviteEmployee(id: string): Promise<{ error?: string }> {
 }
 
 /**
- * Re-send a sign-in link to an employee who already has app access.
- *
- * inviteUserByEmail works exactly once — it *creates* the auth user, so a second
- * call for the same address fails ("already been registered"). After the first
- * invite the recoverable action is a plain magic link, which is the same
- * one-time token the login page issues; the invite was only ever an
- * owner-triggered version of it. Both expire on the project's Email OTP
- * Expiration setting (1 hour by default), so an employee who misses the window
- * just needs another link — this can be run as many times as it takes.
- *
- * Sent through a bare supabase-js client rather than lib/supabase/server.ts:
- * @supabase/ssr forces flowType 'pkce', which would stash a code verifier in the
- * *owner's* cookies, leaving the employee's browser unable to complete the
- * exchange. supabase-js defaults to the implicit flow, which returns the session
- * in the URL fragment — the same shape invite links already arrive in, and
- * already handled by /auth/callback → /auth/confirm.
+ * Re-send a sign-in link (inviteUserByEmail only works once). Uses a bare supabase-js client:
+ * @supabase/ssr forces PKCE, which would put the code verifier in the owner's cookies.
  */
 export async function resendEmployeeInvite(id: string): Promise<{ error?: string }> {
   const auth = await requireOwner()

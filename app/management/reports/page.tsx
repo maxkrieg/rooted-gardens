@@ -15,13 +15,8 @@ interface Props {
 }
 
 /**
- * Revenue and operations reporting (task 8.4). Server-rendered: all three
- * datasets are aggregated on the server and handed to the charts as plain data,
- * so the client components never touch Supabase (CLAUDE.md Data Architecture —
- * `/management/*` is server-first).
- *
- * Visible to every management role; RLS already grants owner/lead/accountant
- * read on invoices, visits, visit_crew, accounts, and properties.
+ * Reports, server-rendered: data is aggregated here and handed to the charts. RLS grants all
+ * management roles the reads.
  */
 export default async function ReportsPage({ searchParams }: Props) {
   const { year: yearParam } = await searchParams

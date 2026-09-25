@@ -4,11 +4,7 @@ import { exchangeCodeForTokens, upsertIntegrationTokens } from '@/lib/quickbooks
 
 const STATE_COOKIE = 'qbo_oauth_state'
 
-/**
- * Handles the QuickBooks OAuth 2.0 redirect back from Intuit. Same
- * self-contained auth story as connect/route.ts — proxy.ts doesn't protect
- * /api/quickbooks/* at all.
- */
+/** QBO OAuth callback. Does its own auth: proxy.ts doesn't gate /api/*. */
 export async function GET(request: NextRequest) {
   function toBilling(qbo: string, reason?: string) {
     const url = new URL('/management/billing', request.url)

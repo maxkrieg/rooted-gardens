@@ -11,7 +11,9 @@ import {
   SheetTitle,
   SheetFooter,
 } from '@/components/ui/sheet'
-import { useUpdateCrewInstruction } from '@/hooks/useUpdateCrewInstruction'
+import { enqueueMutation } from '@/lib/offline/mutation-queue'
+import { nextVisitVersion } from '@/lib/utils/visits'
+import { useQueuedVisitMutation } from '@/hooks/useManagementSchedule'
 
 interface CrewInstructionSheetProps {
   visitId: string
@@ -21,10 +23,8 @@ interface CrewInstructionSheetProps {
 }
 
 /**
- * Focused editor for a visit's crew instruction (the "orange cell") — owner/lead
- * only. Cross-surface (used by VisitDetailContent on both management and crew),
- * mirrors the CrewAssignSheet/SkipSheet bottom-sheet pattern. Saves immediately
- * through the offline queue, so an owner can write one from the field.
+ * Editor for a visit's crew instruction (the orange cell), owner/lead only. Saves through the
+ * offline queue.
  */
 export function CrewInstructionSheet({
   visitId,
@@ -91,4 +91,24 @@ export function CrewInstructionSheet({
       </SheetContent>
     </Sheet>
   )
+}
+
+function useUpdateCrewInstruction(visitId: string) {
+  return useQueuedVisitMutation(visitId, {
+    enqueue: (instruction: string) =>
+      enqueueMutation('crew_instruction', { visitId, instruction: instruction.trim() || null }),
+    patchVisit: (visit, instruction) => ({
+      ...visit,
+      crew_instruction: instruction.trim() || null,
+      updated_at: nextVisitVersion(visit.updated_at),
+    }),
+    patchStop: (stop, instruction) => ({
+      ...stop,
+      visit: {
+        ...stop.visit,
+        crew_instruction: instruction.trim() || null,
+        updated_at: nextVisitVersion(stop.visit.updated_at),
+      },
+    }),
+  })
 }

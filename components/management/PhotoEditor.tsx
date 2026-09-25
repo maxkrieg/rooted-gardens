@@ -22,12 +22,8 @@ import { PHOTO_TYPES, type PhotoType } from '@/types/app'
 import { useRefreshAccounts } from '@/hooks/useAccounts'
 
 /**
- * Owner/lead controls for a single photo: caption, category, delete.
- *
- * Injected into the shared `PhotoLightbox` as its `footer` slot, and lives here
- * rather than in that component because it calls Server Actions — the shared
- * lightbox also renders on `/crew/*`, where those are forbidden. Mount this
- * keyed by photo id so the caption draft resets when navigating photos.
+ * Owner/lead caption, category and delete for one photo, injected as PhotoLightbox's footer.
+ * Separate because it calls Server Actions. Key by photo id.
  */
 export function PhotoEditor({
   accountId,
@@ -72,9 +68,7 @@ export function PhotoEditor({
       toast.success(`Moved to ${photoTypeLabel(next)}`)
       refreshAccounts(accountId)
       router.refresh()
-      // A type change re-partitions the groups, so this photo's index no longer
-      // means what it did. Closing is simpler and less surprising than trying to
-      // track it across the re-sort.
+      // A type change reshuffles the groups, so just close.
       onClose()
     })
   }

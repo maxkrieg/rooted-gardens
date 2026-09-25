@@ -7,14 +7,7 @@ import { syncCustomer, type SyncCustomerResult } from '@/lib/quickbooks/sync'
 import { buildAccountPayload } from '@/lib/utils/accounts'
 import { toUserMessage } from '@/lib/errors'
 
-/**
- * Create a new account.
- *
- * Re-validates on the server (never trust the client).
- * Uses the RLS-respecting server client — owner/lead INSERT policy (task 2.1) applies.
- * Nulls out billing fields that don't apply to the chosen billing_type so the DB
- * stays clean (e.g. per_visit accounts always have contract_rate = null).
- */
+/** Create an account, nulling billing fields that don't apply to its billing_type. */
 export async function createAccount(
   values: AccountFormValues,
 ): Promise<{ error?: string }> {
@@ -34,13 +27,7 @@ export async function createAccount(
   return {}
 }
 
-/**
- * Update an existing account.
- *
- * Same validation + payload conventions as createAccount.
- * The RLS owner/lead UPDATE policy + the accountant column-guard trigger (task 2.1) apply.
- * Revalidates both the list page and the account's own detail page.
- */
+/** Update an account; same conventions as createAccount. */
 export async function updateAccount(
   id: string,
   values: AccountFormValues,
@@ -66,26 +53,13 @@ export async function updateAccount(
 }
 
 /**
- * Archive (soft-delete) an account and every property under it.
- *
- * Not a real DELETE: visits, invoices, photos and leads.converted_account_id all FK
- * back here with NO ACTION, so the rows have to survive for billing history to keep
- * rendering. The app filters is_archived out of every live list, picker and schedule
- * instead. Owner-only, enforced by the enforce_owner_only_archive trigger.
- *
- * supabase-js has no transactions, so this is two statements, and the order matters:
- * properties first, then the account. If the second statement fails, the account is
- * still visible in the list so the owner can retry, and re-archiving already-archived
- * properties is idempotent. The reverse order would hide the account everywhere while
- * leaving its properties live on the Routes page, with no UI left to retry from.
+ * Archive (soft delete) an account and its properties; see "Archiving" in CLAUDE.md. Properties
+ * first: if the account update then fails, it's still visible to retry.
  */
 export async function archiveAccount(id: string): Promise<{ error?: string }> {
   const supabase = await createClient()
 
-  // Drop route-group assignments first. property_route_groups is a pure join table
-  // with no historical value (it already CASCADEs on property delete), and leaving
-  // rows behind would under-count the "unrouted properties" nav badge, which is
-  // computed as (properties − property_route_groups).
+  // Drop route assignments too, or the unrouted badge (properties − assignments) under-counts.
   const { data: propertyRows, error: propertyIdsError } = await supabase
     .from('properties')
     .select('id')
@@ -148,11 +122,7 @@ export async function archiveAccount(id: string): Promise<{ error?: string }> {
   return {}
 }
 
-/**
- * Server Action wrapper for lib/quickbooks/sync.ts's syncCustomer — link (or
- * refresh/verify) the account's QuickBooks customer. Revalidates the account
- * detail page so the fresh qbo_customer_id renders after the sync.
- */
+/** Link or refresh the account's QuickBooks customer. */
 export async function syncAccountWithQuickBooks(accountId: string): Promise<SyncCustomerResult> {
   const result = await syncCustomer(accountId)
   if (!result.error) {

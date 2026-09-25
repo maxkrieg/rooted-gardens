@@ -57,9 +57,7 @@ export default function StopDetailPage() {
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const keyboardOpen = useKeyboardOpen()
 
-  // A stop is routinely a cold entry point — the PWA launching straight into it,
-  // a shared link, or a jump from the management visit sheet — and in those
-  // cases there's no history to go back to, so the button would dead-end.
+  // A stop is often a cold entry point (PWA launch, shared link) with no history to go back to.
   const goBack = useCallback(() => {
     if (window.history.length > 1) router.back()
     else router.replace('/app/schedule')
@@ -81,15 +79,11 @@ export default function StopDetailPage() {
   const visitStartedAt = stop?.visit.started_at ?? optimisticStartedAt ?? null
   const visitEndedAt = stop?.visit.ended_at ?? null
   const inProgress = isVisitInProgress({ started_at: visitStartedAt, ended_at: visitEndedAt })
-  // Note: confirmDiscard is only read inside the `inProgress` branch below, so a
-  // stale `true` left over from a prior session never renders once inProgress
-  // goes false — no effect needed to reset it.
+  // confirmDiscard is only read while inProgress, so a stale `true` never renders.
 
   if (isLoading && !stop) return <LoadingSkeleton />
 
-  // A load failure and a genuinely missing stop both used to render "Stop not
-  // found." — which sends a crew member driving to the wrong conclusion about a
-  // job that is actually still on their list. Separate them.
+  // A load failure isn't "not found": the stop may still be on their list.
   if (isError && !stop) {
     return (
       <ErrorState
@@ -118,11 +112,7 @@ export default function StopDetailPage() {
   const { visit, account } = stop
   const isActive = visit.status !== 'completed' && visit.status !== 'skipped'
 
-  // Which week this visit belongs to — a visit is a (property × week) record, and
-  // crew arrive here from /app/schedule, which may be parked on any week.
-  // Weekday-anchored (matching the management VisitDetailSheet) because this is a
-  // statement of which week you're in, not a nav control: "Mon … Sun" leaves no
-  // doubt about the boundaries when the visit isn't the current week.
+  // The visit's week, weekday-anchored ("Mon … Sun") so the boundaries are unambiguous.
   const weekStartDate = parseISO(visit.week_start)
   const weekRange = `${format(weekStartDate, 'EEE MMM d')} – ${format(addDays(weekStartDate, 6), 'EEE MMM d')}`
 
@@ -140,9 +130,7 @@ export default function StopDetailPage() {
   async function handleDiscard() {
     if (!employee?.id || !inProgress) return
     setConfirmDiscard(false)
-    // Clear the optimistic start too — visitStartedAt falls back to it, so
-    // leaving it set would resurrect the timer the instant the server row
-    // comes back with started_at: null.
+    // Clear the optimistic start too, or the timer resurrects when started_at comes back null.
     setOptimisticStartedAt(null)
     queryClient.setQueryData<StopDetail | null>(['stop-detail', visitId], (old) =>
       old ? { ...old, visit: { ...old.visit, started_at: null } } : old
@@ -156,9 +144,7 @@ export default function StopDetailPage() {
 
   return (
     <>
-      {/* Sticky header — the two facts the body doesn't already shout: whose
-          property this is, and which week. The address is the hero just below,
-          so repeating it here would only cost scarce vertical space. */}
+      {/* Sticky header: account and week. The address is the hero just below. */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-[--border] px-4 py-2 flex items-center gap-2">
         <Button
           variant="ghost"
@@ -199,9 +185,8 @@ export default function StopDetailPage() {
         />
       </div>
 
-      {/* Fixed action bar — three inline icon+label actions above the bottom nav.
-          The offset is the nav's height, so it has to drop to 0 whenever the nav
-          hides for the keyboard or the bar leaves a 56px gap over it. */}
+      {/* Fixed action bar above the bottom nav; offset drops to 0 when the nav hides for the
+         keyboard. */}
       <div
         className="fixed inset-x-0 z-40 bg-background/95 backdrop-blur border-t border-[--border] px-4 pt-2 pb-2"
         style={{ bottom: keyboardOpen ? '0px' : 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }}

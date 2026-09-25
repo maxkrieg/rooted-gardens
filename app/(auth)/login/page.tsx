@@ -27,12 +27,8 @@ function LoginForm({
   const [email, setEmail] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
-  // `?detail=` used to carry the raw GoTrue message straight into the page; the
-  // callback no longer sends it. An expired or already-used link is by far the
-  // most common cause, so name it rather than saying "sign-in failed".
-  // `no-employee-record` is a distinct case from proxy.ts: the sign-in itself
-  // worked, but there's no `employees` row for this auth user — requesting a
-  // new magic link would just loop back here, so say that instead.
+  // Name the likely cause (an expired or used link). `no-employee-record` means sign-in worked
+  // but there's no employees row, so a new link would just loop.
   const [error, setError] = useState<string | null>(
     params.error === 'no-employee-record'
       ? 'You’re signed in, but this account isn’t set up as a team member yet. Ask an owner to add you.'
@@ -85,8 +81,7 @@ function LoginForm({
   return (
     <main className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm space-y-6">
-        {/* Since / became the public marketing home (task 9.2), staff landing
-            here on a stale bookmark or a mistyped URL need a way back out. */}
+        {/* A way back out for staff who land here from a stale bookmark. */}
         <Link
           href="/"
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground w-fit"

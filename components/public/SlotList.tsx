@@ -4,17 +4,8 @@ import { EditableText } from '@/components/public/editing/EditableText'
 import type { PageContent, SitePage } from '@/types/app'
 
 /**
- * Renders a fixed run of `{prefix}_{n}_title` / `{prefix}_{n}_body` slot
- * pairs (1-indexed) as a card grid — the "philosophy" / "principles" /
- * "process" sections on the lawn, gardens, and about pages (task 9.4). Each
- * card is a plain server-rendered `<li>` wrapping two `EditableText`s, so
- * every title and body stays independently editable through the 9.2.5
- * editor — this component owns only the layout, never the copy.
- *
- * Deliberately a fixed slot count rather than a new `site_collection_items`
- * collection: these lists are part of the page's designed structure (the
- * plan is explicit that layout stays code-controlled), not an
- * owner-managed, arbitrary-length list like FAQ/jobs/team.
+ * A fixed run of `{prefix}_{n}_title` / `_body` slot pairs as a card grid. Fixed count, not a
+ * collection: these lists are part of the page's design.
  */
 export function SlotList({
   page,

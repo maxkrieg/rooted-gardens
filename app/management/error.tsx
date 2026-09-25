@@ -3,10 +3,7 @@
 import { useEffect } from 'react'
 import { ErrorState } from '@/components/states/ErrorState'
 
-/**
- * Nested inside `app/management/layout.tsx` so the sidebar survives and the owner
- * can navigate elsewhere rather than being stranded on a dead screen.
- */
+/** Nested under the management layout so the nav survives. */
 export default function ManagementError({
   error,
   reset,

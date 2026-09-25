@@ -20,18 +20,13 @@ export interface NavItem {
   alsoActiveFor?: string[]
 }
 
-/**
- * Every destination in the app, in sidebar order: field routes first, then the
- * desk routes. Access is not encoded here — it comes from `canAccessRoute`, so
- * the nav and the proxy gate can never disagree.
- */
-export const NAV_ITEMS: NavItem[] = [
+/** Every destination in sidebar order. Access comes from canAccessRoute, shared with the proxy. */
+const NAV_ITEMS: NavItem[] = [
   {
     href: '/app/schedule',
     label: 'Schedule',
     icon: CalendarDays,
-    // A stop is opened from the schedule and returns to it. Before the merge
-    // /crew/stop/* lit up no tab at all.
+    // A stop is opened from the schedule and returns to it.
     alsoActiveFor: ['/app/stop'],
   },
   { href: '/app/routes', label: 'Routes', icon: Route },
@@ -44,13 +39,8 @@ export const NAV_ITEMS: NavItem[] = [
 ]
 
 /**
- * Which destinations get a bottom-bar tab, per role. Everything else the role
- * can reach goes in `More`.
- *
- * The rule: the bar holds what works offline, `More` holds what needs a
- * connection — the same field/desk split as the data architecture. The
- * accountant is the one desk-first user, so their two desk routes are the ones
- * promoted. Cap is 3, leaving the 4th slot for `More`.
+ * Bottom-bar tabs per role (max 3, plus More). The bar holds what works offline; More holds
+ * what needs a connection.
  */
 const BAR_BY_ROLE: Record<EmployeeRole, string[]> = {
   owner: ['/app/schedule', '/app/routes', '/app/accounts'],

@@ -66,9 +66,7 @@ export function SkipSheet({
 
     const result = await flushMutationQueue()
 
-    // The cache used to be set to 'skipped' and the sheet closed regardless, so
-    // a skip that never landed looked done forever. Queued-while-offline is
-    // still success; a parked mutation is not.
+    // Queued-while-offline counts as success; a parked mutation doesn't.
     if (result.failed > 0) {
       setSubmitting(false)
       toast.error('That didn’t save.', {

@@ -1,11 +1,7 @@
 import { cn } from '@/lib/utils'
 import { StateMark, type StateMarkVariant } from '@/components/states/StateMark'
 
-/**
- * The one empty state for the whole app. Pick `variant` carefully (see
- * StateMark) — it's what tells an accountant an empty billing queue is good news
- * rather than a gap.
- */
+/** The app's one empty state. `variant` says whether empty is good news or a gap. */
 export function EmptyState({
   variant = 'seed',
   title,

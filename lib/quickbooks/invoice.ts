@@ -11,11 +11,8 @@ const SERVICE_ITEM_NAME = process.env.QBO_SERVICE_ITEM_NAME || 'Services'
 let cachedItemId: string | null = null
 
 /**
- * Resolves the one shared QBO Product/Service every invoice line bills
- * against (see lib/quickbooks/invoice.ts's module doc for why this app uses a
- * single shared item rather than one per customer). Never auto-creates it —
- * that would also require picking/creating an Income account, an accounting
- * decision that should stay with the accountant.
+ * The one shared QBO Service item every line bills against. Never auto-created: that means
+ * picking an Income account, which is the accountant's call.
  */
 async function getServiceItemId(qbo: QuickBooks): Promise<string> {
   if (cachedItemId) return cachedItemId
@@ -32,7 +29,7 @@ async function getServiceItemId(qbo: QuickBooks): Promise<string> {
   return item.Id
 }
 
-export interface AccountInvoiceResult {
+interface AccountInvoiceResult {
   qboInvoiceId?: string
   error?: string
 }
@@ -50,26 +47,9 @@ interface InvoiceLine {
 }
 
 /**
- * Creates one QBO Invoice for a single account's selected visits — one line
- * per visit for per_visit accounts, one flat-rate summary line for contract
- * accounts (this app bills contract accounts a flat periodic rate regardless
- * of visit count — never one line per visit for those). Every line bills
- * against the single shared "Services" item (see getServiceItemId) rather
- * than a per-customer item — this app always sets each line's exact dollar
- * amount explicitly from price_per_visit/contract_rate, so it never needs an
- * item's own default price the way manual QBO data entry does.
- *
- * An account whose billing_type is neither per_visit nor contract has no rate to
- * bill against, so it errors here rather than being silently skipped. The app
- * only writes those two types, but the DB CHECK still permits the retired
- * 'as_needed' value, and the caller (actions.ts) already filters such rows out —
- * so this is a defensive backstop, not the primary skip point.
- *
- * `options.amountOverride` lets a caller bill a contract account something
- * other than its stored `contract_rate` — used by the Contracts tab's ad-hoc
- * invoicing (createContractInvoice) so an owner can invoice a one-off amount
- * without changing the account's standing rate. Only meaningful for
- * `contract`; ignored for `per_visit`.
+ * One QBO invoice for an account: a line per visit (per_visit) or one flat line (contract), all
+ * on the shared item with explicit amounts. Other billing types error as a backstop.
+ * `amountOverride` bills a contract account a one-off amount.
  */
 export async function pushAccountInvoice(
   qbo: QuickBooks,
@@ -129,9 +109,7 @@ export async function pushAccountInvoice(
     return { qboInvoiceId: invoice.Id }
   } catch (err) {
     console.error('[pushAccountInvoice] createInvoice', describeQboError(err))
-    // Forward Intuit's own validation message when there is one — it's written
-    // for a bookkeeper ("Duplicate Document Number") and is exactly what the
-    // accountant needs to fix it. Without it they only knew that it failed.
+    // Forward Intuit's validation message; it's written for a bookkeeper.
     const fault = qboFaultMessage(err)
     return { error: fault ? `QuickBooks rejected the invoice — ${fault}` : 'QuickBooks rejected the invoice.' }
   }

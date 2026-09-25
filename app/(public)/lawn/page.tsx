@@ -8,14 +8,7 @@ import { BulletList } from '@/components/public/BulletList'
 
 export const generateMetadata = () => pageMetadata('lawn')
 
-/**
- * The Electric Lawn division page (task 9.4). 9.2 shipped just heading +
- * intro + a hardcoded CTA button; this adds a hero photo, the "why
- * electric" stat cards, the mowing philosophy (SlotList), a services list,
- * and the division's own contact block (the `global.lawn_contact_*` slots —
- * same ones the footer and /contact edit, so a change in any one place
- * shows up everywhere).
- */
+/** The Electric Lawn page. The contact block uses the shared `global.lawn_contact_*` slots. */
 export default async function LawnPage() {
   const content = await getPageContent('lawn')
   const slot = (key: string) => getSlot(content, key)

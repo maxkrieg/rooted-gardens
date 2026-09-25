@@ -61,19 +61,13 @@ function accountTotal(group: AccountGroup): number {
   return price * group.visits.length
 }
 
-// The Queue's own date filter adds an "All time" default on top of the History
-// tab's presets — the Queue's job is to surface *every* unbilled visit so nothing
-// old is missed, so it must not hide old work by default the way History does.
+// Adds an "All time" default: the queue must never hide old unbilled work.
 type QueueDatePreset = 'all' | DateRangePreset
 type SortKey = 'account' | 'visits' | 'total'
 
 /**
- * The billing invoice queue — one row per (per_visit) account with uninvoiced,
- * completed visits. Checking an account row and pushing bills *all* of that
- * account's shown uninvoiced visits onto a single QBO invoice ("bazooka");
- * clicking a row opens a drawer to hand-pick which visits go on the invoice
- * instead. Sortable columns + the same Date/Account filters as the Invoices tab
- * (applied in-memory here — the queue already holds every uninvoiced visit).
+ * Invoice queue: one row per per_visit account with uninvoiced visits. Checking a row bills all
+ * its visits on one invoice; clicking it opens a drawer to pick visits.
  */
 export function InvoiceQueue({ visits, qboConnected }: InvoiceQueueProps) {
   const [selectedAccountIds, setSelectedAccountIds] = useState<Set<string>>(() => new Set())
@@ -89,10 +83,7 @@ export function InvoiceQueue({ visits, qboConnected }: InvoiceQueueProps) {
    *  longer than a toast — the accountant needs to work through them one by one. */
   const [pushResults, setPushResults] = useState<PushResult[] | null>(null)
 
-  // Reset selection whenever the visit set changes (e.g. after a push
-  // revalidates the page) — nothing is pre-selected, so a stale id from a
-  // now-invoiced account never lingers. Render-phase reset (React's recommended
-  // pattern) rather than an effect, to avoid an extra render pass.
+  // Reset selection when the visit set changes, so an invoiced account's id can't linger.
   const [prevVisits, setPrevVisits] = useState(visits)
   if (visits !== prevVisits) {
     setPrevVisits(visits)

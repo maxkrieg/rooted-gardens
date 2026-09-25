@@ -17,18 +17,8 @@ interface RoleContextValue {
 const RoleContext = createContext<RoleContextValue | null>(null)
 
 /**
- * The single source of role and capability for the app shell and everything
- * under it, replacing the `role` prop that was threaded through the schedule,
- * accounts, and visit-detail trees.
- *
- * `initialRole` comes from the httpOnly `rg-role` cookie, read server-side —
- * a seed, not the truth. The cookie lives 12h so a role change can lag, and the
- * page HTML may itself be served from the service worker cache. `employees.role`
- * via React Query is authoritative and wins as soon as it lands.
- *
- * Seeding from the cookie rather than querying the DB in the layout is
- * deliberate: a field route has to render offline, where a layout-time Supabase
- * round-trip cannot resolve.
+ * Role and capabilities for the shell. `initialRole` is the `rg-role` cookie, a seed only:
+ * employees.role via React Query wins when it lands. Cookie-seeded so field routes render offline.
  */
 export function RoleProvider({
   initialRole,
@@ -42,11 +32,8 @@ export function RoleProvider({
   const { data, isSuccess } = useCurrentEmployee()
 
   const value = useMemo<RoleContextValue>(() => {
-    // A persisted `current-employee` entry can outlive the session that wrote
-    // it, so a row belonging to someone else is ignored rather than trusted —
-    // it would otherwise hand this person the previous user's role. The mount
-    // refetch replaces it; until then the cookie seed (which is user-keyed)
-    // stands.
+    // Ignore a persisted employee row that belongs to someone else; the cookie seed stands until
+    // the refetch.
     const stale = !!data && !!userId && !!data.user_id && data.user_id !== userId
     const employee = stale ? undefined : data
 
@@ -77,13 +64,8 @@ export function useRole() {
 }
 
 /**
- * What the signed-in person may do.
- *
- * ```ts
- * const { editSchedule } = useCan()
- * ```
- *
- * Affordance only — never the security boundary. RLS is.
+ * What the signed-in person may do: `const { editSchedule } = useCan()`.
+ * Affordance only; RLS is the boundary.
  */
 export function useCan(): Capabilities {
   return useRoleContext().can

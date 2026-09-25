@@ -25,13 +25,7 @@ export type AccountGroup = {
   visits: VisitWithLocation[]
 }
 
-/**
- * Clusters uninvoiced visits by account only (not by month) — one group per
- * account, which maps to exactly one QBO invoice per account when pushed. The
- * owner now decides which visits land on which invoice (via the account-row
- * "bazooka" push or the per-account selective drawer), so the queue no longer
- * force-splits a push by calendar month. Sorted by account name.
- */
+/** Groups uninvoiced visits by account (one QBO invoice each), sorted by name. */
 export function groupVisitsByAccount(visits: VisitWithLocation[]): AccountGroup[] {
   const map = new Map<string, AccountGroup>()
   for (const visit of visits) {
@@ -73,12 +67,7 @@ export interface ResolvedDateRange {
   customEnd?: string
 }
 
-/**
- * Resolves the History tab's date-range filter (replaces the old single-month
- * paging) from URL search params. `range` defaults to `this_month` — same
- * default window the tab always had. `start`/`end` (yyyy-MM-dd) only matter
- * when `range=custom`.
- */
+/** History date range from URL params; defaults to this_month. start/end apply only to custom. */
 export function resolveDateRange(params: {
   range?: string
   start?: string

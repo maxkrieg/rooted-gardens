@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { addWeeks, format } from 'date-fns'
 import { getWeekStart, parseWeekParam } from '@/lib/utils/schedule'
 import {
@@ -33,20 +33,16 @@ import { Button } from '@/components/ui/button'
 import { ScheduleFilterBar } from '@/components/management/ScheduleFilterBar'
 import { ScheduleFilterSheet } from '@/components/management/ScheduleFilterSheet'
 import { ScheduleHeaderMobile } from '@/components/management/ScheduleHeaderMobile'
-import {
-  ScheduleViewToggle,
-  type ScheduleViewMode,
-} from '@/components/management/ScheduleViewToggle'
 import { DashboardView } from '@/components/management/DashboardView'
 import { GenerateWeekSheet } from '@/components/management/GenerateWeekSheet'
 import { useWeekPlan, useGenerateWeek } from '@/hooks/useGenerateWeek'
-import { ScheduleStickyBar } from '@/components/management/ScheduleStickyBar'
 import { ScheduleRealtime } from '@/components/management/ScheduleRealtime'
 import { DeepLinkedVisitSheet } from '@/components/management/DeepLinkedVisitSheet'
-import { ScheduleSkeleton } from '@/components/management/ScheduleSkeleton'
 import { CachedNotice } from '@/components/states/CachedNotice'
 import { ErrorState } from '@/components/states/ErrorState'
 import type { Account } from '@/types/app'
+import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
 
 interface ScheduleViewProps {
   initialWeek: string
@@ -59,11 +55,7 @@ interface ScheduleViewProps {
 
 const VIEW_MODE_KEY = 'rg-schedule-view'
 
-/**
- * Client-first schedule. Week and filter state live here rather than in the URL's
- * server round-trip, so paging and filtering work with no signal; the URL is kept
- * in sync with replaceState purely so a view stays shareable.
- */
+/** Client-first schedule. Week and filters live in state, mirrored to the URL for sharing. */
 export function ScheduleView({
   initialWeek,
   initialFilters,
@@ -72,9 +64,8 @@ export function ScheduleView({
 }: ScheduleViewProps) {
   const [windowStart, setWindowStart] = useState(initialWeek)
   const [filters, setFilters] = useState<ScheduleFilterValues>(initialFilters)
-  // Must stay equal to the `lg:` breakpoint the two layouts switch on (see the
-  // breakpoint rule in CLAUDE.md): if this and the CSS disagree, a phone either
-  // fetches three weeks it never renders or renders a grid it never fetched.
+  // Must match the `lg:` breakpoint the layouts switch on, or a phone fetches weeks it never
+  // renders.
   const isWide = useMediaQuery('(min-width: 1024px)')
   const weekCount = isWide ? 4 : 1
   const hydrated = useIsHydrated()
@@ -85,11 +76,8 @@ export function ScheduleView({
   const [sortOverride, setSortOverride] = useState<ScheduleSortState | null>(null)
   const { editSchedule: canEdit, seeDashboard } = useCan()
 
-  // Last-used view wins on open, so whichever one he actually lives in is the
-  // default. Resolved rather than stored in state: localStorage doesn't exist
-  // during the server render, and syncing it into state in an effect would
-  // render the wrong tab once before correcting it. Precedence is
-  // explicit tap → explicit ?view= → last used → Week.
+  // Resolved, not stored: localStorage doesn't exist on the server. Precedence: tap → ?view= →
+  // last used → Week.
   const storedViewMode = useMemo<ScheduleViewMode | null>(() => {
     if (!hydrated) return null
     try {
@@ -100,9 +88,7 @@ export function ScheduleView({
     }
   }, [hydrated])
 
-  // Crew never had a dashboard and shouldn't get one here — it carries
-  // company-wide stats and uninvoiced counts. No toggle, no Today, no
-  // 44px of chrome they'd never use.
+  // Crew get no Today view: it carries company-wide stats.
   const requested = viewOverride ?? initialViewMode ?? storedViewMode ?? 'week'
   const viewMode: ScheduleViewMode = seeDashboard ? requested : 'week'
 
@@ -115,10 +101,7 @@ export function ScheduleView({
     }
   }
 
-  // Same resolve-don't-store shape as the view mode above, for the same reason:
-  // localStorage doesn't exist during the server render. Defaults to drive
-  // order — sort_order is the sequence the crew drive, and priority is the
-  // deliberate override an owner reaches for while planning.
+  // Resolved like the view mode. Defaults to drive order; priority is the planning override.
   const storedSort = useMemo<ScheduleSortState | null>(() => {
     if (!hydrated) return null
     try {
@@ -277,10 +260,7 @@ export function ScheduleView({
         </div>
       </ScheduleStickyBar>
 
-      {/* Under the sticky bar, not inside it — it scrolls away, because once
-          you're reading the week you don't need these pinned. The sort switch
-          is here rather than in the header row: that row is already six targets
-          wide and the week label is what truncates first. */}
+      {/* Under the sticky bar so it scrolls away; the header row has no room left. */}
       {(seeDashboard || viewMode !== 'today') && (
         <div className="mb-2 flex items-center gap-2 lg:mb-3">
           {seeDashboard && (
@@ -340,9 +320,7 @@ export function ScheduleView({
             onGroupSortChange={changeGroupSort}
           />
         </div>
-        {/* -mx-4 cancels the (padded) layout's p-4 so the route cards run to
-            both viewport edges — the phone list needs every pixel for the
-            account name and address. Desktop keeps the page padding. */}
+        {/* -mx-4 cancels page padding so the phone list runs edge to edge. */}
         <div className="lg:hidden -mx-4">
           <ScheduleListMobile
             week={mobileWeek}
@@ -371,4 +349,101 @@ function dedupeAccounts(accounts: Account[]): Account[] {
     if (!byId.has(account.id)) byId.set(account.id, account)
   }
   return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/** First-load placeholder for ScheduleView. Shares its shape with
+ *  app/app/(padded)/schedule/loading.tsx, which covers the RSC shell. */
+function ScheduleSkeleton() {
+  return (
+    <div>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <Skeleton className="h-8 w-32" />
+        <Skeleton className="h-10 w-48 rounded-md" />
+      </div>
+      <div className="mb-6 flex flex-wrap gap-2">
+        <Skeleton className="h-10 w-56 rounded-md" />
+        <Skeleton className="h-10 w-36 rounded-md" />
+        <Skeleton className="h-10 w-36 rounded-md" />
+      </div>
+      <div className="space-y-6">
+        {Array.from({ length: 3 }).map((_, group) => (
+          <div key={group} className="space-y-2">
+            <Skeleton className="h-4 w-40" />
+            {Array.from({ length: 4 }).map((_, row) => (
+              <Skeleton key={row} className="h-14 rounded-xl" />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+type ScheduleViewMode = 'today' | 'week'
+
+/** `Today | Week` — the dashboard folded into the schedule. */
+function ScheduleViewToggle({
+  value,
+  onChange,
+}: {
+  value: ScheduleViewMode
+  onChange: (value: ScheduleViewMode) => void
+}) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Schedule view"
+      className="flex gap-1 rounded-lg bg-secondary p-1"
+    >
+      {(['today', 'week'] as const).map((mode) => (
+        <button
+          key={mode}
+          role="tab"
+          type="button"
+          aria-selected={value === mode}
+          onClick={() => onChange(mode)}
+          className={cn(
+            'min-h-9 flex-1 rounded-md text-sm font-semibold capitalize transition-colors',
+            value === mode
+              ? 'bg-card text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          {mode}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * Sticks the filters and week nav to the top, publishing its height as --schedule-sticky-h for
+ * ScheduleGrid's header. On a phone it re-applies page padding itself so it spans edge to edge.
+ */
+function ScheduleStickyBar({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const publish = () => {
+      document.documentElement.style.setProperty('--schedule-sticky-h', `${el.offsetHeight}px`)
+    }
+    publish()
+    const observer = new ResizeObserver(publish)
+    observer.observe(el)
+    return () => {
+      observer.disconnect()
+      document.documentElement.style.removeProperty('--schedule-sticky-h')
+    }
+  }, [])
+
+  return (
+    <div
+      ref={ref}
+      className="sticky top-0 z-40 -mx-4 bg-background px-4 pb-2 mb-2 lg:mx-0 lg:px-0 lg:pb-3 lg:mb-3"
+    >
+      {children}
+    </div>
+  )
 }

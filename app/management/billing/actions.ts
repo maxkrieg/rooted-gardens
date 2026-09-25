@@ -11,25 +11,11 @@ import { groupVisitsByAccount } from '@/lib/utils/billing'
 import type { Account, Invoice, InvoiceWithVisits, VisitWithLocation } from '@/types/app'
 
 /**
- * All completed, not-yet-invoiced visits, joined to property + account —
- * every uninvoiced visit regardless of month, so nothing sitting in an old
- * month goes unnoticed (the Queue groups these by account; see
- * groupVisitsByAccount). Filters on `status`/`invoice_id` only, hitting
- * the `visits_uninvoiced_idx` partial index
- * (`WHERE status='completed' AND invoice_id IS NULL`). Ordered oldest-first
- * — the oldest unbilled work is the most overdue/actionable.
- *
- * Restricted to `per_visit` accounts — the ones priced by the visit, which the
- * accountant sweeps into one invoice per month. `contract` accounts are billed a
- * flat rate per period regardless of visit count (Contracts tab /
- * createContractInvoice), so they're the wrong fit for a visit-completion-driven
- * queue (see docs/INVOICING.md).
+ * Completed, uninvoiced per_visit visits, oldest first. Contract accounts bill by period, not
+ * visit.
  */
-/**
- * Billing reads used to return `[]` on failure, which the accountant reads as
- * "nothing to invoice" — the most expensive false-empty in the app.
- */
-export interface LoadResult<T> {
+/** Returns an error rather than [] so a failed load never reads as "nothing to invoice". */
+interface LoadResult<T> {
   data: T
   loadError?: boolean
 }
@@ -65,25 +51,8 @@ export interface PushResult {
 }
 
 /**
- * Pushes the selected visits to QuickBooks as real invoices, grouped by
- * account — one QBO Invoice per account (one line per visit for per_visit
- * accounts), combining every selected visit for that account regardless of
- * which month it was completed in. The owner now decides exactly which visits
- * go on which invoice (the account-row "bazooka" push sends all of an account's
- * uninvoiced visits; the per-account drawer sends a hand-picked subset), so the
- * push deliberately no longer force-splits by calendar month. Re-fetches and
- * re-groups the visits server-side rather than trusting client-supplied grouping,
- * since this is a money-moving operation.
- *
- * On success each group inserts one row into the canonical `invoices` table
- * (the record the History tab and status-sync read), then tags its visits with
- * that `invoice_id`. The invoices insert comes first because the visit tag now
- * points at it — so a failed insert fails the whole group (the invoice exists in
- * QBO but can't be recorded locally; same actionable error as before, just now
- * the primary failure path).
- *
- * Per group, not all-or-nothing across the batch: one group failing never
- * blocks or rolls back another group's push in the same batch.
+ * Pushes visits to QBO, one invoice per account. Re-groups server-side since this moves money.
+ * Each group inserts its invoices row, then tags visits; a failed group never blocks the others.
  */
 export async function pushInvoicesToQuickBooks(visitIds: string[]): Promise<PushResult[]> {
   if (visitIds.length === 0) return []
@@ -123,10 +92,7 @@ export async function pushInvoicesToQuickBooks(visitIds: string[]): Promise<Push
   const results: PushResult[] = []
 
   for (const group of groups) {
-    // Defensive backstop. The queue only ever loads per_visit accounts, and the
-    // app can no longer create any other type here — but the DB CHECK still
-    // permits the retired 'as_needed' value, so a legacy row is refused with a
-    // clear message instead of being priced off a null rate.
+    // Backstop for a legacy 'as_needed' row: refuse rather than price it off a null rate.
     if (group.account.billing_type !== 'per_visit' && group.account.billing_type !== 'contract') {
       results.push({
         accountId: group.account.id,
@@ -170,10 +136,7 @@ export async function pushInvoicesToQuickBooks(visitIds: string[]): Promise<Push
       error: `Invoice ${invoiceRes.qboInvoiceId} created in QuickBooks but could not be recorded locally — record it manually`,
     })
 
-    // Insert the canonical invoices row first (the visit tag points at it).
-    // Contract accounts don't reach the Queue, so this is effectively per_visit;
-    // the contract branch below is a defensive backstop for a legacy contract
-    // visit that somehow lands here.
+    // Insert the invoices row first — the visit tag points at it.
     const isContract = group.account.billing_type === 'contract'
     const total = isContract
       ? Number(group.account.contract_rate)
@@ -196,10 +159,7 @@ export async function pushInvoicesToQuickBooks(visitIds: string[]): Promise<Push
       continue
     }
 
-    // Tag the visits with the invoice they were billed on. The per-line dollar
-    // amount isn't stored on the visit — the History tab derives it as
-    // invoices.amount / visit count (every per_visit line is billed at the same
-    // price, so that's exact and stays a point-in-time snapshot).
+    // No per-line amount on the visit; History derives it as invoices.amount / visit count.
     const { error: updErr } = await supabase
       .from('visits')
       .update({ invoice_id: invoiceRow.id })
@@ -225,19 +185,12 @@ export async function pushInvoicesToQuickBooks(visitIds: string[]): Promise<Push
   return results
 }
 
-export interface DateRange {
+interface DateRange {
   start: Date
   end: Date
 }
 
-/**
- * Every invoice created in a date range, joined to its account and the visits it
- * billed — the invoices-primary source for the Billing "History" tab. Range
- * filters on `invoices.created_at` (a real top-level column — the "invoiced"
- * moment), and one nested embed brings the account + per-visit detail rows along
- * in a single query. For contract invoices the embedded visits are just the
- * cosmetically-tagged ones and aren't rendered.
- */
+/** Invoices created in a date range, with account and visits, for the History tab. */
 export async function getInvoicesForRange({
   start,
   end,
@@ -266,13 +219,7 @@ export interface RevenueSummary {
   loadError?: boolean
 }
 
-/**
- * MTD/YTD invoiced revenue, split by billing type. Reads the canonical
- * `invoices` table directly — `amount` is always the single total per invoice,
- * so there's no double-counting to guard against (unlike the old split between
- * visits.invoice_amount and contract_invoices). Pulls the whole calendar year in
- * one query (small volume at this company's scale) and reduces both windows in JS.
- */
+/** MTD/YTD invoiced revenue by billing type, reduced in JS from one year-long query. */
 export async function getRevenueSummary(): Promise<RevenueSummary> {
   const supabase = await createClient()
   const now = new Date()
@@ -317,12 +264,7 @@ export async function getRevenueSummary(): Promise<RevenueSummary> {
   return { mtd: { ...mtd, label: monthLabel }, ytd: { ...ytd, label: yearLabel } }
 }
 
-/**
- * Every active contract account paired with its most recent contract invoice
- * (or null if never invoiced) — backs the Contracts tab. Unlike the Queue,
- * this always lists every contract account regardless of visit activity,
- * since contract billing isn't visit-driven (see docs/INVOICING.md).
- */
+/** Every active contract account with its latest contract invoice, for the Contracts tab. */
 export interface ContractAccountOverview {
   account: Account
   lastInvoice: Invoice | null
@@ -366,7 +308,7 @@ export async function getContractAccountsOverview(): Promise<
   }
 }
 
-export interface CreateContractInvoiceInput {
+interface CreateContractInvoiceInput {
   accountId: string
   periodLabel: string
   periodStart: string // 'yyyy-MM-dd'
@@ -374,23 +316,15 @@ export interface CreateContractInvoiceInput {
   amount: number
 }
 
-export interface CreateContractInvoiceResult {
+interface CreateContractInvoiceResult {
   success: boolean
   qboInvoiceId?: string
   error?: string
 }
 
 /**
- * Creates an ad-hoc invoice for a contract account, independent of visit
- * activity — a period with zero completed visits still owes the flat rate.
- * Bills `input.amount`, not `account.contract_rate` — the dialog prefills with
- * the account's standing rate, but the owner can override it to bill a one-off
- * amount without changing the account's rate. Reuses pushAccountInvoice's
- * `amountOverride` option.
- *
- * Inserts one row into the canonical `invoices` table (with the period_* fields),
- * then tags any completed visits in the period with that `invoice_id` (the amount
- * lives on the invoice row — a contract invoice isn't visit-driven).
+ * Invoices a contract account for a period, regardless of visits. Bills `input.amount`, which
+ * may override the standing rate, then tags any completed visits in the period.
  */
 export async function createContractInvoice(
   input: CreateContractInvoiceInput,
@@ -484,7 +418,7 @@ export async function createContractInvoice(
   return { success: true, qboInvoiceId: invoiceRes.qboInvoiceId }
 }
 
-export interface RefreshInvoiceStatusesResult {
+interface RefreshInvoiceStatusesResult {
   processed: number
   errors: number
   /** Which invoices failed — a bare "3 failed" left nothing to act on. */
@@ -493,14 +427,7 @@ export interface RefreshInvoiceStatusesResult {
   reason?: string
 }
 
-/**
- * Manual "Refresh now" — pulls current QBO status for a specific set of invoices
- * on demand (the History tab's currently-visible rows), so the accountant can
- * confirm an invoice went out right after sending it from inside QuickBooks,
- * without waiting for the daily cron. Runs under the authenticated user's RLS
- * client (permitted by the invoices_update policy) and reuses the same
- * per-invoice sync logic as the cron.
- */
+/** Manual "Refresh now": syncs QBO status for the given invoices under the user's RLS client. */
 export async function refreshInvoiceStatuses(
   invoiceIds: string[],
 ): Promise<RefreshInvoiceStatusesResult> {
@@ -541,19 +468,12 @@ export async function refreshInvoiceStatuses(
   return { processed, errors: failedInvoiceIds.length, failedInvoiceIds }
 }
 
-/** How recently an invoice must have been synced for the background poll to skip
- *  it — the throttle that keeps the History tab's auto-refresh from hammering the
- *  QBO API. The manual "Refresh now" button deliberately ignores this (force-now). */
+/** The background poll skips invoices synced more recently than this. */
 const POLL_STALENESS_MS = 45_000
 
 /**
- * Background auto-refresh for the History tab: syncs QBO status for the visible
- * invoices, but ONLY those that are (a) not already `paid` (terminal — won't
- * change) and (b) not synced within the last POLL_STALENESS_MS. That staleness
- * gate is what makes it safe to call on a short interval / on every tab refocus /
- * from multiple open tabs — QBO gets hit at most about once per invoice per
- * window, no matter how often the client polls. Silent (no toasts); returns how
- * many it actually synced so the client can skip a re-render when nothing changed.
+ * Background History refresh: syncs unpaid invoices not synced within POLL_STALENESS_MS, so it's
+ * safe to call often. Silent; returns how many synced.
  */
 export async function pollInvoiceStatuses(invoiceIds: string[]): Promise<{ synced: number }> {
   if (invoiceIds.length === 0) return { synced: 0 }

@@ -1,7 +1,4 @@
-// Minimal ambient types for `intuit-oauth` and `node-quickbooks` — neither ships
-// official TypeScript types. Only the members actually called by lib/quickbooks/*
-// are declared here (confirmed against the installed packages' JS source), kept
-// in sync as later tasks (5.3, 5.4) add more QBO API calls.
+// Minimal ambient types for intuit-oauth and node-quickbooks, covering only what we call.
 
 declare module 'intuit-oauth' {
   interface OAuthClientConfig {
@@ -73,9 +70,7 @@ declare module 'node-quickbooks' {
     BillAddr?: QboBillAddr
     sparse?: boolean
   }
-  /** QBO's "Fault" error shape — surfaces two ways depending on whether the
-   *  library's HTTP layer caught a non-2xx (axios-wrapped, `.response.data.Fault`)
-   *  or received a 200 with a Fault body anyway (raw `.Fault`). */
+  /** QBO Fault: either axios-wrapped (`.response.data.Fault`) or in a 200 body (`.Fault`). */
   interface QboFaultError {
     Message?: string
     code?: string
@@ -101,10 +96,7 @@ declare module 'node-quickbooks' {
     SyncToken: string
     DocNumber?: string
   }
-  /** The subset of a full QBO Invoice entity we read back to derive lifecycle
-   *  status. `EmailStatus` only reflects invoices sent through QBO's own send
-   *  flow; `Balance` reaching 0 means paid; `DueDate` is a bare 'yyyy-MM-dd'
-   *  calendar date (no timezone). */
+  /** Invoice fields we read for status. DueDate is a bare 'yyyy-MM-dd'. */
   interface QboInvoiceDetail {
     Id: string
     SyncToken: string

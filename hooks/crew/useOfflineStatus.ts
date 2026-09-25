@@ -3,10 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getQueueCounts, flushMutationQueue, subscribeToQueue } from '@/lib/offline/mutation-queue'
 
-/**
- * Connectivity + offline-queue state for the crew shell. `failedCount` is what
- * turns a silently stuck queue into something the crew member can act on.
- */
+/** Connectivity plus offline-queue counts. `failedCount` surfaces a stuck queue. */
 export function useOfflineStatus() {
   // Always start online/empty to match SSR; the effect corrects it on the client.
   const [isOnline, setIsOnline] = useState(true)

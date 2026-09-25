@@ -1,10 +1,6 @@
 import type { ScheduleWeek, SchedulePropertyRow, VisitWithCrew } from '@/types/app'
 
-/**
- * The management schedule's filter state. Lives in the URL (`?routeGroup=&account=
- * &crew=&status=`) alongside `?week=`, so a filtered view is shareable and survives
- * week navigation and refresh.
- */
+/** Schedule filter state, kept in the URL alongside `?week=` so a filtered view is shareable. */
 export type ScheduleFilterValues = {
   /** 'all' | a route_groups.id */
   routeGroup: string
@@ -23,10 +19,7 @@ export const EMPTY_SCHEDULE_FILTERS: ScheduleFilterValues = {
   status: 'all',
 }
 
-/**
- * Status options. `unscheduled` isn't a `visits.status` value — it's the empty
- * "+" cells (no visit row for that week).
- */
+/** `unscheduled` isn't a visits.status: it's a property with no visit that week. */
 export const SCHEDULE_STATUS_FILTERS = [
   'all',
   'unscheduled',
@@ -35,7 +28,7 @@ export const SCHEDULE_STATUS_FILTERS = [
   'skipped',
 ] as const
 
-export type ScheduleStatusFilter = (typeof SCHEDULE_STATUS_FILTERS)[number]
+type ScheduleStatusFilter = (typeof SCHEDULE_STATUS_FILTERS)[number]
 
 export const SCHEDULE_STATUS_FILTER_LABELS: Record<ScheduleStatusFilter, string> = {
   all: 'All statuses',
@@ -63,10 +56,7 @@ export function parseScheduleFilters(sp: {
   }
 }
 
-/**
- * Build the schedule URL's query string. 'all' values are omitted so an unfiltered
- * view keeps a clean `?week=…` URL.
- */
+/** Query string for the schedule; 'all' values are omitted. */
 export function scheduleFilterParams(
   filters: ScheduleFilterValues,
   week?: string
@@ -110,14 +100,8 @@ function matchesVisitFilters(row: SchedulePropertyRow, filters: ScheduleFilterVa
 }
 
 /**
- * Filter a schedule window down to the rows matching `filters`, preserving the shape
- * (and the number of week entries) of the input.
- *
- * Route group and account are structural — they mean the same thing in every week.
- * Crew and status depend on the visit, which differs week to week, so a property row
- * is kept when **any** week in the window matches: on the desktop grid that keeps a
- * matched row's full 4-week context visible. Pass a single-week array to get exact
- * per-week matching (what the phone's one-week list wants).
+ * Filter a schedule window, keeping its shape. Crew/status match if ANY week in the window
+ * matches, so the grid keeps a row's 4-week context. Pass one week for exact matching.
  */
 export function filterScheduleWeeks(
   weeks: ScheduleWeek[],
@@ -127,9 +111,7 @@ export function filterScheduleWeeks(
   // when a filter emptied it, never when it simply has no properties yet.
   if (!hasActiveScheduleFilters(filters)) return weeks
 
-  // Structural pass — identical across every week. A route-group filter other
-  // than 'all' excludes the ungrouped bucket outright (it isn't in any
-  // route); an account filter still applies to it.
+  // Structural pass. A route filter excludes the ungrouped bucket; an account filter still applies.
   const structural = weeks.map((week) => ({
     weekStart: week.weekStart,
     routeGroups: week.routeGroups

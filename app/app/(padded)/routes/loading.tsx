@@ -1,12 +1,7 @@
 import { CardListSkeleton, PageHeaderSkeleton } from '@/components/states/skeletons'
 import { Skeleton } from '@/components/ui/skeleton'
 
-/**
- * Mirrors app/app/routes/page.tsx: header + "New group", the Unrouted
- * panel, then group cards. The panel gets its own clay-tinted placeholder so
- * the layout doesn't jump once real data (with or without unrouted
- * properties) lands.
- */
+/** Matches the routes page layout, including a placeholder for the Unrouted panel. */
 export default function RoutesLoading() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">

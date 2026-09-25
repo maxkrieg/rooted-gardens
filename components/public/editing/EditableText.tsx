@@ -32,23 +32,13 @@ interface EditableTextProps {
   /** Renders a Textarea instead of an Input while editing. */
   multiline?: boolean
   className?: string
-  /** Only used in the plain (not-editing) display state — e.g. `mailto:`/
-   *  `tel:` for a contact field, so it stays a real, clickable link exactly
-   *  as the footer's hand-written `<a>` did before this wrapped it. Once
-   *  edit mode is on, the field becomes click-to-edit instead (navigating
-   *  away would defeat the point), so `href` is ignored in that state. */
+  /** Used only when not editing (e.g. mailto:/tel:); in edit mode a click opens the editor. */
   href?: string
 }
 
 /**
- * The workhorse editable primitive (task 9.2.5) — wraps a single
- * text/email/phone/url `site_content` slot. Not editing (or not an owner):
- * renders `<Tag className={className}>{value}</Tag>`, identical to the plain
- * `{getSlot(content, key)}` call sites it replaces. In edit mode, hovering
- * shows a dashed outline + pencil; clicking opens an inline Input/Textarea
- * with Save/Cancel — only THIS field opens, every other editable region on
- * the page stays in its normal display state (matches the approved mockup:
- * one field open at a time, not a page-wide wall of inputs).
+ * Editable text/email/phone/url slot. Outside edit mode it renders plain `<Tag>{value}</Tag>`;
+ * in edit mode, hover shows a pencil and a click opens this one field inline.
  */
 export function EditableText({
   page,
@@ -105,11 +95,7 @@ export function EditableText({
     )
   }
 
-  // A separate component, mounted only while `open` is true: its `draft`
-  // state initializes fresh from `value` every time it mounts, which is
-  // exactly "reset the draft when the editor opens" with no effect needed —
-  // closing unmounts it entirely (the parent's branches above return a
-  // completely different subtree), so the next open is a brand new mount.
+  // Mounted only while open, so `draft` starts fresh from `value` on each open.
   return (
     <EditableTextForm
       page={page}

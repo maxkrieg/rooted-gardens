@@ -31,20 +31,13 @@ export async function GET(request: NextRequest) {
     if (!error) {
       return NextResponse.redirect(new URL(next, request.url))
     }
-    // The raw GoTrue message used to ride along in `?detail=` and render on the
-    // login page. It said nothing useful to a crew member and put internals in a
-    // shareable URL — the login page now writes its own copy from the code alone.
+    // Don't forward GoTrue's message; the login page writes its own copy from the code.
     console.error('[auth/callback] exchangeCodeForSession error:', error)
     return NextResponse.redirect(new URL('/login?error=auth_failed', request.url))
   }
 
-  // No `?code=` — this is the implicit flow, not PKCE. Admin-generated links
-  // (`auth.admin.inviteUserByEmail`, used by the Team page's "Invite to App")
-  // have no browser-side code verifier, so GoTrue returns the session in the URL
-  // *fragment* instead: `#access_token=…&refresh_token=…&type=invite`. A fragment
-  // is never sent to the server, so this handler structurally cannot read it —
-  // hand off to a client page that can. The fragment rides along through the
-  // redirect on its own (the browser preserves it when the Location has none).
+  // No `?code=`: an invite link with the session in the fragment. Hand off to /auth/confirm;
+  // the browser keeps the fragment across the redirect.
   const confirmUrl = new URL('/auth/confirm', request.url)
   confirmUrl.searchParams.set('next', next)
   return NextResponse.redirect(confirmUrl)

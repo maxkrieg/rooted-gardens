@@ -4,9 +4,8 @@ import { useEffect } from 'react'
 import { ErrorState } from '@/components/states/ErrorState'
 
 /**
- * Nested inside `app/crew/layout.tsx` so the bottom nav and offline banner stay
- * put. Only catches render-phase throws — query failures are handled inline per
- * screen, since replacing cached stops with an error page is wrong in the field.
+ * Nested under the app layout so the nav and offline banner stay. Render throws only: query
+ * failures are handled inline so cached data isn't replaced by an error page.
  */
 export default function CrewError({
   error,

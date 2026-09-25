@@ -4,12 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import type { Employee } from '@/types/app'
 
-/**
- * The full active roster of field-assignable staff — used by the crew schedule
- * filters and the assigned-crew picker on the stop detail page. Excludes
- * accountants, who never work crew visits. RLS now lets crew read all employees
- * (see 20260628150000_crew_schedule_visibility.sql).
- */
+/** Active field staff (no accountants), for crew filters and the crew picker. */
 export function useActiveEmployees() {
   return useQuery<Employee[]>({
     queryKey: ['active-employees'],

@@ -38,10 +38,7 @@ function resolveView(view: string | undefined): BillingView {
   return 'queue'
 }
 
-/**
- * Billing invoice queue — accountant-facing, laptop-first (per CLAUDE.md, the
- * one management area that stays table/grid-dense rather than mobile-first).
- */
+/** Billing, the accountant's laptop-first screen: table-dense by design. */
 export default async function BillingPage({ searchParams }: Props) {
   const { range, start, end, qbo, reason, view } = await searchParams
   const resolvedView = resolveView(view)

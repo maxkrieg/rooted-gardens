@@ -31,14 +31,7 @@ interface ScheduleFilterSheetProps {
   matchCount: number
 }
 
-/**
- * The phone's filter surface, behind the header's filter button.
- *
- * The two quick toggles are the point of it. "My stops" was a one-tap chip on
- * the deleted crew schedule page and became a three-tap dropdown in the merge;
- * this puts it back one tap from the bar, for every role — an owner checking
- * their own day wants exactly the same thing.
- */
+/** The phone's filter sheet. "My stops" is one tap from the bar, for every role. */
 export function ScheduleFilterSheet({
   open,
   onOpenChange,

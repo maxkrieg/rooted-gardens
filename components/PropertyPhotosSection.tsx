@@ -6,11 +6,6 @@ import { format, parseISO } from 'date-fns'
 import { Images } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { photoTypeLabel, signPhotoUrls } from '@/lib/utils/photos'
-import {
-  usePropertyPhotos,
-  PROPERTY_PHOTOS_PAGE_SIZE,
-  type PropertyPhotoRow,
-} from '@/hooks/usePropertyPhotos'
 import type { LightboxPhoto } from '@/components/PhotoLightbox'
 
 interface PropertyPhotosSectionProps {
@@ -21,14 +16,8 @@ interface PropertyPhotosSectionProps {
 }
 
 /**
- * Historical photos for the property, shown inside the drawer's Property Notes
- * card. Everything at this property except the current visit's own photos, flat
- * and newest-first, so crew standing on site can see how the place has looked
- * and what the standing reference photos say.
- *
- * Both queries live here rather than in VisitDetailContent because the Property
- * Notes body is collapsed by default and unmounted until opened — so nothing is
- * fetched until a crew member actually expands the card.
+ * Past photos for this property (excluding the current visit's), newest first. Queries live
+ * here so nothing loads until the collapsed card is opened.
  */
 export function PropertyPhotosSection({
   propertyId,
@@ -42,13 +31,8 @@ export function PropertyPhotosSection({
   const total = data?.total ?? 0
   const paths = rows.map((p) => p.storage_path)
 
-  // Batch-signed in one round trip — the drawer's other photo sections sign one
-  // request per photo, which is fine for ≤4 but not for a dozen or more.
-  //
-  // Returns a plain Record, NOT the Map that signPhotoUrls hands back: the React
-  // Query cache is persisted to IndexedDB through JSON.stringify, and a Map
-  // serializes to {}. A rehydrated Map would arrive as a plain object and blow up
-  // on .get().
+  // Batch-signed in one round trip. A Record, not a Map: the persisted cache goes through
+  // JSON.stringify, and a Map serializes to {}.
   const { data: urlByPath } = useQuery({
     queryKey: ['photo-urls-batch', paths],
     queryFn: async () =>
@@ -174,4 +158,62 @@ function PhotoTile({
       </span>
     </button>
   )
+}
+
+type PropertyPhotoRow = {
+  id: string
+  storage_path: string
+  type: string
+  created_at: string
+  caption: string | null
+  /** Who took it — crew may caption their own photos, owner/lead any. */
+  uploaded_by: string | null
+}
+
+type PropertyPhotosResult = {
+  rows: PropertyPhotoRow[]
+  /** Exact count of matching photos, so the section can offer "Show all (N)". */
+  total: number
+}
+
+const PROPERTY_PHOTOS_PAGE_SIZE = 12
+
+/**
+ * Every photo at a property except the viewed visit's. `limit: 'all'` removes the page cap;
+ * the limit is in the query key, so both results cache separately.
+ */
+function usePropertyPhotos(
+  propertyId: string | undefined,
+  excludeVisitId: string | undefined,
+  limit: number | 'all' = PROPERTY_PHOTOS_PAGE_SIZE,
+) {
+  return useQuery<PropertyPhotosResult>({
+    queryKey: ['property-photos', propertyId, excludeVisitId, limit],
+    queryFn: async () => {
+      const supabase = createClient()
+
+      let query = supabase
+        .from('photos')
+        .select('id, storage_path, type, created_at, caption, uploaded_by', { count: 'exact' })
+        .eq('property_id', propertyId!)
+        // Not `.neq('visit_id', id)`: NULL <> 'x' is NULL, which would drop every property-level
+        // photo.
+        .or(`visit_id.is.null,visit_id.neq.${excludeVisitId}`)
+        .order('created_at', { ascending: false })
+
+      if (limit !== 'all') {
+        query = query.range(0, limit - 1)
+      }
+
+      const { data, error, count } = await query
+      if (error) throw error
+
+      return {
+        rows: (data ?? []) as PropertyPhotoRow[],
+        total: count ?? 0,
+      }
+    },
+    enabled: !!propertyId && !!excludeVisitId,
+    staleTime: 30_000,
+  })
 }

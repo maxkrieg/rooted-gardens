@@ -5,19 +5,11 @@ import { format, parseISO } from 'date-fns'
 import { ChevronDown, History } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { VisitStatusBadge } from '@/components/management/badges'
-import { usePropertyVisitHistory } from '@/hooks/usePropertyVisitHistory'
 import { SERVICE_TYPE_LABELS } from '@/types/app'
+import { useQuery } from '@tanstack/react-query'
+import { createClient } from '@/lib/supabase/client'
 
-/**
- * Secondary "what's happened at this property before" section for a visit's
- * detail view. Shared by the management VisitDetailSheet and the crew stop
- * page — deliberately cross-surface, so it lives at the components/ root
- * rather than under management/ or crew/ (mirroring the existing precedent of
- * the crew stop row importing VisitStatusBadge from management/badges).
- *
- * Collapsed by default and renders nothing when there's no history — this is
- * meant to stay quiet and secondary, never a dense table.
- */
+/** Past visits at this property, for the visit detail view. Collapsed, and silent when empty. */
 export function PropertyVisitHistory({
   propertyId,
   beforeWeekStart,
@@ -99,4 +91,55 @@ export function PropertyVisitHistory({
       )}
     </div>
   )
+}
+
+type PropertyVisitHistoryRow = {
+  id: string
+  status: string
+  week_start: string
+  ended_at: string | null
+  service_types: string[] | null
+  completion_note: string | null
+  skip_reason: string | null
+}
+
+type PropertyVisitHistoryResult = {
+  rows: PropertyVisitHistoryRow[]
+  total: number // exact count of past visits at this property (excludes the current one)
+}
+
+const PAGE_SIZE = 5
+
+/** Completed/skipped visits strictly before the current visit's week, newest first. */
+function usePropertyVisitHistory(
+  propertyId: string | undefined,
+  beforeWeekStart: string | undefined
+) {
+  return useQuery<PropertyVisitHistoryResult>({
+    queryKey: ['property-visit-history', propertyId, beforeWeekStart],
+    queryFn: async () => {
+      const supabase = createClient()
+
+      const { data, error, count } = await supabase
+        .from('visits')
+        .select(
+          'id, status, week_start, ended_at, service_types, completion_note, skip_reason',
+          { count: 'exact' }
+        )
+        .eq('property_id', propertyId!)
+        .in('status', ['completed', 'skipped'])
+        .lt('week_start', beforeWeekStart!)
+        .order('week_start', { ascending: false })
+        .range(0, PAGE_SIZE - 1)
+
+      if (error) throw error
+
+      return {
+        rows: (data ?? []) as PropertyVisitHistoryRow[],
+        total: count ?? 0,
+      }
+    },
+    enabled: !!propertyId && !!beforeWeekStart,
+    staleTime: 30_000,
+  })
 }

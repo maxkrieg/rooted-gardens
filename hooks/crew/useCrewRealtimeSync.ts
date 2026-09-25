@@ -8,20 +8,9 @@ import { createClient } from '@/lib/supabase/client'
 import { getWeekStart } from '@/lib/utils/schedule'
 
 /**
- * Opens two Supabase Realtime channels for the duration of the crew session:
- *
- * 1. `visit_crew` filtered to the current employee's `assigned` rows — fires
- *    when any actor (owner from the management grid, or a fellow crew member
- *    from the Schedule page) adds or removes this crew member from a visit.
- *
- * 2. `visits` filtered to the current week — fires on new stops and crew-
- *    instruction edits so the schedule view stays fresh without a manual refresh.
- *
- * Invalidates React Query caches on each event. The toast for assignment changes
- * is debounced (one per 3 s window) to avoid flooding when a bulk route-assign
- * fires many INSERT events at once.
- *
- * Called from the crew layout so it's always active regardless of which tab is open.
+ * Two Realtime channels for the signed-in user: their own visit_crew assignments (toast,
+ * debounced 3s for bulk assigns) and the current week's visits (new stops, instruction edits).
+ * Mounted by AppShell.
  */
 export function useCrewRealtimeSync(employeeId: string | undefined) {
   const queryClient = useQueryClient()

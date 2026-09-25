@@ -4,11 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import type { Vehicle } from '@/types/app'
 
-/**
- * Non-retired vehicles — used by the Vehicle select in VisitDetailContent. RLS
- * (vehicles_select) permits owner/lead/crew; accountant is intentionally excluded,
- * which is why the Vehicle field is hidden entirely for that role.
- */
+/** Non-retired vehicles. RLS excludes the accountant, who doesn't see the Vehicle field. */
 export function useActiveVehicles() {
   return useQuery<Vehicle[]>({
     queryKey: ['active-vehicles'],

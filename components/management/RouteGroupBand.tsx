@@ -22,27 +22,14 @@ interface RouteGroupBandProps {
   hasNote: boolean
   /** The week's note, when there is one. Absent notes render nothing. */
   noteSlot?: React.ReactNode
-  /** The route's own sort switch. Lives on the plan line rather than the title
-   *  row: the title row has no width to spare, and "how this route is arranged"
-   *  is exactly what that line already says. */
+  /** The route's own sort switch, on the plan line: the title row has no width to spare. */
   sortSlot?: React.ReactNode
 }
 
 /**
- * The header of a route group on the phone schedule.
- *
- * Two text rows, not three. The name owns the first line outright — it's the
- * identity of the block and was being truncated to make room for avatars — and
- * the standing plan (days, crew, truck) drops to a muted second line that
- * disappears entirely when nothing is set.
- *
- * The progress bar became the band's bottom border: a 3px strip that doubles as
- * the divider above the stops. It was costing a full row to say what a hairline
- * says, and this is the "how much of this route is settled" signal the coloured
- * spreadsheet block gave at a glance.
- *
- * Crew and truck are aggregated from the group's actual visits. Once a visit
- * carries no assignment the route's defaults (R3.1) are the fallback.
+ * Route header on the phone schedule: name on line one, the muted plan (days, crew, truck) on
+ * line two, and a 3px progress strip as the bottom border. Crew and truck come from the visits,
+ * falling back to the route's defaults.
  */
 export function RouteGroupBand({
   name,
@@ -87,10 +74,8 @@ export function RouteGroupBand({
         )}
       </div>
 
-      {/* The standing plan, muted and secondary. It used to be omitted entirely
-          when a route had no plan — an unplanned route shouldn't pay a row to
-          say nothing — but the sort switch belongs on this line, and every route
-          has a sort. So the row renders whenever it has either to show. */}
+      {/* The plan line renders whenever there's a plan or a sort switch to show (always, in
+         practice). */}
       {(hasPlan || sortSlot) && (
         <div className="flex items-center gap-2 pl-5 pr-4 pb-2 pt-1 text-[11px] text-accent-foreground">
           {days.length > 0 && (
@@ -125,7 +110,7 @@ export function OnSiteDot() {
   )
 }
 
-export function RouteDoneCount({ done, total }: { done: number; total: number }) {
+function RouteDoneCount({ done, total }: { done: number; total: number }) {
   return (
     <span
       className="flex shrink-0 items-baseline tabular-nums"
@@ -260,10 +245,7 @@ function MenuItem({ label, onClick }: { label: string; onClick: () => void }) {
 
 const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 
-/**
- * `['tue','mon'] → 'Mon/Tue'`. Sorted into week order rather than the order they
- * were ticked, so the label reads the way the route sheet writes it.
- */
+/** `['tue','mon'] → 'Mon/Tue'`, in week order like the route sheet. */
 export function formatDays(days: string[]): string {
   return [...days]
     .sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b))
@@ -271,7 +253,7 @@ export function formatDays(days: string[]): string {
     .join('/')
 }
 
-export function initialsOf(name: string): string {
+function initialsOf(name: string): string {
   return name
     .split(' ')
     .map((part) => part[0])

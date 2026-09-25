@@ -1,15 +1,12 @@
 import { openDB, type IDBPDatabase } from 'idb'
 
 const DB_NAME = 'rooted-crew'
-// v2 added `status` + `lastError` so a permanently failing mutation can be
-// parked instead of retried forever. v3 added the photo-blobs store, so
-// gate-code photos survive a dead zone (the signed URLs they normally load
-// through rotate hourly, so only the bytes can be cached).
+// v2 added status + lastError (parking failed mutations); v3 added photo-blobs.
 const DB_VERSION = 3
 
 // Management schedule types (create_visit…revert_status) were added when owners
 // went phone-primary in the field; `payload` is untyped here, so no DB_VERSION bump.
-export type MutationType =
+type MutationType =
   | 'completion'
   | 'photo'
   | 'photo_caption'
@@ -27,7 +24,7 @@ export type MutationType =
 
 /** 'failed' mutations are excluded from flushes, so a poisoned one stops burning
  *  a request on every app open, and surfaced so lost work can't stay invisible. */
-export type MutationStatus = 'pending' | 'failed'
+type MutationStatus = 'pending' | 'failed'
 
 export interface QueuedMutation {
   id: string

@@ -27,8 +27,7 @@ export const metadata: Metadata = {
     default: 'Rooted Gardens',
     template: '%s · Rooted Gardens',
   },
-  // Public-facing default (task 9.2 made `/` a marketing page) — management
-  // and crew routes are behind auth regardless of what this says.
+  // Public-facing default; `/` is the marketing home.
   description: 'Eco-minded lawn care and garden design serving Norwich, VT and the Upper Valley.',
   icons: {
     icon: '/icons/icon-192.png',
@@ -42,17 +41,10 @@ export const viewport: Viewport = {
   // Required for env(safe-area-inset-*) to resolve to anything but 0px on
   // notched iOS. Without it every safe-area calc in the app is a no-op.
   viewportFit: 'cover',
-  // Android Chrome defaults to 'resizes-visual': the keyboard shrinks only the
-  // visual viewport, so dvh stays tall and every `fixed … bottom-0` element —
-  // above all the bottom sheets, which is where nearly all the app's text input
-  // lives — sits stranded behind the keyboard. iOS reparents fixed elements onto
-  // the visual viewport instead, which is why this only ever broke on Android.
-  // 'resizes-content' shrinks the layout viewport, so dvh, the sheets, and
-  // Chrome's own scroll-into-view all start working. iOS ignores the key.
+  // Android defaults to 'resizes-visual', which strands every bottom-0 sheet behind the keyboard.
+  // 'resizes-content' shrinks the layout viewport instead. iOS ignores it.
   interactiveWidget: 'resizes-content',
-  // No maximum-scale / user-scalable: blocking pinch-zoom fails WCAG 1.4.4, and
-  // it isn't needed — every input bases at text-base (16px), which is what
-  // actually prevents iOS zoom-on-focus.
+  // No maximum-scale: blocking zoom fails WCAG. 16px inputs already prevent iOS focus zoom.
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#F6F3EA' },
     { media: '(prefers-color-scheme: dark)', color: '#1C1A15' },

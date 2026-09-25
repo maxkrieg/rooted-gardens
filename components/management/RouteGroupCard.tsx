@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Building2, ChevronsUpDown, MoreHorizontal, Trash2, Truck, X } from 'lucide-react'
+import { useState, useCallback } from 'react'
+import { Building2, ChevronsUpDown, MoreHorizontal, Truck, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -11,14 +11,19 @@ import { usePropertyLastVisit } from '@/hooks/usePropertyLastVisit'
 import { RouteGroupSheet } from '@/components/management/RouteGroupSheet'
 import { PropertyAssignmentSheet } from '@/components/management/PropertyAssignmentSheet'
 import { deleteRouteGroup, moveRouteGroup } from '@/app/app/(padded)/routes/actions'
-import { useRefreshRoutes } from '@/hooks/useRoutes'
+import { useRefreshRoutes, routesDataKey } from '@/hooks/useRoutes'
 import { toUserMessage } from '@/lib/errors'
 import { cn } from '@/lib/utils'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { RouteDefaultsSheet } from '@/components/management/RouteDefaultsSheet'
 import { formatDays } from '@/components/management/RouteGroupBand'
-import { useReorderRouteProperties, moveToGap } from '@/hooks/useReorderRouteProperties'
 import type { Employee, RouteGroup, PropertyWithAccount, Vehicle } from '@/types/app'
+import { useQueryClient } from '@tanstack/react-query'
+import { useAssignPropertyRoute } from '@/hooks/useAssignPropertyRoute'
+import { scheduleReferenceKey } from '@/hooks/useManagementSchedule'
+import { navUnroutedCountKey } from '@/hooks/useNavCounts'
+import type { RoutesData } from '@/lib/routes/fetch'
+import type { ScheduleReference } from '@/lib/schedule/fetch'
 
 interface RouteGroupCardProps {
   routeGroup: RouteGroup
@@ -55,9 +60,7 @@ export function RouteGroupCard({
   // Index of the property picked up and waiting for a destination.
   const [lifted, setLifted] = useState<number | null>(null)
   const reorder = useReorderRouteProperties()
-  // Own busy flag, not a transition's pending: a shared pending flag disabled
-  // every control on the card and could stay stuck true (see commit f4e09e3,
-  // which fixed the same shape in the assignment sheets).
+  // Own busy flag: a shared transition pending flag could stick and disable the whole card.
   const [busy, setBusy] = useState(false)
   const refreshRoutes = useRefreshRoutes()
 
@@ -106,8 +109,7 @@ export function RouteGroupCard({
         setConfirmDelete(false)
         return
       }
-      // Refreshing the cache is what removes this card now — revalidatePath only
-      // refreshes an RSC shell that no longer holds the list.
+      // The cache refresh removes the card; revalidatePath can't reach this client-first page.
       refreshRoutes()
     } catch (err) {
       toast.error('Could not delete route group', {
@@ -139,9 +141,7 @@ export function RouteGroupCard({
           <div className="flex shrink-0 items-center gap-0.5">
           <RouteGroupSheet routeGroup={routeGroup} />
 
-          {/* One overflow instead of five targets crowding a truncating
-              title: reorder, rename, defaults and delete are all occasional,
-              and the title is what has to stay readable on a phone. */}
+          {/* One overflow menu so the title stays readable on a phone. */}
           <Popover open={menuOpen} onOpenChange={setMenuOpen}>
             <PopoverTrigger asChild>
               <Button
@@ -282,12 +282,8 @@ export function RouteGroupCard({
                       </div>
                     </div>
 
-                    {/* Tap to lift, tap a gap to place. Chevrons cost one tap per
-                        position — moving a stop three places was three precise
-                        taps on a 20px target — and this is two taps at any
-                        distance. Still not drag: the repo has no gesture
-                        infrastructure, and a drag inside a scrolling page is the
-                        case that actually needs it. */}
+                    {/* Tap to lift, tap a gap to place: two taps at any distance, no drag
+                       infrastructure needed. */}
                     {assignedProperties.length > 1 && (
                       <button
                         type="button"
@@ -348,15 +344,8 @@ export function RouteGroupCard({
 }
 
 /**
- * A tappable landing strip between two rows, shown only while something is
- * lifted.
- *
- * Carries an explicit "Move here" pill rather than just a rule. A dashed line on
- * its own reads as a divider — the first version used `border-primary/40`, which
- * on warm paper is a grey hairline indistinguishable from the row separators,
- * and it was reported as "not showing" even though it was rendering.
- *
- * 36px tall and full width: you tap roughly between two rows, no aiming.
+ * A tap target between rows while something is lifted. The explicit pill matters: a bare
+ * dashed line read as a row divider.
  */
 function DropGap({
   show,
@@ -454,4 +443,88 @@ function RouteDefaultsSummary({
       )}
     </button>
   )
+}
+
+/**
+ * Reorder a property within its route (sort_order = drive order). The batch owns its optimistic
+ * state and writes `silent`, or a mid-flight refetch bounces the row. Only moved rows are written.
+ */
+function useReorderRouteProperties() {
+  const assign = useAssignPropertyRoute()
+  const queryClient = useQueryClient()
+
+  return useCallback(
+    async (
+      routeGroupId: string,
+      orderedPropertyIds: string[],
+      currentSortOrders: Record<string, number>,
+      labelByPropertyId: Record<string, string> = {},
+    ) => {
+      // One patch for the whole new order, before anything is written.
+      queryClient.setQueryData<RoutesData>(routesDataKey, (old) =>
+        old
+          ? {
+              ...old,
+              assignedIdsByGroup: {
+                ...old.assignedIdsByGroup,
+                [routeGroupId]: orderedPropertyIds,
+              },
+              sortOrderByPropertyId: {
+                ...old.sortOrderByPropertyId,
+                ...Object.fromEntries(orderedPropertyIds.map((id, i) => [id, i])),
+              },
+            }
+          : old,
+      )
+
+      // The schedule sorts its rows by the same column, so it has to move too —
+      // and offline this patch is the only thing that will ever move it.
+      const positions = new Map(orderedPropertyIds.map((id, i) => [id, i]))
+      queryClient.setQueryData<ScheduleReference>(scheduleReferenceKey, (old) =>
+        old
+          ? {
+              ...old,
+              assignments: old.assignments.map((a) =>
+                positions.has(a.property_id)
+                  ? { ...a, sort_order: positions.get(a.property_id)! }
+                  : a,
+              ),
+            }
+          : old,
+      )
+
+      try {
+        for (const [index, propertyId] of orderedPropertyIds.entries()) {
+          if (currentSortOrders[propertyId] === index) continue
+          await assign.mutateAsync({
+            propertyId,
+            routeGroupId,
+            sortOrder: index,
+            label: labelByPropertyId[propertyId],
+            silent: true,
+          })
+        }
+      } finally {
+        // Once, after the batch. Online this reconciles; offline it's a no-op
+        // and the patches above stand on their own.
+        queryClient.invalidateQueries({ queryKey: routesDataKey })
+        queryClient.invalidateQueries({ queryKey: scheduleReferenceKey })
+        queryClient.invalidateQueries({ queryKey: navUnroutedCountKey })
+      }
+    },
+    [assign, queryClient],
+  )
+}
+
+/**
+ * Move the item at `from` into gap `gap` (before the item at that index; 0…length). Returns the
+ * same array for a no-op.
+ */
+function moveToGap<T>(items: T[], from: number, gap: number): T[] {
+  if (gap === from || gap === from + 1) return items
+  if (from < 0 || from >= items.length || gap < 0 || gap > items.length) return items
+  const next = [...items]
+  const [item] = next.splice(from, 1)
+  next.splice(gap > from ? gap - 1 : gap, 0, item)
+  return next
 }

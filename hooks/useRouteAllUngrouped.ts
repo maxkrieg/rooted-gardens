@@ -8,11 +8,8 @@ import { useScheduleReference } from '@/hooks/useManagementSchedule'
 import type { SchedulePropertyRow } from '@/types/app'
 
 /**
- * Put every unrouted property on one route, with Undo.
- *
- * A loop over the queued per-property mutation, not the `assignProperties`
- * Server Action: that one is a delete-then-insert that clobbers concurrent
- * edits and is deliberately online-only, and this is used from a truck.
+ * Put every unrouted property on one route, with Undo. Loops the queued per-property mutation
+ * rather than the online-only bulk action.
  */
 export function useRouteAllUngrouped() {
   const assignRoute = useAssignPropertyRoute()

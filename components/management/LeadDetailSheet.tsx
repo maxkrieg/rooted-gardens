@@ -35,15 +35,8 @@ interface LeadDetailSheetProps {
 }
 
 /**
- * Lead detail Sheet (task 9.8) — right-side slide-over, same shape as
- * RouteGroupSheet / EmployeeCard's edit sheet. `lead` stays non-null after
- * close (the parent only flips `open`, never clears the selection) so the
- * Sheet's own close animation has content to animate away, matching every
- * other sheet in the app.
- *
- * "Convert to Account" (task 9.9) opens ConvertLeadSheet on top of this one
- * for a service_inquiry that hasn't been converted yet; once converted, this
- * shows a link to the resulting account instead.
+ * Lead detail sheet. `lead` stays set after close so the exit animation has content.
+ * Unconverted inquiries get "Convert to Account"; converted ones link to the account.
  */
 export function LeadDetailSheet({ lead, open, onOpenChange }: LeadDetailSheetProps) {
   const router = useRouter()
@@ -53,10 +46,7 @@ export function LeadDetailSheet({ lead, open, onOpenChange }: LeadDetailSheetPro
 
   if (!lead) return null
 
-  // Captured once as a plain string const: TS's null-narrowing on `lead`
-  // (from the guard above) doesn't carry into the async closures below since
-  // `lead` is a function parameter, not a `const` — but `leadId` is, so it
-  // stays known-`string` inside them with no assertion needed.
+  // A const so TS keeps the narrowing inside the async closures below.
   const leadId = lead.id
 
   const details =

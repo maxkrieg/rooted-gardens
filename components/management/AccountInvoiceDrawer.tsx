@@ -28,13 +28,7 @@ interface AccountInvoiceDrawerProps {
   qboConnected: boolean
 }
 
-/**
- * The selective-invoicing drawer — opened from an account row in the queue. Lists
- * that account's uninvoiced visits (same card as the account detail's Recent
- * visits) with a checkbox each and a select-all, and creates a single QBO invoice
- * from just the hand-picked visits. Any visits left unchecked stay uninvoiced, so
- * the account keeps its queue row after the page revalidates.
- */
+/** Pick which of an account's uninvoiced visits go on one QBO invoice. The rest stay queued. */
 export function AccountInvoiceDrawer({
   open,
   onOpenChange,

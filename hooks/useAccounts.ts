@@ -13,15 +13,11 @@ import {
   type AccountDetail,
 } from '@/lib/accounts/fetch'
 
-export const accountsListKey = ['accounts-list'] as const
-export const accountDetailKey = (id: string) => ['account-detail', id]
-export const accountPhotosKey = (id: string) => ['account-photos', id]
+const accountsListKey = ['accounts-list'] as const
+const accountDetailKey = (id: string) => ['account-detail', id]
+const accountPhotosKey = (id: string) => ['account-photos', id]
 
-/**
- * The accounts list, client-side so it reads from the persisted cache in the
- * field. Same shape as useManagementSchedule: cached data renders flagged as
- * stale rather than erroring over something the owner can still use.
- */
+/** The accounts list, read from the persisted cache and flagged stale rather than erroring. */
 export function useAccountsList() {
   const query = useQuery({
     queryKey: accountsListKey,
@@ -39,13 +35,7 @@ export function useAccountsList() {
   }
 }
 
-/**
- * Refresh the account caches after a Server Action write.
- *
- * These pages are client-first now, so `revalidatePath` in an action only
- * refreshes an RSC shell that holds no data — without this, an edit lands in
- * Postgres and the screen never changes.
- */
+/** Refresh account caches after a Server Action; revalidatePath can't reach client-first pages. */
 export function useRefreshAccounts() {
   const queryClient = useQueryClient()
 
@@ -95,12 +85,7 @@ export function useAccountPhotos(accountId: string, propertyIds: string[]) {
   })
 }
 
-/**
- * Queue a property notes/interval edit so an owner can correct a gate code — or
- * retune how often a property comes due — from the driveway. Address and
- * frequency changes still go through updateProperty: replaying those blindly
- * could clobber an edit made meanwhile.
- */
+/** Queue a notes/interval edit. Address and frequency still go through updateProperty. */
 export function useUpdatePropertyNotes(accountId: string) {
   const queryClient = useQueryClient()
 
@@ -136,7 +121,7 @@ export function useUpdatePropertyNotes(accountId: string) {
   )
 }
 
-export type PropertyNotes = {
+type PropertyNotes = {
   crewNotes: string | null
   accessNotes: string | null
   parkingNotes: string | null
@@ -144,12 +129,7 @@ export type PropertyNotes = {
   preferredIntervalDays?: number | null
 }
 
-/**
- * Signed URLs for a batch of storage paths. Kept off the persistence allowlist
- * deliberately: they expire in an hour, so a rehydrated one is always dead.
- * Returns a plain Record, not a Map — the cache round-trips through JSON, and a
- * Map serializes to {}.
- */
+/** Signed URLs. Not persisted (they expire hourly). A Record, since a Map serializes to {}. */
 export function useSignedPhotoUrls(paths: string[]) {
   return useQuery({
     queryKey: ['photo-urls-batch', paths],

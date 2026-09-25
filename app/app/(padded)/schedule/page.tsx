@@ -3,12 +3,7 @@ import { parseWeekParam } from '@/lib/utils/schedule'
 import { parseScheduleFilters } from '@/lib/utils/schedule-filters'
 import { ScheduleView } from '@/components/management/ScheduleView'
 
-/**
- * Thin shell. The schedule itself is client-first (ScheduleView) so it reads from
- * the persisted React Query cache and its writes go through the offline queue —
- * everyone runs this page from the field. All this does is seed the initial URL
- * state; capabilities come from the shell's RoleProvider.
- */
+/** Thin shell for the client-first ScheduleView; seeds the initial URL state. */
 export default async function SchedulePage({
   searchParams,
 }: {

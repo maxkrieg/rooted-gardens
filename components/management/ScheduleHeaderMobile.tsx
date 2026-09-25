@@ -21,14 +21,8 @@ interface ScheduleHeaderMobileProps {
 }
 
 /**
- * The whole phone schedule header, in one 48px row.
- *
- * It replaces ~200px of stacked chrome: an `<h1>` repeating what the nav tab
- * already says, four filter dropdowns wrapping to two rows, a four-button week
- * nav, and a week-range link duplicating the range beside it. The filters moved
- * behind the button on the right — they're set occasionally and read never,
- * which is the wrong trade for permanent vertical space on a phone held in one
- * hand in a truck.
+ * The whole phone schedule header in one 48px row. Filters sit behind the right-hand button:
+ * set occasionally, not worth permanent space.
  */
 export function ScheduleHeaderMobile({
   weekStart,

@@ -34,17 +34,13 @@ function toDatetimeLocalValue(iso: string): string {
 }
 
 interface CapturedPhoto {
-  // Set only for a photo that was already uploaded in a prior completion (from
-  // initialPhotos) — its row already exists, so it's never re-enqueued as a new
-  // photo on submit (a caption edit is enqueued separately).
+  // Set for a photo uploaded in a prior completion: its row exists, so it's never re-enqueued.
   id?: string
   localUrl?: string // object URL for a photo captured this session
   remoteUrl?: string // signed URL for a previously uploaded photo
   storagePath: string // empty string while a fresh capture's upload is in-flight
   createdAt?: string // only known for already-persisted photos
-  // Captions are held locally and written on submit: a photo captured this
-  // session has no `photos` row yet (the row is inserted from the offline queue
-  // when the form is submitted), so there's nothing to UPDATE against until then.
+  // Captions are written on submit: a new photo has no `photos` row until the queue inserts it.
   caption?: string | null
   // What the caption was when the form opened, so submit only enqueues real edits.
   initialCaption?: string | null
@@ -115,10 +111,7 @@ export function VisitLogger({
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   // Which photo the caption lightbox is showing, by index into `photos`.
   const [captionIndex, setCaptionIndex] = useState<number | null>(null)
-  // When the lightbox last closed. Closing it is a two-step sequence — the
-  // lightbox tears down first, and only then does the trailing event reach this
-  // Sheet — so a guard that only checks `captionIndex` sees null by that point
-  // and lets the close through. This timestamp survives the gap.
+  // When the lightbox last closed. Its trailing close event reaches this Sheet after it unmounts.
   const photoClosedAt = useRef(0)
 
   function closeCaption() {
@@ -143,9 +136,7 @@ export function VisitLogger({
       url: photo.localUrl ?? photo.remoteUrl ?? null,
     }
   }
-  // Start time — required, and must fall within the visit's scheduled week. Prefilled
-  // from the visit's started_at, or defaults to the latest allowed time if the crew
-  // forgot to tap Start; either way they must confirm/set a value.
+  // Required, within the visit's week. Prefilled from started_at, else the latest allowed time.
   const [startTime, setStartTime] = useState('')
   const [startTimeError, setStartTimeError] = useState<string | null>(null)
   // End time — the completion timestamp (= visits.ended_at), prefilled to the latest
@@ -166,9 +157,7 @@ export function VisitLogger({
   // Seed state every time the sheet opens, using pre-fill values when editing
   useEffect(() => {
     if (open) {
-      // Recomputed locally (rather than closing over the render-scoped `latestAllowed`
-      // above) so this effect's dependency list only needs `weekStart`, not a value
-      // that's freshly recreated every render.
+      // Recomputed here so the effect depends only on `weekStart`.
       const openWeekEnd = endOfDay(addDays(startOfDay(parseISO(weekStart)), 6))
       const openLatestAllowed = minDate([new Date(), openWeekEnd])
 
@@ -182,9 +171,7 @@ export function VisitLogger({
       setPresentIdsError(false)
       setCaptionIndex(null)
 
-      // Seed previously uploaded photos (editing an existing completion) with
-      // fresh signed URLs — they aren't re-enqueued on submit since they're
-      // already persisted.
+      // Previously uploaded photos get fresh signed URLs; they're already persisted.
       if (initialPhotos && initialPhotos.length > 0) {
         const supabase = createClient()
         Promise.all(
@@ -239,13 +226,8 @@ export function VisitLogger({
   }
 
   function handleOpenChange(next: boolean) {
-    // Dismissing the caption lightbox must never tear down the form underneath
-    // it. Two stacked Radix overlays both portal to <body>, so closing the inner
-    // one reaches this Sheet as an outside interaction and takes the whole form
-    // with it — losing everything typed so far. Every close path (X, Esc,
-    // outside click) funnels through here, so this covers all of them; the
-    // timestamp catches the trailing event that arrives after the lightbox has
-    // already unmounted.
+    // Closing the stacked caption lightbox reaches this Sheet as an outside interaction and would
+    // discard the form. The timestamp catches the trailing event.
     if (!next && (captionIndex !== null || Date.now() - photoClosedAt.current < 500)) return
     if (!next) resetForm()
     onOpenChange(next)
@@ -323,9 +305,8 @@ export function VisitLogger({
     }
     setSubmitting(true)
 
-    // ended_at is the completion timestamp (and the visit's effective date).
-    // started_at is recorded when the job was started, or set retroactively if the
-    // crew entered a start time without tapping Start — it's required either way.
+    // ended_at is the completion date. started_at is required, set retroactively if Start was never
+    // tapped.
     const endedAt = new Date(endTime).toISOString()
     const startedAtISO = new Date(startTime).toISOString()
 
@@ -376,9 +357,7 @@ export function VisitLogger({
     // Without this, the photo row sits in the IDB queue until the next layout mount.
     const result = await flushMutationQueue()
 
-    // The most expensive false success in the app: a completion that never
-    // landed was cached as 'completed' and the form closed, so it was believed
-    // logged and never invoiced. Keep the form open with their entries intact.
+    // A failed completion must not look saved (it would never be invoiced). Keep the form open.
     if (result.failed > 0) {
       setSubmitting(false)
       toast.error('That didn’t save.', {
@@ -447,18 +426,14 @@ export function VisitLogger({
   return (
     <>
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      {/* max-h/overflow/rounded/safe-area now come from the bottom SheetContent
-          variant itself; pb-0 here because the sticky footer below owns its
-          own safe-area padding instead. */}
+      {/* pb-0: the sticky footer owns the safe-area padding. */}
       <SheetContent side="bottom" className="px-0 pb-0">
         <SheetHeader className="px-4 pb-2">
           <SheetTitle className="font-display text-xl">Log Completion</SheetTitle>
         </SheetHeader>
 
         <div className="px-4 space-y-5 pb-4">
-          {/* Start time — required; prefilled when the job was started, otherwise
-              defaults to the latest allowed time so the crew can confirm/adjust it.
-              Bounded to the visit's scheduled week (Mon–Sun, capped at now). */}
+          {/* Start time: bounded to the visit's week (Mon–Sun, capped at now). */}
           <div className="space-y-1.5">
             <label className="text-sm font-semibold text-foreground" htmlFor="start-time">
               Start time <span className="text-destructive">*</span>
@@ -572,9 +547,7 @@ export function VisitLogger({
               onChange={handlePhotoCapture}
             />
 
-            {/* Camera-only on touch devices: `pointer-coarse` means the primary
-                pointer is a finger, so a touchscreen laptop still gets the
-                single desktop button. CSS, not JS — no hydration flash. */}
+            {/* Camera-only when the primary pointer is a finger; CSS, so no hydration flash. */}
             <div className="grid grid-cols-1 pointer-coarse:grid-cols-2 gap-2">
               <Button
                 type="button"
@@ -618,9 +591,7 @@ export function VisitLogger({
               <div className="flex gap-2 flex-wrap">
                 {photos.map((photo, i) => (
                   <div key={photo.id ?? photo.localUrl ?? i} className="relative">
-                    {/* Tapping opens the photo big, with a caption field —
-                        captions are most likely to be written right after the
-                        shot, while the crew member still remembers why. */}
+                    {/* Tapping opens the photo big with a caption field. */}
                     <button
                       type="button"
                       onClick={() => setCaptionIndex(i)}
@@ -662,9 +633,7 @@ export function VisitLogger({
           </div>
         </div>
 
-        {/* sticky, not just last-in-flow — this is the tallest, input-densest
-            sheet in the app, and Submit/Cancel must stay reachable even when
-            the on-screen keyboard is covering the bottom of the scrollport. */}
+        {/* Sticky so Submit stays reachable above the on-screen keyboard. */}
         <SheetFooter className="sticky bottom-0 flex-row gap-2 border-t border-[--border] bg-background px-4 pt-2 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
           <Button
             type="button"
@@ -708,14 +677,8 @@ export function VisitLogger({
 }
 
 /**
- * Caption input for the completion form. Unlike the drawer's PhotoCaptionEditor
- * this writes to local form state instead of the database — a photo captured in
- * this session has no `photos` row until the form is submitted, and the form has
- * to keep working offline either way.
- *
- * Because there's no save request to react to, the caption would otherwise give
- * no feedback at all — hence the explicit Done button and the note about when it
- * actually persists.
+ * Caption input that writes to local form state, not the DB: the photo row doesn't exist until
+ * submit. The Done button is the only feedback.
  */
 function LocalCaptionField({
   value,

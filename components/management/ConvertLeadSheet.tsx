@@ -25,17 +25,8 @@ interface ConvertLeadSheetProps {
 }
 
 /**
- * Two-step "Convert to Account" wizard (task 9.9), opened from
- * LeadDetailSheet on a service_inquiry lead. Step 1 reuses AccountForm
- * (prefilled from the lead, submitting through convertLeadToAccount instead
- * of createAccount so the new id can be captured); step 2 reuses
- * PropertyForm, prefilled with the lead's address and skippable. Finishing
- * either step navigates to the new account's detail page — that's where the
- * owner's next move (real pricing, more properties, scheduling) lives.
- *
- * Once the account is created, closing the sheet also routes to the account
- * page rather than dropping the owner back in the inbox with a
- * half-finished flow and no way back to step 2.
+ * Two-step lead conversion: AccountForm (via convertLeadToAccount), then an optional
+ * PropertyForm. Once the account exists, finishing or closing goes to its page.
  */
 export function ConvertLeadSheet({ lead, open, onOpenChange }: ConvertLeadSheetProps) {
   const router = useRouter()

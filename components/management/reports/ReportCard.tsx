@@ -59,11 +59,7 @@ export function ReportCard({
   )
 }
 
-/**
- * Keeps free-text `children` rather than EmptyState's title/hint split — each
- * chart's copy is one sentence naming the year, which a heading would only
- * worsen. Borrows the shared mark. Load failures are handled on the page.
- */
+/** Free-text children: each chart's empty copy is one sentence naming the year. */
 export function ReportEmpty({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-[12rem] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-background/50 px-6 py-8">

@@ -9,14 +9,7 @@ import { EditableImageSlot } from '@/components/public/editing/EditableImageSlot
 
 export const generateMetadata = () => pageMetadata('home')
 
-/**
- * Marketing home page (task 9.3). The 9.2 shell was just the hero + two
- * service-line teaser cards; this expands it into the full landing page:
- * hero, mission statement, service teasers, a services overview, the ELA
- * membership badge, a Field Notes teaser (linking out — the blog itself is
- * deferred), and a closing CTA band. Every heading/body/CTA is a `home`
- * (or `global`) `site_content` slot, editable in place via 9.2.5.
- */
+/** Marketing home. Every heading, body and CTA is an editable `home` or `global` slot. */
 export default async function HomePage() {
   const [home, lawn, gardens] = await Promise.all([
     getPageContent('home'),

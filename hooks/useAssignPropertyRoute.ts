@@ -14,7 +14,7 @@ type AccountDetailLike = {
   routeGroupByPropertyId?: Record<string, { id: string; name: string }>
 }
 
-export type AssignPropertyRouteInput = {
+type AssignPropertyRouteInput = {
   propertyId: string
   /** null removes the property from every route group. */
   routeGroupId: string | null
@@ -22,26 +22,13 @@ export type AssignPropertyRouteInput = {
   sortOrder?: number
   /** Shown in "Changes that didn't save" when this one gets stuck. */
   label?: string
-  /**
-   * Skip the cache patch and the invalidation. For callers issuing a *batch*
-   * that owns its own optimistic state — a reorder, where patching per row
-   * would animate the list through every intermediate order, and invalidating
-   * per row would refetch the pre-batch order mid-flight.
-   */
+  /** For batches that own their optimistic state (a reorder): skip the patch and invalidation. */
   silent?: boolean
 }
 
 /**
- * Move one property onto a route group, or off routes entirely — through the
- * offline queue.
- *
- * This was the one field route whose writes were still Server Actions, which is
- * indefensible for a page used from a truck: routing a property is exactly the
- * kind of small correction made while standing in front of it.
- *
- * Every cache it touches is patched by hand rather than invalidated. An
- * invalidation offline is a refetch that fails, and the point of queuing the
- * write is that the screen agrees with it immediately.
+ * Move a property onto a route, or off all routes, via the offline queue. Caches are patched
+ * by hand, not invalidated: offline, an invalidation is a failed refetch.
  */
 export function useAssignPropertyRoute() {
   const queryClient = useQueryClient()
@@ -63,9 +50,7 @@ export function useAssignPropertyRoute() {
 
     onMutate: ({ propertyId, routeGroupId, sortOrder = 0, silent }) => {
       if (silent) return
-      // Read before patching: moving between two routes changes no count, so
-      // the badge delta depends on where the property was, not just where it's
-      // going.
+      // Read before patching: the badge delta depends on where the property was.
       const wasRouted = Object.values(
         queryClient.getQueryData<RoutesData>(routesDataKey)?.assignedIdsByGroup ?? {},
       ).some((ids) => ids.includes(propertyId))
@@ -78,9 +63,7 @@ export function useAssignPropertyRoute() {
         }
         if (routeGroupId) {
           const list = [...(assignedIdsByGroup[routeGroupId] ?? [])]
-          // Insert at its position, not at the end: this list is drive order,
-          // and appending made every move look like "sent to the bottom" for a
-          // frame before the refetch corrected it.
+          // Insert at its position; this list is drive order.
           list.splice(Math.min(sortOrder, list.length), 0, propertyId)
           assignedIdsByGroup[routeGroupId] = list
         }
@@ -97,10 +80,8 @@ export function useAssignPropertyRoute() {
       queryClient.setQueryData<ScheduleReference>(scheduleReferenceKey, (old) => {
         if (!old) return old
 
-        // The row carries the nested property+account the grid renders, so
-        // moving a property means carrying that payload across rather than
-        // rebuilding it — it comes either from its old assignment or from the
-        // ungrouped bucket, depending on which direction this is going.
+        // Carry the row's nested property+account over from its old assignment or the ungrouped
+        // bucket.
         const existing = old.assignments.find((a) => a.property_id === propertyId)
         const ungroupedMatch = old.ungroupedProperties.find((p) => p.id === propertyId)
         const nested = existing?.property ?? ungroupedMatch ?? null
@@ -122,9 +103,7 @@ export function useAssignPropertyRoute() {
         return { ...old, assignments, ungroupedProperties }
       })
 
-      // The account detail page keeps its own routeGroupByPropertyId map, so
-      // without this the property card's "Route group: …" line never changed —
-      // the write landed and the screen didn't move.
+      // The account page keeps its own routeGroupByPropertyId map; patch it too.
       const groupName = queryClient
         .getQueryData<RoutesData>(routesDataKey)
         ?.routeGroups.find((rg) => rg.id === routeGroupId)?.name
@@ -149,9 +128,7 @@ export function useAssignPropertyRoute() {
 
     onSettled: (_data, _error, variables) => {
       if (variables?.silent) return
-      // Online this reconciles the hand-patched caches against the server.
-      // Offline these are no-ops against a failed refetch, which is why the
-      // patches above have to stand on their own.
+      // Reconciles against the server when online; offline these no-op.
       queryClient.invalidateQueries({ queryKey: routesDataKey })
       queryClient.invalidateQueries({ queryKey: scheduleReferenceKey })
       queryClient.invalidateQueries({ queryKey: navUnroutedCountKey })

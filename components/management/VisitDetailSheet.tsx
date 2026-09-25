@@ -22,7 +22,7 @@ import { useStopDetail, type StopDetail } from '@/hooks/crew/useStopDetail'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { isVisitInProgress } from '@/lib/utils/visits'
 import { useApplyVisitUpdate } from '@/hooks/useManagementSchedule'
-import type { EmployeeRole, SchedulePropertyRow } from '@/types/app'
+import type { SchedulePropertyRow } from '@/types/app'
 
 // routeGroup is never read in this component — callers without route-group context
 // (e.g. the account detail page's Recent visits list) don't need to supply one.
@@ -35,9 +35,7 @@ interface VisitDetailSheetProps {
   weekStart: string
 }
 
-/** Normalizes the schedule grid's raw DB-joined row into the same StopDetail
- *  shape the crew page's useStopDetail returns, so both containers feed
- *  VisitDetailContent identically and share one React Query cache entry. */
+/** Maps the grid's row into useStopDetail's shape so both share one cache entry. */
 function normalizeRow(row: VisitDetailRow): StopDetail | undefined {
   const v = row.visit
   if (!v) return undefined
@@ -100,17 +98,8 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart }: VisitDe
   // Query entries, and live updates are written into those (applyVisitUpdate).
   const data = raw
 
-  // Push what the drawer knows into the schedule's cache. Status writes here are
-  // direct-client (no Server Action, no revalidatePath) and the close-time
-  // router.refresh() has proven unreliable, so this is what actually repaints
-  // the cell behind the sheet — including revert-to-scheduled, which never
-  // closes the drawer at all.
-  //
-  // The optimistic write that lands first carries the *old* updated_at, so the
-  // version guard rejects it; the refetch forced by the mutation's
-  // invalidateQueries then arrives with the server's real updated_at and wins.
-  // Deliberately not synthesizing a client timestamp — a fast client clock would
-  // pin the value and start rejecting genuine later updates.
+  // Push the drawer's state into the schedule cache so the cell behind the sheet repaints.
+  // The version guard lets the server's refetch win over this write; no client timestamps.
   const visitForOverlay = raw?.visit
   useEffect(() => {
     if (!visitForOverlay) return
@@ -130,19 +119,11 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart }: VisitDe
   }
   const { data: currentEmployee } = useCurrentEmployee()
 
-  // Only the still-server-rendered containers (billing's InvoicedHistory) need
-  // this; the schedule and account pages read React Query, which the drawer's
-  // writes patch directly. Offline it is worse than useless — the RSC fetch
-  // fails and takes the page down with it.
+  // Only server-rendered containers (billing) need a refresh; offline it would crash the page.
   function handleOpenChange(next: boolean) {
-    // Dismissing the photo lightbox must not close this sheet with it — both are
-    // Radix overlays portaled to <body>, so the inner close reaches this one as
-    // an outside interaction, arriving just after the lightbox has unmounted.
+    // The stacked lightbox's close reaches this sheet as an outside interaction; ignore it.
     if (!next && (photoViewerOpen || Date.now() - photoClosedAt.current < 500)) return
-    // Refresh BEFORE onOpenChange: the parent's close handler runs
-    // syncVisitUrlParam(null) → history.replaceState, which Next turns into a
-    // router action of its own, and a refresh dispatched after it can be
-    // discarded by that restore.
+    // Refresh before onOpenChange: its replaceState can discard a refresh dispatched after it.
     if (!next && navigator.onLine) router.refresh()
     onOpenChange(next)
   }
@@ -162,18 +143,13 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart }: VisitDe
   return (
     <>
       <Sheet open={open} onOpenChange={handleOpenChange}>
-        {/* When the Sheet closes while a Select trigger inside it holds focus, Radix's
-            focus-restoration races with the closing subtree and can leave the page with a
-            stuck pointer-events lock (cells become unclickable). preventDefault sends focus
-            to document.body instead, which clears the lock. */}
+        {/* Send focus to body on close, or Radix can leave a stuck pointer-events lock. */}
         <SheetContent
           side="right"
           className="w-full sm:max-w-lg flex flex-col p-0 gap-0"
           onCloseAutoFocus={(e) => e.preventDefault()}
         >
-          {/* Identity block, read top-down: which account, which property, which
-              week. The owner reopens this sheet constantly across properties and
-              weeks, so all three answer at a glance before any action. */}
+          {/* Identity block: account, property, week. */}
           <SheetHeader className="px-6 pt-6 pb-4 border-b border-border shrink-0 gap-0 space-y-3">
             {/* pr-8 keeps the week chip clear of the Sheet's own close button,
                 which is absolutely positioned at top-right. */}
@@ -186,9 +162,7 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart }: VisitDe
               >
                 {row.account.name}
               </Link>
-              {/* Weekdays are spelled out because the whole app thinks in Mon–Sun
-                  weeks — "Mon … Sun" makes the boundaries unmistakable when
-                  jumping between weeks. */}
+              {/* Weekdays spelled out so the Mon–Sun boundaries are unmistakable. */}
               <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-[11px] font-semibold text-[--accent-foreground] tabular-nums">
                 <CalendarDays className="h-3 w-3 shrink-0" />
                 {weekRangeLabel}
@@ -236,10 +210,8 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart }: VisitDe
             />
           </div>
 
-          {/* Bottom safe-area padding: a right-side sheet is full-width on a
-              phone (w-full sm:max-w-lg) and sits flush against the home
-              indicator on notched iPhones — the bottom variant handles this
-              itself, but side="right" doesn't. */}
+          {/* Right-side sheets don't pad for the home indicator on a phone; the bottom variant
+             does. */}
           <SheetFooter className="px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] border-t border-border shrink-0">
             <SheetClose asChild>
               <Button type="button" variant="outline" className="w-full sm:w-auto">

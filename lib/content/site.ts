@@ -3,10 +3,7 @@ import { collectionItemDataSchema, siteCollectionSchema } from '@/lib/validators
 import type { PageContent, SiteCollection, SiteCollectionItem, SitePage, SiteSlot } from '@/types/app'
 import { CONTENT_DEFAULTS } from './defaults'
 
-/** Minimal escaper for the richtext default-fallback case below — the input
- *  is always a developer-authored string from defaults.ts, never user input,
- *  but this keeps the invariant "SiteSlot.value is always safe HTML for a
- *  richtext slot" true even for that path, with no exceptions to remember. */
+/** Keeps richtext `value` always-safe HTML, even for developer-authored defaults. */
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
@@ -14,20 +11,9 @@ function escapeHtml(text: string): string {
     .replace(/>/g, '&gt;')
 }
 
-/**
- * Server-only read layer for the public marketing site's DB-backed content
- * (task 9.2). Every public page calls `getPageContent` for its slots and
- * `getCollection` for any list it renders (FAQ / jobs / team) — never the
- * Supabase client directly, so the default-fallback and Zod validation stay
- * in one place.
- */
+/** Server-only read layer for public site content. Pages go through this, never Supabase directly. */
 
-/**
- * All slots for a page, merged over `CONTENT_DEFAULTS` so a missing or
- * not-yet-edited row still renders real copy instead of a blank page.
- * `global` slots (footer contacts, socials) are always included alongside
- * the page's own slots — one query, `.in('page', ['global', page])`.
- */
+/** All slots for a page plus `global`, merged over CONTENT_DEFAULTS so nothing renders blank. */
 export async function getPageContent(page: SitePage): Promise<PageContent> {
   const layers: SitePage[] = page === 'global' ? ['global'] : ['global', page]
 
@@ -46,15 +32,10 @@ export async function getPageContent(page: SitePage): Promise<PageContent> {
   const rows = data ?? []
   const slots: Record<string, SiteSlot> = {}
 
-  // Apply defaults first, then DB rows on top, layer by layer (global, then
-  // the specific page) — so a page-level edit can override a global default
-  // and neither layer can leave the other half-populated.
+  // Defaults first, then DB rows, global then page, so a page edit can override a global default.
   for (const layerPage of layers) {
     for (const [key, def] of Object.entries(CONTENT_DEFAULTS[layerPage] ?? {})) {
-      // A still-default richtext slot has no DB row yet, so no Tiptap `doc`
-      // to resume editing from — the editor synthesizes a one-paragraph doc
-      // from this plain string itself. `value` still has to be safe,
-      // directly-renderable HTML, hence the escape-and-wrap.
+      // A default richtext slot has no `doc`; the editor builds one from this escaped string.
       slots[key] =
         def.kind === 'richtext'
           ? { page: layerPage, key, kind: def.kind, value: `<p>${escapeHtml(def.value)}</p>` }
@@ -64,11 +45,8 @@ export async function getPageContent(page: SitePage): Promise<PageContent> {
       if (row.page !== layerPage || row.value === null || row.value === undefined) continue
 
       if (row.kind === 'richtext') {
-        // task 9.2.5: a richtext row's jsonb value is `{ doc, html }` — `doc`
-        // is the Tiptap JSON the editor resumes from, `html` (rendered once,
-        // server-side, at save time — see app/(public)/actions.ts) is what
-        // every page read actually uses. Never re-render `doc` on read: that
-        // would mean pulling @tiptap/html + happy-dom into the hot read path.
+        // Richtext rows store `{ doc, html }`. Reads use the pre-rendered `html`; never render
+        // `doc` here.
         const richValue = row.value as { doc?: unknown; html?: string }
         if (typeof richValue?.html !== 'string') continue
         slots[row.key] = { page: layerPage, key: row.key, kind: 'richtext', value: richValue.html, doc: richValue.doc }
@@ -87,19 +65,12 @@ export async function getPageContent(page: SitePage): Promise<PageContent> {
   return { page, slots }
 }
 
-/** Convenience accessor: `getSlot(content, 'hero_heading')`. Never throws —
- *  an unknown key (e.g. a typo) just renders empty rather than crashing a
- *  marketing page for a copy mistake. */
+/** Unknown keys render empty rather than crash a marketing page. */
 export function getSlot(content: PageContent, key: string): string {
   return content.slots[key]?.value ?? ''
 }
 
-/**
- * Published items in an owner-managed collection (FAQ / jobs / team),
- * ordered for display. Each row is Zod-validated against its collection's
- * shape; a malformed row (e.g. hand-edited via SQL) is logged and skipped
- * rather than breaking the whole list.
- */
+/** Published collection items in display order. Rows failing Zod are logged and skipped. */
 export async function getCollection<T>(collection: SiteCollection): Promise<SiteCollectionItem<T>[]> {
   siteCollectionSchema.parse(collection)
 

@@ -8,13 +8,7 @@ import { nextVisitVersion } from '@/lib/utils/visits'
 import { useCreateVisit } from '@/hooks/useCreateVisit'
 import type { Employee, SchedulePropertyRow, VisitCrewWithEmployee } from '@/types/app'
 
-/**
- * What a bulk apply did, and how to take it back.
- *
- * `undo` is absent when the action can't be reversed — scheduling mints visits
- * and there is no delete-visit mutation, and a visit crew may already have
- * started isn't safe to remove blind.
- */
+/** What a bulk apply did. `undo` is absent when it can't be reversed (scheduling creates visits). */
 /** One stop to act on: a property row and the week its visit belongs to. The
  *  desktop grid selects cells across weeks, so the week travels per target. */
 export interface BulkTarget {
@@ -28,17 +22,8 @@ export interface BulkResult {
 }
 
 /**
- * Bulk versions of the per-visit schedule mutations, for select mode.
- *
- * These enqueue the *existing* mutation types in a loop rather than adding a
- * bulk type, which is what makes them work offline for free: the queue already
- * knows how to replay each one, and a partially-flushed batch resumes rather
- * than being lost. The per-visit hooks can't be reused directly because they're
- * hooks bound to one visitId — the enqueue and the cache patch are lifted here
- * instead.
- *
- * Undo is built from the same primitives, so it queues and survives a dead zone
- * exactly like the change it reverses.
+ * Bulk schedule mutations for select mode. They loop over existing queue types, so they work
+ * offline and undo queues the same way.
  */
 export function useBulkScheduleActions() {
   const queryClient = useQueryClient()
@@ -62,9 +47,7 @@ export function useBulkScheduleActions() {
       const pending = targets.filter(({ row }) => !row.visit)
       await ensureVisits(pending)
       await flushMutationQueue()
-      // No undo: reversing this means deleting visits, and there is no
-      // delete-visit mutation type — deliberately, since a visit crew may have
-      // already started can't be removed safely.
+      // No undo: there's no delete-visit mutation.
       return { changed: pending.length }
     },
     [ensureVisits],
@@ -138,11 +121,7 @@ export function useBulkScheduleActions() {
     [ensureVisits, queryClient],
   )
 
-  /**
-   * Only scheduled visits. Nothing to skip on a row with no visit, and skipping
-   * a completed one would make undo lossy — `revert_status` sets 'scheduled',
-   * so it can't put a completion back.
-   */
+  /** Only scheduled visits: revert_status can't restore a completion, so undo would be lossy. */
   const skipAll = useCallback(
     async (targets: BulkTarget[], skipReason: string): Promise<BulkResult> => {
       const rows = targets.map((t) => t.row).filter((row) => row.visit?.status === 'scheduled')

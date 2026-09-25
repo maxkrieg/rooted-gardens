@@ -17,9 +17,7 @@ import { expectedVisitsForFrequency } from '@/lib/utils/reports'
 /** How many trailing weeks the crew report covers. */
 const CREW_WINDOW_WEEKS = 12
 
-/* ────────────────────────────────────────────────────────────────────────────
- * 1. Revenue by month — invoiced vs. paid
- * ──────────────────────────────────────────────────────────────────────────── */
+/* ── 1. Revenue by month: invoiced vs. paid ────────────────────────────────── */
 
 export interface MonthlyRevenue {
   /** Short month label for the x-axis, e.g. "Jan". */
@@ -33,19 +31,10 @@ export interface MonthlyRevenue {
 }
 
 /**
- * Twelve zero-filled Jan–Dec buckets for `year`, each carrying both the amount
- * invoiced and the amount collected.
- *
- * The query has to span *two* date columns because an invoice pushed in
- * December and paid in January belongs to both years — filtering on
- * `created_at` alone would silently drop that payment from the paid series.
- *
- * `invoices.amount` is the authoritative total for every billing type
- * (per_visit invoices already carry price x visit count; contract invoices
- * carry the flat rate), so a plain sum is correct with no per-billing-type
- * special-casing — see docs/INVOICING.md.
+ * Jan–Dec invoiced and collected totals for `year`. Queries both created_at and paid_at, since
+ * a December invoice paid in January counts in both years.
  */
-export interface RevenueReport {
+interface RevenueReport {
   months: MonthlyRevenue[]
   /** True when the query failed — see the note on CrewVisitsReport.loadError. */
   loadError?: boolean
@@ -100,9 +89,7 @@ export async function getRevenueByMonth(year: number): Promise<RevenueReport> {
   return { months }
 }
 
-/* ────────────────────────────────────────────────────────────────────────────
- * 2. Completed visits per crew member, per week
- * ──────────────────────────────────────────────────────────────────────────── */
+/* ── 2. Completed visits per crew member, per week ─────────────────────────── */
 
 export interface CrewWeeklyVisits {
   employeeId: string
@@ -123,13 +110,8 @@ export interface CrewVisitsReport {
 }
 
 /**
- * Completed visits per crew member across the trailing 12 weeks of `year`
- * (for a past year, that year's final 12 weeks).
- *
- * Credit follows `visit_crew.relation = 'completed'`, not `'assigned'` — who
- * actually did the work, matching how crew are displayed everywhere else in
- * the app. A visit worked by two people counts once for each, which is the
- * intended reading of "who's doing the most work".
+ * Completed visits per crew member over the year's trailing 12 weeks. Credit follows
+ * relation='completed'; a two-person visit counts for each.
  */
 export async function getVisitsPerCrewByWeek(year: number): Promise<CrewVisitsReport> {
   const supabase = await createClient()
@@ -199,9 +181,7 @@ export async function getVisitsPerCrewByWeek(year: number): Promise<CrewVisitsRe
   return { crew, windowLabel, maxWeekly }
 }
 
-/* ────────────────────────────────────────────────────────────────────────────
- * 3. Visit frequency vs. contracted frequency
- * ──────────────────────────────────────────────────────────────────────────── */
+/* ── 3. Visit frequency vs. contracted frequency ───────────────────────────── */
 
 export interface AccountAdherence {
   accountId: string
@@ -223,20 +203,9 @@ export interface AdherenceReport {
 }
 
 /**
- * Per-account actual vs. expected visit count for `year`.
- *
- * The window is the **season, derived from the data** rather than a hardcoded
- * Apr–Oct constant: it runs from the first week that year with any completed
- * visit to the last (capped at the current week). Deriving it means a quiet
- * winter never counts against an account, and it self-calibrates if the
- * company's season shifts — but it does mean the denominator moves, so the
- * window is always stated in the card subtitle.
- *
- * `as_needed` *properties* are excluded outright: with no contracted cadence
- * there is no expectation to fall short of (expectedVisitsForFrequency returns
- * null for them). The matching billing-type filter below is now only a guard
- * against legacy rows — 'as_needed' was retired as a billing type, but the DB
- * CHECK still permits it.
+ * Actual vs. expected visits per account over a season derived from the data (first to last
+ * week with a completed visit), so winter doesn't count against anyone. as_needed properties are
+ * excluded: no cadence, no expectation.
  */
 export async function getFrequencyAdherence(year: number): Promise<AdherenceReport> {
   const supabase = await createClient()

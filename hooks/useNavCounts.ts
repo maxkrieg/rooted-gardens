@@ -6,14 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 export const navLeadCountKey = ['nav-lead-count'] as const
 export const navUnroutedCountKey = ['nav-unrouted-count'] as const
 
-/**
- * Sidebar badge counts, cached rather than server-fetched.
- *
- * These used to be three extra round-trips in app/management/layout.tsx on every
- * navigation, existing only to avoid a flash of "0" while the client query ran.
- * The persisted cache plus the hydration gate solves that better, and offline
- * these hold their last known value instead of hanging.
- */
+/** Sidebar badge counts from the persisted cache, so they hold their last value offline. */
 export function useNewLeadCount(role: string | null | undefined) {
   const enabled = role === 'owner' || role === 'lead'
 
@@ -33,13 +26,7 @@ export function useNewLeadCount(role: string | null | undefined) {
   })
 }
 
-/**
- * Refreshed by the writes that move it (useRefreshRoutes, useRefreshAccounts),
- * not by realtime: `property_route_groups` and `properties` are NOT in the
- * supabase_realtime publication, so the channel this used to rely on could never
- * fire. It only looked live because the layout re-fetched the count server-side
- * on every navigation.
- */
+/** Refreshed by the writes that change them: these tables aren't in the realtime publication. */
 export function useUnroutedCount() {
   return useQuery({
     queryKey: navUnroutedCountKey,

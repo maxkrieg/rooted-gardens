@@ -12,14 +12,7 @@ import {
 } from '@/lib/validators/fleet'
 import { toUserMessage } from '@/lib/errors'
 
-/**
- * Fleet Server Actions (tasks 6.1 + 6.3).
- *
- * All re-validate on the server (never trust the client) and use the
- * RLS-respecting server client — the owner/lead write policies on vehicles /
- * equipment / maintenance_logs apply. Each revalidates /management/fleet so the
- * server-rendered page reflects the change.
- */
+/** Fleet actions. RLS client (owner/lead write policies); each revalidates /management/fleet. */
 
 function vehiclePayload(data: VehicleFormValues) {
   return {
@@ -99,12 +92,7 @@ export async function updateEquipment(
   return {}
 }
 
-/**
- * Log a maintenance event against exactly one vehicle or equipment item.
- * When the target is equipment, also advance equipment.last_serviced to the
- * logged service_date so the card's "last serviced" and the DB column stay in
- * sync (vehicles have no such column — their card derives it from the log).
- */
+/** Log maintenance for one vehicle or equipment item. For equipment, also sets last_serviced. */
 export async function logMaintenance(
   target: { vehicleId: string } | { equipmentId: string },
   values: MaintenanceLogFormValues,

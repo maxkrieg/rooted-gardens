@@ -18,19 +18,15 @@ interface EditableImageProps {
    *  lib/utils/site-media.ts. */
   scope: string
   alt: string
-  /** The parent decides how the new path gets persisted: a standalone slot
-   *  would call updateSiteSlot(kind:'image'); CollectionEditor folds it into
-   *  the item's `data` ahead of that item's own Save. Bytes go straight
-   *  browser → Storage, same reasoning as PhotoUploadDropzone — Server
-   *  Action bodies are capped well below a 20 MB image. */
+  /**
+   * The parent persists the new path (a slot save, or the collection item's data). Bytes go
+   * browser → Storage: Server Action bodies are capped well below 20MB.
+   */
   onUploaded: (path: string) => void
   className?: string
 }
 
-/** Image counterpart to EditableText/EditableRichText (task 9.2.5). Its one
- *  in-scope wiring is the `team` collection's photo field via
- *  CollectionEditor — see the 9.2.5 plan's scope note on why no new page
- *  gets a hero image slot in this task. */
+/** Image counterpart to EditableText; currently used for team photos in CollectionEditor. */
 export function EditableImage({ path, scope, alt, onUploaded, className }: EditableImageProps) {
   const { canEdit, editing } = useEditMode()
   const inputRef = useRef<HTMLInputElement>(null)

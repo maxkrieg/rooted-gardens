@@ -5,9 +5,8 @@ import { useOfflineStatus } from '@/hooks/crew/useOfflineStatus'
 import { StuckChangesSheet } from '@/components/crew/StuckChangesSheet'
 
 /**
- * Connectivity strip, escalating: clay = something didn't save and stopped
- * retrying (tappable, wins over the rest — a lost completion is a lost invoice),
- * ochre = offline, sage = syncing.
+ * Connectivity strip: clay = changes stopped retrying (tappable, wins), ochre = offline,
+ * sage = syncing.
  */
 export function OfflineBanner() {
   const { isOnline, pendingCount, failedCount, refreshCount } = useOfflineStatus()
@@ -21,11 +20,7 @@ export function OfflineBanner() {
         <button
           type="button"
           onClick={() => setReviewOpen(true)}
-          // Not sticky — it already renders at the top of the layout's outer
-          // flex column, above <main>. Making it sticky as well put it in a
-          // different containing block from the page's own sticky headers
-          // (schedule week-nav, stop-detail back button), so it silently
-          // covered them whenever a mutation got stuck.
+          // Not sticky: that covered the pages' own sticky headers.
           className="flex w-full min-h-11 items-center justify-center gap-2 px-4 py-2 text-sm font-sans font-medium"
           style={{
             backgroundColor: 'oklch(from var(--clay) l c h / 0.14)',

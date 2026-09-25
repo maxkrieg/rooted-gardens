@@ -4,11 +4,12 @@ import { useRef, useState } from 'react'
 import { Camera, Image as ImageIcon, ImagePlus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { useAddVisitPlanPhoto } from '@/hooks/crew/useAddVisitPlanPhoto'
-import { useDeleteVisitPlanPhoto } from '@/hooks/crew/useDeleteVisitPlanPhoto'
 import { MAX_PHOTO_BYTES, ALLOWED_PHOTO_TYPES } from '@/lib/utils/photos'
 import type { LightboxPhoto } from '@/components/PhotoLightbox'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { createClient } from '@/lib/supabase/client'
+import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 
 const MAX_PLAN_PHOTOS = 4
 
@@ -27,10 +28,8 @@ interface VisitPlanPhotosProps {
 }
 
 /**
- * Owner/lead-managed reference photos on the Visit Plan (photos.type = 'plan') —
- * distinct from crew's completion photos (type = 'visit', shown in the Completion
- * Log). Visible to every role; add/delete is gated to owner/lead and locks once
- * the visit is final, same treatment as the sibling Plan rows.
+ * Owner/lead reference photos on the Plan (type 'plan'). Everyone sees them; add/delete is
+ * owner/lead-only and locks once the visit is final.
  */
 export function VisitPlanPhotos({
   visitId,
@@ -123,9 +122,7 @@ export function VisitPlanPhotos({
               const url = urlByPath.get(photo.storage_path)
               return (
                 <div key={photo.id} className="relative">
-                  {/* Opens the shared lightbox rather than dumping a raw signed
-                      URL into a new tab — crew are on a phone and need to page
-                      through photos with the caption and date in view. */}
+                  {/* Opens the shared lightbox so crew can page with caption and date in view. */}
                   <button
                     type="button"
                     onClick={() => onOpenPhoto(i)}
@@ -183,9 +180,7 @@ export function VisitPlanPhotos({
               onChange={handleFileChange}
             />
             <div className="flex items-center gap-2 flex-wrap">
-              {/* Camera-only on touch devices: `pointer-coarse` means the primary
-                  pointer is a finger, so a touchscreen laptop still gets the
-                  single desktop button. CSS, not JS — no hydration flash. */}
+              {/* Camera-only when the primary pointer is a finger; CSS, so no hydration flash. */}
               <Button
                 type="button"
                 variant="outline"
@@ -227,4 +222,101 @@ export function VisitPlanPhotos({
       </div>
     </div>
   )
+}
+
+/**
+ * Upload a plan photo. Online-only, and appended in onSuccess since its id doesn't exist until
+ * the insert completes.
+ */
+function useAddVisitPlanPhoto(visitId: string, propertyId: string) {
+  const queryClient = useQueryClient()
+  const { data: employee } = useCurrentEmployee()
+
+  return useMutation({
+    mutationFn: async (file: File) => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        throw new Error('offline')
+      }
+
+      const supabase = createClient()
+      const storagePath = `photos/${propertyId}/${visitId}/${Date.now()}.jpg`
+
+      const { error: uploadError } = await supabase.storage.from('photos').upload(storagePath, file)
+      if (uploadError) throw uploadError
+
+      const { data, error } = await supabase
+        .from('photos')
+        .insert({
+          property_id: propertyId,
+          visit_id: visitId,
+          storage_path: storagePath,
+          type: 'plan',
+          uploaded_by: employee?.id ?? null,
+        })
+        .select('id, storage_path, type, created_at, caption, uploaded_by')
+        .single()
+      if (error) throw error
+
+      const photo = data as StopDetail['photos'][number]
+
+      // Sign it now so the lightbox can open on the new photo for captioning.
+      const { data: signed } = await supabase.storage
+        .from('photos')
+        .createSignedUrl(storagePath, 3600)
+
+      return { photo, url: signed?.signedUrl ?? null }
+    },
+
+    onSuccess: ({ photo }) => {
+      queryClient.setQueryData<StopDetail | null>(['stop-detail', visitId], (old) =>
+        old ? { ...old, photos: [...(old.photos ?? []), photo] } : old
+      )
+    },
+
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
+      queryClient.invalidateQueries({ queryKey: ['schedule-visits'] })
+    },
+  })
+}
+
+/** Delete a plan photo's storage object and row (row-only would orphan the blob). Online-only. */
+function useDeleteVisitPlanPhoto(visitId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ id, storagePath }: { id: string; storagePath: string }) => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        throw new Error('offline')
+      }
+
+      const supabase = createClient()
+      await supabase.storage.from('photos').remove([storagePath])
+
+      const { error } = await supabase.from('photos').delete().eq('id', id)
+      if (error) throw error
+    },
+
+    onMutate: async ({ id }) => {
+      await queryClient.cancelQueries({ queryKey: ['stop-detail', visitId] })
+      const previous = queryClient.getQueryData<StopDetail | null>(['stop-detail', visitId])
+
+      queryClient.setQueryData<StopDetail | null>(['stop-detail', visitId], (old) =>
+        old ? { ...old, photos: (old.photos ?? []).filter((p) => p.id !== id) } : old
+      )
+
+      return { previous }
+    },
+
+    onError: (_err, _input, context) => {
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(['stop-detail', visitId], context.previous)
+      }
+    },
+
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
+      queryClient.invalidateQueries({ queryKey: ['schedule-visits'] })
+    },
+  })
 }

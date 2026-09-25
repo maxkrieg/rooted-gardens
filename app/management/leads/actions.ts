@@ -2,34 +2,15 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { requireRole } from '@/lib/auth/server-role'
 import { leadStatusSchema } from '@/lib/validators/lead'
 import { accountFormSchema, type AccountFormValues } from '@/lib/validators/account'
 import { buildAccountPayload } from '@/lib/utils/accounts'
 import { toUserMessage } from '@/lib/errors'
 import type { JobApplicationDetails } from '@/types/app'
 
-/**
- * Leads inbox Server Actions (task 9.8). Owner/lead only — matches the
- * `leads` RLS policies (migration 20260804130000_leads.sql) exactly, so this
- * check is defense-in-depth the same way requireOwner() is in
- * app/management/team/actions.ts, not the real boundary.
- */
-async function requireLeadAccess(): Promise<{ error?: string }> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-  const { data: employee } = await supabase
-    .from('employees')
-    .select('role')
-    .eq('user_id', user.id)
-    .single()
-  if (employee?.role !== 'owner' && employee?.role !== 'lead') {
-    return { error: 'Only owners and leads can manage the leads inbox' }
-  }
-  return {}
-}
+const requireLeadAccess = () =>
+  requireRole(['owner', 'lead'], 'Only owners and leads can manage the leads inbox')
 
 export async function updateLeadStatus(id: string, status: string): Promise<{ error?: string }> {
   const auth = await requireLeadAccess()
@@ -48,19 +29,8 @@ export async function updateLeadStatus(id: string, status: string): Promise<{ er
 }
 
 /**
- * Signed URL for a job application's résumé. Re-reads `details.resume_path`
- * from the DB rather than trusting a client-supplied path — the sheet only
- * ever passes a lead id.
- *
- * Uses the RLS-respecting server client, not the service-role client: the
- * `resumes` bucket's "owners and leads can read resumes" SELECT policy
- * (migration 20260806130000) is the real gate here, unlike 9.6's *upload*
- * path, which needed service-role because the uploader was an anonymous
- * public applicant with no session to scope a policy by. A signed-in
- * owner/lead reading their own résumé has a session, so RLS applies cleanly.
- *
- * Short expiry (5 min) — a résumé is PII, and this URL is fetched and used
- * immediately from the detail sheet, never stored.
+ * 5-minute signed URL for a résumé. The path is re-read server-side; the resumes SELECT policy
+ * is the gate.
  */
 export async function getLeadResumeUrl(id: string): Promise<{ url?: string; error?: string }> {
   const auth = await requireLeadAccess()
@@ -89,21 +59,8 @@ export async function getLeadResumeUrl(id: string): Promise<{ url?: string; erro
 }
 
 /**
- * Convert a service_inquiry lead into an account (task 9.9) — step 1 of the
- * ConvertLeadSheet wizard. Creates the account, then marks the lead won and
- * links it back. Property creation (step 2) is a separate call to the
- * existing createProperty (app/app/(padded)/accounts/property-actions.ts) once
- * the caller has the new account id.
- *
- * Re-reads the lead server-side rather than trusting the client's `kind` /
- * conversion state — same "the client only ever passes an id" posture as
- * getLeadResumeUrl above — so a stale sheet or a double-click can't create a
- * duplicate account for an already-converted lead.
- *
- * If the account insert succeeds but the lead update fails, the account is
- * NOT rolled back (supabase-js has no cross-table transaction) — it's
- * returned via `accountId` with a `warning` rather than silently lost, so the
- * caller can still proceed to step 2 and surface the problem.
+ * Convert an inquiry lead to an account, then mark it won. Re-reads the lead so a stale sheet
+ * can't double-convert. If the lead update fails, returns the account with a `warning`.
  */
 export async function convertLeadToAccount(
   leadId: string,

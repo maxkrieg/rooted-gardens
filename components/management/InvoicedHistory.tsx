@@ -59,9 +59,7 @@ interface InvoicedHistoryProps {
 
 type SheetRow = { property: Property; account: Account; visit: Visit }
 
-// How often the tab auto-refreshes invoice status while visible. The server
-// action is staleness-gated (see pollInvoiceStatuses), so this only bounds how
-// quickly a stale invoice gets picked up — not how hard QBO is hit.
+// Auto-refresh interval. The server action is staleness-gated, so this can't hammer QBO.
 const POLL_INTERVAL_MS = 60_000
 
 const INVOICE_STATUSES = ['draft', 'sent', 'paid', 'overdue'] as const
@@ -99,13 +97,8 @@ function RevenueCard({
 }
 
 /**
- * Read-only audit trail of already-created invoices, one row per QBO invoice
- * (from the canonical `invoices` table), showing its real QBO lifecycle status
- * (draft/sent/paid/overdue). per_visit invoices are collapsible to their billed
- * visits; contract invoices show their period. Amounts are the invoice total
- * snapshot, never a live account price. "Refresh now" pulls current status for
- * the visible invoices from QuickBooks on demand (the daily cron does the same
- * unattended).
+ * Read-only history, one row per QBO invoice with its synced status. per_visit rows expand to
+ * their visits; contract rows show their period. Amounts are stored snapshots.
  */
 export function InvoicedHistory({
   invoices,
@@ -213,13 +206,8 @@ export function InvoicedHistory({
     })
   }
 
-  // Background auto-refresh while the tab is visible: polls QBO status for the
-  // visible, non-terminal (not paid) invoices on an interval and the moment the
-  // tab regains focus. The server action is staleness-gated, so a short interval,
-  // frequent refocus, or multiple open tabs can't hammer the QBO API. Silent —
-  // the "Refresh now" button is the explicit, force-now path. Ids live in a ref
-  // so the effect subscribes once (on mount) rather than re-subscribing whenever
-  // the data changes.
+  // Poll unpaid invoice status on an interval and on refocus (server-side staleness-gated).
+  // Ids live in a ref so the effect subscribes once.
   const pollableIds = useMemo(
     () => filtered.filter((inv) => inv.status !== 'paid').map((inv) => inv.id),
     [filtered],
@@ -508,10 +496,8 @@ export function InvoicedHistory({
                       <TableCell className="py-1.5" />
                       <TableCell className="py-1.5" />
                       <TableCell className="py-1.5 text-right text-sm tabular-nums">
-                        {/* Per-line price = invoice total / visit count. Every
-                            per_visit line is billed at the same price, so this is
-                            exact and stays a point-in-time snapshot (invoices.amount
-                            is stored at push time, never a live account lookup). */}
+                        {/* Per-line price = invoice total / visit count: exact, since every line
+                           bills the same price. */}
                         ${(Number(invoice.amount) / invoice.visits.length).toFixed(2)}
                       </TableCell>
                     </TableRow>

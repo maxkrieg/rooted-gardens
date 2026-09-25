@@ -18,14 +18,8 @@ interface WeekNoteRibbonProps {
 }
 
 /**
- * The route sheet's group-header dispatch note, on the band.
- *
- * "no Ryan till Thurs", "matts gone all week" — a fact about the *week and the
- * route*, which is why it doesn't belong on any one visit's crew_instruction.
- * Crew read it; owner and lead tap it to edit.
- *
- * Clay rather than the band's stone, so it reads as an exception to the plan
- * rather than part of it — the same signal the orange cell carries on the sheet.
+ * The route's dispatch note for the week ("no Ryan till Thurs"), shown on the band. Crew read
+ * it; owner/lead tap to edit. Clay, so it reads as an exception to the plan.
  */
 export function WeekNoteRibbon({
   note,
@@ -45,9 +39,7 @@ export function WeekNoteRibbon({
     if (editing) setDraft(note ?? '')
   }
 
-  // No note and not editing renders nothing at all. A permanent "add a note"
-  // row cost every route group vertical space to say there was nothing to say;
-  // the affordance lives in the band's ⋯ instead.
+  // Nothing to show when empty; the band's ⋯ menu adds a note.
   if (!editing && !note) return null
 
   if (!editing) {

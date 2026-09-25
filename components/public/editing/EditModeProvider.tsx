@@ -30,9 +30,7 @@ export function EditModeProvider({
   )
 }
 
-/** Every Editable* component and the header's Edit toggle read from this —
- *  never from a prop drilled down separately, so wiring a new editable field
- *  into a page never means threading canEdit/editing through it by hand. */
+/** Every Editable* component reads edit state from here, so nothing gets prop-drilled. */
 export function useEditMode(): EditModeContextValue {
   const ctx = useContext(EditModeContext)
   if (!ctx) {

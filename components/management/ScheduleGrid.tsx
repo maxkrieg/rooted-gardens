@@ -1,17 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { addDays, format, parseISO } from 'date-fns'
-import { toast } from 'sonner'
 import { Camera, FilePen, Flag, Receipt } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import {
-  getWeekStart,
-  groupRowsByAccount,
-  routeGroupStats,
-  sortRowsByPriority,
-} from '@/lib/utils/schedule'
-import { usePropertyLastVisit } from '@/hooks/usePropertyLastVisit'
+import { getWeekStart, groupRowsByAccount, routeGroupStats } from '@/lib/utils/schedule'
 import {
   DEFAULT_SCHEDULE_SORT,
   UNGROUPED_SORT_KEY,
@@ -20,10 +13,6 @@ import {
   type ScheduleSortState,
 } from '@/lib/utils/schedule-sort'
 import { ScheduleSortToggle } from '@/components/management/ScheduleSortToggle'
-import { syncVisitUrlParam } from '@/lib/utils/visit-url'
-import { useCan } from '@/components/app/RoleProvider'
-import { useCreateVisit } from '@/hooks/useCreateVisit'
-import { toUserMessage } from '@/lib/errors'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
 import { RouteDefaultsSheet } from '@/components/management/RouteDefaultsSheet'
@@ -39,9 +28,8 @@ import {
   formatDays,
 } from '@/components/management/RouteGroupBand'
 import { CheckIndicator } from '@/components/app/CheckIndicator'
-import { useScheduleReference } from '@/hooks/useManagementSchedule'
-import { useWeekNotesForWeeks, useSaveWeekNote } from '@/hooks/useWeekNotes'
-import { useRouteAllUngrouped } from '@/hooks/useRouteAllUngrouped'
+import { useScheduleInteractions } from '@/hooks/useScheduleInteractions'
+import { useWeekNotesForWeeks } from '@/hooks/useWeekNotes'
 import type { BulkTarget } from '@/hooks/useBulkScheduleActions'
 import { isVisitInProgress, formatElapsed, displayCrewFor } from '@/lib/utils/visits'
 import {
@@ -60,6 +48,7 @@ import type {
   Vehicle,
   VisitWithCrew,
 } from '@/types/app'
+import { firstName } from '@/lib/utils/team'
 
 // Shared width for the sticky label column — kept in one place so the header
 // `<th>`, the label cells, and the route header cells can never drift apart.
@@ -92,61 +81,39 @@ export function ScheduleGrid({
   sortState = DEFAULT_SCHEDULE_SORT,
   onGroupSortChange,
 }: ScheduleGridProps) {
-  const { editSchedule: canEdit } = useCan()
+  const {
+    canEdit,
+    lastVisitByProperty,
+    reference,
+    routeAllUngrouped,
+    saveWeekNote,
+    orderRows,
+    sheetOpen,
+    sheetRow,
+    sheetWeek,
+    openSheet,
+    handleSheetOpenChange,
+    creatingKey,
+    createdVisits,
+    scheduleVisit,
+    assignOpen,
+    setAssignOpen,
+    assignGroup,
+    openAssign,
+    defaultsGroup,
+    setDefaultsGroup,
+    noteEditKey,
+    setNoteEditKey,
+    selected,
+    setSelected,
+  } = useScheduleInteractions({ selectMode, sortState, windowStart: weeks[0]?.weekStart })
+
   const currentWeekStart = useMemo(
     () => format(getWeekStart(new Date()), 'yyyy-MM-dd'),
     []
   )
-  const createVisit = useCreateVisit()
-
-  const { data: lastVisitByProperty } = usePropertyLastVisit()
-
-  // Each group resolves its own mode, exactly as the phone list does.
-  // Applied before groupRowsByAccount so a multi-property account still clusters.
-  const orderRows = useCallback(
-    (groupKey: string, rows: SchedulePropertyRow[]) =>
-      sortModeForGroup(sortState, groupKey) === 'priority'
-        ? sortRowsByPriority(rows, lastVisitByProperty)
-        : rows,
-    [sortState, lastVisitByProperty],
-  )
-
-  // Tick elapsed time every 30s — one timer for the grid, not one per cell.
-  const [, setTick] = useState(0)
-  useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 30_000)
-    return () => clearInterval(id)
-  }, [])
-
-  const [sheetOpen, setSheetOpen] = useState(false)
-  const [sheetRow, setSheetRow] = useState<SchedulePropertyRow | null>(null)
-  const [sheetWeek, setSheetWeek] = useState('')
-  const [creatingKey, setCreatingKey] = useState<string | null>(null)
-  // Visits created in this session, keyed by cell. Layered *under* the server
-  // data so a just-scheduled cell paints immediately, and never cleared, since
-  // clearing it would race the data catching up (the routes-page freeze, f4e09e3).
-  const [createdVisits, setCreatedVisits] = useState<Map<string, VisitWithCrew>>(new Map())
-
-  const [assignOpen, setAssignOpen] = useState(false)
-  const [assignGroup, setAssignGroup] = useState<RouteGroup | null>(null)
-  const [defaultsGroup, setDefaultsGroup] = useState<RouteGroup | null>(null)
-  // Which route×week note editor is open — a note belongs to one week column.
-  const [noteEditKey, setNoteEditKey] = useState<string | null>(null)
-
   const weekStarts = useMemo(() => weeks.map((w) => w.weekStart), [weeks])
   const notesByWeek = useWeekNotesForWeeks(weekStarts)
-  const saveWeekNote = useSaveWeekNote()
-  const { data: reference } = useScheduleReference()
-  const routeAllUngrouped = useRouteAllUngrouped()
-
-  const [selected, setSelected] = useState<Set<string>>(new Set())
-  // Leaving select mode drops the selection — adjusted during render, as the
-  // phone list does, so the stale selection never paints once.
-  const [selectModeSnapshot, setSelectModeSnapshot] = useState(selectMode)
-  if (selectModeSnapshot !== selectMode) {
-    setSelectModeSnapshot(selectMode)
-    if (selected.size > 0) setSelected(new Set())
-  }
 
   // Build visit lookup: property_id → week_start → visit
   const visitMap = useMemo(() => {
@@ -176,44 +143,7 @@ export function ScheduleGrid({
     )
   }
 
-  function openSheet(row: SchedulePropertyRow, visit: VisitWithCrew, weekStart: string) {
-    setSheetRow({ ...row, visit })
-    setSheetWeek(weekStart)
-    setSheetOpen(true)
-    // weeks[0] is the leftmost rendered column — the window the server built.
-    syncVisitUrlParam(visit.id, weeks[0]?.weekStart)
-  }
-
-  /**
-   * Schedule an empty cell. `openDrawer` is true for a click — the owner almost
-   * always wants to set crew or an instruction next. The `S` shortcut passes
-   * false to keep a fast path for filling a week without a drawer each time.
-   *
-   * Deliberately not wrapped in startTransition: the drawer state must be an
-   * urgent update, or it reads as a frozen cell.
-   */
-  async function scheduleCell(
-    row: SchedulePropertyRow,
-    weekStart: string,
-    { openDrawer }: { openDrawer: boolean },
-  ) {
-    const key = `${row.property.id}-${weekStart}`
-    setCreatingKey(key)
-    try {
-      const visit = await createVisit(row, weekStart)
-      setCreatedVisits((prev) => new Map(prev).set(key, visit))
-      if (openDrawer) openSheet(row, visit, weekStart)
-    } catch (err) {
-      // A thrown failure (dropped connection mid-action) would otherwise leave
-      // the cell stuck on its placeholder.
-      toast.error('Failed to create visit', {
-        description: toUserMessage(err, 'Could not add the stop.', '[ScheduleGrid.scheduleCell]'),
-      })
-    } finally {
-      setCreatingKey(null)
-    }
-  }
-
+  // `S` schedules without opening the drawer — a fast path for filling a week.
   function toggleCells(keys: string[]) {
     setSelected((prev) => {
       const next = new Set(prev)
@@ -232,13 +162,8 @@ export function ScheduleGrid({
     } else if (visit) {
       openSheet(row, visit, weekStart)
     } else {
-      void scheduleCell(row, weekStart, { openDrawer: true })
+      void scheduleVisit(row, weekStart, { openDrawer: true })
     }
-  }
-
-  function handleSheetOpenChange(next: boolean) {
-    setSheetOpen(next)
-    if (!next) syncVisitUrlParam(null)
   }
 
   function handleCellKeyDown(
@@ -251,7 +176,7 @@ export function ScheduleGrid({
     // cells in a row. Off while selecting, where a keypress shouldn't write.
     if ((e.key === 's' || e.key === 'S') && !visit && !selectMode) {
       e.preventDefault()
-      void scheduleCell(row, weekStart, { openDrawer: false })
+      void scheduleVisit(row, weekStart, { openDrawer: false })
     }
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
@@ -320,12 +245,7 @@ export function ScheduleGrid({
     ]
   }
 
-  /**
-   * One week's slice of a route's header: the phone band's progress, crew,
-   * truck and dispatch note, per column. In select mode the summary toggles
-   * every cell of this route in this week — the common "this route, this week"
-   * batch in one click.
-   */
+  /** A route's header for one week. In select mode it toggles every cell of that route-week. */
   function renderRouteWeekCell(routeGroup: RouteGroup, rows: SchedulePropertyRow[], week: ScheduleWeek) {
     const stats = routeGroupStats(
       rows.map((row) => visitFor(row, week.weekStart)),
@@ -452,12 +372,8 @@ export function ScheduleGrid({
   return (
     <>
       <div className="rounded-xl border border-border overflow-clip bg-card shadow-warm">
-        {/* A bounded, internally-scrolling pane rather than page scroll: an
-            ancestor with overflow-x becomes a scroll container on both axes and
-            breaks a page-sticky <thead>, so this div is its own scroll container
-            and `sticky top-0` works as the ordinary case. The cap leaves room for
-            the sticky filter bar (--schedule-sticky-h) above and, while
-            selecting, the selection bar below. */}
+        {/* Its own scroll container so the <thead> can stick; the cap leaves room for the sticky
+           filter bar and the selection bar. */}
         <div
           className="overflow-auto"
           style={{
@@ -534,8 +450,7 @@ export function ScheduleGrid({
                               {
                                 label: 'Assign route…',
                                 onClick: () => {
-                                  setAssignGroup(routeGroup)
-                                  setAssignOpen(true)
+                                  openAssign(routeGroup)
                                 },
                               },
                               { label: 'Route defaults…', onClick: () => setDefaultsGroup(routeGroup) },
@@ -563,16 +478,12 @@ export function ScheduleGrid({
                     </td>
                     {weeks.map((week) => renderRouteWeekCell(routeGroup, rows, week))}
                   </tr>,
-                  // ~99% of accounts have exactly one property — merge the account
-                  // identity and its single site into one label cell. Only accounts
-                  // with multiple sites get a header row + railed property rows.
+                  // One-property accounts (~99%) merge account and site into one label cell.
                   ...groupRowsByAccount(orderRows(routeGroup.id, rows)).flatMap(({ account, rows: acctRows }) =>
                     renderPropertyRows(routeGroup.id, account, acctRows)
                   ),
                 ]),
-                // "Not on a route" — properties with no property_route_groups row.
-                // Rendered last, in clay, with the same inline route picker the
-                // phone has, so fixing it doesn't mean leaving the schedule.
+                // "Not on a route": last, in clay, with an inline route picker.
                 ...(structure.ungrouped.length > 0
                   ? [
                       <tr key="ungrouped-header">
@@ -677,14 +588,8 @@ export function ScheduleGrid({
 
 // ─── Label column cells ────────────────────────────────────────────────────
 //
-// Three shapes share one sticky, fixed-width column so its right edge and
-// hover highlight stay continuous no matter which shape a given row uses:
-//   - `merged`  — the ~99% case: one account with one property.
-//   - `nested`  — a property row under a multi-property account header. Only
-//                 these carry the sage rail — "a site of the account above."
-//   - the multi-property account header itself (`AccountHeaderLabelCell`).
-// No rate, matching the phone: the schedule is a dispatch screen, and pricing
-// is the accountant's question.
+// `merged` (one-property account), `nested` (under a multi-property header, sage rail), and the
+// account header share one sticky column. No rate — this is a dispatch screen.
 
 function PropertyLabelCell({
   account,
@@ -715,9 +620,7 @@ function PropertyLabelCell({
         {property.address}
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-        {/* Always counted here, unlike the phone list: this cell is the label for
-            all four week columns at once, so it can't take its cue from any one
-            week's visit. Days-since is a property fact, so it reads the same. */}
+        {/* Always counted here: this label spans all four weeks. */}
         <CadenceBadge property={property} lastVisitOn={lastVisitOn} showDays />
       </div>
     </td>
@@ -740,12 +643,7 @@ function AccountHeaderLabelCell({ account, propertyCount }: { account: Account; 
   )
 }
 
-/**
- * One property×week. Same vocabulary as the phone's stop row: a status glyph and
- * a settled-visit wash rather than a status word, crew on a muted line, the
- * invoice as a quiet label, and the crew instruction readable inline. Desktop
- * keeps what it has room for — the completed date and the photo count.
- */
+/** One property×week cell, matching the phone row, plus completed date and photo count. */
 function ScheduleCell({
   visit,
   isCreating,
@@ -799,7 +697,7 @@ function ScheduleCell({
   const inProgress = isVisitInProgress(visit)
   const settled = visit.status === 'completed' || visit.status === 'skipped'
   const displayCrew = displayCrewFor(visit)
-  const crewLabel = displayCrew.slice(0, 2).map((emp) => emp.name.split(' ')[0]).join(', ')
+  const crewLabel = displayCrew.slice(0, 2).map((emp) => firstName(emp.name)).join(', ')
   const overflow = displayCrew.length - 2
 
   return (

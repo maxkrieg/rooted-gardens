@@ -84,10 +84,7 @@ export function RouteAssignDialog({
       toast.error('Failed to assign route', { description: res.error })
       return
     }
-    // revalidatePath can't repaint a client-first page. Without this the crew
-    // avatars only appear on the next full reload — the vehicle looked fine
-    // because it rode in on the realtime `visits` overlay, which carries no
-    // visit_crew rows.
+    // Refetch explicitly: realtime carries the vehicle change but not visit_crew rows.
     refreshSchedule(values.week_start)
 
     const count = res.count ?? 0

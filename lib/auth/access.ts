@@ -1,20 +1,11 @@
 import type { EmployeeRole } from '@/types/app'
 
 /**
- * Route access and role capabilities, in one dependency-free module.
- *
- * Kept free of React and of any Node-only import so `proxy.ts` (Edge runtime)
- * can import it directly — that's what lets the redirect gate and the nav
- * filter agree instead of drifting, which is how `ROLE_HOME` ended up
- * duplicated into app/(public)/layout.tsx as `STAFF_HOME`.
+ * Route access and role capabilities. Dependency-free so proxy.ts (Edge) can import it: the
+ * redirect gate and the nav must share one list.
  */
 
-/**
- * Where a role lands when it has nowhere better to go.
- *
- * Everyone but the accountant lands on the schedule: since R2.6 it carries the
- * dashboard as its `Today` view, so there is no separate dashboard to land on.
- */
+/** Where each role lands. The schedule carries the dashboard as its `Today` view. */
 export const ROLE_HOME: Record<EmployeeRole, string> = {
   owner: '/app/schedule',
   lead: '/app/schedule',
@@ -22,22 +13,14 @@ export const ROLE_HOME: Record<EmployeeRole, string> = {
   accountant: '/management/billing',
 }
 
-/**
- * Which roles may load which route prefix. Longest match wins, so
- * `/management/team` beats `/management`.
- *
- * Access is deliberately broader than the nav: an accountant keeps the
- * schedule/accounts/routes access they had under the old `MANAGEMENT_ROLES`
- * set, they just aren't given bottom-bar tabs for it. Promoting a destination
- * and permitting it are different decisions.
- */
+/** Which roles may load which prefix; longest match wins. Deliberately broader than the nav. */
 const ROUTE_ACCESS: Array<{ prefix: string; roles: readonly EmployeeRole[] }> = [
   // Field app — the merged surface.
   { prefix: '/app/schedule', roles: ['owner', 'lead', 'crew', 'accountant'] },
   { prefix: '/app/stop', roles: ['owner', 'lead', 'crew'] },
   { prefix: '/app/accounts', roles: ['owner', 'lead', 'accountant'] },
   { prefix: '/app/routes', roles: ['owner', 'lead', 'accountant'] },
-  // Retired in R2.6 — kept here so the redirect to ?view=today isn't gated
+  // Retired, but listed so the redirect to ?view=today isn't gated
   // away before next.config gets to it.
   { prefix: '/app/dashboard', roles: ['owner', 'lead', 'accountant'] },
 
@@ -63,24 +46,14 @@ export function isProtectedRoute(pathname: string): boolean {
   return pathname.startsWith('/app') || pathname.startsWith('/management')
 }
 
-/**
- * Whether `role` may load `pathname`. An unmatched protected path denies —
- * a new route is inaccessible until it's listed here, which fails closed.
- */
+/** Unmatched protected paths deny, so a new route fails closed until listed. */
 export function canAccessRoute(pathname: string, role: EmployeeRole): boolean {
   const match = matchRoute(pathname)
   if (!match) return !isProtectedRoute(pathname)
   return match.roles.includes(role)
 }
 
-/**
- * What a role may *do*. Consolidates the checks that were duplicated across
- * VisitDetailContent, ScheduleView, AccountDetailView, and the two schedule
- * pages.
- *
- * These drive affordances only. RLS is the real boundary — every capability
- * here has a matching policy, and a forced-on flag still fails at the database.
- */
+/** What a role may do. Affordances only: RLS is the real boundary. */
 export interface Capabilities {
   /** Create visits, bulk-assign a route, edit crew instructions. */
   editSchedule: boolean

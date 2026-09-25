@@ -3,12 +3,7 @@ import { FleetView } from '@/components/management/FleetView'
 import { ErrorState } from '@/components/states/ErrorState'
 import type { Vehicle, Equipment, MaintenanceLog } from '@/types/app'
 
-/**
- * Fleet & Equipment management page (tasks 6.1 + 6.3).
- * Server Component — fetches vehicles, equipment, and maintenance logs, groups
- * the logs by target in JS (the same merge-in-JS pattern as the accounts page),
- * then hands the merged data to the interactive FleetView client component.
- */
+/** Fleet page: vehicles, equipment and maintenance logs, merged in JS for FleetView. */
 export default async function FleetPage() {
   const supabase = await createClient()
 

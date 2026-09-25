@@ -2,11 +2,7 @@
 
 import { useEffect } from 'react'
 
-/**
- * The root layout itself threw, before fonts, tokens, or providers mounted. It
- * replaces the whole document, so it ships its own <html>/<body> and inlines the
- * Field & Foliage values — the CSS variables may not have loaded.
- */
+/** The root layout threw. Replaces the whole document, so it inlines the theme values. */
 export default function GlobalError({
   error,
   reset,

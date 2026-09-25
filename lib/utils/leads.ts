@@ -4,11 +4,7 @@ import type { AccountFormValues } from '@/lib/validators/account'
 import type { PropertyFormValues } from '@/lib/validators/property'
 import type { JobApplicationDetails, LeadWithConverted } from '@/types/app'
 
-/**
- * The one-line "what are they after" summary shown in both the leads table
- * and LeadCard: a job application's position, or a service inquiry's
- * service_interest label. Shared so the two renderings can't drift.
- */
+/** The one-line "what are they after": position or service interest. */
 export function leadInterestOrPosition(lead: LeadWithConverted): string | null {
   if (lead.kind === 'job_application') {
     return (lead.details as JobApplicationDetails | null)?.position ?? null
@@ -22,21 +18,9 @@ export function leadInterestOrPosition(lead: LeadWithConverted): string | null {
 }
 
 /**
- * Prefill for AccountForm when converting a service_inquiry lead to an
- * account (task 9.9). `status` defaults to 'prospective'; `billing_type` to
- * 'per_visit', which covers virtually every website inquiry (contract is for
- * negotiated commercial work that doesn't arrive through the public form).
- *
- * This deliberately leaves `price_per_visit` unset, so accountFormSchema's
- * refine makes it a required field the owner must fill in to convert. That is
- * the intended gate: an account with no rate can't be invoiced by the billing
- * queue, so a lead shouldn't be able to become one silently. (This prefill used
- * to be 'as_needed' purely to dodge that requirement; that billing type has
- * been removed.)
- *
- * Billing address fields are left blank on purpose: `lead.address` is the
- * *service* address (it belongs on the property, via leadToPropertyDefaults
- * below), not the account's structured billing/mailing address.
+ * AccountForm prefill for a converted inquiry: prospective, per_visit. price_per_visit is left
+ * blank on purpose, so the owner must set a rate before the account exists. lead.address is the
+ * service address; it goes on the property.
  */
 export function leadToAccountDefaults(lead: LeadWithConverted): Partial<AccountFormValues> {
   const interest = leadInterestOrPosition(lead)
@@ -58,11 +42,7 @@ export function leadToAccountDefaults(lead: LeadWithConverted): Partial<AccountF
   }
 }
 
-/**
- * Prefill for PropertyForm when converting a service_inquiry lead (task 9.9).
- * Frequency is left at the form's own 'weekly' default — a lead's message
- * gives no reliable signal for it.
- */
+/** PropertyForm prefill. Frequency stays at the form default; a message isn't a reliable signal. */
 export function leadToPropertyDefaults(lead: LeadWithConverted): Partial<PropertyFormValues> {
   return {
     address: lead.address ?? '',

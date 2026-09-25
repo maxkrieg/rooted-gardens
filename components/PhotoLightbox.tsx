@@ -11,12 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { photoTypeLabel } from '@/lib/utils/photos'
 
-/**
- * Narrow on purpose. Crew's `StopDetail['photos']` rows only select
- * (id, storage_path, type, created_at, caption) — they carry no property_id /
- * visit_id / uploaded_by, so the fuller `PhotoWithUrl` would not be satisfiable
- * from the crew side. This is the intersection both surfaces can provide.
- */
+/** The fields both crew and management photo rows can supply. */
 export type LightboxPhoto = {
   id: string
   type: string
@@ -36,19 +31,13 @@ interface PhotoLightboxProps {
   onIndexChange: (next: number) => void
   onClose: () => void
   /**
-   * Owner-only editing controls, injected by the management account gallery.
-   * Deliberately a slot rather than a `canManage` flag: the editor calls Server
-   * Actions, and this component is rendered inside the crew stop page, where
-   * CLAUDE.md forbids them (they're network round-trips that fail offline).
-   * Keeping them out here is what makes the component shareable.
+   * Owner-only editing controls, injected as a slot so this stays free of Server Actions for the
+   * offline stop page.
    */
   footer?: React.ReactNode
 }
 
-/**
- * Full-screen photo viewer with left/right paging — shared by the management
- * account gallery and the visit drawer (crew + management).
- */
+/** Full-screen photo viewer with paging, shared by the account gallery and the visit drawer. */
 export function PhotoLightbox({
   photos,
   index,
@@ -93,10 +82,8 @@ export function PhotoLightbox({
     <Dialog open onOpenChange={(next) => !next && onClose()}>
       <DialogContent
         className="max-w-4xl w-[95vw] p-0 gap-0 bg-card sm:rounded-2xl overflow-hidden"
-        // This Dialog can open inside the management VisitDetailSheet — a Radix
-        // Sheet, also a Dialog under the hood. Letting Radix restore focus into
-        // the closing subtree leaves the page with a stuck pointer-events lock
-        // (same failure VisitDetailSheet works around on its own SheetContent).
+        // Inside a Radix Sheet, restoring focus into the closing subtree leaves a stuck pointer
+        // lock.
         onCloseAutoFocus={(e) => e.preventDefault()}
       >
         {/* Radix requires a title/description for screen readers. */}
@@ -110,9 +97,7 @@ export function PhotoLightbox({
 
         <div className="relative bg-muted">
           {photo.url ? (
-            // Plain <img>: next/image can't cache a signed URL whose signature
-            // rotates hourly, and would need a remotePatterns entry for the
-            // Supabase host. Matches how photos render elsewhere in the app.
+            // Plain <img>: signed URLs rotate hourly, so next/image can't cache them.
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={photo.url}
@@ -149,9 +134,7 @@ export function PhotoLightbox({
           )}
         </div>
 
-        {/* dvh, not vh — and sized so image + body fit inside the DialogContent's
-            own max-h-[85dvh] cap, so the caption field (with the keyboard up)
-            doesn't land in a doubly-nested scroll container. */}
+        {/* dvh, sized to fit the dialog's cap so the caption field never double-scrolls. */}
         <div className="p-5 space-y-4 max-h-[30dvh] overflow-y-auto">
           <div className="flex items-center justify-between gap-3 text-sm">
             <span className="text-muted-foreground">

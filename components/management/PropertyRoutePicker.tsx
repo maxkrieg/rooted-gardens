@@ -12,16 +12,7 @@ interface PropertyRoutePickerProps {
   currentRouteGroupId: string | null
 }
 
-/**
- * Put one property on a route, from wherever the property already is.
- *
- * The account page could previously only *display* a property's route and link
- * to /app/routes with no property context — so routing one property meant
- * leaving the page, finding it again in a list of every property, and losing
- * your place. This is the same write, without the round trip.
- *
- * Queued, so it works from the truck.
- */
+/** Put one property on a route from the account page. Queued. */
 export function PropertyRoutePicker({
   propertyId,
   propertyAddress,

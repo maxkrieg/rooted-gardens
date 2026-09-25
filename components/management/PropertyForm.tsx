@@ -27,12 +27,7 @@ import { FREQUENCY_DEFAULT_INTERVAL_DAYS } from '@/lib/utils/cadence'
 import { propertyFormSchema, type PropertyFormValues } from '@/lib/validators/property'
 import type { Property } from '@/types/app'
 
-/**
- * True when the edit touches only the fields the offline queue can replay
- * safely: the three notes plus the service interval. Address and frequency
- * still need the Server Action — replaying those blindly could clobber a real
- * edit made in between.
- */
+/** True when only notes and interval changed, which the offline queue can replay safely. */
 function isQueueableChange(property: Property, values: PropertyFormValues): boolean {
   return property.address === values.address.trim() && property.frequency === values.frequency
 }
@@ -201,9 +196,8 @@ export function PropertyForm({ accountId, onSuccess, property, defaults }: Prope
                     inputMode="numeric"
                     min={1}
                     max={365}
-                    // The placeholder is the derived default, live off the
-                    // frequency field above — it's what makes "leave this blank"
-                    // legible without a second control explaining it.
+                    // The placeholder shows the frequency's default, so "leave blank" is self-
+                    // explanatory.
                     placeholder={intervalPlaceholder}
                     className="h-11 text-base pr-14"
                     {...field}

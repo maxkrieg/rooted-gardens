@@ -45,33 +45,19 @@ const persister = createAsyncStoragePersister({
 })
 
 /**
- * Drop the persisted cache. Call on sign-out: `current-employee` is persisted,
- * so without this the next person to sign in on the same phone rehydrates the
- * previous person's employee row — and their role with it.
- *
- * Only touches the `rq-cache` store. The `mutations` store in the same database
- * holds unsynced field writes and must survive a sign-out.
+ * Drop the persisted query cache on sign-out, or the next user inherits the previous user's
+ * employee row. Leaves the `mutations` store (unsynced writes) alone.
  */
 export async function clearPersistedQueryCache(): Promise<void> {
   await persister.removeClient()
 }
 
-/**
- * Bump whenever a persisted query's *shape* changes, not just its data — a
- * restored entry written by an older bundle is otherwise indistinguishable from
- * a fresh one. `stop-detail` gaining `visit.updated_at` is the case in hand:
- * entries missing it made version comparison undecidable downstream.
- */
+/** Bump when a persisted query's shape changes, so older entries are discarded. */
 const CACHE_BUSTER = 'property-cadence-2'
 
 /**
- * Allowlist, not a denylist: persistence is otherwise all-or-nothing, so any new
- * query would silently land in IndexedDB on a personal phone. Only what's needed
- * in the field belongs here — billing, team, and leads deliberately don't.
- *
- * Anything listed here must return JSON-safe data. The persister serialises with
- * JSON.stringify, so a Map or Set rehydrates as `{}` — which works until the
- * first reload and then throws on `.get`. Key by object, not by Map.
+ * Allowlist of persisted query keys; field data only (no billing, team, or leads). Values must
+ * be JSON-safe: a Map rehydrates as {}.
  */
 const PERSISTED_QUERY_KEYS = new Set([
   'schedule-reference',

@@ -39,12 +39,7 @@ interface ScheduleFilterBarProps {
   stacked?: boolean
 }
 
-/**
- * Route group / account / crew / status filters for the management schedule.
- * State is owned by ScheduleView and mirrored into the URL, so a filtered view
- * stays shareable without a server round-trip on every change. Sizing is
- * phone-first: 2-up on a narrow screen, a single row from `sm` up.
- */
+/** Route / account / crew / status filters. State lives in ScheduleView, mirrored to the URL. */
 export function ScheduleFilterBar({
   filters,
   routeGroups,

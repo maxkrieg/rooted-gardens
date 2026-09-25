@@ -1,10 +1,7 @@
 import type { Account } from '@/types/app'
 import type { AccountFormValues } from '@/lib/validators/account'
 
-/**
- * Format the billing rate for display.
- * Works with any object that has the Account billing fields.
- */
+/** Billing rate for display. */
 export function formatAccountPrice(
   account: Pick<Account, 'billing_type' | 'price_per_visit' | 'contract_rate' | 'contract_period'>,
 ): string {
@@ -19,12 +16,8 @@ export function formatAccountPrice(
 }
 
 /**
- * Builds the DB insert/update payload from validated account form values.
- * Shared by createAccount / updateAccount (app/app/(padded)/accounts/actions.ts)
- * and convertLeadToAccount (app/management/leads/actions.ts, task 9.9) — moved
- * out of the actions file since every export there must be an async Server
- * Action, so a plain payload builder couldn't live there and be imported
- * elsewhere.
+ * DB payload from validated account form values. Lives here because a 'use server' file can
+ * only export async actions.
  */
 export function buildAccountPayload(data: AccountFormValues) {
   return {

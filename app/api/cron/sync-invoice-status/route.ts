@@ -4,16 +4,8 @@ import { getQuickBooksClient } from '@/lib/quickbooks/client'
 import { syncPendingInvoices } from '@/lib/quickbooks/invoiceStatus'
 
 /**
- * Daily Vercel Cron (see vercel.json) that pulls QBO invoice lifecycle status
- * back into the `invoices` table. The Hobby plan only allows daily cron, so this
- * is the safety-net refresh; the immediate case (an accountant sending an
- * invoice from inside QBO and wanting to confirm it) is covered by the manual
- * "Refresh now" action on the Billing → History tab.
- *
- * Authenticated by CRON_SECRET (Vercel injects `Authorization: Bearer <secret>`
- * automatically when the env var is set). Fails closed if the secret is unset.
- * Uses the service-role client — this is unattended, with no user session — the
- * exact use case createServiceClient documents.
+ * Daily Vercel Cron that syncs QBO invoice status (Hobby allows daily only; "Refresh now" covers
+ * the urgent case). Requires CRON_SECRET, failing closed; uses the service client.
  */
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET

@@ -171,14 +171,12 @@ rooted-gardens/
 │   │   └── photo-blobs.ts
 │   ├── supabase/
 │   │   ├── client.ts            ← browser client
-│   │   ├── server.ts            ← server client (Server Actions / RSC)
-│   │   └── middleware.ts
+│   │   └── server.ts            ← server client (Server Actions / RSC)
 │   ├── quickbooks/
 │   │   ├── client.ts
 │   │   └── sync.ts              ← push visits to QBO
 │   └── utils/
-│       ├── dates.ts             ← week helpers (getWeekStart, etc.)
-│       ├── schedule.ts          ← buildScheduleWeek + planWeek (the generate rule)
+│       ├── schedule.ts          ← week helpers, buildScheduleWeek + planWeek (the generate rule)
 │       └── visits.ts            ← visit status helpers
 ├── types/
 │   ├── database.ts              ← generated Supabase types (supabase gen types)
@@ -651,7 +649,7 @@ A `property` is the unit of scheduling — there is no sub-property work-area co
 was eliminated in migration `20260630130000_drop_service_zones`; the multi-frequency-
 per-area capability was intentionally dropped.) Each property carries a single
 `frequency` (`'weekly' | 'biweekly' | 'monthly' | 'as_needed'`), shown via
-`FrequencyBadge`. A formerly multi-zone property (e.g. a commercial site with a lawn on
+`CadenceBadge`. A formerly multi-zone property (e.g. a commercial site with a lawn on
 one cadence and garden beds on another) is represented as one property at its most-
 frequent cadence, with the per-area breakdown folded into `crew_notes` as freeform text.
 
@@ -883,10 +881,12 @@ as before. Don't convert these without a reason.
 - **A batch of writes must own its optimistic state.** Per-row patch + per-row invalidation in
   a loop makes the UI visibly bounce: a mid-batch refetch returns the pre-batch state. Patch
   once up front, run each write `silent`, invalidate once at the end (see
-  `useReorderRouteProperties`).
+  `useReorderRouteProperties` in `RouteGroupCard.tsx`).
 - **Queued mutations need `networkMode: 'always'`.** React Query's default *pauses* a
   mutation when offline: `onMutate` runs (so the UI looks saved) but `mutationFn` never
-  does, so nothing is enqueued. Genuinely online-only mutations keep the default.
+  does, so nothing is enqueued. Genuinely online-only mutations keep the default. For a
+  queued edit to one visit, use `useQueuedVisitMutation` (`hooks/useManagementSchedule.ts`),
+  which also handles the optimistic patch and rollback.
 - **New query keys must be added to `PERSISTED_QUERY_KEYS`** (`components/providers.tsx`) or
   they won't survive a reload. It's an allowlist so account data doesn't land in IndexedDB
   by accident. Signed-URL keys stay off it — they expire in an hour.

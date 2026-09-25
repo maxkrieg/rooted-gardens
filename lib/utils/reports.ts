@@ -3,13 +3,7 @@ import type { Frequency } from '@/types/app'
 /** Earliest year the reports page will page back to. */
 export const REPORTS_MIN_YEAR = 2020
 
-/**
- * Resolve the `?year=` query param for the reports page. Falls back to the
- * current year when missing or unparseable, and clamps into
- * [REPORTS_MIN_YEAR, currentYear] so a hand-typed URL can't ask for a future
- * year (which would render three empty charts and look like a bug).
- * Same defensive shape as `resolveDateRange` in `lib/utils/billing.ts`.
- */
+/** Resolve `?year=`, clamped to [REPORTS_MIN_YEAR, current year]. */
 export function resolveReportYear(value: string | null | undefined): number {
   const currentYear = new Date().getFullYear()
   if (!value) return currentYear
@@ -19,16 +13,8 @@ export function resolveReportYear(value: string | null | undefined): number {
 }
 
 /**
- * How many visits a property on `frequency` is expected to receive across
- * `weeks` weeks — the denominator for the frequency-adherence report.
- *
- * `as_needed` returns null rather than 0: those properties have no contracted
- * cadence, so they have no expectation to fall short of. Callers must skip
- * them entirely rather than treat them as "expected 0" (which would score every
- * one of them as over-served).
- *
- * `monthly` divides by 4.345 (52/12) rather than 4, so a full season doesn't
- * accumulate a phantom extra visit.
+ * Expected visits for `frequency` over `weeks` weeks. as_needed returns null (no expectation),
+ * so callers skip it. Monthly uses 52/12 weeks per month.
  */
 export function expectedVisitsForFrequency(
   frequency: Frequency | string,

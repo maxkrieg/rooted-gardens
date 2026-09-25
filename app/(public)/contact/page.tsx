@@ -5,14 +5,7 @@ import { InquiryForm } from '@/components/public/InquiryForm'
 
 export const generateMetadata = () => pageMetadata('contact')
 
-/**
- * Task 9.5: the real inquiry form (honeypot + rate limit + Server Action
- * inserting a `leads` row — see app/(public)/contact/actions.ts) replaces
- * the 9.2 placeholder, which just listed each division's phone/email. Those
- * numbers are kept as a compact "prefer to call?" footnote below the form,
- * rather than as their own competing CTA — the full division cards still
- * live in PublicFooter on every page.
- */
+/** The inquiry form, with division phone/email as a "prefer to call?" footnote. */
 export default async function ContactPage() {
   const content = await getPageContent('contact')
   const slot = (key: string) => getSlot(content, key)
@@ -55,12 +48,7 @@ export default async function ContactPage() {
         <InquiryForm />
       </div>
 
-      {/* Division contacts are `global` slots — the same ones the footer
-          edits (see PublicFooter.tsx), so an edit made from either place
-          shows up on both. Kept as a compact line per division (name ·
-          phone · email) rather than the old full-width cards, since the
-          form above is now the page's primary path — this is just the
-          fallback for someone who'd rather call. */}
+      {/* Division contacts are `global` slots shared with the footer. */}
       <div className="mt-10 border-t border-border pt-6">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
           Prefer to call or email?

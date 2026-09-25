@@ -4,25 +4,14 @@ import { useQuery } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
 
-export const propertyLastVisitKey = ['property-last-visit'] as const
+const propertyLastVisitKey = ['property-last-visit'] as const
+
+/** A plain object, not a Map: the persisted cache goes through JSON.stringify. */
+type PropertyLastVisitMap = Record<string, string>
 
 /**
- * A plain object, deliberately NOT a Map. This query is persisted, and the
- * persister serialises with JSON.stringify — which turns a Map into `{}`. It
- * would work until the first reload and then throw on every `.get`.
- */
-export type PropertyLastVisitMap = Record<string, string>
-
-/**
- * Most recent completed visit per property, as yyyy-MM-dd, keyed by property id.
- *
- * One shared side-car map rather than a join into each feature's query: the
- * schedule, accounts, routes and the stop screen all need it, and joining a
- * view without an FK relationship would mean a second query per feature plus a
- * shape change (and a CACHE_BUSTER bump) on four persisted caches.
- *
- * Phases biweekly and monthly properties in planWeek(), and drives every
- * days-since-last-visit reading in the UI.
+ * Last completed visit (yyyy-MM-dd) per property, shared by every surface that shows
+ * days-since. Also phases planWeek().
  */
 export function usePropertyLastVisit() {
   return useQuery({

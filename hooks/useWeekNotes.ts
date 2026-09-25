@@ -6,15 +6,9 @@ import { fetchWeekNotes } from '@/lib/schedule/fetch'
 import { enqueueMutation, flushMutationQueue } from '@/lib/offline/mutation-queue'
 import type { RouteGroupWeekNote } from '@/types/app'
 
-export const weekNotesKey = (weekStartISO: string) => ['schedule-week-notes', weekStartISO]
+const weekNotesKey = (weekStartISO: string) => ['schedule-week-notes', weekStartISO]
 
-/**
- * The dispatch notes for every route group in one week.
- *
- * A separate query from the visits, not an embed: the notes change on a
- * completely different rhythm (once on Sunday, by one person) and this keeps a
- * note edit from invalidating the whole week's visits.
- */
+/** One week's dispatch notes, separate from visits so a note edit doesn't invalidate them. */
 export function useWeekNotes(weekStartISO: string) {
   return useQuery({
     queryKey: weekNotesKey(weekStartISO),
@@ -37,10 +31,7 @@ export function useWeekNotesForWeeks(weekStarts: string[]) {
   })
 }
 
-/**
- * Save (or clear) one route group's note for a week, through the offline queue —
- * this is written from the same truck as everything else on the schedule.
- */
+/** Save or clear a route's week note via the offline queue. */
 export function useSaveWeekNote() {
   const queryClient = useQueryClient()
 

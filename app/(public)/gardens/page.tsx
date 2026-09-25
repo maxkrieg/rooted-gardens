@@ -9,12 +9,7 @@ import { BulletList } from '@/components/public/BulletList'
 
 export const generateMetadata = () => pageMetadata('gardens')
 
-/**
- * Rooted Gardens (garden design/maintenance) division page (task 9.4) —
- * mirrors the shape of the Lawn page: hero photo, ecological principles
- * (SlotList), a philosophy paragraph, a services list, and the division's
- * own `global.garden_contact_*` contact block.
- */
+/** Rooted Gardens page, shaped like Lawn, with the `global.garden_contact_*` block. */
 export default async function GardensPage() {
   const content = await getPageContent('gardens')
   const slot = (key: string) => getSlot(content, key)

@@ -11,6 +11,7 @@ import {
   type BulkTarget,
 } from '@/hooks/useBulkScheduleActions'
 import type { Employee, Vehicle } from '@/types/app'
+import { firstName } from '@/lib/utils/team'
 
 interface ScheduleBulkControlsProps {
   /** What's selected, resolved to the visit for its own week. */
@@ -24,12 +25,7 @@ interface ScheduleBulkControlsProps {
   vehicles: Vehicle[]
 }
 
-/**
- * The select-mode bar and its action sheet, shared by the phone list and the
- * desktop grid so the two can't drift. Owns the busy label, the toast with Undo,
- * and dropping the selection on success; a failure keeps the selection so the
- * owner can retry the same set rather than reselecting it.
- */
+/** Select-mode bar and action sheet for both layouts. On failure the selection stays for a retry. */
 export function ScheduleBulkControls({
   targets,
   selectableCount,
@@ -121,9 +117,9 @@ export function ScheduleBulkControls({
         vehicles={vehicles}
         onPickCrew={(employee) =>
           runBulk(
-            `Assigning ${employee.name.split(' ')[0]}…`,
+            `Assigning ${firstName(employee.name)}…`,
             () => bulk.assignCrew(targets, employee),
-            (n) => `${employee.name.split(' ')[0]} assigned to ${stops(n)}.`,
+            (n) => `${firstName(employee.name)} assigned to ${stops(n)}.`,
           )
         }
         onPickVehicle={(vehicleId) =>

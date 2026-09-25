@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { format, parseISO } from 'date-fns'
-import { Search } from 'lucide-react'
+import { Search, Calendar, Mail, Phone } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -20,19 +20,20 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { LeadCard } from '@/components/management/LeadCard'
 import { LeadDetailSheet } from '@/components/management/LeadDetailSheet'
 import { LeadKindBadge, LeadStatusBadge } from '@/components/management/badges'
 import { EmptyState } from '@/components/states/EmptyState'
-import { syncLeadUrlParam } from '@/lib/utils/lead-url'
 import { leadInterestOrPosition } from '@/lib/utils/leads'
 import {
   LEAD_KINDS,
   LEAD_KIND_LABELS,
   LEAD_STATUSES,
   LEAD_STATUS_LABELS,
+  type LeadKind,
+  type LeadStatus,
+  type LeadWithConverted,
 } from '@/types/app'
-import type { LeadKind, LeadStatus, LeadWithConverted } from '@/types/app'
+import { Card, CardContent } from '@/components/ui/card'
 
 interface LeadsInboxProps {
   leads: LeadWithConverted[]
@@ -41,23 +42,13 @@ interface LeadsInboxProps {
   initialLeadId?: string
 }
 
-/**
- * Leads inbox (task 9.8) — structural port of AccountsTable.tsx: client-side
- * search/filter state (this inbox is short at the company's volume, unlike
- * the schedule's URL-state filters which exist to make a filtered *week*
- * shareable), a table on desktop and cards on phone, and a detail Sheet
- * rather than a route (there's no /management/leads/[id] page).
- */
+/** Leads inbox: client-side search/filter, table on desktop, cards on phone, detail in a Sheet. */
 export function LeadsInbox({ leads, initialLeadId }: LeadsInboxProps) {
   const [search, setSearch] = useState('')
   const [kindFilter, setKindFilter] = useState<LeadKind | 'all'>('all')
   const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all')
 
-  // Selection persists after the sheet closes (only `sheetOpen` flips) so the
-  // Sheet's own exit animation has content to animate away — same reasoning
-  // as DeepLinkedVisitSheet's mount-only resolution, but here the id is a
-  // plain useState seeded from the prop rather than a separate component,
-  // since rows can be reopened repeatedly within one page load.
+  // Selection outlives the close so the Sheet has content to animate out.
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(initialLeadId ?? null)
   const [sheetOpen, setSheetOpen] = useState(Boolean(initialLeadId))
 
@@ -95,9 +86,7 @@ export function LeadsInbox({ leads, initialLeadId }: LeadsInboxProps) {
     setStatusFilter('all')
   }
 
-  // Two different problems, same as AccountsTable: a genuinely empty inbox
-  // needs no action (leads only ever arrive from the public site), one
-  // hidden by filters needs them cleared.
+  // An empty inbox needs no action; one emptied by filters needs them cleared.
   const emptyState =
     leads.length === 0 ? (
       <EmptyState
@@ -235,5 +224,69 @@ export function LeadsInbox({ leads, initialLeadId }: LeadsInboxProps) {
         onOpenChange={handleSheetOpenChange}
       />
     </>
+  )
+}
+
+/** Mirror the open lead into `?lead=` with replaceState: router.replace would rerun the page query. */
+function syncLeadUrlParam(leadId: string | null) {
+  if (typeof window === 'undefined') return
+
+  const url = new URL(window.location.href)
+  const current = url.searchParams.get('lead')
+  const next = leadId ?? null
+  if (current === next) return
+
+  if (next) url.searchParams.set('lead', next)
+  else url.searchParams.delete('lead')
+
+  window.history.replaceState(null, '', url)
+}
+
+/** Phone card. Takes `onClick` because lead detail is a Sheet, not a route. */
+function LeadCard({ lead, onClick }: { lead: LeadWithConverted; onClick: () => void }) {
+  const interestOrPosition = leadInterestOrPosition(lead)
+
+  return (
+    <button type="button" onClick={onClick} className="block w-full text-left">
+      <Card className="rounded-2xl border border-border shadow-warm hover:shadow-warm-lg transition-shadow">
+        <CardContent className="p-4">
+          {/* Header row */}
+          <div className="flex items-start justify-between gap-2 mb-3">
+            <div className="min-w-0">
+              <p className="font-display text-base font-semibold text-foreground truncate">
+                {lead.name}
+              </p>
+              {interestOrPosition && (
+                <p className="text-sm text-muted-foreground truncate">{interestOrPosition}</p>
+              )}
+            </div>
+            <div className="shrink-0 flex flex-col items-end gap-1.5">
+              <LeadStatusBadge status={lead.status} />
+              <LeadKindBadge kind={lead.kind} />
+            </div>
+          </div>
+
+          {/* Meta row */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+            {lead.email && (
+              <span className="flex items-center gap-1 min-w-0">
+                <Mail className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{lead.email}</span>
+              </span>
+            )}
+            {lead.phone && (
+              <span className="flex items-center gap-1 tabular-nums">
+                <Phone className="h-3.5 w-3.5 shrink-0" />
+                {lead.phone}
+              </span>
+            )}
+            <span className="flex items-center gap-1">
+              <Calendar className="h-3.5 w-3.5 shrink-0" />
+              {format(parseISO(lead.created_at), 'EEE MMM d')}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+    </button>
   )
 }

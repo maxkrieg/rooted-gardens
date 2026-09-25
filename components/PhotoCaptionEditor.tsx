@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { useUpdatePhotoCaption } from '@/hooks/useUpdatePhotoCaption'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { createClient } from '@/lib/supabase/client'
 
 interface PhotoCaptionEditorProps {
   photoId: string
@@ -14,11 +15,8 @@ interface PhotoCaptionEditorProps {
 }
 
 /**
- * Caption editing inside the visit drawer's lightbox — the crew-safe counterpart
- * to management's PhotoEditor. Caption only: correcting a photo's category or
- * deleting it stays on the account Photos page.
- *
- * Mount keyed by photo id so the draft resets when paging between photos.
+ * Caption editing in the visit drawer's lightbox. Caption only; category and delete stay on
+ * the account Photos page. Keyed by photo id so the draft resets on paging.
  */
 export function PhotoCaptionEditor({
   photoId,
@@ -76,4 +74,38 @@ export function PhotoCaptionEditor({
       </Button>
     </div>
   )
+}
+
+/**
+ * Caption a photo from the drawer. Direct-client and online-only: no Server Actions on the stop
+ * page, and a deliberate caption should fail loudly. RLS limits crew to their own photos.
+ */
+function useUpdatePhotoCaption() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ photoId, caption }: { photoId: string; caption: string }) => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        throw new Error('offline')
+      }
+
+      const supabase = createClient()
+      const trimmed = caption.trim() || null
+
+      const { error } = await supabase
+        .from('photos')
+        .update({ caption: trimmed })
+        .eq('id', photoId)
+      if (error) throw error
+
+      return trimmed
+    },
+
+    onSettled: () => {
+      // Prefix-matched: refreshes whichever drawer surface the photo came from
+      // (visit plan / completion via stop-detail, history via property-photos).
+      queryClient.invalidateQueries({ queryKey: ['stop-detail'] })
+      queryClient.invalidateQueries({ queryKey: ['property-photos'] })
+    },
+  })
 }

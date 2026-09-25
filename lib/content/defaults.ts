@@ -1,26 +1,9 @@
 import type { SiteContentKind, SitePage } from '@/types/app'
 
 /**
- * Canonical starting copy for the public marketing site (task 9.2), page
- * structure adapted from the live site (myrootedgardens.com) as of
- * 2026-08-06 — copy itself is written fresh for this app, not copied.
- * Serves three jobs:
- *   1. The source the 9.2 migration's seed INSERTs were hand-copied from.
- *   2. The fallback `getPageContent` merges under the DB rows, so a deleted or
- *      not-yet-created slot renders this instead of a blank page.
- *   3. The list of slots the 9.2.5 editor knows how to offer.
- *
- * Task 9.3/9.4 note: every key added here needs **no migration** — a slot's
- * DB row is created the first time an owner edits it, via `updateSiteSlot`'s
- * upsert (app/(public)/actions.ts). Only `site_collection_items` (FAQ/team
- * entries, which have no default fallback) need a seed migration; see
- * supabase/migrations/20260806000000_site_collections_phase_9_4.sql.
- * `hero_body`-style slots declared `kind: 'text'` here (e.g. `mission_body`,
- * `gardens.philosophy_body`) are meant for `EditableRichText` — they flip to
- * `kind: 'richtext'` in the DB the first time an owner saves through Tiptap
- * (lib/content/site.ts handles both states).
- * An `image`-kind slot's default `value` is `''`, meaning "no photo
- * uploaded yet" — pages should treat an empty value as `path: null`.
+ * Default public-site copy: the fallback under DB rows, and the list of slots the editor offers.
+ * New keys need no migration (a row is created on first edit). Some 'text' slots become
+ * 'richtext' after their first Tiptap save. Empty image `value` = no photo yet.
  */
 
 type DefaultSlot = { kind: SiteContentKind; value: string }

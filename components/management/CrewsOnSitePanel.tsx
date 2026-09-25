@@ -6,6 +6,7 @@ import { WifiOff } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useIsOnline } from '@/hooks/use-hydrated'
 import { formatElapsed } from '@/lib/utils/visits'
+import { firstName } from '@/lib/utils/team'
 
 type InProgressVisit = {
   id: string
@@ -19,11 +20,7 @@ const IN_PROGRESS_SELECT =
 
 const inProgressKey = ['crews-on-site'] as const
 
-/**
- * Who is on site right now. Deliberately NOT cached offline: a frozen list with
- * a pulsing dot and a timer that keeps counting for a crew who stopped an hour
- * ago is worse than saying we don't know.
- */
+/** Who's on site now. Not cached offline: a frozen list with a ticking timer would mislead. */
 export function CrewsOnSitePanel() {
   const isOnline = useIsOnline()
   const queryClient = useQueryClient()
@@ -125,7 +122,7 @@ export function CrewsOnSitePanel() {
         {visits.map((v) => {
           const assignedNames = v.visit_crew
             .filter((vc) => vc.relation === 'assigned' && vc.employee)
-            .map((vc) => vc.employee!.name.split(' ')[0])
+            .map((vc) => firstName(vc.employee!.name))
             .join(', ')
 
           return (

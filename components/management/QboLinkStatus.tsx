@@ -13,10 +13,7 @@ interface QboLinkStatusProps {
   qboCustomerId: string | null
 }
 
-/** QuickBooks link status + "Link / Sync" trigger for the account detail
- *  page. Create-vs-update is decided server-side (syncCustomer) based on
- *  whether qbo_customer_id is already set — once linked, every click pushes
- *  the account's current name/email/phone/billing address to QBO. */
+/** Account QBO link status and "Link / Sync". Each click pushes the account's current details. */
 export function QboLinkStatus({ accountId, qboCustomerId }: QboLinkStatusProps) {
   const [pending, startTransition] = useTransition()
   const refreshAccounts = useRefreshAccounts()

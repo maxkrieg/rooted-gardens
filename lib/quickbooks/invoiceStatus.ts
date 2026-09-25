@@ -5,10 +5,7 @@ import type { Database } from '@/types/database'
 import type { Invoice, InvoiceStatus } from '@/types/app'
 import { describeQboError } from '@/lib/quickbooks/errors'
 
-// `node-quickbooks` uses `export =`, so its ambient interfaces can't be named-
-// imported — the subset of a QBO Invoice we read is declared locally (same
-// precedent as lib/quickbooks/invoice.ts's InvoiceLine). Structurally matches
-// the QboInvoiceDetail in types/quickbooks.d.ts that getInvoice's callback uses.
+// node-quickbooks uses `export =`, so the Invoice fields we read are declared locally.
 interface QboInvoiceDetail {
   Id: string
   SyncToken: string
@@ -19,21 +16,11 @@ interface QboInvoiceDetail {
 }
 
 /**
- * Reads QBO invoice lifecycle status back into the app's `invoices` table.
- *
- * This is the one narrow exception to the otherwise strictly one-way (app → QBO)
- * sync: we read an invoice's status ONLY to answer "has QuickBooks actually sent
- * it to the customer / been paid yet" — never customer data, payment details, or
- * edits made in QBO, and nothing here feeds back into invoice creation or pricing.
- *
- * Driven by both the daily cron (app/api/cron/sync-invoice-status) and the manual
- * "Refresh now" action (app/management/billing/actions.ts). The Supabase client is
- * passed in — cron supplies the service client (bypasses RLS, unattended), the
- * action supplies the authenticated RLS client — the same "caller supplies the
- * client" pattern as lib/quickbooks/client.ts's upsertIntegrationTokens.
+ * Reads QBO invoice status back into `invoices` — the one exception to one-way sync. Status
+ * only; nothing feeds invoice creation. Callers pass the client (service for cron, RLS for manual).
  */
 
-export interface DerivedInvoiceStatus {
+interface DerivedInvoiceStatus {
   status: InvoiceStatus
   qboBalance: number
   qboDueDate: string | null
@@ -41,22 +28,10 @@ export interface DerivedInvoiceStatus {
 }
 
 /**
- * Pure mapping from a QBO Invoice entity to our lifecycle status. Priority:
- *   1. Balance == 0                                    → paid
- *   2. EmailSent && Balance > 0 && DueDate < today     → overdue
- *   3. EmailSent && Balance > 0                         → sent
- *   4. otherwise                                        → draft
- *
- * `todayISODate` is supplied by the caller (e.g. format(new Date(), 'yyyy-MM-dd'))
- * so this stays pure/testable. DueDate is QBO's bare 'yyyy-MM-dd' calendar date;
- * comparing it as a plain string against todayISODate avoids Date-parsing
- * timezone bugs — both are the same lexicographically-ordered format.
- *
- * Known gaps (see docs/INVOICING.md): a voided invoice also reports Balance 0, so
- * it reads as `paid`; a partial payment leaves Balance > 0, so it stays
- * sent/overdue with qbo_balance < amount. Neither is detected separately here.
+ * QBO Invoice → status: Balance 0 → paid; emailed and past due → overdue; emailed → sent;
+ * else draft. Dates compare as 'yyyy-MM-dd' strings. Voids read as paid, partials as sent.
  */
-export function deriveInvoiceStatus(
+function deriveInvoiceStatus(
   invoice: QboInvoiceDetail,
   todayISODate: string,
 ): DerivedInvoiceStatus {
@@ -79,17 +54,9 @@ export function deriveInvoiceStatus(
   return { status, qboBalance: balance, qboDueDate: dueDate, qboEmailStatus: emailStatus }
 }
 
-/** The invoice fields syncInvoiceStatus needs — its id (to update), the QBO id
- *  (to fetch), and the set-once timestamps (so they're only stamped the first
- *  time the invoice reaches that state). */
 type SyncableInvoice = Pick<Invoice, 'id' | 'qbo_invoice_id' | 'sent_at' | 'paid_at'>
 
-/**
- * Fetches one invoice from QBO, derives its status, and writes the snapshot back.
- * Never throws — returns `{ error }` on either the QBO call or the DB write
- * failing, so a batch caller can continue past a bad row (same per-item
- * resilience as pushInvoicesToQuickBooks's per-group loop).
- */
+/** Fetch one invoice from QBO and write its status back. Returns `{ error }`, never throws. */
 export async function syncInvoiceStatus(
   supabase: SupabaseClient<Database>,
   qbo: QuickBooks,
@@ -102,10 +69,7 @@ export async function syncInvoiceStatus(
     console.error(
       `[syncInvoiceStatus] getInvoice ${row.qbo_invoice_id} — ${describeQboError(err)}`,
     )
-    // Back off: stamp last_synced_at even on failure so a permanently-bad id
-    // (e.g. a placeholder qbo_invoice_id that doesn't resolve in QBO) or a
-    // transient blip isn't retried on every poll/cron tick. The next cycle still
-    // picks it up (cron by oldest-synced; poll after the staleness window).
+    // Stamp last_synced_at even on failure so a bad id isn't retried every tick.
     await supabase
       .from('invoices')
       .update({ last_synced_at: new Date().toISOString() })
@@ -142,17 +106,12 @@ export async function syncInvoiceStatus(
   return {}
 }
 
-export interface SyncResult {
+interface SyncResult {
   processed: number
   errors: number
 }
 
-/**
- * Syncs the oldest-not-recently-synced open invoices (status <> 'paid') from QBO,
- * bounded by `limit` to cap QBO API calls per run. Ordered by last_synced_at
- * ascending nulls-first so never-synced and stalest invoices are refreshed first.
- * One bad invoice never aborts the batch.
- */
+/** Syncs up to `limit` unpaid invoices, stalest first. One failure never aborts the batch. */
 export async function syncPendingInvoices(
   supabase: SupabaseClient<Database>,
   qbo: QuickBooks,

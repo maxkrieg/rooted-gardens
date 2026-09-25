@@ -36,12 +36,7 @@ interface ContractInvoicingProps {
   qboConnected: boolean
 }
 
-/**
- * Ad-hoc contract invoicing (docs/INVOICING.md) — lists every active contract
- * account regardless of visit activity, since contract billing is a flat rate
- * per period, not visit-driven. "Create Invoice" opens a small dialog for the
- * period, and works even when zero visits happened in it.
- */
+/** Contract invoicing: every active contract account, invoiced per period even with no visits. */
 export function ContractInvoicing({ accounts, qboConnected }: ContractInvoicingProps) {
   const [dialogAccountId, setDialogAccountId] = useState<string | null>(null)
   const dialogEntry = accounts.find((a) => a.account.id === dialogAccountId) ?? null

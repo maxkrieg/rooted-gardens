@@ -9,13 +9,7 @@ import type { FaqItemData } from '@/types/app'
 
 export const generateMetadata = () => pageMetadata('faq')
 
-/**
- * FAQ page (task 9.4) — upgrades the 9.2 stacked-card list to a shadcn
- * `accordion` (added via `npx shadcn@latest add accordion`; see
- * components/ui/accordion.tsx). Only this page's read-only rendering
- * changes — `CollectionSection` swaps the whole block for `CollectionEditor`
- * in edit mode, so the accordion and the owner editor never conflict.
- */
+/** FAQ as an accordion; edit mode swaps the whole block for CollectionEditor. */
 export default async function FaqPage() {
   const [content, faqs] = await Promise.all([getPageContent('faq'), getCollection<FaqItemData>('faq')])
 

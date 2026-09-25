@@ -2,35 +2,22 @@ import { differenceInMinutes, parseISO } from 'date-fns'
 import type { Employee, Visit, VisitWithCrew } from '@/types/app'
 
 /** The on-site timing fields now live directly on the visit row. */
-export type VisitTiming = {
+type VisitTiming = {
   started_at: string | null
   ended_at: string | null
 }
 
-/**
- * A visit is "in progress" when work has started but not yet ended. This is a
- * derived state — never a value of visits.status.
- */
+/** In progress = started but not ended. Derived; never a visits.status value. */
 export function isVisitInProgress(v: VisitTiming): boolean {
   return !!v.started_at && !v.ended_at
 }
 
-/**
- * A live patch for one visit, delivered by Realtime (the full `payload.new` row)
- * or pushed in by the management drawer after it writes. Always carries the
- * row's `updated_at` so a merge can tell which copy is newer.
- */
+/** A live patch for one visit (a Realtime row or a drawer write). `updated_at` decides which copy wins. */
 export type VisitOverlay = Partial<Visit> & { id: string; updated_at: string }
 
 /**
- * Millisecond version of a visit row, or null when it can't be trusted.
- *
- * `updated_at` is declared non-null, but a row can still reach the client
- * without one — most importantly from a React Query entry persisted to
- * IndexedDB before the column was added to the select. Returning null (rather
- * than letting NaN propagate) is what keeps comparisons decidable: every NaN
- * comparison is false, so a NaN version silently defeats both "is newer" and
- * "is not newer" and lets an overlay write on every render.
+ * Millisecond version of a visit row, or null if missing. Null, not NaN: NaN makes every
+ * comparison false, which would let a stale overlay win on every render.
  */
 export function visitVersion(v: { updated_at?: string | null }): number | null {
   if (!v.updated_at) return null
@@ -39,15 +26,8 @@ export function visitVersion(v: { updated_at?: string | null }): number | null {
 }
 
 /**
- * The version an optimistic cache write should carry so the live overlay accepts
- * it right away instead of waiting for the confirming refetch.
- *
- * One millisecond past the row it replaces — deliberately NOT `Date.now()`. A
- * device running fast would stamp a version the real server write can't beat,
- * and the overlay would then reject genuine later updates for the length of the
- * skew. Anchoring to the row being replaced is monotonic against server time and
- * cannot overshoot: the server's own updated_at, written seconds later, is
- * always larger, so the truth reclaims the cell as soon as it lands.
+ * Version for an optimistic write: 1ms past the row it replaces, not Date.now(). A fast device
+ * clock would otherwise outrank the real server write.
  */
 export function nextVisitVersion(current: string | null | undefined): string {
   const ms = visitVersion({ updated_at: current })
@@ -68,10 +48,7 @@ export function formatDuration(startedAt: string, endedAt: string): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`
 }
 
-/**
- * Who to show on a visit: the people who actually did it once it's completed,
- * else who was planned. Never dedupe or merge the two — see visit_crew notes.
- */
+/** Completed crew once done, else assigned crew. Never merge or dedupe the two. */
 export function displayCrewFor(visit: VisitWithCrew): Employee[] {
   const pick = (relation: 'assigned' | 'completed') =>
     visit.visit_crew.filter((vc) => vc.relation === relation && vc.employee).map((vc) => vc.employee)

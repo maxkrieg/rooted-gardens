@@ -31,14 +31,12 @@ import type { Account } from '@/types/app'
 interface AccountFormProps {
   /** Called on successful save — used by the parent Sheet to close itself. */
   onSuccess: () => void
-  /** Prefill the form for edit mode (task 2.4). Presence flips isEdit=true. */
+  /** Presence switches the form to edit mode. */
   account?: Account
   /** Create-mode prefill (lead→account, 9.9) — does NOT flip the form into
    *  edit mode the way `account` does. Merged over the plain-create defaults. */
   defaults?: Partial<AccountFormValues>
-  /** Create-mode override for the submit handler (lead→account, 9.9), used in
-   *  place of createAccount so the caller can capture the new account's id
-   *  and link it back to the lead. Ignored in edit mode. */
+  /** Create-mode submit override (lead conversion needs the new account id). Ignored when editing. */
   onCreate?: (values: AccountFormValues) => Promise<{ error?: string }>
 }
 
@@ -279,9 +277,7 @@ export function AccountForm({ onSuccess, account, defaults, onCreate }: AccountF
                   onValueChange={field.onChange}
                   className="flex flex-col gap-2 pt-1"
                 >
-                  {/* Describe how the work is priced, not how often it's billed —
-                      per-visit accounts are swept onto one monthly invoice by the
-                      accountant, so a per-option cadence would be misleading. */}
+                  {/* Describe pricing, not billing cadence. */}
                   {[
                     { value: 'per_visit', label: 'Per Visit', description: 'Set price for each visit' },
                     { value: 'contract', label: 'Contract', description: 'Flat rate per period, however many visits happen' },

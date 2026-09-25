@@ -1,9 +1,8 @@
 import { cn } from '@/lib/utils'
 
 /**
- * Marks for the app's absence/failure states, keyed to meaning rather than page:
- * seed = nothing set up yet, pruned = filters hid it, sprig = done, broken =
- * failed. 1.25px so the weight matches the card borders they sit inside.
+ * Marks for empty/failure states by meaning: seed = nothing yet, pruned = filtered out,
+ * sprig = done, broken = failed.
  */
 
 export type StateMarkVariant = 'seed' | 'pruned' | 'sprig' | 'broken'
