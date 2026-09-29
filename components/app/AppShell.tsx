@@ -4,12 +4,14 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
-import { Leaf, LogOut, MoreHorizontal, Search, TriangleAlert } from 'lucide-react'
+import { CircleHelp, Leaf, LogOut, MoreHorizontal, Search, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { OfflineBanner } from '@/components/crew/OfflineBanner'
 import { InstallPrompt } from '@/components/crew/InstallPrompt'
 import { CommandPalette } from '@/components/management/CommandPalette'
 import { MoreSheet } from '@/components/app/MoreSheet'
+import { OnboardingProvider, useOnboarding } from '@/components/onboarding/OnboardingProvider'
+import { TourOffer } from '@/components/onboarding/TourOffer'
 import { RoleProvider, useRole } from '@/components/app/RoleProvider'
 import { isNavItemActive, navFor, type NavItem } from '@/components/app/nav-items'
 import { canAccessRoute } from '@/lib/auth/access'
@@ -52,7 +54,9 @@ export function AppShell({
 }) {
   return (
     <RoleProvider initialRole={initialRole} userId={userId}>
-      <AppShellInner userEmail={userEmail}>{children}</AppShellInner>
+      <OnboardingProvider>
+        <AppShellInner userEmail={userEmail}>{children}</AppShellInner>
+      </OnboardingProvider>
     </RoleProvider>
   )
 }
@@ -68,6 +72,7 @@ function AppShellInner({
   const router = useRouter()
   const queryClient = useQueryClient()
   const { role, employeeId, can } = useRole()
+  const { openHelp, dueNewsCount } = useOnboarding()
   const { data: employee, isError: employeeError } = useCurrentEmployee()
   const [moreOpen, setMoreOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
@@ -190,6 +195,21 @@ function AppShellInner({
         )}
         <SidebarLinks pathname={pathname} items={all} counts={counts} />
         <div className="border-t border-border px-3 pt-3 pb-3 shrink-0">
+          <Button
+            variant="ghost"
+            data-tour="nav.help"
+            className="relative mb-1 w-full justify-start gap-2 px-2 text-sm text-muted-foreground hover:text-foreground"
+            onClick={openHelp}
+          >
+            <CircleHelp className="h-4 w-4 shrink-0" />
+            Help &amp; tours
+            {dueNewsCount > 0 && (
+              <span
+                className="ml-auto h-2 w-2 rounded-full bg-[var(--ochre)]"
+                aria-label={`${dueNewsCount} new`}
+              />
+            )}
+          </Button>
           {userEmail && (
             <p className="text-xs text-muted-foreground truncate px-1 mb-2" title={userEmail}>
               {userEmail}
@@ -217,6 +237,7 @@ function AppShellInner({
       >
         <OfflineBanner />
         <InstallPrompt />
+        <TourOffer />
         {/* Silent failure here breaks "My stops", the roster, and realtime at once. */}
         {employeeError && !employee && <SessionNotice />}
         {children}
@@ -245,17 +266,23 @@ function AppShellInner({
             <button
               type="button"
               onClick={() => setMoreOpen(true)}
+              data-tour="nav.more"
               aria-label={
-                moreBadgeCount > 0 ? `More — ${moreBadgeCount} needing attention` : 'More'
+                moreBadgeCount + dueNewsCount > 0
+                  ? `More — ${moreBadgeCount + dueNewsCount} needing attention`
+                  : 'More'
               }
               className="relative flex h-full w-full flex-col items-center justify-center gap-0.5 text-xs font-sans font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               <MoreHorizontal size={22} strokeWidth={1.75} aria-hidden />
               <span className="leading-none">More</span>
-              {moreBadgeCount > 0 && (
+              {(moreBadgeCount > 0 || dueNewsCount > 0) && (
                 <span
                   aria-hidden
-                  className="absolute top-1.5 right-[calc(50%-1.25rem)] h-2 w-2 rounded-full bg-primary ring-2 ring-card"
+                  className={cn(
+                    'absolute top-1.5 right-[calc(50%-1.25rem)] h-2 w-2 rounded-full ring-2 ring-card',
+                    moreBadgeCount > 0 ? 'bg-primary' : 'bg-[var(--ochre)]',
+                  )}
                 />
               )}
             </button>
@@ -271,6 +298,8 @@ function AppShellInner({
         pathname={pathname}
         counts={counts}
         onOpenSearch={canSearch ? () => setPaletteOpen(true) : undefined}
+        onOpenHelp={openHelp}
+        helpBadge={dueNewsCount}
         onSignOut={handleSignOut}
       />
     </div>

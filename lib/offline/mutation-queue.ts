@@ -109,6 +109,14 @@ interface AssignPropertyRoutePayload {
   sortOrder: number
 }
 
+/** Last-write-wins upsert on (employee_id, item_key); the client never enqueues a downgrade. */
+interface OnboardingProgressPayload {
+  employeeId: string
+  itemKey: string
+  version: number
+  state: 'seen' | 'completed' | 'dismissed'
+}
+
 type MutationPayload =
   | { type: 'completion'; payload: CompletionPayload }
   | { type: 'job_start'; payload: JobStartPayload }
@@ -124,6 +132,7 @@ type MutationPayload =
   | { type: 'property_notes'; payload: PropertyNotesPayload }
   | { type: 'route_week_note'; payload: RouteWeekNotePayload }
   | { type: 'assign_property_route'; payload: AssignPropertyRoutePayload }
+  | { type: 'onboarding_progress'; payload: OnboardingProgressPayload }
 
 /** Retries before a mutation is parked as 'failed' and shown in "Changes that didn't save". */
 const MAX_ATTEMPTS = 5
@@ -489,6 +498,17 @@ export async function flushMutationQueue(): Promise<FlushResult> {
               )
               .throwOnError()
           }
+          break
+        }
+        case 'onboarding_progress': {
+          const p = mutation.payload as OnboardingProgressPayload
+          await supabase
+            .from('onboarding_progress')
+            .upsert(
+              { employee_id: p.employeeId, item_key: p.itemKey, version: p.version, state: p.state },
+              { onConflict: 'employee_id,item_key' },
+            )
+            .throwOnError()
           break
         }
         default:

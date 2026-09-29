@@ -77,6 +77,7 @@ const PERSISTED_QUERY_KEYS = new Set([
   'property-photos',
   'property-visit-history',
   'property-last-visit',
+  'onboarding-progress',
 ])
 
 export function Providers({ children }: { children: React.ReactNode }) {

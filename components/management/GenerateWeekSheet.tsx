@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { addDays, format, parseISO } from 'date-fns'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -18,6 +18,7 @@ import { toUserMessage } from '@/lib/errors'
 import { cn } from '@/lib/utils'
 import { formatDays } from '@/components/management/RouteGroupBand'
 import type { PlanDecision } from '@/lib/utils/schedule'
+import { emitTourEvent } from '@/lib/onboarding/events'
 
 interface GenerateWeekSheetProps {
   open: boolean
@@ -45,6 +46,10 @@ export function GenerateWeekSheet({
   const [excluded, setExcluded] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
   const [showSkipped, setShowSkipped] = useState(false)
+
+  useEffect(() => {
+    emitTourEvent(open ? 'schedule.generateOpened' : 'schedule.generateClosed')
+  }, [open])
 
   const due = useMemo(() => decisions.filter((d) => d.due), [decisions])
   const skipped = useMemo(() => decisions.filter((d) => !d.due), [decisions])
@@ -85,6 +90,7 @@ export function GenerateWeekSheet({
     setSaving(true)
     try {
       const n = await onConfirm(selected)
+      emitTourEvent('schedule.weekGenerated')
       onOpenChange(false)
       setExcluded(new Set())
       toast.success(`${n} ${n === 1 ? 'stop' : 'stops'} scheduled for ${weekLabel}.`)
@@ -109,7 +115,7 @@ export function GenerateWeekSheet({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4" data-tour="generate.list">
           {isError && (
             <SectionError
               title="Couldn&rsquo;t read visit history."
@@ -201,6 +207,7 @@ export function GenerateWeekSheet({
 
         <div className="border-t border-border px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
           <Button
+            data-tour="generate.confirm"
             className="h-12 w-full"
             disabled={saving || isLoading || selected.length === 0}
             onClick={confirm}

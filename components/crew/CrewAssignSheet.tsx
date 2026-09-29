@@ -14,6 +14,7 @@ import { useActiveEmployees } from '@/hooks/crew/useActiveEmployees'
 import { enqueueMutation } from '@/lib/offline/mutation-queue'
 import { useQueuedVisitMutation } from '@/hooks/useManagementSchedule'
 import type { VisitCrewWithEmployee } from '@/types/app'
+import { emitTourEvent } from '@/lib/onboarding/events'
 
 interface CrewAssignSheetProps {
   visitId: string
@@ -98,8 +99,10 @@ type ReassignCrewInput = {
 
 function useReassignCrew(visitId: string) {
   return useQueuedVisitMutation(visitId, {
-    enqueue: ({ employeeId, action }: ReassignCrewInput) =>
-      enqueueMutation('assign_crew', { visitId, employeeId, action }),
+    enqueue: async ({ employeeId, action }: ReassignCrewInput) => {
+      await enqueueMutation('assign_crew', { visitId, employeeId, action })
+      if (action === 'add') emitTourEvent('schedule.crewAssigned')
+    },
     patchVisit: (visit, { employeeId, name, action }) => {
       const isThis = (vc: VisitCrewWithEmployee) =>
         vc.employee_id === employeeId && vc.relation === 'assigned'

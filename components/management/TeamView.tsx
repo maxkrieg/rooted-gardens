@@ -23,13 +23,16 @@ import { EmployeeCard } from '@/components/management/EmployeeCard'
 import { EmployeeForm } from '@/components/management/EmployeeForm'
 import { SERVICE_SIDE_LABELS } from '@/lib/utils/team'
 import type { AppAccessStatus, Employee } from '@/types/app'
+import type { OnboardingSummary } from '@/lib/onboarding/summary'
 
 export function TeamView({
   employees,
   accessStatuses,
+  onboarding,
 }: {
   employees: Employee[]
   accessStatuses: Record<string, AppAccessStatus>
+  onboarding: Record<string, OnboardingSummary>
 }) {
   const [newOpen, setNewOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -130,6 +133,7 @@ export function TeamView({
                   key={e.id}
                   employee={e}
                   accessStatus={accessStatuses[e.id] ?? (e.user_id ? 'active' : 'none')}
+                  onboarding={onboarding[e.id]}
                 />
               ))}
             </div>

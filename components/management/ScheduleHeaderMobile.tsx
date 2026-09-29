@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar'
 import { getWeekStart } from '@/lib/utils/schedule'
 import { cn } from '@/lib/utils'
+import { emitTourEvent } from '@/lib/onboarding/events'
 
 interface ScheduleHeaderMobileProps {
   /** ISO Monday of the single week the phone list renders. */
@@ -49,7 +50,7 @@ export function ScheduleHeaderMobile({
   }
 
   return (
-    <div className="flex h-12 items-center gap-1">
+    <div className="flex h-12 items-center gap-1" data-tour="schedule.weekNav">
       <Button
         variant="ghost"
         size="icon"
@@ -119,6 +120,7 @@ export function ScheduleHeaderMobile({
         size="icon"
         className={cn('relative h-10 w-10 shrink-0', activeFilterCount > 0 && 'text-foreground')}
         onClick={onOpenFilters}
+        data-tour="schedule.filters"
         aria-label={
           activeFilterCount > 0
             ? `Filters — ${activeFilterCount} active`
@@ -137,9 +139,16 @@ export function ScheduleHeaderMobile({
       </Button>
 
       {overflowActions.length > 0 && (
-        <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+        <Popover
+          open={menuOpen}
+          onOpenChange={(next) => {
+            setMenuOpen(next)
+            if (next) emitTourEvent('schedule.menuOpened')
+          }}
+        >
           <PopoverTrigger asChild>
             <Button
+              data-tour="schedule.actions"
               variant="ghost"
               size="icon"
               className="h-10 w-9 shrink-0"
@@ -148,7 +157,7 @@ export function ScheduleHeaderMobile({
               <MoreHorizontal className="h-[18px] w-[18px]" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent align="end" className="w-52 p-1">
+          <PopoverContent align="end" className="w-52 p-1" data-tour="schedule.actionsMenu">
             {overflowActions.map((action) => (
               <button
                 key={action.label}

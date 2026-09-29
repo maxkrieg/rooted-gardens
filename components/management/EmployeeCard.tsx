@@ -23,6 +23,7 @@ import {
 import { SERVICE_SIDE_LABELS } from '@/lib/utils/team'
 import { cn } from '@/lib/utils'
 import type { AppAccessStatus, Employee } from '@/types/app'
+import type { OnboardingSummary } from '@/lib/onboarding/summary'
 
 const ACCESS_LABELS: Record<AppAccessStatus, string> = {
   none: 'No app access',
@@ -33,9 +34,12 @@ const ACCESS_LABELS: Record<AppAccessStatus, string> = {
 export function EmployeeCard({
   employee,
   accessStatus,
+  onboarding,
 }: {
   employee: Employee
   accessStatus: AppAccessStatus
+  /** Absent for anyone without app access, or a role with nothing to learn yet. */
+  onboarding?: OnboardingSummary
 }) {
   const [editOpen, setEditOpen] = useState(false)
   const [invitePending, startInvite] = useTransition()
@@ -163,6 +167,14 @@ export function EmployeeCard({
         </div>
         {!hasAppAccess && !employee.email && (
           <p className="text-xs text-muted-foreground -mt-1">Add an email to invite them.</p>
+        )}
+        {onboarding && (
+          <p className="text-xs text-muted-foreground -mt-1 tabular-nums">
+            {onboarding.toursTotal > 0 &&
+              `Tours ${onboarding.toursDone} of ${onboarding.toursTotal}`}
+            {onboarding.toursTotal > 0 && ' · '}
+            {onboarding.welcomeDone ? 'Saw the welcome' : 'Hasn’t opened the app since tours shipped'}
+          </p>
         )}
 
         {/* SMS consent + Edit */}

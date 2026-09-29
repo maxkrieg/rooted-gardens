@@ -259,7 +259,7 @@ export function VisitDetailContent({
 
       {/* Status control — owner/lead only; hidden for crew, read-only (badge above) for accountant */}
       {canManage && (
-        <div className="space-y-1.5">
+        <div className="space-y-1.5" data-tour="visit.status">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</p>
           <Select value={visit.status} onValueChange={(v) => handleStatusSelect(v as VisitStatus)}>
             <SelectTrigger>
@@ -314,7 +314,7 @@ export function VisitDetailContent({
       )}
 
       {/* Plan: instruction, crew, vehicle. Collapses and locks once the visit is final. */}
-      <div className="rounded-2xl border border-[--border] bg-card overflow-hidden shadow-[0_1px_2px_rgba(43,42,36,.04),_0_6px_16px_-4px_rgba(43,42,36,.08)]">
+      <div data-tour="visit.plan" className="rounded-2xl border border-[--border] bg-card overflow-hidden shadow-[0_1px_2px_rgba(43,42,36,.04),_0_6px_16px_-4px_rgba(43,42,36,.08)]">
         {isFinalVisit ? (
           <button
             type="button"

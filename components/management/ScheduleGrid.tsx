@@ -189,7 +189,12 @@ export function ScheduleGrid({
     // week.weekStart and currentWeekStart are both 'yyyy-MM-dd', so this sorts lexicographically.
     const isPastWeek = week.weekStart < currentWeekStart
     return (
-      <td key={week.weekStart} className={cn('px-1.5 py-1.5 align-top', isPastWeek && 'bg-foreground/[0.04]')}>
+      <td
+        key={week.weekStart}
+        // Only cells with a visit: clicking an empty one creates it.
+        data-tour={visit ? 'schedule.stop' : undefined}
+        className={cn('px-1.5 py-1.5 align-top', isPastWeek && 'bg-foreground/[0.04]')}
+      >
         <ScheduleCell
           visit={visit}
           isCreating={creatingKey === `${row.property.id}-${week.weekStart}`}
@@ -429,7 +434,7 @@ export function ScheduleGrid({
             <tbody>
               {[
                 ...structure.routeGroups.flatMap(({ routeGroup, rows }) => [
-                  <tr key={`rg-${routeGroup.id}`}>
+                  <tr key={`rg-${routeGroup.id}`} data-tour="schedule.routeBand">
                     {/* The route opens a section, so it reads as a heading: sage
                         band, Fraunces name, and a forest spine down the label. */}
                     <td

@@ -15,6 +15,7 @@ import { useRefreshRoutes, routesDataKey } from '@/hooks/useRoutes'
 import { toUserMessage } from '@/lib/errors'
 import { cn } from '@/lib/utils'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { emitTourEvent } from '@/lib/onboarding/events'
 import { RouteDefaultsSheet } from '@/components/management/RouteDefaultsSheet'
 import { formatDays } from '@/components/management/RouteGroupBand'
 import type { Employee, RouteGroup, PropertyWithAccount, Vehicle } from '@/types/app'
@@ -122,7 +123,7 @@ export function RouteGroupCard({
   }
 
   return (
-    <Card className="rounded-2xl border border-border shadow-warm">
+    <Card data-tour="routes.card" className="rounded-2xl border border-border shadow-warm">
       <CardHeader className="px-4 pb-1.5 pt-3">
         <div className="flex items-start justify-between gap-3">
           {/* Name + count */}
@@ -142,9 +143,16 @@ export function RouteGroupCard({
           <RouteGroupSheet routeGroup={routeGroup} />
 
           {/* One overflow menu so the title stays readable on a phone. */}
-          <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+          <Popover
+            open={menuOpen}
+            onOpenChange={(next) => {
+              setMenuOpen(next)
+              if (next) emitTourEvent('routes.groupMenuOpened')
+            }}
+          >
             <PopoverTrigger asChild>
               <Button
+                data-tour="routes.groupMenu"
                 variant="ghost"
                 size="icon"
                 className="-mr-1 h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
@@ -153,7 +161,7 @@ export function RouteGroupCard({
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="w-52 p-1">
+            <PopoverContent align="end" className="w-52 p-1" data-tour="routes.groupMenuContent">
               <MenuButton
                 label="Move up"
                 disabled={isFirst || busy}
@@ -206,7 +214,7 @@ export function RouteGroupCard({
         />
       </CardHeader>
 
-      <CardContent className="px-4 pb-3">
+      <CardContent className="px-4 pb-3" data-tour="routes.stops">
         {/* Assigned properties list */}
         {assignedProperties.length === 0 ? (
           // The card already has its own "Assign" control, so stay compact.
@@ -423,6 +431,7 @@ function RouteDefaultsSummary({
 
   return (
     <button
+      data-tour="routes.defaults"
       type="button"
       onClick={onEdit}
       className="mt-1 flex min-h-7 w-full flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg text-left text-xs text-muted-foreground transition-colors hover:text-foreground"

@@ -23,6 +23,7 @@ import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { isVisitInProgress } from '@/lib/utils/visits'
 import { useApplyVisitUpdate } from '@/hooks/useManagementSchedule'
 import type { SchedulePropertyRow } from '@/types/app'
+import { emitTourEvent } from '@/lib/onboarding/events'
 
 // routeGroup is never read in this component — callers without route-group context
 // (e.g. the account detail page's Recent visits list) don't need to supply one.
@@ -105,6 +106,11 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart }: VisitDe
     if (!visitForOverlay) return
     applyVisitUpdate(visitForOverlay)
   }, [visitForOverlay, applyVisitUpdate])
+
+  useEffect(() => {
+    if (open) emitTourEvent('schedule.visitOpened')
+    else emitTourEvent('schedule.visitClosed')
+  }, [open])
 
   const [completionOpen, setCompletionOpen] = useState(false)
   const [skipOpen, setSkipOpen] = useState(false)

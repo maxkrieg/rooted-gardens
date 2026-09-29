@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/sheet'
 import { PropertyForm } from '@/components/management/PropertyForm'
 import type { Property } from '@/types/app'
+import { emitTourEvent } from '@/lib/onboarding/events'
 
 interface PropertySheetProps {
   accountId: string
@@ -65,7 +66,10 @@ export function PropertySheet({ accountId, property }: PropertySheetProps) {
             <PropertyForm
               accountId={accountId}
               property={property}
-              onSuccess={() => setOpen(false)}
+              onSuccess={() => {
+                if (!isEdit) emitTourEvent('accounts.propertyAdded')
+                setOpen(false)
+              }}
             />
           </div>
         </SheetContent>
