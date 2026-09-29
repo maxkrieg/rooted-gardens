@@ -13,6 +13,7 @@ import { useRefreshRoutes } from '@/hooks/useRoutes'
 import { useAssignPropertyRoute } from '@/hooks/useAssignPropertyRoute'
 import { useOfflineStatus } from '@/hooks/crew/useOfflineStatus'
 import type { PropertyWithAccount, RouteGroup } from '@/types/app'
+import { emitTourEvent } from '@/lib/onboarding/events'
 
 interface UnroutedPanelProps {
   properties: PropertyWithAccount[]
@@ -171,6 +172,7 @@ export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
         }
         deselect(ids)
         markRouted(ids, true)
+        emitTourEvent('routes.propertyRouted')
         // refreshRoutes alone: router.refresh() on a client-first page is an RSC
         // fetch that adds nothing here and takes the page down when it fails.
         refreshRoutes()
@@ -191,7 +193,10 @@ export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
   }
 
   return (
-    <div className="rounded-2xl border border-[var(--clay)]/30 bg-[var(--clay)]/[0.06] p-4 sm:p-5 space-y-4">
+    <div
+      data-tour="routes.unrouted"
+      className="rounded-2xl border border-[var(--clay)]/30 bg-[var(--clay)]/[0.06] p-4 sm:p-5 space-y-4"
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-2.5 min-w-0">
           <TriangleAlert className="h-4 w-4 text-[var(--clay)] shrink-0 mt-0.5" />

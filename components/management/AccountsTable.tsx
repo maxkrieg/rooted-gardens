@@ -41,6 +41,7 @@ import { CardListSkeleton, PageHeaderSkeleton } from '@/components/states/skelet
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAccountsList } from '@/hooks/useAccounts'
 import { useIsHydrated } from '@/hooks/use-hydrated'
+import { emitTourEvent } from '@/lib/onboarding/events'
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -107,6 +108,7 @@ function AccountsTable({ accounts }: AccountsTableProps) {
       <div className="flex items-center justify-between gap-4 mb-6">
         <h1 className="font-display text-2xl font-semibold text-foreground">Accounts</h1>
         <Button
+          data-tour="accounts.new"
           onClick={() => setSheetOpen(true)}
           className="h-10 gap-2 shrink-0"
         >
@@ -117,7 +119,7 @@ function AccountsTable({ accounts }: AccountsTableProps) {
       </div>
 
       {/* Filter bar */}
-      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+      <div className="flex flex-col sm:flex-row gap-2 mb-4" data-tour="accounts.search">
         <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input
@@ -164,7 +166,7 @@ function AccountsTable({ accounts }: AccountsTableProps) {
       </p>
 
       {/* Desktop table (md+) */}
-      <div className="hidden md:block rounded-xl border border-border overflow-hidden bg-card shadow-warm">
+      <div data-tour="accounts.list" className="hidden md:block rounded-xl border border-border overflow-hidden bg-card shadow-warm">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent border-b border-border">
@@ -225,7 +227,7 @@ function AccountsTable({ accounts }: AccountsTableProps) {
       </div>
 
       {/* Mobile card list (< md) */}
-      <div className="md:hidden flex flex-col gap-3">
+      <div data-tour="accounts.list" className="md:hidden flex flex-col gap-3">
         {filtered.length === 0 ? (
           emptyState
         ) : (
@@ -245,7 +247,12 @@ function AccountsTable({ accounts }: AccountsTableProps) {
             </SheetDescription>
           </SheetHeader>
           <div className="flex-1 overflow-y-auto px-6 py-5">
-            <AccountForm onSuccess={() => setSheetOpen(false)} />
+            <AccountForm
+              onSuccess={() => {
+                emitTourEvent('accounts.created')
+                setSheetOpen(false)
+              }}
+            />
           </div>
         </SheetContent>
       </Sheet>

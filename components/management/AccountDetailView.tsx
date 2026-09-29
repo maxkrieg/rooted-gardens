@@ -41,6 +41,7 @@ import { useCan } from '@/components/app/RoleProvider'
 import { PropertyRoutePicker } from '@/components/management/PropertyRoutePicker'
 import type { PhotoWithUrl } from '@/types/app'
 import { getCachedPhoto, isCacheablePhoto, putCachedPhoto } from '@/lib/offline/photo-blobs'
+import { emitTourEvent } from '@/lib/onboarding/events'
 
 type AccountView = 'details' | 'photos'
 
@@ -55,6 +56,10 @@ export function AccountDetailView({ accountId, initialView }: AccountDetailViewP
   const hydrated = useIsHydrated()
   const [view, setView] = useState<AccountView>(initialView)
   const { detail, isLoading, isError, isStale, hasData } = useAccountDetail(accountId)
+
+  useEffect(() => {
+    emitTourEvent('accounts.accountOpened')
+  }, [])
 
   useEffect(() => {
     const url = view === 'photos' ? `?view=photos` : window.location.pathname
@@ -90,7 +95,7 @@ export function AccountDetailView({ accountId, initialView }: AccountDetailViewP
 
       {/* Identity sits above the info card so the tab strip stays in the first
           viewport on a phone. */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-4" data-tour="account.header">
         <div className="min-w-0">
           <h1 className="font-display text-2xl font-semibold text-foreground leading-snug">
             {account.name}
@@ -117,7 +122,7 @@ export function AccountDetailView({ accountId, initialView }: AccountDetailViewP
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 border-b border-border">
+      <div className="flex items-center gap-1.5 border-b border-border" data-tour="account.tabs">
         {(['details', 'photos'] as const).map((tab) => (
           <button
             key={tab}
@@ -207,7 +212,7 @@ function DetailsTab({ detail }: { detail: AccountDetail }) {
         </CardContent>
       </Card>
 
-      <section>
+      <section data-tour="account.properties">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-display text-lg font-semibold text-foreground">Properties</h2>
           <PropertySheet accountId={account.id} />
@@ -264,7 +269,10 @@ function DetailsTab({ detail }: { detail: AccountDetail }) {
                       className="mb-3"
                     />
 
-                    <div className="flex flex-wrap items-center gap-2 text-sm mb-3">
+                    <div
+                      data-tour="account.route"
+                      className="flex flex-wrap items-center gap-2 text-sm mb-3"
+                    >
                       {!routeGroup && (
                         <TriangleAlert className="h-3.5 w-3.5 text-[var(--clay)] shrink-0" />
                       )}

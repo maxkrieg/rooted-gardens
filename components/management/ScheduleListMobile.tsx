@@ -166,6 +166,8 @@ export function ScheduleListMobile({
       <button
         key={row.property.id}
         type="button"
+        // Only rows that already have a visit: tapping an empty one creates it.
+        data-tour={visit ? 'schedule.stop' : undefined}
         disabled={isCreating}
         aria-pressed={selectMode ? isSelected : undefined}
         onClick={() =>

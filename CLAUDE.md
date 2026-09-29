@@ -481,6 +481,19 @@ visit_crew (
 --   CREATE INDEX visits_in_progress_idx ON visits (id)
 --     WHERE started_at IS NOT NULL AND ended_at IS NULL;
 
+-- Per-person onboarding progress (welcome, tours, checklist, What's new). Keys and
+-- versions come from lib/onboarding/registry.ts; a row only records what one person did.
+onboarding_progress (
+  employee_id uuid FK → employees ON DELETE CASCADE,
+  item_key text NOT NULL,               -- 'tour.schedule', 'task.generateWeek', 'news.…'
+  version integer NOT NULL DEFAULT 1,
+  state text NOT NULL CHECK (state IN ('seen', 'completed', 'dismissed')),
+  created_at, updated_at,
+  PRIMARY KEY (employee_id, item_key)
+)
+-- RLS: read/write your own rows; owners also read everyone's (Team page). Written via the
+-- offline queue, since non-owners can't update their own employees row.
+
 -- NOTE: payroll time tracking (the `time_entries` clock-in/clock-out table) was removed
 -- (migration 20260723000000_drop_time_entries). The owners don't track employee
 -- clock-in/clock-out or run timesheets in this app. Attendance ("who was at which
@@ -908,7 +921,7 @@ across any deploy that renames them.
 
 Queued types: `completion`, `photo`, `photo_caption`, `job_start`, `job_discard`, `skip`,
 `create_visit`, `assign_crew`, `set_vehicle`, `crew_instruction`, `revert_status`,
-`property_notes`, `route_week_note`, `assign_property_route`. Adding one means touching
+`property_notes`, `route_week_note`, `assign_property_route`, `onboarding_progress`. Adding one means touching
 `MutationType` (idb.ts), the payload interface + `MutationPayload` union, a `case` in the
 flush switch, and `TYPE_LABELS` in `StuckChangesSheet` (compiler-enforced).
 
@@ -966,6 +979,28 @@ designed as in-app only, and they are built and working.)
 
 ---
 
+## Onboarding: tours, checklist, What's new
+
+`lib/onboarding/registry.ts` holds everything the app teaches, as data: per-role welcome
+slides, spotlight tours on the real screens, the Getting started checklist, and `NEWS`.
+`OnboardingProvider` (mounted by `AppShell`) decides what to show, and never shows more than
+one thing at a time. Progress lives in `onboarding_progress`. Help & tours is in More on a
+phone and in the sidebar on desktop.
+
+- Tours point at elements by `data-tour="…"`. Both schedule layouts stay mounted, so the
+  runner uses the first *visible* match. `npm run check:tours` fails if an anchor has no match.
+- Tours make the user do only safe things (open a stop, open the Generate *preview*). Never
+  write a step that clicks or requires a write.
+- `lib/onboarding/events.ts` is how steps advance and checklist items tick. UI moments emit
+  events that advance "do it" steps; successful writes emit events that tick checklist items.
+  Emitting never touches the write itself.
+- **When you change a toured screen:** keep its anchors. If the *flow* changed, bump the
+  tour's `version`, which re-offers it softly. If existing users should notice something new,
+  add a `NEWS` item (with `parentTour`, so people who learn it from the tour aren't told twice).
+  Copy-only edits need no bump.
+
+---
+
 ## Development Conventions
 
 - **TypeScript strict mode** — no `any` types
@@ -993,7 +1028,8 @@ designed as in-app only, and they are built and working.)
   you're pointed at before `db push --linked`.
 - Keep schedule-related logic in `lib/utils/schedule.ts`
 - Keep QBO sync logic in `lib/quickbooks/sync.ts` — never inline it
-- **Check trio:** `npm run build` · `npm run typecheck` · `npm run lint` — use `npm run typecheck` (not `npx tsc --noEmit`) for type checking. `app/sw.ts` is excluded from the main typecheck (webworker lib) — run `npm run typecheck:sw` when touching it; `npm run build` also fails if it's broken, since `createSerwistRoute` compiles it at build time.
+- **Check trio (+1):** `npm run build` · `npm run typecheck` · `npm run lint` ·
+  `npm run check:tours` (see Onboarding above) — use `npm run typecheck` (not `npx tsc --noEmit`) for type checking. `app/sw.ts` is excluded from the main typecheck (webworker lib) — run `npm run typecheck:sw` when touching it; `npm run build` also fails if it's broken, since `createSerwistRoute` compiles it at build time.
 - **Migrations before 2026-08-07 are squashed.** `supabase/migrations/` starts at
   `20260807090000_baseline_schema.sql`, a single schema-only dump of the dev project (plus
   hand-carried Storage buckets/policies and `site_content`/`site_collection_items` seed

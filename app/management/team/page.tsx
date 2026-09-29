@@ -4,6 +4,8 @@ import { TeamView } from '@/components/management/TeamView'
 import { ErrorState } from '@/components/states/ErrorState'
 import type { Employee, AppAccessStatus } from '@/types/app'
 import { createServiceClient } from '@/lib/supabase/service'
+import { summarizeOnboarding, type OnboardingSummary } from '@/lib/onboarding/summary'
+import type { EmployeeRole } from '@/types/app'
 
 /**
  * Team page, owner-only. Rechecked here since the employees SELECT policy also allows lead
@@ -42,8 +44,31 @@ export default async function TeamPage() {
 
   const roster = (employees ?? []) as Employee[]
   const accessStatuses = await getAppAccessStatuses(roster)
+  const onboarding = await getOnboardingSummaries(supabase, roster)
 
-  return <TeamView employees={roster} accessStatuses={accessStatuses} />
+  return <TeamView employees={roster} accessStatuses={accessStatuses} onboarding={onboarding} />
+}
+
+/** Tours finished per person. Owner RLS reads everyone's rows; a failure just hides the line. */
+async function getOnboardingSummaries(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  employees: Employee[],
+): Promise<Record<string, OnboardingSummary>> {
+  const { data, error } = await supabase
+    .from('onboarding_progress')
+    .select('employee_id, item_key, version, state')
+  if (error) {
+    console.error('[team] onboarding_progress', error)
+    return {}
+  }
+  const summaries: Record<string, OnboardingSummary> = {}
+  for (const e of employees) {
+    if (!e.user_id) continue
+    const rows = (data ?? []).filter((row) => row.employee_id === e.id)
+    const summary = summarizeOnboarding(e.role as EmployeeRole, rows)
+    if (summary) summaries[e.id] = summary
+  }
+  return summaries
 }
 
 /**

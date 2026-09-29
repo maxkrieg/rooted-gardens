@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { LogOut, Search, Smartphone } from 'lucide-react'
+import { CircleHelp, LogOut, Search, Smartphone } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { ProfileEditSheet } from '@/components/crew/ProfileEditSheet'
 import { isNavItemActive, type NavItem } from '@/components/app/nav-items'
@@ -17,6 +17,9 @@ interface MoreSheetProps {
   counts: Record<string, number>
   /** Omitted for a role that can't open an account — the palette only finds those. */
   onOpenSearch?: () => void
+  onOpenHelp: () => void
+  /** Unseen What's new items. */
+  helpBadge: number
   onSignOut: () => void
 }
 
@@ -28,6 +31,8 @@ export function MoreSheet({
   pathname,
   counts,
   onOpenSearch,
+  onOpenHelp,
+  helpBadge,
   onSignOut,
 }: MoreSheetProps) {
   const { employee, role } = useRole()
@@ -137,6 +142,26 @@ export function MoreSheet({
               >
                 {smsOptIn ? 'On' : 'Off'}
               </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                onOpenChange(false)
+                onOpenHelp()
+              }}
+              className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            >
+              <CircleHelp className="h-[18px] w-[18px] shrink-0" />
+              <span className="flex-1 text-left">Help &amp; tours</span>
+              {helpBadge > 0 && (
+                <span
+                  className="shrink-0 rounded-full bg-[var(--ochre)]/20 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#9A6B16]"
+                  aria-label={`${helpBadge} new`}
+                >
+                  New
+                </span>
+              )}
             </button>
 
             <button

@@ -34,6 +34,7 @@ import { bulkAssignRoute } from '@/app/app/(padded)/schedule/actions'
 import { useRefreshSchedule } from '@/hooks/useManagementSchedule'
 import { routeAssignSchema, type RouteAssignValues } from '@/lib/validators/visit'
 import type { Employee, RouteGroup, ScheduleWeek, Vehicle } from '@/types/app'
+import { emitTourEvent } from '@/lib/onboarding/events'
 
 interface RouteAssignDialogProps {
   open: boolean
@@ -88,6 +89,7 @@ export function RouteAssignDialog({
     refreshSchedule(values.week_start)
 
     const count = res.count ?? 0
+    if (count > 0) emitTourEvent('schedule.crewAssigned')
     toast.success(count === 0 ? 'No scheduled visits found for that week' : `Assigned ${count} visit${count === 1 ? '' : 's'}`)
     form.reset()
     onOpenChange(false)

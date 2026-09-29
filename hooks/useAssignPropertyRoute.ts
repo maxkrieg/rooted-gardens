@@ -5,6 +5,7 @@ import { enqueueMutation, flushMutationQueue } from '@/lib/offline/mutation-queu
 import { routesDataKey } from '@/hooks/useRoutes'
 import { scheduleReferenceKey } from '@/hooks/useManagementSchedule'
 import { navUnroutedCountKey } from '@/hooks/useNavCounts'
+import { emitTourEvent } from '@/lib/onboarding/events'
 import type { ScheduleReference } from '@/lib/schedule/fetch'
 import type { RoutesData } from '@/lib/routes/fetch'
 import type { ScheduleAssignment } from '@/lib/utils/schedule'
@@ -124,6 +125,10 @@ export function useAssignPropertyRoute() {
           typeof old === 'number' ? Math.max(0, isRouted ? old - 1 : old + 1) : old,
         )
       }
+    },
+
+    onSuccess: (_data, variables) => {
+      if (variables.routeGroupId && !variables.silent) emitTourEvent('routes.propertyRouted')
     },
 
     onSettled: (_data, _error, variables) => {

@@ -7,6 +7,7 @@ import { patchScheduleVisit, scheduleVisitsKey } from '@/hooks/useManagementSche
 import { nextVisitVersion } from '@/lib/utils/visits'
 import { useCreateVisit } from '@/hooks/useCreateVisit'
 import type { Employee, SchedulePropertyRow, VisitCrewWithEmployee } from '@/types/app'
+import { emitTourEvent } from '@/lib/onboarding/events'
 
 /** What a bulk apply did. `undo` is absent when it can't be reversed (scheduling creates visits). */
 /** One stop to act on: a property row and the week its visit belongs to. The
@@ -183,6 +184,7 @@ async function applyCrew(
 ): Promise<void> {
   for (const visitId of visitIds) {
     await enqueueMutation('assign_crew', { visitId, employeeId: employee.id, action })
+    if (action === 'add') emitTourEvent('schedule.crewAssigned')
     patchScheduleVisit(queryClient, visitId, (visit) => ({
       ...visit,
       visit_crew:

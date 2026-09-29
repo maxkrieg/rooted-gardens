@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Button } from '@/components/ui/button'
 import { CheckIndicator } from '@/components/app/CheckIndicator'
 import { setRouteGroupDefaults } from '@/app/app/(padded)/routes/actions'
+import { emitTourEvent } from '@/lib/onboarding/events'
 import { useRefreshRoutes } from '@/hooks/useRoutes'
 import { useOfflineStatus } from '@/hooks/crew/useOfflineStatus'
 import { cn } from '@/lib/utils'
@@ -67,6 +68,7 @@ export function RouteDefaultsSheet({
       // showing the old defaults.
       refreshRoutes()
       onOpenChange(false)
+      emitTourEvent('routes.defaultsSaved')
       toast.success(`Defaults saved for ${routeGroup.name}.`)
     })
   }

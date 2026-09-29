@@ -9,6 +9,7 @@
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
     "typecheck:sw": "tsc -p tsconfig.sw.json",
+    "check:tours": "node scripts/check-tour-anchors.mjs",
     "sync:invoices": "node scripts/sync-invoice-status.mjs"
   },
   "dependencies": {

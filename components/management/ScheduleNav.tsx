@@ -43,7 +43,7 @@ export function ScheduleNav({ windowStart, onWeekChange }: ScheduleNavProps) {
   const singleWeekLabel = `${format(windowStartDate, 'MMM d')} – ${format(addDays(windowStartDate, 6), 'MMM d')}`
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <div className="flex flex-wrap items-center gap-1.5" data-tour="schedule.weekNav">
       {!isCurrentWeekVisible && (
         <Button
           variant="outline"

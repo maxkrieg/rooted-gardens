@@ -43,6 +43,7 @@ import { ErrorState } from '@/components/states/ErrorState'
 import type { Account } from '@/types/app'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
+import { emitTourEvent } from '@/lib/onboarding/events'
 
 interface ScheduleViewProps {
   initialWeek: string
@@ -94,6 +95,7 @@ export function ScheduleView({
 
   function changeViewMode(next: ScheduleViewMode) {
     setViewOverride(next)
+    if (next === 'week') emitTourEvent('schedule.viewWeek')
     try {
       window.localStorage.setItem(VIEW_MODE_KEY, next)
     } catch {
@@ -242,10 +244,17 @@ export function ScheduleView({
                 to show them outright. Generate works on the leftmost week. */}
             {canEdit && viewMode !== 'today' && (
               <>
-                <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setGenerateOpen(true)}>
+                <Button
+                  data-tour="schedule.actions"
+                  variant="outline"
+                  size="sm"
+                  className="h-9 text-xs"
+                  onClick={() => setGenerateOpen(true)}
+                >
                   Generate week…
                 </Button>
                 <Button
+                  data-tour="schedule.select"
                   variant={selectMode ? 'default' : 'outline'}
                   size="sm"
                   className="h-9 text-xs"
@@ -393,6 +402,7 @@ function ScheduleViewToggle({
     <div
       role="tablist"
       aria-label="Schedule view"
+      data-tour="schedule.viewToggle"
       className="flex gap-1 rounded-lg bg-secondary p-1"
     >
       {(['today', 'week'] as const).map((mode) => (

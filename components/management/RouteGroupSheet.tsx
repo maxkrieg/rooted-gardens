@@ -35,6 +35,7 @@ export function RouteGroupSheet({ routeGroup }: RouteGroupSheetProps) {
         </Button>
       ) : (
         <Button
+          data-tour="routes.newGroup"
           className="gap-2"
           onClick={() => setOpen(true)}
         >

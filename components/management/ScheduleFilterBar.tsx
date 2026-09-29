@@ -72,6 +72,7 @@ export function ScheduleFilterBar({
 
   return (
     <div
+      data-tour="schedule.filters"
       className={cn(
         stacked ? 'flex flex-col gap-2' : 'flex flex-wrap items-center gap-2',
       )}

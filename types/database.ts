@@ -418,6 +418,41 @@ export type Database = {
           },
         ]
       }
+      onboarding_progress: {
+        Row: {
+          created_at: string
+          employee_id: string
+          item_key: string
+          state: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          item_key: string
+          state: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          item_key?: string
+          state?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_progress_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       photos: {
         Row: {
           caption: string | null

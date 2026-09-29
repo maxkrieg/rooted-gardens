@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { MoreHorizontal, Truck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { emitTourEvent } from '@/lib/onboarding/events'
 import { cn } from '@/lib/utils'
 import type { RouteGroupStats } from '@/lib/utils/schedule'
 import type { Employee } from '@/types/app'
@@ -49,7 +50,10 @@ export function RouteGroupBand({
   return (
     // Same heading treatment as the desktop grid's route row: sage band, a
     // forest spine, and the name in Fraunces rather than a tracked caps label.
-    <div className="bg-accent text-accent-foreground shadow-[inset_3px_0_0_0_var(--primary)]">
+    <div
+      data-tour="schedule.routeBand"
+      className="bg-accent text-accent-foreground shadow-[inset_3px_0_0_0_var(--primary)]"
+    >
       <div className="flex items-center gap-2 pl-5 pr-4 pt-2.5">
         <span className="min-w-0 flex-1 truncate font-display text-[15px] font-semibold leading-tight text-foreground">
           {name}
@@ -204,9 +208,16 @@ export function RouteGroupMenu({
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   return (
-    <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+    <Popover
+      open={menuOpen}
+      onOpenChange={(next) => {
+        setMenuOpen(next)
+        if (next) emitTourEvent('schedule.routeMenuOpened')
+      }}
+    >
       <PopoverTrigger asChild>
         <Button
+          data-tour="schedule.routeMenu"
           size="icon"
           variant="ghost"
           className="-mr-2 h-7 w-7 shrink-0 text-accent-foreground/70 hover:bg-primary/10 hover:text-accent-foreground"

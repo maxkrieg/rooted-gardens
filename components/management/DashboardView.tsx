@@ -17,6 +17,7 @@ import type { VisitWithDetails, Equipment, Vehicle } from '@/types/app'
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { firstName } from '@/lib/utils/team'
+import { GettingStartedCard } from '@/components/onboarding/GettingStartedCard'
 
 /** Client-first dashboard, derived from the schedule's cached week; no extra queries. */
 export function DashboardView() {
@@ -68,6 +69,8 @@ export function DashboardView() {
           Week of {format(getWeekStart(today), 'MMM d, yyyy')}
         </p>
       </div>
+
+      <GettingStartedCard />
 
       {isStale && <CachedNotice />}
 
