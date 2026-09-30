@@ -101,6 +101,8 @@ not just at runtime — missing them doesn't error the build, it silently breaks
 | `QBO_ENVIRONMENT` | no | `sandbox` for this deploy. |
 | `QBO_SERVICE_ITEM_NAME` | no | Defaults to `Services` in code if unset, but set it explicitly to avoid surprises — it's the shared QBO Product/Service every invoice line bills against. |
 | `CRON_SECRET` | no | Generate: `openssl rand -hex 32`. Required — the cron route fails closed (401s, syncs nothing) if this is unset. Use a value different from anything used locally. |
+| `NEXT_PUBLIC_SENTRY_DSN` | **yes** (inlined) | Error reporting — see "Error monitoring (Sentry)" in Part 3. Optional; unset turns Sentry off. |
+| `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | **yes** (build-only) | Source-map upload. Optional; without them Sentry still works, stack traces are just minified. |
 
 **Do not set:** any `TWILIO_*` variable (SMS is deferred — zero code paths read them) or
 `NEXT_PUBLIC_ENABLE_SW` (dev-only flag; the service worker is always on in production
@@ -244,12 +246,48 @@ Run through this against the live URL once Part 1 is complete:
 | `QBO_SERVICE_ITEM_NAME` | server | Shared QBO Product/Service every invoice line bills against (default `Services`) |
 | `NEXT_PUBLIC_APP_URL` | public, **build-time** | `https://<your-app>.vercel.app` |
 | `CRON_SECRET` | server | Authenticates the invoice-status cron (§10 above) |
+| `NEXT_PUBLIC_SENTRY_DSN` | public, **build-time** | Sentry project DSN. Unset = error reporting off (local dev). Inlined into the browser bundle, so a change needs a redeploy. |
+| `SENTRY_AUTH_TOKEN` | **build-only**, secret | Uploads source maps so stack traces are readable. Unset = no maps generated (and none served publicly). Create an org auth token in Sentry. |
+| `SENTRY_ORG` | build-only | Sentry org slug, for the source-map upload. |
+| `SENTRY_PROJECT` | build-only | Sentry project slug, for the source-map upload. |
 
 `TWILIO_*` variables are **not** used anywhere in code (SMS is deferred indefinitely — see
 CLAUDE.md) — don't set them.
 
 > Env var changes only take effect on a **new deployment**. After adding or changing one,
 > redeploy.
+
+### Error monitoring (Sentry)
+
+Vercel runtime logs on Hobby are kept for about an hour and only see the server. Most of this
+app's failures happen on phones (the offline queue, client-first reads), so errors go to Sentry.
+What's wired up:
+
+- **Server:** `instrumentation.ts` → `onRequestError` catches anything uncaught in Server
+  Components, Server Actions, Route Handlers and the proxy.
+- **Browser:** `instrumentation-client.ts`. Uses Sentry's offline transport, so an error hit with
+  no signal is held in IndexedDB and sent on reconnect. Events go through the `/monitoring`
+  tunnel (a Next rewrite) so ad blockers don't drop them; `proxy.ts` skips that path.
+- **Handled errors:** `toUserMessage()` (`lib/errors.ts`) reports what it maps, except weak
+  signal, expired sessions and sign-in mistakes (`shouldReport`). Known Postgres codes go in as
+  warnings, anything unmapped as errors. The error pages and `ErrorBoundary` report too.
+- **Offline queue:** a change that gives up after 5 tries (lands in "Changes that didn't save")
+  is reported once, tagged `mutation_type`. The queued contents never leave the phone.
+- **QuickBooks:** push, customer sync and status-sync failures, with the Intuit fault text
+  (`describeQboError`), not the raw response.
+- **Cron:** `/api/cron/sync-invoice-status` is a Sentry Cron Monitor (`sync-invoice-status`),
+  so you're alerted if it errors **or never runs**. It's created on the first check-in; its
+  schedule must match `vercel.json`. "QuickBooks not connected" is reported as a warning.
+
+**Privacy** (`lib/observability/sentry-options.ts`): request bodies, cookies, query strings
+(magic-link `?code=`) and all headers but user-agent/content-type/next-action are stripped.
+The user is the employee **id** plus a `role` tag, never a name or email. Tracing and Session
+Replay are off. Don't turn on Replay: it would record gate codes and client notes.
+
+**Setup, once:** create a Next.js project in Sentry → copy the DSN into `NEXT_PUBLIC_SENTRY_DSN`
+(Production, and Preview if you want preview errors) → create an org auth token for
+`SENTRY_AUTH_TOKEN` and set `SENTRY_ORG` / `SENTRY_PROJECT` → redeploy. Then in Sentry, add alert
+rules for new issues, and for the `sync-invoice-status` monitor once it has checked in.
 
 ### Making a schema change (dev → prod)
 

@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { getQuickBooksClient, qboPromise } from '@/lib/quickbooks/client'
 import type QuickBooks from 'node-quickbooks'
 import { toUserMessage } from '@/lib/errors'
+import { describeQboError } from '@/lib/quickbooks/errors'
+import { reportError } from '@/lib/observability/report'
 
 export interface SyncCustomerResult {
   error?: string
@@ -123,11 +125,13 @@ export async function syncCustomer(accountId: string): Promise<SyncCustomerResul
         action = 'updated'
       } catch (updateErr) {
         console.error('[syncCustomer] updateCustomer', updateErr)
+        reportError(updateErr, '[syncCustomer] updateCustomer', { message: describeQboError(updateErr) })
         return { error: 'Could not update QuickBooks customer' }
       }
     } catch (err) {
       if (!isQboNotFoundError(err)) {
         console.error('[syncCustomer] getCustomer', err)
+        reportError(err, '[syncCustomer] getCustomer', { message: describeQboError(err) })
         return { error: 'Could not verify QuickBooks customer' }
       }
       try {
@@ -135,6 +139,7 @@ export async function syncCustomer(accountId: string): Promise<SyncCustomerResul
         action = 'recreated'
       } catch (createErr) {
         console.error('[syncCustomer] recreate after 610', createErr)
+        reportError(createErr, '[syncCustomer] recreate after 610', { message: describeQboError(createErr) })
         return { error: 'Could not create replacement QuickBooks customer' }
       }
     }
@@ -144,6 +149,7 @@ export async function syncCustomer(accountId: string): Promise<SyncCustomerResul
       action = 'created'
     } catch (err) {
       console.error('[syncCustomer] createCustomer', err)
+      reportError(err, '[syncCustomer] createCustomer', { message: describeQboError(err) })
       return { error: 'Could not create QuickBooks customer' }
     }
   }

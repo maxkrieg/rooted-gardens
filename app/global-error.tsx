@@ -1,5 +1,6 @@
 'use client'
 
+import * as Sentry from '@sentry/nextjs'
 import { useEffect } from 'react'
 
 /** The root layout threw. Replaces the whole document, so it inlines the theme values. */
@@ -12,6 +13,8 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error('[global-error]', error)
+    // A digest means it was thrown on the server, where onRequestError already reported it.
+    if (!error.digest) Sentry.captureException(error, { tags: { context: '[global-error]' } })
   }, [error])
 
   return (

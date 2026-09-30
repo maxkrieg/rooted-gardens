@@ -3,6 +3,7 @@ import { qboPromise } from '@/lib/quickbooks/client'
 import type QuickBooks from 'node-quickbooks'
 import type { Account, VisitWithLocation } from '@/types/app'
 import { describeQboError, qboFaultMessage } from '@/lib/quickbooks/errors'
+import { reportError } from '@/lib/observability/report'
 
 const SERVICE_ITEM_NAME = process.env.QBO_SERVICE_ITEM_NAME || 'Services'
 
@@ -66,6 +67,7 @@ export async function pushAccountInvoice(
     itemId = await getServiceItemId(qbo)
   } catch (err) {
     console.error('[pushAccountInvoice] getServiceItemId', describeQboError(err))
+    reportError(err, '[pushAccountInvoice] getServiceItemId', { message: describeQboError(err) })
     return {
       error: `Could not find the "${SERVICE_ITEM_NAME}" product in QuickBooks. Create it there, then try again.`,
     }
@@ -109,6 +111,7 @@ export async function pushAccountInvoice(
     return { qboInvoiceId: invoice.Id }
   } catch (err) {
     console.error('[pushAccountInvoice] createInvoice', describeQboError(err))
+    reportError(err, '[pushAccountInvoice] createInvoice', { message: describeQboError(err) })
     // Forward Intuit's validation message; it's written for a bookkeeper.
     const fault = qboFaultMessage(err)
     return { error: fault ? `QuickBooks rejected the invoice — ${fault}` : 'QuickBooks rejected the invoice.' }

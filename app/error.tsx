@@ -1,5 +1,6 @@
 'use client'
 
+import * as Sentry from '@sentry/nextjs'
 import { useEffect } from 'react'
 import { ErrorState } from '@/components/states/ErrorState'
 
@@ -13,6 +14,8 @@ export default function AppError({
 }) {
   useEffect(() => {
     console.error('[app/error]', error)
+    // A digest means it was thrown on the server, where onRequestError already reported it.
+    if (!error.digest) Sentry.captureException(error, { tags: { context: '[app/error]' } })
   }, [error])
 
   return (

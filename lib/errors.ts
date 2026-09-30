@@ -3,6 +3,8 @@
  * The original is always logged.
  */
 
+import { reportError } from '@/lib/observability/report'
+
 /** Shape of a PostgREST / Supabase error. Not exported by supabase-js in a usable form. */
 interface CodedError {
   code?: string
@@ -71,10 +73,21 @@ export function isNetworkError(err: unknown): boolean {
   )
 }
 
-/** Any error → actionable copy; never the raw message. Make `fallback` specific per call site. */
+/** Any error → actionable copy; never the raw message. Make `fallback` specific per call site.
+ *  Logs the original, and reports it to Sentry unless it's the user's situation rather than a
+ *  bug (see `shouldReport`). */
 export function toUserMessage(err: unknown, fallback: string, context?: string): string {
-  if (err) console.error(context ?? '[error]', err)
+  if (err) {
+    console.error(context ?? '[error]', err)
+    if (shouldReport(err)) {
+      reportError(err, context ?? '[error]', { level: isKnownCode(err) ? 'warning' : 'error' })
+    }
+  }
+  return userMessageFor(err, fallback)
+}
 
+/** `toUserMessage` without the logging or reporting — for callers that retry and report once. */
+export function userMessageFor(err: unknown, fallback: string): string {
   if (isNetworkError(err)) {
     return "Couldn't reach the server. Check your connection, then try again."
   }
@@ -101,6 +114,27 @@ export function toUserMessage(err: unknown, fallback: string, context?: string):
   }
 
   return fallback
+}
+
+const SESSION_CODES = new Set(['PGRST301', 'PGRST302'])
+
+function isKnownCode(err: unknown): boolean {
+  const code = asCodedError(err)?.code
+  return !!code && (code in PG_CODE_MESSAGES || code in PGRST_CODE_MESSAGES)
+}
+
+/** Weak signal, an expired session or a sign-in mistake is the user's situation, not a bug.
+ *  Everything else goes to Sentry — an RLS denial (42501) included, since the UI offering a write
+ *  the policy refuses is a capability bug. */
+export function shouldReport(err: unknown): boolean {
+  if (!err || isNetworkError(err) || isOfflineError(err)) return false
+  const coded = asCodedError(err)
+  if (coded?.code && SESSION_CODES.has(coded.code)) return false
+  if (coded?.status === 401) return false
+  if (coded?.message && AUTH_MESSAGE_PATTERNS.some(([pattern]) => pattern.test(coded.message!))) {
+    return false
+  }
+  return true
 }
 
 /** Online-only crew mutations throw this rather than attempt a doomed request. */
