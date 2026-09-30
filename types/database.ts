@@ -108,6 +108,50 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_log: {
+        Row: {
+          action: string
+          actor_employee_id: string | null
+          actor_label: string
+          changes: Json | null
+          entity_id: string | null
+          entity_label: string | null
+          entity_table: string
+          id: number
+          occurred_at: string
+        }
+        Insert: {
+          action: string
+          actor_employee_id?: string | null
+          actor_label: string
+          changes?: Json | null
+          entity_id?: string | null
+          entity_label?: string | null
+          entity_table: string
+          id?: never
+          occurred_at?: string
+        }
+        Update: {
+          action?: string
+          actor_employee_id?: string | null
+          actor_label?: string
+          changes?: Json | null
+          entity_id?: string | null
+          entity_label?: string | null
+          entity_table?: string
+          id?: never
+          occurred_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_actor_employee_id_fkey"
+            columns: ["actor_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           active: boolean

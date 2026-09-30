@@ -1,6 +1,7 @@
 import {
   BarChart3,
   CalendarDays,
+  History,
   Inbox,
   Receipt,
   Route,
@@ -36,6 +37,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/management/reports', label: 'Reports', icon: BarChart3 },
   { href: '/management/fleet', label: 'Fleet', icon: Truck },
   { href: '/management/team', label: 'Team', icon: UserCircle },
+  { href: '/management/audit', label: 'Activity log', icon: History },
 ]
 
 /**

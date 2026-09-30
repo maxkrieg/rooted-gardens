@@ -139,7 +139,8 @@ rooted-gardens/
 │   │   ├── leads/page.tsx
 │   │   ├── reports/page.tsx
 │   │   ├── fleet/page.tsx
-│   │   └── team/page.tsx
+│   │   ├── team/page.tsx
+│   │   └── audit/page.tsx       ← Activity log (owner/lead): every change, who, when
 │   └── api/
 │       ├── quickbooks/
 │       │   ├── connect/route.ts ← OAuth initiation
@@ -561,6 +562,25 @@ invoices (
 -- RLS: select for owner/lead/accountant; insert for owner/lead; update for
 -- owner/lead/accountant (the manual "Refresh now" status sync). The cron sync
 -- (app/api/cron/sync-invoice-status) writes via the service client, bypassing RLS.
+
+-- Append-only audit trail behind /management/audit. Written ONLY by the
+-- audit_row_change() AFTER trigger (migration 20260930120000_audit_log.sql), which
+-- is attached to every table the app writes to — so offline-queue replays, Server
+-- Actions and service-client writes are all captured without app code.
+audit_log (
+  id bigint PK (identity),
+  occurred_at timestamptz,              -- server time of the write (a queued offline
+                                        -- write is stamped when it syncs, not when tapped)
+  actor_employee_id uuid FK → employees, -- null = 'System' (cron / service client)
+  actor_label text NOT NULL,            -- name snapshot
+  action text NOT NULL,                 -- e.g. 'visit.completed'; labels in lib/audit/actions.ts
+  entity_table text, entity_id uuid, entity_label text,
+  changes jsonb                         -- {column: [old, new]} on UPDATE only
+)
+-- RLS: SELECT owner/lead; no write policies. Anon writes (public forms) and
+-- noise (onboarding_progress, token refresh, QBO sync bookkeeping, completed-by
+-- visit_crew churn) are deliberately not logged. The trigger swallows its own
+-- errors (WARNING) so logging can never block a write.
 ```
 
 ---
@@ -642,6 +662,9 @@ account name and property address.
   `enforce_owner_only_archive` BEFORE UPDATE trigger on both tables, not by RLS (RLS can't
   gate one column). `is_archived` is also in the `enforce_accountant_account_columns` guard
   list — **any new `accounts` column must be added there or accountants can write it.**
+- **Audit trail:** a new table the app writes to must get the `audit_<table>` trigger
+  (`audit_row_change()`) and a `CASE` branch + labels in `lib/audit/actions.ts`, or its
+  changes never reach the Activity log.
 - **Where to filter:** *enumeration* points filter (`.eq('is_archived', false)`) — account
   list & detail, ⌘K palette, routes page, unrouted counts, schedule grid, crew week schedule,
   contract-billing overview, reports, and the dashboard (current week + in-progress, which
