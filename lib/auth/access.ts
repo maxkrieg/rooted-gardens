@@ -27,6 +27,7 @@ const ROUTE_ACCESS: Array<{ prefix: string; roles: readonly EmployeeRole[] }> = 
   // Desk routes — unchanged from the old proxy sub-route gates.
   { prefix: '/management/team', roles: ['owner'] },
   { prefix: '/management/leads', roles: ['owner', 'lead'] },
+  { prefix: '/management/audit', roles: ['owner', 'lead'] },
   { prefix: '/management', roles: ['owner', 'lead', 'accountant'] },
 ]
 
