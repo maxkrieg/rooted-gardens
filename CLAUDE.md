@@ -135,6 +135,9 @@ rooted-gardens/
 │   │   │   └── routes/page.tsx      ← route groups + their defaults
 │   │   └── stop/[visitId]/      ← one stop: log completion, start/stop, photos.
 │   │       └── page.tsx             Outside (padded) — it owns its own chrome.
+│   ├── admin/
+│   │   └── impersonate/         ← super-admin console: sign in as any employee (env allowlist,
+│   │                              outside AppShell; see "Super admin" under Auth & Roles)
 │   ├── management/              ← THE DESK ROUTES — server-first, same AppShell
 │   │   ├── layout.tsx
 │   │   ├── billing/page.tsx     ← invoice queue (the one laptop-first screen)
@@ -578,8 +581,13 @@ audit_log (
   actor_label text NOT NULL,            -- name snapshot
   action text NOT NULL,                 -- e.g. 'visit.completed'; labels in lib/audit/actions.ts
   entity_table text, entity_id uuid, entity_label text,
-  changes jsonb                         -- {column: [old, new]} on UPDATE only
+  changes jsonb,                        -- {column: [old, new]} on UPDATE only
+  impersonated_by text                  -- super admin's email when they made the change while
+                                        -- signed in as the actor (see Auth & Roles)
 )
+-- impersonation_sessions (service-client only, no policies) maps an impersonated auth
+-- session_id to the super admin; the trigger reads it. Deliberately not itself audited —
+-- start/stop are logged as admin.impersonation_* rows by app/admin/impersonate/actions.ts.
 -- RLS: SELECT owner/lead; no write policies. Anon writes (public forms) and
 -- noise (onboarding_progress, token refresh, QBO sync bookkeeping, completed-by
 -- visit_crew churn) are deliberately not logged. The trigger swallows its own
@@ -598,6 +606,14 @@ Supabase Auth with **magic link** (email only — no passwords).
 | `lead` | Same as owner minus Team and archiving |
 | `crew` | `/app/schedule` and `/app/stop/*` only — see the week, log their own work |
 | `accountant` | Billing and reports; read-only on schedule, accounts and routes |
+
+**Super admin (the developer) is not a role.** `SUPER_ADMIN_USER_IDS` (auth user ids,
+`lib/auth/super-admin.ts`) gates `/admin/*` in `proxy.ts`, outside `ROUTE_ACCESS`. Its one
+screen, `/admin/impersonate`, signs you in as any employee with a *real* session for them, so
+RLS and the audit trail treat every action as theirs; `audit_log.impersonated_by` (via
+`impersonation_sessions`) records who was really there, shown as "via …" in the Activity log.
+While impersonating, onboarding stays quiet and a non-dismissable banner offers Stop. Details
+in "Super-admin impersonation" in `docs/DEPLOYMENT.md`.
 
 **One allowlist drives both the redirect gate and the nav** — `ROUTE_ACCESS` in
 `lib/auth/access.ts`, imported by `proxy.ts` (Edge, so that module must stay dependency-free)
@@ -1104,6 +1120,10 @@ NEXT_PUBLIC_SENTRY_DSN=         # unset = Sentry off (the default for local dev)
 SENTRY_AUTH_TOKEN=              # build-only: source-map upload. Unset = no maps generated
 SENTRY_ORG=
 SENTRY_PROJECT=
+
+# Super-admin impersonation (/admin/impersonate) — see docs/DEPLOYMENT.md
+SUPER_ADMIN_USER_IDS=           # comma-separated auth user ids; unset = no super admin
+IMPERSONATION_SECRET=           # openssl rand -hex 32; encrypts the parked admin session
 
 # App
 NEXT_PUBLIC_APP_URL=            # https://yourapp.vercel.app

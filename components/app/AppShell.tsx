@@ -7,6 +7,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import { CircleHelp, Leaf, LogOut, MoreHorizontal, Search, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { OfflineBanner } from '@/components/crew/OfflineBanner'
+import { ImpersonationBanner } from '@/components/admin/ImpersonationBanner'
+import { stopImpersonation } from '@/app/admin/impersonate/actions'
+import { finishIdentitySwitch, queueBlocksSwitch } from '@/components/admin/identity-switch'
 import { InstallPrompt } from '@/components/crew/InstallPrompt'
 import { CommandPalette } from '@/components/management/CommandPalette'
 import { MoreSheet } from '@/components/app/MoreSheet'
@@ -71,7 +74,7 @@ function AppShellInner({
   const pathname = usePathname()
   const router = useRouter()
   const queryClient = useQueryClient()
-  const { role, employeeId, can } = useRole()
+  const { role, employeeId, can, impersonating } = useRole()
   const { openHelp, dueNewsCount } = useOnboarding()
   const { data: employee, isError: employeeError } = useCurrentEmployee()
   const [moreOpen, setMoreOpen] = useState(false)
@@ -151,6 +154,21 @@ function AppShellInner({
   }, [can.seeLeads, router, queryClient])
 
   async function handleSignOut() {
+    // Signing out of someone else's session hands back your own, like the banner's Stop.
+    if (impersonating) {
+      const blocked = await queueBlocksSwitch()
+      if (blocked) {
+        toast.error(blocked)
+        return
+      }
+      const result = await stopImpersonation().catch(() => null)
+      if (!result || result.error !== undefined) {
+        toast.error(result?.error ?? 'Signing out needs a connection.')
+        return
+      }
+      await finishIdentitySwitch(queryClient, result.home)
+      return
+    }
     const supabase = createClient()
     await supabase.auth.signOut()
     // Clear the persisted cache first, or the next person on this phone inherits the role and data.
@@ -235,6 +253,7 @@ function AppShellInner({
           'pb-[calc(3.5rem+0.5rem+env(safe-area-inset-bottom,0px))] lg:pb-0',
         )}
       >
+        <ImpersonationBanner />
         <OfflineBanner />
         <InstallPrompt />
         <TourOffer />

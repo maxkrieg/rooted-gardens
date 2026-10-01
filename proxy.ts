@@ -5,6 +5,7 @@ import { formatRoleCookie, parseRoleCookie } from '@/lib/utils/role-cookie'
 import { PUBLIC_ROUTES } from '@/lib/content/routes'
 import { isNetworkError } from '@/lib/errors'
 import { ROLE_HOME, canAccessRoute, isProtectedRoute } from '@/lib/auth/access'
+import { isSuperAdmin } from '@/lib/auth/super-admin'
 import type { EmployeeRole } from '@/types/app'
 
 const ROLE_COOKIE = 'rg-role'
@@ -51,6 +52,24 @@ export async function proxy(request: NextRequest) {
   )
 
   const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+  // The super-admin console. Gated by the env allowlist, not ROUTE_ACCESS: it isn't a role,
+  // and the super admin may have no employee row for the role lookup below to find.
+  if (pathname === '/admin' || pathname.startsWith('/admin/')) {
+    if (!user) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      url.search = ''
+      return NextResponse.redirect(url)
+    }
+    if (!isSuperAdmin(user.id)) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/'
+      url.search = ''
+      return NextResponse.redirect(url)
+    }
+    return supabaseResponse
+  }
 
   const isProtected = isProtectedRoute(pathname)
   // Exempt ?error=, the no-role dead end, or the redirect loop returns.
@@ -110,7 +129,14 @@ export async function proxy(request: NextRequest) {
   }
 
   // No employee row for this user: a dead end, since any redirect into the app would loop.
+  // Except the super admin, who needs no employee row: their home is the admin console.
   if (user && !role && (isProtected || isLoginWithSession)) {
+    if (isSuperAdmin(user.id)) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/admin/impersonate'
+      url.search = ''
+      return NextResponse.redirect(url)
+    }
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     url.search = '?error=no-employee-record'
