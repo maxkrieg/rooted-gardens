@@ -1,5 +1,6 @@
 'use client'
 
+import * as Sentry from '@sentry/nextjs'
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { ErrorState } from '@/components/states/ErrorState'
 
@@ -27,7 +28,12 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error(`[ErrorBoundary${this.props.context ? ` ${this.props.context}` : ''}]`, error, info.componentStack)
+    const label = `[ErrorBoundary${this.props.context ? ` ${this.props.context}` : ''}]`
+    console.error(label, error, info.componentStack)
+    Sentry.captureException(error, {
+      tags: { context: label },
+      contexts: { react: { componentStack: info.componentStack ?? '' } },
+    })
   }
 
   reset = () => this.setState({ error: null })

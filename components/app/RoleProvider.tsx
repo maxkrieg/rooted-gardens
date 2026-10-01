@@ -1,6 +1,7 @@
 'use client'
 
-import { createContext, useContext, useMemo } from 'react'
+import * as Sentry from '@sentry/nextjs'
+import { createContext, useContext, useEffect, useMemo } from 'react'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { capabilitiesFor, type Capabilities } from '@/lib/auth/access'
 import type { Employee, EmployeeRole } from '@/types/app'
@@ -46,6 +47,12 @@ export function RoleProvider({
       isReconciling: !isSuccess || stale,
     }
   }, [data, userId, initialRole, isSuccess])
+
+  // Who hit an error, for Sentry: the employee id and role only — never name, email or phone.
+  useEffect(() => {
+    Sentry.setUser(value.employeeId ? { id: value.employeeId } : null)
+    Sentry.setTag('role', value.role ?? 'unknown')
+  }, [value.employeeId, value.role])
 
   return <RoleContext.Provider value={value}>{children}</RoleContext.Provider>
 }

@@ -140,8 +140,9 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Skip all of _next/, the service worker and the manifest: none of them should pay a getUser()
-    // round-trip (it fed a dev-server livelock), and the worker must never redirect to /login.
-    '/((?!_next/|favicon.ico|serwist/|manifest[\\w-]*\\.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // Skip all of _next/, the service worker, the manifest and the Sentry tunnel: none of them should
+    // pay a getUser() round-trip (it fed a dev-server livelock), and the worker must never redirect
+    // to /login.
+    '/((?!_next/|favicon.ico|serwist/|monitoring/?$|manifest[\\w-]*\\.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

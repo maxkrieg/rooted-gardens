@@ -1,5 +1,6 @@
 import type { NextConfig } from 'next'
 import { withSerwist } from '@serwist/turbopack'
+import { withSentryConfig } from '@sentry/nextjs/config'
 
 // next/image for the public `site-media` bucket, derived from the Supabase URL when set.
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -54,4 +55,18 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default withSerwist(nextConfig)
+export default withSentryConfig(withSerwist(nextConfig), {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: !process.env.CI,
+  // A fixed path (not `true`) so proxy.ts's matcher can exclude it; ad blockers on crew phones
+  // drop requests to sentry.io. Must stay outside /app and /management, which the proxy gates.
+  tunnelRoute: '/monitoring',
+  sourcemaps: {
+    // No token, no upload — and the SDK only deletes browser maps after an upload, so don't
+    // generate them at all rather than serve them publicly.
+    disable: !process.env.SENTRY_AUTH_TOKEN,
+  },
+  widenClientFileUpload: true,
+})

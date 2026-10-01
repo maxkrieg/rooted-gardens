@@ -4,6 +4,7 @@ import { qboPromise } from '@/lib/quickbooks/client'
 import type { Database } from '@/types/database'
 import type { Invoice, InvoiceStatus } from '@/types/app'
 import { describeQboError } from '@/lib/quickbooks/errors'
+import { reportError } from '@/lib/observability/report'
 
 // node-quickbooks uses `export =`, so the Invoice fields we read are declared locally.
 interface QboInvoiceDetail {
@@ -69,6 +70,7 @@ export async function syncInvoiceStatus(
     console.error(
       `[syncInvoiceStatus] getInvoice ${row.qbo_invoice_id} — ${describeQboError(err)}`,
     )
+    reportError(err, '[syncInvoiceStatus] getInvoice', { message: describeQboError(err) })
     // Stamp last_synced_at even on failure so a bad id isn't retried every tick.
     await supabase
       .from('invoices')
@@ -100,6 +102,7 @@ export async function syncInvoiceStatus(
 
   if (error) {
     console.error('[syncInvoiceStatus] update', row.id, error)
+    reportError(error, '[syncInvoiceStatus] update')
     return { error: 'Could not record invoice status locally' }
   }
 
@@ -128,6 +131,7 @@ export async function syncPendingInvoices(
 
   if (error || !data) {
     console.error('[syncPendingInvoices] select', error)
+    if (error) reportError(error, '[syncPendingInvoices] select')
     return { processed: 0, errors: 0 }
   }
 

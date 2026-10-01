@@ -1,6 +1,7 @@
 import { getDB, type QueuedMutation } from './idb'
 import { createClient } from '@/lib/supabase/client'
-import { toUserMessage } from '@/lib/errors'
+import { shouldReport, userMessageFor } from '@/lib/errors'
+import { reportError } from '@/lib/observability/report'
 import type { PhotoType } from '@/types/app'
 
 // Payload types
@@ -235,9 +236,17 @@ async function recordFailure(mutation: QueuedMutation, err: unknown): Promise<bo
     ...mutation,
     attempts,
     status: parked ? 'failed' : 'pending',
-    lastError: toUserMessage(err, 'It could not be saved.', `[mutation-queue:${mutation.type}]`),
+    // Not toUserMessage: that reports every attempt. Only a parked write goes to Sentry.
+    lastError: userMessageFor(err, 'It could not be saved.'),
   })
   notifyQueueChanged()
+  // Parked = field work that never reached the database. The one queue failure worth an alert;
+  // the payload (notes, addresses) stays on the phone.
+  if (parked && shouldReport(err)) {
+    reportError(err, '[mutation-queue] parked', {
+      tags: { mutation_type: mutation.type, attempts },
+    })
+  }
   return parked
 }
 

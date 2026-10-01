@@ -110,6 +110,8 @@ rooted-gardens/
 │                                  describes the result. Read it for the reasoning behind
 │                                  /app/*, the generated week, and route defaults.
 ├── proxy.ts                     ← root request proxy (Next 16; auth + role gating, formerly middleware.ts)
+├── instrumentation.ts           ← Sentry server/edge init + onRequestError
+├── instrumentation-client.ts    ← Sentry browser init (offline transport)
 ├── app/
 │   ├── layout.tsx               ← root layout (fonts, providers)
 │   ├── (auth)/
@@ -166,6 +168,7 @@ rooted-gardens/
 │   ├── auth/
 │   │   └── access.ts            ← ROUTE_ACCESS + capabilities; imported by proxy.ts,
 │   │                              so it must stay dependency-free (Edge runtime)
+│   ├── observability/           ← Sentry: shared options + scrubbing, reportError()
 │   ├── offline/                 ← the offline queue + caches (was lib/crew/)
 │   │   ├── mutation-queue.ts
 │   │   ├── idb.ts
@@ -1051,6 +1054,11 @@ phone and in the sidebar on desktop.
   you're pointed at before `db push --linked`.
 - Keep schedule-related logic in `lib/utils/schedule.ts`
 - Keep QBO sync logic in `lib/quickbooks/sync.ts` — never inline it
+- **Errors go to Sentry** (`@sentry/nextjs`). Route a caught error through `toUserMessage`
+  (reports it) or `reportError` (`lib/observability/report.ts`), not a bare `console.error`.
+  Never pass customer data in a message or tag, and use `message:` when the raw error might
+  carry some (QBO faults: `describeQboError`). Retrying code reports once, when it gives up
+  (see `recordFailure` in the offline queue). Scrubbing lives in `lib/observability/sentry-options.ts`.
 - **Check trio (+1):** `npm run build` · `npm run typecheck` · `npm run lint` ·
   `npm run check:tours` (see Onboarding above) — use `npm run typecheck` (not `npx tsc --noEmit`) for type checking. `app/sw.ts` is excluded from the main typecheck (webworker lib) — run `npm run typecheck:sw` when touching it; `npm run build` also fails if it's broken, since `createSerwistRoute` compiles it at build time.
 - **Migrations before 2026-08-07 are squashed.** `supabase/migrations/` starts at
@@ -1090,6 +1098,12 @@ CRON_SECRET=                    # Vercel Cron sends this as `Authorization: Bear
 # TWILIO_ACCOUNT_SID=
 # TWILIO_AUTH_TOKEN=
 # TWILIO_MESSAGING_SERVICE_SID= # use a Messaging Service, not a raw number
+
+# Sentry (error monitoring — see "Error monitoring (Sentry)" in docs/DEPLOYMENT.md)
+NEXT_PUBLIC_SENTRY_DSN=         # unset = Sentry off (the default for local dev)
+SENTRY_AUTH_TOKEN=              # build-only: source-map upload. Unset = no maps generated
+SENTRY_ORG=
+SENTRY_PROJECT=
 
 # App
 NEXT_PUBLIC_APP_URL=            # https://yourapp.vercel.app
