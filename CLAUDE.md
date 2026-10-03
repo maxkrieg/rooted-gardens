@@ -109,6 +109,8 @@ rooted-gardens/
 ├── REDESIGN.md                  ← the field-first redesign, R1–R5. BUILT — this file
 │                                  describes the result. Read it for the reasoning behind
 │                                  /app/*, the generated week, and route defaults.
+├── SCHEDULE_REDESIGN.md         ← the schedule as a dispatch board, S0–S5. PLANNED — one
+│                                  Claude Code session per phase; check its status block.
 ├── proxy.ts                     ← root request proxy (Next 16; auth + role gating, formerly middleware.ts)
 ├── instrumentation.ts           ← Sentry server/edge init + onRequestError
 ├── instrumentation-client.ts    ← Sentry browser init (offline transport)
