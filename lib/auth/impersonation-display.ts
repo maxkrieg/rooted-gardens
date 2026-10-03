@@ -15,8 +15,10 @@ export interface ImpersonationDisplay {
   live: boolean
 }
 
+// Plain JSON: cookies().set URL-encodes the value itself, and encoding here too meant the
+// banner's single decode never parsed.
 export function formatImpersonationDisplay(display: ImpersonationDisplay): string {
-  return encodeURIComponent(JSON.stringify(display))
+  return JSON.stringify(display)
 }
 
 export function parseImpersonationDisplay(
