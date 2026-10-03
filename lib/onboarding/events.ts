@@ -11,6 +11,8 @@ export type TourEvent =
   | 'schedule.generateOpened'
   | 'schedule.generateClosed'
   | 'schedule.routeMenuOpened'
+  | 'schedule.routeOpened'
+  | 'schedule.routeClosed'
   | 'routes.groupMenuOpened'
   | 'accounts.accountOpened'
   // Real work done — complete checklist tasks.

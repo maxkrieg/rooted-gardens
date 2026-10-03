@@ -244,6 +244,10 @@ export interface RouteGroupStats {
   vehicles: string[]
   /** Any visit in the group currently on site. */
   onSite: boolean
+  /** Properties with no visit this week. */
+  unscheduled: number
+  /** Scheduled visits nobody is on yet — the week overview's "N without crew". */
+  withoutCrew: number
 }
 
 /** One route group's week at a glance, from the same resolved visits the rows render. */
@@ -255,13 +259,20 @@ export function routeGroupStats(
   const vehicleNames = new Set<string>()
   let done = 0
   let onSite = false
+  let unscheduled = 0
+  let withoutCrew = 0
 
   for (const visit of visits) {
-    if (!visit) continue
+    if (!visit) {
+      unscheduled += 1
+      continue
+    }
     // Skipped counts as settled: the decision is made and the week has moved on.
     if (visit.status === 'completed' || visit.status === 'skipped') done += 1
     if (isVisitInProgress(visit)) onSite = true
-    for (const emp of displayCrewFor(visit)) crewById.set(emp.id, emp)
+    const crew = displayCrewFor(visit)
+    if (visit.status === 'scheduled' && crew.length === 0) withoutCrew += 1
+    for (const emp of crew) crewById.set(emp.id, emp)
     const vehicleName = vehicles.find((v) => v.id === visit.vehicle_id)?.name
     if (vehicleName) vehicleNames.add(vehicleName)
   }
@@ -272,5 +283,7 @@ export function routeGroupStats(
     crew: [...crewById.values()],
     vehicles: [...vehicleNames],
     onSite,
+    unscheduled,
+    withoutCrew,
   }
 }

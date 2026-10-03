@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState, useRef } from 'react'
 import { addWeeks, format } from 'date-fns'
 import { getWeekStart, parseWeekParam } from '@/lib/utils/schedule'
 import {
@@ -19,6 +19,7 @@ import { useCan } from '@/components/app/RoleProvider'
 import {
   DEFAULT_SCHEDULE_SORT,
   SCHEDULE_SORT_KEY,
+  UNGROUPED_SORT_KEY,
   parseScheduleSortState,
   setAllSortMode,
   setGroupSortMode,
@@ -28,6 +29,7 @@ import {
 import { ScheduleSortToggle } from '@/components/management/ScheduleSortToggle'
 import { ScheduleGrid } from '@/components/management/ScheduleGrid'
 import { ScheduleListMobile } from '@/components/management/ScheduleListMobile'
+import { ScheduleWeekOverview } from '@/components/management/ScheduleWeekOverview'
 import { ScheduleNav } from '@/components/management/ScheduleNav'
 import { Button } from '@/components/ui/button'
 import { ScheduleFilterBar } from '@/components/management/ScheduleFilterBar'
@@ -40,7 +42,7 @@ import { ScheduleRealtime } from '@/components/management/ScheduleRealtime'
 import { DeepLinkedVisitSheet } from '@/components/management/DeepLinkedVisitSheet'
 import { CachedNotice } from '@/components/states/CachedNotice'
 import { ErrorState } from '@/components/states/ErrorState'
-import type { Account } from '@/types/app'
+import type { Account, ScheduleWeek } from '@/types/app'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { emitTourEvent } from '@/lib/onboarding/events'
@@ -52,6 +54,8 @@ interface ScheduleViewProps {
   /** `?view=` when the URL names one — the old /app/dashboard redirect does.
    *  null means "no instruction", and the stored preference decides. */
   initialViewMode: ScheduleViewMode | null
+  /** `?route=` — opens that route's drill-in (a route group id, or UNGROUPED_SORT_KEY). */
+  initialRouteId: string | null
 }
 
 const VIEW_MODE_KEY = 'rg-schedule-view'
@@ -62,6 +66,7 @@ export function ScheduleView({
   initialFilters,
   initialVisitId,
   initialViewMode,
+  initialRouteId,
 }: ScheduleViewProps) {
   const [windowStart, setWindowStart] = useState(initialWeek)
   const [filters, setFilters] = useState<ScheduleFilterValues>(initialFilters)
@@ -73,9 +78,19 @@ export function ScheduleView({
   const [filterSheetOpen, setFilterSheetOpen] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
   const [generateOpen, setGenerateOpen] = useState(false)
-  const [viewOverride, setViewOverride] = useState<ScheduleViewMode | null>(null)
+  // A `?route=` link backs out to the Week overview, not to a stored Today.
+  const [viewOverride, setViewOverride] = useState<ScheduleViewMode | null>(
+    initialRouteId ? 'week' : null,
+  )
   const [sortOverride, setSortOverride] = useState<ScheduleSortState | null>(null)
+  // The phone's route drill-in. Crew don't get one: their week is already a short flat list.
+  const [route, setRoute] = useState<string | null>(initialRouteId)
   const { editSchedule: canEdit, seeDashboard } = useCan()
+
+  const weekStarts = useMemo(() => {
+    const base = parseWeekParam(windowStart)
+    return Array.from({ length: weekCount }, (_, n) => format(addWeeks(base, n), 'yyyy-MM-dd'))
+  }, [windowStart, weekCount])
 
   // Resolved, not stored: localStorage doesn't exist on the server. Precedence: tap → ?view= →
   // last used → Week.
@@ -89,9 +104,15 @@ export function ScheduleView({
     }
   }, [hydrated])
 
-  // Crew get no Today view: it carries company-wide stats.
+  const { weeks, isLoading, isError, isStale, hasData } = useManagementSchedule(weekStarts)
+
+  // Unknown until the week loads; then a route that no longer exists falls back to the overview.
+  const activeRoute =
+    seeDashboard && route && (!weeks[0] || routeExists(weeks[0], route)) ? route : null
+
+  // Crew get no Today view: it carries company-wide stats. A route is always a Week thing.
   const requested = viewOverride ?? initialViewMode ?? storedViewMode ?? 'week'
-  const viewMode: ScheduleViewMode = seeDashboard ? requested : 'week'
+  const viewMode: ScheduleViewMode = seeDashboard && !activeRoute ? requested : 'week'
 
   function changeViewMode(next: ScheduleViewMode) {
     setViewOverride(next)
@@ -125,15 +146,11 @@ export function ScheduleView({
   }
 
   const changeAllSort = (mode: ScheduleSortMode) => persistSort(setAllSortMode(mode))
+  // The phone has one switch now, in the route view; per-route overrides stay stored, unread.
+  const phoneSort = setAllSortMode(sortState.all)
   const changeGroupSort = (groupKey: string, mode: ScheduleSortMode) =>
     persistSort(setGroupSortMode(sortState, groupKey, mode))
 
-  const weekStarts = useMemo(() => {
-    const base = parseWeekParam(windowStart)
-    return Array.from({ length: weekCount }, (_, n) => format(addWeeks(base, n), 'yyyy-MM-dd'))
-  }, [windowStart, weekCount])
-
-  const { weeks, isLoading, isError, isStale, hasData } = useManagementSchedule(weekStarts)
   const prefetchWeeks = usePrefetchWeeks()
   const { data: employees = [] } = useActiveEmployees()
   const { data: vehicles = [] } = useActiveVehicles()
@@ -150,9 +167,61 @@ export function ScheduleView({
   // Shareable URL without a router navigation — the round-trip is what breaks
   // offline. Same reasoning as syncVisitUrlParam and the crew schedule page.
   useEffect(() => {
-    const params = scheduleFilterParams(filters, windowStart)
-    window.history.replaceState(null, '', `/app/schedule?${params.toString()}`)
-  }, [filters, windowStart])
+    window.history.replaceState(null, '', scheduleUrl(filters, windowStart, activeRoute))
+  }, [filters, windowStart, activeRoute])
+
+  // Entering a route pushes a history entry, so Back (button, browser or OS gesture) pops to
+  // the overview. A `?route=` deep link gets an overview entry slipped in underneath, once.
+  const pushedRoute = useRef(false)
+  const deepLinkSettled = useRef(false)
+  useEffect(() => {
+    if (deepLinkSettled.current || !weeks[0]) return
+    deepLinkSettled.current = true
+    if (!activeRoute) return
+    window.history.replaceState(null, '', scheduleUrl(filters, windowStart, null))
+    window.history.pushState(null, '', scheduleUrl(filters, windowStart, activeRoute))
+    pushedRoute.current = true
+  }, [weeks, activeRoute, filters, windowStart])
+
+  useEffect(() => {
+    function onPopState() {
+      const next = new URL(window.location.href).searchParams.get('route')
+      pushedRoute.current = Boolean(next)
+      setSelectMode(false)
+      setRoute(next)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
+  const overviewScroll = useRef(0)
+  function openRoute(routeKey: string) {
+    overviewScroll.current = window.scrollY
+    setSelectMode(false)
+    setRoute(routeKey)
+    window.history.pushState(null, '', scheduleUrl(filters, windowStart, routeKey))
+    pushedRoute.current = true
+    emitTourEvent('schedule.routeOpened')
+  }
+
+  function closeRoute() {
+    emitTourEvent('schedule.routeClosed')
+    if (pushedRoute.current) {
+      window.history.back()
+      return
+    }
+    setSelectMode(false)
+    setRoute(null)
+  }
+
+  // A route opens at its top; going back lands where the overview was left.
+  const lastRoute = useRef(activeRoute)
+  useLayoutEffect(() => {
+    if (lastRoute.current === activeRoute) return
+    const leaving = lastRoute.current !== null && activeRoute === null
+    lastRoute.current = activeRoute
+    window.scrollTo(0, leaving ? overviewScroll.current : 0)
+  }, [activeRoute])
 
   const filtered = hasActiveScheduleFilters(filters)
 
@@ -184,6 +253,11 @@ export function ScheduleView({
   // silently skip everything the filter hid.
   const plan = useWeekPlan(windowStart, weeks[0])
   const generateWeek = useGenerateWeek(windowStart)
+  // The same decisions GenerateWeekSheet previews, so the CTA and the preview agree.
+  const dueCount =
+    canEdit && !plan.isLoading && !plan.isError
+      ? plan.decisions.filter((d) => d.due).length
+      : null
 
   const gridWeeks = useMemo(() => filterScheduleWeeks(weeks, filters), [weeks, filters])
   const mobileWeek = useMemo(
@@ -211,26 +285,22 @@ export function ScheduleView({
     <div>
       {/* No <h1>: the nav tab already says Schedule, and on a phone that line
           cost more vertical space than anything else on the screen. */}
-      <ScheduleStickyBar>
-        <div className="lg:hidden">
-          <ScheduleHeaderMobile
-            weekStart={windowStart}
-            onWeekChange={goToWeek}
-            activeFilterCount={activeScheduleFilterCount(filters)}
-            onOpenFilters={() => setFilterSheetOpen(true)}
-            overflowActions={
-              canEdit
-                ? [
-                    { label: 'Generate week…', onClick: () => setGenerateOpen(true) },
-                    {
-                      label: selectMode ? 'Done selecting' : 'Select stops',
-                      onClick: () => setSelectMode((on) => !on),
-                    },
-                  ]
-                : []
-            }
-          />
-        </div>
+      {/* On the route view the phone header steps aside: the route's own header sticks instead. */}
+      <ScheduleStickyBar collapsedOnPhone={Boolean(activeRoute)}>
+        {!activeRoute && (
+          <div className="lg:hidden">
+            <ScheduleHeaderMobile
+              weekStart={windowStart}
+              onWeekChange={goToWeek}
+              activeFilterCount={activeScheduleFilterCount(filters)}
+              onOpenFilters={() => setFilterSheetOpen(true)}
+              // Select stops moved to the route view: selection is route-shaped.
+              overflowActions={
+                canEdit ? [{ label: 'Generate week…', onClick: () => setGenerateOpen(true) }] : []
+              }
+            />
+          </div>
+        )}
         <div className="hidden flex-wrap items-center justify-between gap-x-3 gap-y-2 lg:flex">
           <ScheduleFilterBar
             filters={filters}
@@ -271,18 +341,24 @@ export function ScheduleView({
 
       {/* Under the sticky bar so it scrolls away; the header row has no room left. */}
       {(seeDashboard || viewMode !== 'today') && (
-        <div className="mb-2 flex items-center gap-2 lg:mb-3">
+        <div
+          className={cn(
+            'mb-2 flex items-center gap-2 lg:mb-3',
+            activeRoute && 'hidden lg:flex',
+          )}
+        >
           {seeDashboard && (
             <div className="max-w-xs flex-1">
               <ScheduleViewToggle value={viewMode} onChange={changeViewMode} />
             </div>
           )}
+          {/* Office roles sort from the route view on a phone; crew keep this one. */}
           {viewMode !== 'today' && (
             <ScheduleSortToggle
               mode={sortState.all}
               onChange={changeAllSort}
               scope="Every route"
-              className="ml-auto"
+              className={cn('ml-auto', seeDashboard && 'hidden lg:inline-flex')}
             />
           )}
         </div>
@@ -331,17 +407,31 @@ export function ScheduleView({
         </div>
         {/* -mx-4 cancels page padding so the phone list runs edge to edge. */}
         <div className="lg:hidden -mx-4">
-          <ScheduleListMobile
-            week={mobileWeek}
-            windowWeeks={weeks}
-            employees={employees}
-            vehicles={vehicles}
-            filtered={filtered}
-            selectMode={selectMode && !isWide}
-            onExitSelectMode={() => setSelectMode(false)}
-            sortState={sortState}
-            onGroupSortChange={changeGroupSort}
-          />
+          {seeDashboard && !activeRoute ? (
+            <ScheduleWeekOverview
+              week={mobileWeek}
+              vehicles={vehicles}
+              filtered={filtered}
+              dueCount={dueCount}
+              onGenerate={() => setGenerateOpen(true)}
+              onOpenRoute={openRoute}
+            />
+          ) : (
+            <ScheduleListMobile
+              week={mobileWeek}
+              windowWeeks={weeks}
+              employees={employees}
+              vehicles={vehicles}
+              filtered={filtered}
+              selectMode={selectMode && !isWide}
+              onExitSelectMode={() => setSelectMode(false)}
+              sortState={phoneSort}
+              onSortChange={changeAllSort}
+              routeGroupId={activeRoute ?? undefined}
+              onBack={activeRoute ? closeRoute : undefined}
+              onStartSelect={canEdit ? () => setSelectMode(true) : undefined}
+            />
+          )}
         </div>
         {/* Rendered once, outside both layouts — both are always mounted, so
             giving each the deep link opened two stacked sheets. */}
@@ -349,6 +439,18 @@ export function ScheduleView({
       </div>
     </div>
   )
+}
+
+function scheduleUrl(filters: ScheduleFilterValues, week: string, route: string | null): string {
+  const params = scheduleFilterParams(filters, week)
+  if (route) params.set('route', route)
+  return `/app/schedule?${params.toString()}`
+}
+
+/** Checked against the unfiltered week, so a filter can't make a real route look deleted. */
+function routeExists(week: ScheduleWeek, route: string): boolean {
+  if (route === UNGROUPED_SORT_KEY) return week.ungrouped.length > 0
+  return week.routeGroups.some((g) => g.routeGroup.id === route)
 }
 
 /** One entry per account, sorted by name — the account filter's option list. */
@@ -430,7 +532,14 @@ function ScheduleViewToggle({
  * Sticks the filters and week nav to the top, publishing its height as --schedule-sticky-h for
  * ScheduleGrid's header. On a phone it re-applies page padding itself so it spans edge to edge.
  */
-function ScheduleStickyBar({ children }: { children: React.ReactNode }) {
+function ScheduleStickyBar({
+  children,
+  collapsedOnPhone = false,
+}: {
+  children: React.ReactNode
+  /** Drop the phone padding when there's nothing in the bar below lg (the route view). */
+  collapsedOnPhone?: boolean
+}) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -451,7 +560,10 @@ function ScheduleStickyBar({ children }: { children: React.ReactNode }) {
   return (
     <div
       ref={ref}
-      className="sticky top-0 z-40 -mx-4 bg-background px-4 pb-2 mb-2 lg:mx-0 lg:px-0 lg:pb-3 lg:mb-3"
+      className={cn(
+        'sticky top-0 z-40 -mx-4 bg-background px-4 pb-2 mb-2 lg:mx-0 lg:px-0 lg:pb-3 lg:mb-3',
+        collapsedOnPhone && 'max-lg:p-0 max-lg:m-0',
+      )}
     >
       {children}
     </div>

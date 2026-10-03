@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { MoreHorizontal, Truck } from 'lucide-react'
+import { ChevronLeft, MoreHorizontal, Truck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { emitTourEvent } from '@/lib/onboarding/events'
@@ -23,8 +23,6 @@ interface RouteGroupBandProps {
   hasNote: boolean
   /** The week's note, when there is one. Absent notes render nothing. */
   noteSlot?: React.ReactNode
-  /** The route's own sort switch, on the plan line: the title row has no width to spare. */
-  sortSlot?: React.ReactNode
 }
 
 /**
@@ -42,18 +40,13 @@ export function RouteGroupBand({
   onEditNote,
   hasNote,
   noteSlot,
-  sortSlot,
 }: RouteGroupBandProps) {
   const { done, total, crew, vehicles, onSite } = stats
-  const hasPlan = days.length > 0 || crew.length > 0 || vehicles.length > 0
 
   return (
     // Same heading treatment as the desktop grid's route row: sage band, a
     // forest spine, and the name in Fraunces rather than a tracked caps label.
-    <div
-      data-tour="schedule.routeBand"
-      className="bg-accent text-accent-foreground shadow-[inset_3px_0_0_0_var(--primary)]"
-    >
+    <div className="bg-accent text-accent-foreground shadow-[inset_3px_0_0_0_var(--primary)]">
       <div className="flex items-center gap-2 pl-5 pr-4 pt-2.5">
         <span className="min-w-0 flex-1 truncate font-display text-[15px] font-semibold leading-tight text-foreground">
           {name}
@@ -78,21 +71,7 @@ export function RouteGroupBand({
         )}
       </div>
 
-      {/* The plan line renders whenever there's a plan or a sort switch to show (always, in
-         practice). */}
-      {(hasPlan || sortSlot) && (
-        <div className="flex items-center gap-2 pl-5 pr-4 pb-2 pt-1 text-[11px] text-accent-foreground">
-          {days.length > 0 && (
-            <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 font-semibold">
-              {formatDays(days)}
-            </span>
-          )}
-          <RouteCrewTruck crew={crew} vehicles={vehicles} />
-          {sortSlot && <span className="ml-auto -mr-1.5">{sortSlot}</span>}
-        </div>
-      )}
-
-      {!hasPlan && !sortSlot && <div className="pb-1.5" />}
+      <RoutePlanLine days={days} crew={crew} vehicles={vehicles} />
 
       {noteSlot}
 
@@ -103,7 +82,94 @@ export function RouteGroupBand({
   )
 }
 
+/**
+ * The route view's header: back to the week, the route's name and the week, and done/total, over
+ * the progress bar. One 48px row, so it can stick without breaking the ≤56px chrome rule.
+ */
+export function RouteViewHeader({
+  name,
+  weekLabel,
+  done,
+  total,
+  onSite,
+  onBack,
+  tone = 'route',
+}: {
+  name: string
+  weekLabel: string
+  done: number
+  total: number
+  onSite: boolean
+  onBack: () => void
+  /** 'unrouted' is the clay "Not on a route" bucket. */
+  tone?: 'route' | 'unrouted'
+}) {
+  const unrouted = tone === 'unrouted'
+  return (
+    // Sticky, so both tones must be opaque: the clay tint sits on a card-coloured base.
+    <div
+      className={cn(
+        unrouted
+          ? 'bg-card bg-linear-to-r from-[var(--clay)]/10 to-[var(--clay)]/10 text-[var(--clay)]'
+          : 'bg-accent text-accent-foreground shadow-[inset_3px_0_0_0_var(--primary)]',
+      )}
+    >
+      <div className="flex h-12 items-center gap-1 pr-4">
+        <button
+          type="button"
+          data-tour="schedule.routeBack"
+          onClick={onBack}
+          className="flex h-11 shrink-0 items-center gap-0.5 rounded-lg pl-2 pr-2.5 text-sm font-semibold transition-colors hover:bg-primary/10 active:bg-primary/15"
+          aria-label="Back to the week"
+        >
+          <ChevronLeft className="h-5 w-5" aria-hidden />
+          Week
+        </button>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-display text-[15px] font-semibold leading-tight text-foreground">
+            {name}
+          </span>
+          <span className="block truncate text-[11px] leading-tight opacity-80">{weekLabel}</span>
+        </span>
+        {onSite && <OnSiteDot />}
+        {!unrouted && <RouteDoneCount done={done} total={total} />}
+      </div>
+      {!unrouted && (
+        <RouteProgressBar done={done} total={total} name={name} className="bg-primary/15" />
+      )}
+    </div>
+  )
+}
+
 // ─── Pieces shared with the desktop grid's per-week route header cells ──────
+
+/** Days, crew and truck under a route's name. Keeps a little bottom space when there's no plan. */
+export function RoutePlanLine({
+  days,
+  crew,
+  vehicles,
+  trailing,
+}: {
+  days: string[]
+  crew: Employee[]
+  vehicles: string[]
+  /** Right-aligned control, e.g. the route view's sort switch. */
+  trailing?: React.ReactNode
+}) {
+  const hasPlan = days.length > 0 || crew.length > 0 || vehicles.length > 0
+  if (!hasPlan && !trailing) return <div className="pb-1.5" />
+  return (
+    <div className="flex items-center gap-2 pl-5 pr-4 pb-2 pt-1 text-[11px] text-accent-foreground">
+      {days.length > 0 && (
+        <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 font-semibold">
+          {formatDays(days)}
+        </span>
+      )}
+      <RouteCrewTruck crew={crew} vehicles={vehicles} />
+      {trailing && <span className="ml-auto -mr-1.5">{trailing}</span>}
+    </div>
+  )
+}
 
 export function OnSiteDot() {
   return (
@@ -114,7 +180,7 @@ export function OnSiteDot() {
   )
 }
 
-function RouteDoneCount({ done, total }: { done: number; total: number }) {
+export function RouteDoneCount({ done, total }: { done: number; total: number }) {
   return (
     <span
       className="flex shrink-0 items-baseline tabular-nums"

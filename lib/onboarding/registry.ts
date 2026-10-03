@@ -108,7 +108,7 @@ export const WELCOMES: Welcome[] = [
 export const TOURS: Tour[] = [
   {
     key: 'tour.schedule',
-    version: 1,
+    version: 2,
     title: 'Schedule',
     summary: 'Plan the week, open a stop, generate a week, change many stops at once.',
     roles: OFFICE,
@@ -141,11 +141,21 @@ export const TOURS: Tour[] = [
       {
         id: 'band',
         anchor: 'schedule.routeBand',
+        breakpoint: 'mobile',
+        title: 'One row per route',
+        body: 'Its days, crew, truck, how many stops, and this week’s note. Tap a route to open its stops.',
+        advanceOn: 'schedule.routeOpened',
+      },
+      {
+        id: 'band-desktop',
+        anchor: 'schedule.routeBand',
+        breakpoint: 'desktop',
         title: 'Each route has a header',
         body: 'Crew, truck and how many stops are done. Its ⋯ menu assigns the whole route, sets its defaults, or adds a note for the week.',
       },
       {
         id: 'open-stop',
+        requires: ['band', 'band-desktop'],
         anchor: 'schedule.stop',
         title: 'Open a stop',
         body: 'Tap any scheduled stop to see its details.',
@@ -173,11 +183,28 @@ export const TOURS: Tour[] = [
         advanceOn: 'schedule.visitClosed',
       },
       {
+        id: 'route-actions',
+        requires: ['band'],
+        anchor: 'schedule.routeActions',
+        breakpoint: 'mobile',
+        title: 'The whole route at once',
+        body: 'Crew and Truck set them for every stop this week. Note is the week’s note. ⋯ has the route’s defaults, and Select stops to change a few together.',
+      },
+      {
+        id: 'route-back',
+        requires: ['band'],
+        anchor: 'schedule.routeBack',
+        breakpoint: 'mobile',
+        title: 'Back to the week',
+        body: 'Tap Week to see every route again.',
+        advanceOn: 'schedule.routeClosed',
+      },
+      {
         id: 'actions-mobile',
         anchor: 'schedule.actions',
         breakpoint: 'mobile',
         title: 'Week actions live in ⋯',
-        body: 'Tap ⋯ to see what you can do with the whole week.',
+        body: 'Generating the week is in ⋯, and on a green button above the routes while stops are due. Tap ⋯.',
         advanceOn: 'schedule.menuOpened',
       },
       {
@@ -218,13 +245,6 @@ export const TOURS: Tour[] = [
         breakpoint: 'desktop',
         title: 'Change many stops at once',
         body: 'Select stops, then set crew or truck, or skip them, all together.',
-      },
-      {
-        id: 'select-mobile',
-        anchor: 'schedule.actions',
-        breakpoint: 'mobile',
-        title: 'Change many stops at once',
-        body: 'Select stops is in ⋯ too. Tick several, then set crew or truck, or skip them together.',
       },
       {
         id: 'filters',
@@ -416,7 +436,18 @@ export const TASKS: Task[] = [
 ]
 
 /** Newest last. See the upkeep note at the top of this file. */
-export const NEWS: NewsItem[] = []
+export const NEWS: NewsItem[] = [
+  {
+    key: 'news.scheduleRoutes',
+    roles: ['owner', 'lead', 'accountant'],
+    introduced: '2026-10-03',
+    title: 'The week is a list of routes',
+    body: 'On your phone, Week now shows one row per route: crew, truck, stops and the week’s note. Tap one for its stops. Generate week sits at the top while stops are due.',
+    parentTour: 'tour.schedule',
+    route: '/app/schedule',
+    anchor: 'schedule.routeBand',
+  },
+]
 
 export function forRole<T extends { roles: Roles }>(items: T[], role: EmployeeRole | null): T[] {
   return role ? items.filter((item) => item.roles.includes(role)) : []

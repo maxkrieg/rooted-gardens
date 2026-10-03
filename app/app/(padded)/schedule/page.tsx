@@ -17,6 +17,8 @@ export default async function SchedulePage({
     visit?: string
     /** 'today' | 'week'. Set by the retired /app/dashboard redirect. */
     view?: string
+    /** Opens one route's drill-in on the phone Week view. */
+    route?: string
   }>
 }) {
   const params = await searchParams
@@ -29,6 +31,7 @@ export default async function SchedulePage({
       initialViewMode={
         params.view === 'today' ? 'today' : params.view === 'week' ? 'week' : null
       }
+      initialRouteId={params.route ?? null}
     />
   )
 }

@@ -163,7 +163,9 @@ rooted-gardens/
 │   │   └── nav-items.ts         ← one nav array, access-filtered by lib/auth/access.ts
 │   ├── management/              ← schedule, accounts, routes, billing components
 │   │   ├── ScheduleGrid.tsx     ← the 4-week desktop grid (lg+ only)
-│   │   ├── ScheduleListMobile.tsx   ← the phone schedule (the screen that matters)
+│   │   ├── ScheduleWeekOverview.tsx ← phone Week for office roles: one row per route
+│   │   ├── ScheduleListMobile.tsx   ← the phone schedule (the screen that matters); one route
+│   │   │                              alone on the `?route=` drill-in, crew's flat list otherwise
 │   │   ├── RouteGroupBand.tsx       ← route header: crew, truck, progress, week note
 │   │   └── InvoiceQueue.tsx
 │   └── crew/                    ← field-work components (name predates the merge)

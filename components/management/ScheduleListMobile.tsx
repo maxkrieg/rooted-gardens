@@ -1,11 +1,20 @@
 'use client'
 
-import { FilePen, Receipt } from 'lucide-react'
+import { useState } from 'react'
+import { addDays, format, parseISO } from 'date-fns'
+import { ChevronLeft, FilePen, Flag, MoreHorizontal, Receipt, Truck, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useKeyboardOpen } from '@/hooks/use-keyboard-open'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
 import { ScheduleEmptyState } from '@/components/management/ScheduleEmptyState'
-import { RouteGroupBand } from '@/components/management/RouteGroupBand'
+import {
+  RouteGroupBand,
+  RoutePlanLine,
+  RouteViewHeader,
+} from '@/components/management/RouteGroupBand'
 import { ScheduleBulkControls } from '@/components/management/ScheduleBulkControls'
 import type { BulkTarget } from '@/hooks/useBulkScheduleActions'
 import { CheckIndicator } from '@/components/app/CheckIndicator'
@@ -19,7 +28,6 @@ import { groupRowsByAccount, routeGroupStats } from '@/lib/utils/schedule'
 import {
   DEFAULT_SCHEDULE_SORT,
   UNGROUPED_SORT_KEY,
-  sortModeForGroup,
   type ScheduleSortMode,
   type ScheduleSortState,
 } from '@/lib/utils/schedule-sort'
@@ -33,6 +41,7 @@ import {
 import type {
   Account,
   Employee,
+  RouteGroup,
   ScheduleWeek,
   SchedulePropertyRow,
   Vehicle,
@@ -53,10 +62,16 @@ interface ScheduleListMobileProps {
    *  the header's `⋯ → Select` can toggle it. */
   selectMode?: boolean
   onExitSelectMode?: () => void
-  /** Schedule-wide default plus per-group overrides. Owned by ScheduleView so
-   *  the top-of-page switch and the per-band switches share one state. */
+  /** Owned by ScheduleView. The route view's header carries the switch that changes it. */
   sortState?: ScheduleSortState
-  onGroupSortChange?: (groupKey: string, mode: ScheduleSortMode) => void
+  onSortChange?: (mode: ScheduleSortMode) => void
+  /** Render one route alone (a route group id, or UNGROUPED_SORT_KEY): the drill-in from the
+   *  week overview. Absent renders every route, which is crew's flat list. */
+  routeGroupId?: string
+  /** The route view's `‹ Week`. */
+  onBack?: () => void
+  /** Enter select mode from the route view's ⋯. */
+  onStartSelect?: () => void
 }
 
 export function ScheduleListMobile({
@@ -68,7 +83,10 @@ export function ScheduleListMobile({
   selectMode = false,
   onExitSelectMode,
   sortState = DEFAULT_SCHEDULE_SORT,
-  onGroupSortChange,
+  onSortChange,
+  routeGroupId,
+  onBack,
+  onStartSelect,
 }: ScheduleListMobileProps) {
   const {
     canEdit,
@@ -116,15 +134,43 @@ export function ScheduleListMobile({
     }
   }
 
-  if (!week || (week.routeGroups.length === 0 && week.ungrouped.length === 0)) {
-    return <ScheduleEmptyState filtered={filtered} />
+  const routeView = routeGroupId !== undefined
+  // The route view renders one bucket; everything below (select all, counts) follows it.
+  const groups = !week
+    ? []
+    : routeView
+      ? week.routeGroups.filter((g) => g.routeGroup.id === routeGroupId)
+      : week.routeGroups
+  const ungrouped =
+    !week || (routeView && routeGroupId !== UNGROUPED_SORT_KEY) ? [] : week.ungrouped
+
+  if (!week || (groups.length === 0 && ungrouped.length === 0)) {
+    return (
+      <>
+        {/* A filter can empty the open route; the header that carries Back isn't rendered then. */}
+        {routeView && onBack && (
+          <Button variant="ghost" className="mx-2 mb-2 h-11 gap-0.5 px-2" onClick={onBack}>
+            <ChevronLeft className="h-5 w-5" aria-hidden />
+            Week
+          </Button>
+        )}
+        <ScheduleEmptyState filtered={filtered} />
+      </>
+    )
   }
   const currentWeek = week
+  const weekStartDate = parseISO(currentWeek.weekStart)
+  const weekLabel = `${format(weekStartDate, 'MMM d')} – ${format(addDays(weekStartDate, 6), 'MMM d')}`
+  const sortToggle = onSortChange && (
+    <ScheduleSortToggle
+      size="compact"
+      scope="This route"
+      mode={sortState.all}
+      onChange={onSortChange}
+    />
+  )
 
-  const allRows = [
-    ...currentWeek.routeGroups.flatMap((g) => g.rows),
-    ...currentWeek.ungrouped,
-  ]
+  const allRows = [...groups.flatMap((g) => g.rows), ...ungrouped]
   const selectedTargets: BulkTarget[] = allRows
     .filter((row) => selected.has(row.property.id))
     .map((row) => ({ row, weekStart: currentWeek.weekStart }))
@@ -280,119 +326,162 @@ export function ScheduleListMobile({
     )
   }
 
+  function renderRows(groupKey: string, rows: SchedulePropertyRow[]) {
+    return groupRowsByAccount(orderRows(groupKey, rows)).map(({ account, rows: acctRows }, acctIdx) => {
+      if (acctRows.length === 1) {
+        return renderStopRow(account, acctRows[0], 'merged', acctIdx > 0)
+      }
+      return (
+        <div key={account.id}>
+          <AccountHeaderRow account={account} propertyCount={acctRows.length} showTopBorder={acctIdx > 0} />
+          {acctRows.map((row, rowIdx) => renderStopRow(account, row, 'nested', rowIdx > 0))}
+        </div>
+      )
+    })
+  }
+
+  function noteRibbon(routeGroup: RouteGroup) {
+    return (
+      <WeekNoteRibbon
+        note={weekNotes.find((n) => n.route_group_id === routeGroup.id)?.note ?? null}
+        canEdit={canEdit}
+        editing={noteEditGroupId === routeGroup.id}
+        onEditingChange={(open) => setNoteEditGroupId(open ? routeGroup.id : null)}
+        onSave={(note) => saveWeekNote(currentWeek.weekStart, routeGroup.id, note)}
+      />
+    )
+  }
+
+  const routeAllPicker = canEdit && (
+    <RoutePicker
+      routeGroups={reference?.routeGroups ?? []}
+      label={`Route all ${ungrouped.length}`}
+      className="h-8 border-[var(--clay)]/40 text-[var(--clay)]"
+      onSelect={(routeGroupId) => void routeAllUngrouped(ungrouped, routeGroupId)}
+    />
+  )
+
+  // Sticks under ScheduleView's header, which collapses to nothing on the route view.
+  const stickyTop = { top: 'var(--schedule-sticky-h, 0px)' }
+  const showActionBar = routeView && canEdit && !selectMode
+
   return (
     <>
       <div className="space-y-3">
-        {currentWeek.routeGroups.map(({ routeGroup, rows }) => (
-          <div
-            key={routeGroup.id}
-            /* Full-bleed on a phone (ScheduleView cancels the page padding), so
-               there are no side edges to round or shadow — just hairlines. */
-            className="border-y border-border bg-card"
-          >
-            {/* Sticks under the header (height from --schedule-sticky-h). The card must not clip
-               overflow. */}
-            <div className="sticky z-10" style={{ top: 'var(--schedule-sticky-h, 0px)' }}>
-              <RouteGroupBand
-                name={routeGroup.name}
-                sortSlot={
-                  onGroupSortChange && (
-                    <ScheduleSortToggle
-                      size="compact"
-                      scope={routeGroup.name}
-                      mode={sortModeForGroup(sortState, routeGroup.id)}
-                      onChange={(mode) => onGroupSortChange(routeGroup.id, mode)}
+        {groups.map(({ routeGroup, rows }) => {
+          const stats = statsFor(rows, currentWeek.weekStart)
+          return (
+            <div
+              key={routeGroup.id}
+              /* Full-bleed on a phone (ScheduleView cancels the page padding), so
+                 there are no side edges to round or shadow — just hairlines. */
+              className="border-y border-border bg-card"
+            >
+              {routeView && onBack ? (
+                <>
+                  <div className="sticky z-10" style={stickyTop}>
+                    <RouteViewHeader
+                      name={routeGroup.name}
+                      weekLabel={weekLabel}
+                      done={stats.done}
+                      total={stats.total}
+                      onSite={stats.onSite}
+                      onBack={onBack}
                     />
-                  )
-                }
-                days={routeGroup.default_days ?? []}
-                stats={statsFor(rows, currentWeek.weekStart)}
-                canEdit={canEdit}
-                onAssignRoute={() => {
-                  openAssign(routeGroup)
-                }}
-                onEditDefaults={() => setDefaultsGroup(routeGroup)}
-                onEditNote={() => setNoteEditGroupId(routeGroup.id)}
-                hasNote={weekNotes.some((n) => n.route_group_id === routeGroup.id)}
-                noteSlot={
-                  <WeekNoteRibbon
-                    note={
-                      weekNotes.find((n) => n.route_group_id === routeGroup.id)?.note ?? null
-                    }
-                    canEdit={canEdit}
-                    editing={noteEditGroupId === routeGroup.id}
-                    onEditingChange={(open) =>
-                      setNoteEditGroupId(open ? routeGroup.id : null)
-                    }
-                    onSave={(note) => saveWeekNote(currentWeek.weekStart, routeGroup.id, note)}
-                  />
-                }
-              />
-            </div>
-
-            {/* Properties, nested by account */}
-            <div className="overflow-hidden">
-              {groupRowsByAccount(orderRows(routeGroup.id, rows)).map(({ account, rows: acctRows }, acctIdx) => {
-                if (acctRows.length === 1) {
-                  return renderStopRow(account, acctRows[0], 'merged', acctIdx > 0)
-                }
-                return (
-                  <div key={account.id}>
-                    <AccountHeaderRow account={account} propertyCount={acctRows.length} showTopBorder={acctIdx > 0} />
-                    {acctRows.map((row, rowIdx) => renderStopRow(account, row, 'nested', rowIdx > 0))}
                   </div>
-                )
-              })}
-            </div>
-          </div>
-        ))}
-
-        {currentWeek.ungrouped.length > 0 && (
-          <div className="overflow-hidden border-y border-[var(--clay)]/30 bg-card">
-            {/* "Not on a route" — properties with no property_route_groups row.
-                These used to be silently dropped from the schedule entirely. */}
-            <div className="bg-[var(--clay)]/10 text-[var(--clay)] flex items-center justify-between px-4 py-2.5 border-b border-[var(--clay)]/30">
-              <span className="flex min-w-0 items-center gap-2">
-                <span className="truncate text-xs font-semibold uppercase tracking-widest">
-                  Not on a route · {currentWeek.ungrouped.length}
-                </span>
-                {onGroupSortChange && (
-                  <ScheduleSortToggle
-                    size="compact"
-                    scope="Stops with no route"
-                    mode={sortModeForGroup(sortState, UNGROUPED_SORT_KEY)}
-                    onChange={(mode) => onGroupSortChange(UNGROUPED_SORT_KEY, mode)}
+                  <div className="bg-accent text-accent-foreground shadow-[inset_3px_0_0_0_var(--primary)]">
+                    <RoutePlanLine
+                      days={routeGroup.default_days ?? []}
+                      crew={stats.crew}
+                      vehicles={stats.vehicles}
+                      trailing={sortToggle}
+                    />
+                    {noteRibbon(routeGroup)}
+                  </div>
+                </>
+              ) : (
+                // Sticks under the header (height from --schedule-sticky-h). The card must not
+                // clip overflow.
+                <div className="sticky z-10" style={stickyTop}>
+                  <RouteGroupBand
+                    name={routeGroup.name}
+                    days={routeGroup.default_days ?? []}
+                    stats={stats}
+                    canEdit={canEdit}
+                    onAssignRoute={() => openAssign(routeGroup)}
+                    onEditDefaults={() => setDefaultsGroup(routeGroup)}
+                    onEditNote={() => setNoteEditGroupId(routeGroup.id)}
+                    hasNote={weekNotes.some((n) => n.route_group_id === routeGroup.id)}
+                    noteSlot={noteRibbon(routeGroup)}
                   />
-                )}
-              </span>
-              {/* Was a link to /app/routes carrying no context — you arrived at
-                  a list of every route with no memory of which stop sent you. */}
-              {canEdit && (
-                <RoutePicker
-                  routeGroups={reference?.routeGroups ?? []}
-                  label={`Route all ${currentWeek.ungrouped.length}`}
-                  className="h-8 border-[var(--clay)]/40 text-[var(--clay)]"
-                  onSelect={(routeGroupId) =>
-                    void routeAllUngrouped(currentWeek.ungrouped, routeGroupId)
-                  }
+                </div>
+              )}
+
+              {/* Properties, nested by account */}
+              <div className="overflow-hidden">{renderRows(routeGroup.id, rows)}</div>
+
+              {showActionBar && (
+                <RouteActionBar
+                  hasNote={weekNotes.some((n) => n.route_group_id === routeGroup.id)}
+                  onAssign={() => openAssign(routeGroup)}
+                  onEditNote={() => {
+                    setNoteEditGroupId(routeGroup.id)
+                    // The editor opens in the header area; bring it into view.
+                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                  }}
+                  menuItems={[
+                    { label: 'Assign route…', onClick: () => openAssign(routeGroup) },
+                    { label: 'Route defaults…', onClick: () => setDefaultsGroup(routeGroup) },
+                    ...(onStartSelect ? [{ label: 'Select stops', onClick: onStartSelect }] : []),
+                  ]}
                 />
               )}
             </div>
-            <div>
-              {groupRowsByAccount(orderRows(UNGROUPED_SORT_KEY, currentWeek.ungrouped)).map(({ account, rows: acctRows }, acctIdx) => {
-                if (acctRows.length === 1) {
-                  return renderStopRow(account, acctRows[0], 'merged', acctIdx > 0)
-                }
-                return (
-                  <div key={account.id}>
-                    <AccountHeaderRow account={account} propertyCount={acctRows.length} showTopBorder={acctIdx > 0} />
-                    {acctRows.map((row, rowIdx) => renderStopRow(account, row, 'nested', rowIdx > 0))}
-                  </div>
-                )
-              })}
-            </div>
+          )
+        })}
+
+        {ungrouped.length > 0 && (
+          <div className="border-y border-[var(--clay)]/30 bg-card">
+            {/* "Not on a route" — properties with no property_route_groups row.
+                These used to be silently dropped from the schedule entirely. */}
+            {routeView && onBack ? (
+              <>
+                <div className="sticky z-10" style={stickyTop}>
+                  <RouteViewHeader
+                    name={`Not on a route · ${ungrouped.length}`}
+                    weekLabel={weekLabel}
+                    done={0}
+                    total={ungrouped.length}
+                    onSite={false}
+                    onBack={onBack}
+                    tone="unrouted"
+                  />
+                </div>
+                <div className="flex items-center gap-2 border-b border-[var(--clay)]/30 bg-[var(--clay)]/10 px-4 py-2">
+                  {routeAllPicker}
+                  <span className="ml-auto">{sortToggle}</span>
+                </div>
+              </>
+            ) : (
+              <div className="bg-[var(--clay)]/10 text-[var(--clay)] flex items-center justify-between px-4 py-2.5 border-b border-[var(--clay)]/30">
+                <span className="truncate text-xs font-semibold uppercase tracking-widest">
+                  Not on a route · {ungrouped.length}
+                </span>
+                {/* Was a link to /app/routes carrying no context — you arrived at
+                    a list of every route with no memory of which stop sent you. */}
+                {routeAllPicker}
+              </div>
+            )}
+            <div className="overflow-hidden">{renderRows(UNGROUPED_SORT_KEY, ungrouped)}</div>
+
+            {showActionBar && onStartSelect && (
+              <RouteActionBar menuItems={[{ label: 'Select stops', onClick: onStartSelect }]} />
+            )}
           </div>
         )}
+
+        {/* Room for the fixed action bar, so the last stop can scroll clear of it. */}
+        {showActionBar && <div aria-hidden className="h-16" />}
       </div>
 
       {selectMode && (
@@ -440,5 +529,82 @@ export function ScheduleListMobile({
         />
       )}
     </>
+  )
+}
+
+/**
+ * The route view's actions, fixed above the app's bottom nav like /app/stop's bar so they sit
+ * in thumb reach. Hidden while the keyboard is up, as the nav is.
+ */
+function RouteActionBar({
+  hasNote,
+  onAssign,
+  onEditNote,
+  menuItems,
+}: {
+  hasNote?: boolean
+  /** Crew and Truck both open RouteAssignDialog, which sets either for the whole route. */
+  onAssign?: () => void
+  onEditNote?: () => void
+  menuItems: Array<{ label: string; onClick: () => void }>
+}) {
+  const keyboardOpen = useKeyboardOpen()
+  const [menuOpen, setMenuOpen] = useState(false)
+  if (keyboardOpen) return null
+
+  return (
+    <div
+      data-tour="schedule.routeActions"
+      className="fixed inset-x-0 z-40 border-t border-border bg-background/95 px-4 py-2 backdrop-blur lg:hidden"
+      style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }}
+    >
+      <div className="flex gap-2">
+        {onAssign && (
+          <>
+            <Button variant="outline" className="h-11 flex-1 gap-1.5" onClick={onAssign}>
+              <Users className="h-4 w-4" aria-hidden />
+              Crew
+            </Button>
+            <Button variant="outline" className="h-11 flex-1 gap-1.5" onClick={onAssign}>
+              <Truck className="h-4 w-4" aria-hidden />
+              Truck
+            </Button>
+          </>
+        )}
+        {onEditNote && (
+          <Button variant="outline" className="h-11 flex-1 gap-1.5" onClick={onEditNote}>
+            <Flag className="h-4 w-4" aria-hidden />
+            {hasNote ? 'Note' : 'Add note'}
+          </Button>
+        )}
+        <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn('h-11 gap-1.5', onAssign ? 'w-11 shrink-0 px-0' : 'flex-1')}
+              aria-label="More route actions"
+            >
+              <MoreHorizontal className="h-4 w-4" aria-hidden />
+              {!onAssign && 'More'}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" side="top" className="w-52 p-1">
+            {menuItems.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false)
+                  item.onClick()
+                }}
+                className="flex min-h-11 w-full items-center rounded-md px-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-secondary"
+              >
+                {item.label}
+              </button>
+            ))}
+          </PopoverContent>
+        </Popover>
+      </div>
+    </div>
   )
 }

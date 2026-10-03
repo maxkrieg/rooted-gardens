@@ -5,9 +5,10 @@ one changes **what the schedule is organized around**. See `CLAUDE.md` for stack
 conventions. It is the source of truth wherever this file is silent.
 
 > **Status:** planned 2026-10-03. S0 done 2026-10-03 (prototype built; no walkthrough with Matt).
+> S1 done 2026-10-03 (static checks pass; the functional checks under Verify are still to run).
 >
 > - [x] **S0** — Clickable prototype for Matt
-> - [ ] **S1** — Week overview + route drill-in
+> - [x] **S1** — Week overview + route drill-in
 > - [ ] **S2** — "Needs you" and "From the field"
 > - [ ] **S3** — Today, rebuilt around routes
 > - [ ] **S4** — Property history in the stop sheet
@@ -327,7 +328,69 @@ Make Generate the visible primary action. Fixes F1, F4, F5 (plan side), F6, F7, 
 - Chrome above the first overview row ≤ 124px (R2's measured number), ≤ 56px sticky.
 
 ### S1 as built — deviations
-_(empty)_
+**Shipped as specified:** `ScheduleWeekOverview.tsx` (new), the Generate CTA, `?route=` drill-in
+in `ScheduleListMobile` (`routeGroupId` prop), the route action bar, per-band sort switches
+removed, Select only on the route view, desktop grid untouched, `tour.schedule` → `version: 2`.
+No new `MutationType`, no schema change.
+
+Deviations and decisions:
+- **`routeGroupStats` gained two fields,** `unscheduled` and `withoutCrew`, computed in the same
+  loop. "Reuse, don't recompute" meant not re-walking the visits in the overview, so the counts
+  went into the shared function. S2's `noCrew` exception should read `withoutCrew` from here.
+  "Without crew" = a `scheduled` visit whose `displayCrewFor()` is empty.
+- **Overview row:** the stop count is every property on the route this week, with
+  "· N not scheduled" / "· none scheduled" when some have no visit yet. On an ungenerated week
+  that reads "8 stops · none scheduled", which is more honest than "8 stops".
+  `RouteDoneCount` and the progress bar appear once `done > 0`.
+- **No "Due, not scheduled · N" row.** The mockup has one, but the Build list doesn't, and the
+  CTA already carries the number. It's S2's `dueUnscheduled` item.
+- **The CTA is hidden while the plan is loading or errored** (`useWeekPlan().isError`), and for
+  anyone without `editSchedule`. That way it can never show a number the preview would disagree with.
+- **Route header:** a new `RouteViewHeader` in `RouteGroupBand.tsx`, not the band itself. The
+  band was ~60px+ with its plan line and note, over the ≤56px sticky rule. So only the 48px title
+  row (`‹ Week`, name over the week's dates, `OnSiteDot`, done/total) + the 3px progress bar
+  sticks. The plan line (now `RoutePlanLine`, shared with the band) and the note ribbon scroll
+  under it. The schedule's own sticky header collapses to nothing on the route view
+  (`ScheduleStickyBar collapsedOnPhone`), so the route header sticks at the top.
+- **Sort switch:** on the route view's plan line, right-aligned, as the per-band one was. The
+  phone passes `setAllSortMode(sortState.all)` to the list, so `byGroup` is stored but unread
+  there. The desktop grid still reads and writes it (untouched). **Crew keep the top-of-page
+  "Every route" switch,** since they have no route view. It's hidden below `lg` only for
+  `seeDashboard` roles.
+- **Action bar:** Crew and Truck both open `RouteAssignDialog`, which sets either one. The Note
+  button reads "Add note" when there isn't one, opens the ribbon editor and scrolls to the top
+  to show it. The bar hides while the keyboard is up (`useKeyboardOpen`), like the nav, and while
+  select mode's `SelectionBar` is showing. "Not on a route" gets a reduced bar: ⋯ → Select stops.
+  Its "Route all N" picker sits under its header.
+- **History:** `openRoute` `pushState`s, and `‹ Week` calls `history.back()` when it pushed, so
+  the button and the OS gesture are the same action. A `?route=` load slips an overview entry
+  underneath once the week loads (replace → push), so Back from a deep link lands on the overview,
+  not off the app. A deep link also forces Week, so you don't back out into a stored `Today`.
+  Next 16 patches `pushState` to copy its `__NA` tree, so popstate restores from the router cache
+  with no RSC fetch (checked in `node_modules/next/dist/client/components/app-router.js`).
+  Overview scroll is saved on entry and restored in a layout effect on the way back.
+- **A route that doesn't exist** is checked against the *unfiltered* week. A filter that empties a
+  real route shows the empty state with a `‹ Week` button rather than kicking you out.
+  "Not on a route" counts as gone once it's empty, e.g. after "Route all".
+- **Tour v2 (mobile):** `band` is now a "do it" step (`advanceOn: 'schedule.routeOpened'`).
+  `open-stop` requires `band` or `band-desktop` (the old band copy, kept for the grid). New steps:
+  `route-actions` (anchor `schedule.routeActions`) and `route-back` (anchor
+  `schedule.routeBack`, `advanceOn` a second new event, `schedule.routeClosed`), so the tour gets
+  back to the overview for the ⋯ → Generate steps. `select-mobile` is gone (folded into
+  `route-actions`). No step points at the CTA: it vanishes once a week is generated, and a
+  missing anchor costs a 2.5s wait before the step is skipped. `actions-mobile` mentions it instead.
+  `NEWS` item `news.scheduleRoutes` (owner, lead, accountant), anchored on the first overview row.
+- **Chrome budget:** sticky header 48 + 16px padding/margin, then the Today|Week row 44 + 8 =
+  ~116px above the first overview row. The Generate CTA (60px) sits above it while stops are due,
+  which is deliberate: it's the primary action, not chrome.
+
+**Checks:** `npm run build` ✓ · `npm run typecheck` ✓ · `npm run check:tours` ✓ (30 anchors) ·
+`npm run lint`: the only error is the pre-existing `react-hooks/set-state-in-effect` in
+`components/crew/VisitLogger.tsx`, a file this phase didn't touch.
+
+**Not yet run: the functional checks under Verify** (375px under `build && start`, airplane mode,
+impersonating crew and the accountant). Run them before relying on this phase. The riskiest parts
+are the history entries (OS back from a deep link) and the scroll restore.
 
 ---
 
