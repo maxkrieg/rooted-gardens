@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { getSeedRole } from '@/lib/auth/server-role'
+import { isSuperAdmin } from '@/lib/auth/super-admin'
 import { AppShell } from '@/components/app/AppShell'
 import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration'
 
@@ -30,7 +31,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <>
       <ServiceWorkerRegistration />
-      <AppShell initialRole={role} userId={user?.id} userEmail={user?.email}>
+      <AppShell
+        initialRole={role}
+        userId={user?.id}
+        userEmail={user?.email}
+        superAdmin={isSuperAdmin(user?.id)}
+      >
         {children}
       </AppShell>
     </>

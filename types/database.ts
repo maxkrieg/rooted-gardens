@@ -118,6 +118,7 @@ export type Database = {
           entity_label: string | null
           entity_table: string
           id: number
+          impersonated_by: string | null
           occurred_at: string
         }
         Insert: {
@@ -129,6 +130,7 @@ export type Database = {
           entity_label?: string | null
           entity_table: string
           id?: never
+          impersonated_by?: string | null
           occurred_at?: string
         }
         Update: {
@@ -140,6 +142,7 @@ export type Database = {
           entity_label?: string | null
           entity_table?: string
           id?: never
+          impersonated_by?: string | null
           occurred_at?: string
         }
         Relationships: [
@@ -229,6 +232,50 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      impersonation_sessions: {
+        Row: {
+          admin_label: string
+          admin_user_id: string
+          auth_session_id: string
+          created_at: string
+          ended_at: string | null
+          id: string
+          started_at: string
+          target_employee_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          admin_label: string
+          admin_user_id: string
+          auth_session_id: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          started_at?: string
+          target_employee_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          admin_label?: string
+          admin_user_id?: string
+          auth_session_id?: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          started_at?: string
+          target_employee_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "impersonation_sessions_target_employee_id_fkey"
+            columns: ["target_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       integrations: {
         Row: {

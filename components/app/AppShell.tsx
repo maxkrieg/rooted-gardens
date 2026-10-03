@@ -7,6 +7,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import { CircleHelp, Leaf, LogOut, MoreHorizontal, Search, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { OfflineBanner } from '@/components/crew/OfflineBanner'
+import { ImpersonationBanner } from '@/components/admin/ImpersonationBanner'
+import { stopImpersonation } from '@/app/admin/impersonate/actions'
+import { finishIdentitySwitch, queueBlocksSwitch } from '@/components/admin/identity-switch'
 import { InstallPrompt } from '@/components/crew/InstallPrompt'
 import { CommandPalette } from '@/components/management/CommandPalette'
 import { MoreSheet } from '@/components/app/MoreSheet'
@@ -45,17 +48,20 @@ export function AppShell({
   initialRole,
   userId,
   userEmail,
+  superAdmin = false,
   children,
 }: {
   initialRole: EmployeeRole | null
   userId?: string | null
   userEmail?: string | null
+  /** Server-computed: SUPER_ADMIN_USER_IDS isn't exposed to the client. */
+  superAdmin?: boolean
   children: React.ReactNode
 }) {
   return (
     <RoleProvider initialRole={initialRole} userId={userId}>
       <OnboardingProvider>
-        <AppShellInner userEmail={userEmail}>{children}</AppShellInner>
+        <AppShellInner userEmail={userEmail} superAdmin={superAdmin}>{children}</AppShellInner>
       </OnboardingProvider>
     </RoleProvider>
   )
@@ -63,15 +69,17 @@ export function AppShell({
 
 function AppShellInner({
   userEmail,
+  superAdmin,
   children,
 }: {
   userEmail?: string | null
+  superAdmin: boolean
   children: React.ReactNode
 }) {
   const pathname = usePathname()
   const router = useRouter()
   const queryClient = useQueryClient()
-  const { role, employeeId, can } = useRole()
+  const { role, employeeId, can, impersonating } = useRole()
   const { openHelp, dueNewsCount } = useOnboarding()
   const { data: employee, isError: employeeError } = useCurrentEmployee()
   const [moreOpen, setMoreOpen] = useState(false)
@@ -86,7 +94,7 @@ function AppShellInner({
     '/app/routes': unroutedCount,
   }
 
-  const { bar, more, all } = navFor(role)
+  const { bar, more, all } = navFor(role, superAdmin)
   // The More tab carries one dot summarising every badge it hides, the same
   // job the old mobile hamburger's dot did.
   const moreBadgeCount = more.reduce((sum, item) => sum + (counts[item.href] ?? 0), 0)
@@ -151,6 +159,21 @@ function AppShellInner({
   }, [can.seeLeads, router, queryClient])
 
   async function handleSignOut() {
+    // Signing out of someone else's session hands back your own, like the banner's Stop.
+    if (impersonating) {
+      const blocked = await queueBlocksSwitch()
+      if (blocked) {
+        toast.error(blocked)
+        return
+      }
+      const result = await stopImpersonation().catch(() => null)
+      if (!result || result.error !== undefined) {
+        toast.error(result?.error ?? 'Signing out needs a connection.')
+        return
+      }
+      await finishIdentitySwitch(queryClient, result.home)
+      return
+    }
     const supabase = createClient()
     await supabase.auth.signOut()
     // Clear the persisted cache first, or the next person on this phone inherits the role and data.
@@ -235,6 +258,7 @@ function AppShellInner({
           'pb-[calc(3.5rem+0.5rem+env(safe-area-inset-bottom,0px))] lg:pb-0',
         )}
       >
+        <ImpersonationBanner />
         <OfflineBanner />
         <InstallPrompt />
         <TourOffer />

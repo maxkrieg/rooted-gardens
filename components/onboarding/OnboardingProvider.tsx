@@ -68,7 +68,7 @@ function stepsFor(tour: Tour, can: Capabilities, isWide: boolean): TourStep[] {
 
 /** Welcome, tours, checklist and What's new. Surfaces at most one thing at a time. */
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
-  const { role, can, employeeId, isReconciling } = useRole()
+  const { role, can, employeeId, isReconciling, impersonating } = useRole()
   const pathname = usePathname()
   const router = useRouter()
   // Same breakpoint as the nav: bottom bar below, sidebar above.
@@ -82,7 +82,9 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const [helpOpen, setHelpOpen] = useState(false)
 
   const progress = useMemo(() => progressData ?? {}, [progressData])
-  const ready = !!progressData && !!employeeId && !isReconciling
+  // Nothing pops up or ticks while a super admin is impersonating: it would spend the real
+  // person's welcome, tours and checklist before they ever see them.
+  const ready = !!progressData && !!employeeId && !isReconciling && !impersonating
 
   const tours = useMemo(
     () => forRole(TOURS, role).filter((t) => !t.capability || can[t.capability]),

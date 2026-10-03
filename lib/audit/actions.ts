@@ -1,6 +1,7 @@
 /**
  * Labels for the action codes written by the `audit_row_change()` trigger
  * (supabase/migrations/20260930120000_audit_log.sql). Keep the two in step.
+ * The `admin.*` codes are the exception: the impersonation actions insert them directly.
  */
 
 export const AUDIT_GROUPS = [
@@ -15,6 +16,7 @@ export const AUDIT_GROUPS = [
   'Fleet',
   'Leads',
   'Website',
+  'Admin',
 ] as const
 
 export type AuditGroup = (typeof AUDIT_GROUPS)[number]
@@ -101,6 +103,10 @@ export const AUDIT_ACTIONS: Record<string, { label: string; group: AuditGroup }>
   'site.item_updated': { label: 'Website item edited', group: 'Website' },
   'site.item_reordered': { label: 'Website item moved', group: 'Website' },
   'site.item_deleted': { label: 'Website item deleted', group: 'Website' },
+
+  // Written by app/admin/impersonate/actions.ts, not the trigger.
+  'admin.impersonation_started': { label: 'Started impersonating', group: 'Admin' },
+  'admin.impersonation_stopped': { label: 'Stopped impersonating', group: 'Admin' },
 }
 
 /** Unknown codes (a trigger action added without a label) show raw rather than break. */

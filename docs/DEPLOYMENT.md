@@ -250,6 +250,8 @@ Run through this against the live URL once Part 1 is complete:
 | `SENTRY_AUTH_TOKEN` | **build-only**, secret | Uploads source maps so stack traces are readable. Unset = no maps generated (and none served publicly). Create an org auth token in Sentry. |
 | `SENTRY_ORG` | build-only | Sentry org slug, for the source-map upload. |
 | `SENTRY_PROJECT` | build-only | Sentry project slug, for the source-map upload. |
+| `SUPER_ADMIN_USER_IDS` | server (also read by the Edge proxy) | Comma-separated Supabase **auth user ids** (not employee ids) allowed into `/admin/impersonate`. Unset = no super admin. See "Super-admin impersonation" below. |
+| `IMPERSONATION_SECRET` | server, secret | Encrypts the parked super-admin session while impersonating. Generate: `openssl rand -hex 32`, different per environment. Rotating it strands anyone mid-impersonation (Stop then just signs them out). |
 
 `TWILIO_*` variables are **not** used anywhere in code (SMS is deferred indefinitely — see
 CLAUDE.md) — don't set them.
@@ -344,6 +346,28 @@ push — against prod especially, where there's no `db reset` to fall back on.
 
 > No staging environment exists. Dev is where you catch mistakes; prod has real data and no
 > undo. Take a backup (Supabase → Database → Backups) before anything destructive.
+
+### Super-admin impersonation
+
+`/admin/impersonate` lets the developer sign in as any employee to debug. Set
+`SUPER_ADMIN_USER_IDS` to your auth user id (Supabase → Authentication → Users, or
+`select id from auth.users where email = '…'`) and `IMPERSONATION_SECRET`, in each environment
+you want it in, then redeploy. You need no employee row: a super admin without one lands on
+the console after signing in.
+
+- **It's a real session for that person.** RLS, their role, the nav and the audit trail all
+  treat what you do as theirs. On prod that includes pushing invoices to QuickBooks — the
+  banner turns brick red there (`VERCEL_ENV=production`).
+- **The Activity log still knows.** `impersonation_sessions` maps the impersonated auth session
+  to you, and `audit_row_change()` copies that into `audit_log.impersonated_by`, shown as a
+  "via …" tag. Start and stop are logged too. Owners/leads can see all of it, by design.
+- **Mechanics:** `generateLink` (sends nothing) → `verifyOtp` on a cookieless client →
+  `setSession`; your own refresh token is parked in the encrypted httpOnly `rg-impersonator`
+  cookie (12h) and restored on Stop. Stop revokes only that browser's impersonated session.
+- Start and Stop both refuse while the offline queue holds anything, because queued writes
+  carry the employee id they were made as but sync under whoever is signed in.
+- Side effects on the target: any unused magic link in their inbox is invalidated, and their
+  `last_sign_in_at` moves. Their own sessions are untouched.
 
 ### Invoice-status cron + `CRON_SECRET`
 

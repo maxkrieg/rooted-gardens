@@ -187,6 +187,7 @@ export function AuditLogView({
                   </TableCell>
                   <TableCell className="text-sm font-medium text-foreground whitespace-nowrap">
                     {entry.actor_label}
+                    <ViaTag by={entry.impersonated_by} />
                   </TableCell>
                   <TableCell className="text-sm text-foreground whitespace-nowrap">
                     {auditActionLabel(entry.action)}
@@ -268,8 +269,22 @@ function AuditCard({ entry }: { entry: AuditEntry }) {
         {changes && <p className="mt-1 text-sm text-muted-foreground">{changes}</p>}
         <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {entry.actor_label}
+          <ViaTag by={entry.impersonated_by} />
         </p>
       </CardContent>
     </Card>
+  )
+}
+
+/** A super admin signed in as the actor made this change (app/admin/impersonate). */
+function ViaTag({ by }: { by: string | null }) {
+  if (!by) return null
+  return (
+    <span
+      title={`Made by ${by} while signed in as this person`}
+      className="ml-2 inline-block rounded-full bg-secondary px-2 py-0.5 align-middle text-[0.65rem] font-semibold normal-case tracking-normal text-secondary-foreground"
+    >
+      via {by}
+    </span>
   )
 }
