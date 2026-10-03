@@ -4,9 +4,9 @@ A follow-on to `REDESIGN.md` (R1–R5, built). That redesign made the app work o
 one changes **what the schedule is organized around**. See `CLAUDE.md` for stack, schema and
 conventions. It is the source of truth wherever this file is silent.
 
-> **Status:** planned 2026-10-03. Nothing built.
+> **Status:** planned 2026-10-03. S0 done 2026-10-03 (prototype built; no walkthrough with Matt).
 >
-> - [ ] **S0** — Clickable prototype for Matt
+> - [x] **S0** — Clickable prototype for Matt
 > - [ ] **S1** — Week overview + route drill-in
 > - [ ] **S2** — "Needs you" and "From the field"
 > - [ ] **S3** — Today, rebuilt around routes
@@ -227,7 +227,33 @@ system in `CLAUDE.md` → UI Conventions).
 pushes back on the model.
 
 ### S0 as built — deviations
-_(empty)_
+**Prototype:** https://claude.ai/artifact/QVR9yzSanXFdXRQEj8LfLz (private; share it from the
+page's Share menu if Matt opens it himself). One HTML file, no app code touched. Fixture is
+Tue Jun 9 2026, 2:30 pm: 5 routes (Wilder, New Hampshire, Hanover, Sharon, Hawk Pine Rd),
+48 stops, 3 unrouted, 3 due-but-unscheduled. All names and addresses are invented.
+
+What it covers, beyond the brief:
+- **Today** shows Needs you → Running today → From the field (S2 + S3 together), so Matt sees
+  the end state. Needs you derives the S2 kinds from the fixture: skipped, crew report,
+  long on site (>4h, Ledyard Commons), no crew grouped per route, due-not-scheduled.
+  Opening a skip or report marks it seen, so it leaves Needs you but stays in the feed.
+- **Week** has ‹ › across three weeks: last week (all settled), this week (mid-week), next
+  week (empty until you press `Generate week · N due`, which opens a preview first).
+- **Route** drill-in with the sticky band, week-note ribbon and the bottom Crew / Truck / Note /
+  ⋯ bar. Crew, Truck and Note really change the in-memory data, so "N without crew" on the
+  overview and Needs you update. `⋯` items are stubs.
+- **Stop** sheet has Start / Stop & log / Skip (with reasons) so the feed and Needs you can be
+  seen reacting live, plus an "Earlier visits here" list (S4).
+- **Desktop** tab: three panes beside the sidebar, ↑/↓/Enter/Esc work in the middle pane. A
+  fake address bar shows `?route=` / `?visit=` changing, to make the shared-URL idea visible.
+- A walkthrough column (things to try, questions to ask, notes saved in the browser).
+
+Not in it: crew's flat list, the accountant's read-only view, search, offline, and the other
+nav destinations (they toast "not in the prototype").
+
+**Matt's reactions:** none collected. Max decided (2026-10-03) to skip the walkthrough, so the
+riskiest assumption ("see what needs me" over "see every row") goes into S1 untested. S1–S5
+stand as written.
 
 ---
 
