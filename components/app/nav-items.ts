@@ -8,6 +8,7 @@ import {
   Truck,
   UserCircle,
   Users,
+  VenetianMask,
   type LucideIcon,
 } from 'lucide-react'
 import { canAccessRoute } from '@/lib/auth/access'
@@ -40,6 +41,9 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/management/audit', label: 'Activity log', icon: History },
 ]
 
+// Gated by isSuperAdmin (the same env allowlist proxy.ts checks for /admin/*), not ROUTE_ACCESS.
+const ADMIN_ITEM: NavItem = { href: '/admin/impersonate', label: 'Impersonate', icon: VenetianMask }
+
 /**
  * Bottom-bar tabs per role (max 3, plus More). The bar holds what works offline; More holds
  * what needs a connection.
@@ -57,7 +61,10 @@ export function isNavItemActive(item: NavItem, pathname: string): boolean {
 }
 
 /** The items a role may see, split into bottom-bar tabs and `More` contents. */
-export function navFor(role: EmployeeRole | null): {
+export function navFor(
+  role: EmployeeRole | null,
+  superAdmin = false,
+): {
   bar: NavItem[]
   more: NavItem[]
   all: NavItem[]
@@ -65,6 +72,7 @@ export function navFor(role: EmployeeRole | null): {
   if (!role) return { bar: [], more: [], all: [] }
 
   const all = NAV_ITEMS.filter((item) => canAccessRoute(item.href, role))
+  if (superAdmin) all.push(ADMIN_ITEM)
   const barHrefs = BAR_BY_ROLE[role] ?? []
 
   // Ordered by BAR_BY_ROLE, not by NAV_ITEMS, so the tab order is deliberate.

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { getSeedRole } from '@/lib/auth/server-role'
+import { isSuperAdmin } from '@/lib/auth/super-admin'
 import { AppShell } from '@/components/app/AppShell'
 import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration'
 
@@ -19,7 +20,12 @@ export default async function ManagementLayout({
   return (
     <>
       <ServiceWorkerRegistration />
-      <AppShell initialRole={role} userId={user?.id} userEmail={user?.email}>
+      <AppShell
+        initialRole={role}
+        userId={user?.id}
+        userEmail={user?.email}
+        superAdmin={isSuperAdmin(user?.id)}
+      >
         <div className="p-4 lg:p-6">{children}</div>
       </AppShell>
     </>

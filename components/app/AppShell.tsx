@@ -48,17 +48,20 @@ export function AppShell({
   initialRole,
   userId,
   userEmail,
+  superAdmin = false,
   children,
 }: {
   initialRole: EmployeeRole | null
   userId?: string | null
   userEmail?: string | null
+  /** Server-computed: SUPER_ADMIN_USER_IDS isn't exposed to the client. */
+  superAdmin?: boolean
   children: React.ReactNode
 }) {
   return (
     <RoleProvider initialRole={initialRole} userId={userId}>
       <OnboardingProvider>
-        <AppShellInner userEmail={userEmail}>{children}</AppShellInner>
+        <AppShellInner userEmail={userEmail} superAdmin={superAdmin}>{children}</AppShellInner>
       </OnboardingProvider>
     </RoleProvider>
   )
@@ -66,9 +69,11 @@ export function AppShell({
 
 function AppShellInner({
   userEmail,
+  superAdmin,
   children,
 }: {
   userEmail?: string | null
+  superAdmin: boolean
   children: React.ReactNode
 }) {
   const pathname = usePathname()
@@ -89,7 +94,7 @@ function AppShellInner({
     '/app/routes': unroutedCount,
   }
 
-  const { bar, more, all } = navFor(role)
+  const { bar, more, all } = navFor(role, superAdmin)
   // The More tab carries one dot summarising every badge it hides, the same
   // job the old mobile hamburger's dot did.
   const moreBadgeCount = more.reduce((sum, item) => sum + (counts[item.href] ?? 0), 0)
