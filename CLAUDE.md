@@ -164,6 +164,8 @@ rooted-gardens/
 │   ├── management/              ← schedule, accounts, routes, billing components
 │   │   ├── ScheduleGrid.tsx     ← the 4-week desktop grid (lg+ only)
 │   │   ├── ScheduleWeekOverview.tsx ← phone Week for office roles: one row per route
+│   │   ├── NeedsYouList.tsx         ← exceptions (skips, crew reports, no crew…) — scheduleExceptions()
+│   │   ├── FieldActivityList.tsx    ← "From the field": settled visits, newest first — fieldActivity()
 │   │   ├── ScheduleListMobile.tsx   ← the phone schedule (the screen that matters); one route
 │   │   │                              alone on the `?route=` drill-in, crew's flat list otherwise
 │   │   ├── RouteGroupBand.tsx       ← route header: crew, truck, progress, week note

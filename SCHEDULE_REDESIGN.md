@@ -6,10 +6,11 @@ conventions. It is the source of truth wherever this file is silent.
 
 > **Status:** planned 2026-10-03. S0 done 2026-10-03 (prototype built; no walkthrough with Matt).
 > S1 done 2026-10-03 (static checks pass; the functional checks under Verify are still to run).
+> S2 done 2026-10-03 (same: static checks pass, functional checks not yet run).
 >
 > - [x] **S0** — Clickable prototype for Matt
 > - [x] **S1** — Week overview + route drill-in
-> - [ ] **S2** — "Needs you" and "From the field"
+> - [x] **S2** — "Needs you" and "From the field"
 > - [ ] **S3** — Today, rebuilt around routes
 > - [ ] **S4** — Property history in the stop sheet
 > - [ ] **S5** — Desktop three-pane, retire the grid
@@ -447,7 +448,64 @@ stop. Fixes F1 and F2.
 - An item marked seen comes back if the crew edits the note again.
 
 ### S2 as built — deviations
-_(empty)_
+**Shipped as specified:** `scheduleExceptions` and `fieldActivity` in `lib/utils/schedule.ts`
+(pure, from the cached week, no new query), `NeedsYouList.tsx` and `FieldActivityList.tsx` (new),
+per-viewer seen state under `rg-schedule-seen`, both lists at the top of the phone Week overview.
+No new `MutationType`, no schema change, no toast.
+
+Deviations and decisions:
+- **Signature:** `scheduleExceptions(week, decisions, now)`. It imports `UNGROUPED_SORT_KEY` for the
+  "Not on a route" bucket's `routeKey`. Visit items carry the whole `row` + `visit`, not just ids,
+  because `openSheet` needs the row. Order: skipped → longOnSite → crewReport → noCrew →
+  dueUnscheduled. Skips and reports are newest first within their kind.
+- **`noCrew` counts in its own loop** instead of reading `routeGroupStats().withoutCrew` (the S1 note
+  suggested reusing it). That function needs `vehicles`, which a pure exceptions function shouldn't
+  take. The definition is the same: a `scheduled` visit whose `displayCrewFor()` is empty. Items say
+  "4 stops on Wilder have no crew" and open the route. Ungrouped says "… not on a route …".
+- **`longOnSite`** is > `LONG_ON_SITE_HOURS` (4) since `started_at`. It's live state, so opening it
+  doesn't mark it seen. The overview's `useScheduleInteractions` 30s tick keeps it current.
+- **`dueUnscheduled` isn't shown on the Week overview:** the overview passes `decisions = []`,
+  because the Generate CTA right above already carries that number. The derivation supports it, so
+  S3's Today should pass `plan.decisions` (gated on `editSchedule` and a loaded, non-errored plan,
+  like `dueCount`). The item opens the Generate sheet.
+- **Seen is keyed on content, not `updated_at`.** The stored value is
+  `status|skip_reason|completion_note|photo_count`. Pushing an invoice, or an office crew/vehicle
+  edit, bumps `updated_at` too, and that would have resurfaced every report already read. Editing the
+  note (or the skip reason, or reverting and re-completing) changes the signature, so it comes back,
+  which is what Verify asks for. Capped at the latest 500 entries. `useScheduleSeen` reads storage in
+  its `useState` initializer, which is safe because `ScheduleView` gates on hydration.
+- **The sheet:** the overview calls `useScheduleInteractions` just for its sheet state and renders
+  its own `VisitDetailSheet`, the same way `ScheduleListMobile` does. The two never mount together
+  (overview ↔ route view), so there is never a second sheet. `?visit=` still syncs via `openSheet`.
+- **Filtered week:** both lists derive from the *filtered* week, the same one the route rows below
+  use. That way a route filter narrows everything on screen together.
+- **From the field** is hidden while it's empty. Each row is time (today: `2:14 PM`, earlier:
+  `Tue 2:14 PM`), "Christian finished **Account**", then the note/photo summary or the skip reason,
+  plus the status glyph. Completed-over-assigned crew, first names. "Show all N" expands in place.
+  Opening a row also marks it seen, so reading a report from the feed clears it from Needs you.
+- **Needs you · 0** collapses to one 44px all-clear line rather than vanishing. That keeps the
+  `schedule.needsYou` anchor stable. A small "Routes" label now separates the lists from the route rows.
+- **Photo count freshness:** `photo_count` is only computed at fetch (completed visits, `type =
+  'visit'`). Realtime `UPDATE`s preserve it (`{ ...v, ...incoming }`), but `photos` isn't in the
+  realtime publication. So a crew completion arriving live shows its note right away, but its photo
+  count only after the next refetch (focus, week change, reload). A follow-up could invalidate
+  `schedule-visits` when a live update flips a visit to `completed`.
+- **Onboarding:** no tour version bump, since the flow is unchanged. New anchor `schedule.needsYou`
+  and `NEWS` item `news.scheduleNeedsYou` (owner, lead, accountant). It has **no `parentTour`**:
+  the tour doesn't teach the lists, so finishing it shouldn't mark the news seen.
+- **Accountant:** sees both lists. Rows open the read-only sheet. `noCrew` opens the route
+  (read-only, no action bar).
+- **Chrome budget:** the lists sit between the CTA and the first route row, so the routes start
+  lower than S1's ~116px. That's deliberate (principle 2: what needs a decision comes first).
+
+**Checks:** `npm run build` ✓ · `npm run typecheck` ✓ · `npm run check:tours` ✓ (31 anchors) ·
+`npm run lint`: the only error is still the pre-existing one in `components/crew/VisitLogger.tsx`.
+The phase's files lint clean. The derivations were run in a scratch script (jiti) against a hand-built
+week: kinds, order, per-route grouping, ungrouped wording, `ended_at`→`updated_at` fallback and
+mixed-offset sorting all came out as intended.
+
+**Not yet run: the functional checks under Verify** (realtime skip → Needs you without reload,
+offline render, seen → re-edit resurfaces). Run them under `build && start` with impersonation.
 
 ---
 
@@ -611,3 +669,7 @@ coupling that `CLAUDE.md` warns about.
 
 ### S5 as built — deviations
 _(empty)_
+
+
+### S6 - Follow-ups on anything that came up in S1–S5
+**Goal.** Fix anything that came up in S1–S5 that didn't have a clear owner or a clear fix. This is the "catch-all" phase for anything that was discovered during the previous phases that needs to be addressed before the redesign is considered complete.

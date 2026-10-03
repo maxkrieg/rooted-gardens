@@ -10,9 +10,20 @@ import {
   RouteProgressBar,
   formatDays,
 } from '@/components/management/RouteGroupBand'
+import { NeedsYouList } from '@/components/management/NeedsYouList'
+import { FieldActivityList } from '@/components/management/FieldActivityList'
+import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import { useWeekNotes } from '@/hooks/useWeekNotes'
-import { routeGroupStats, type RouteGroupStats } from '@/lib/utils/schedule'
-import { UNGROUPED_SORT_KEY } from '@/lib/utils/schedule-sort'
+import { useScheduleInteractions } from '@/hooks/useScheduleInteractions'
+import { useScheduleSeen } from '@/hooks/useScheduleSeen'
+import {
+  fieldActivity,
+  routeGroupStats,
+  scheduleExceptions,
+  type RouteGroupStats,
+  type ScheduleException,
+} from '@/lib/utils/schedule'
+import { DEFAULT_SCHEDULE_SORT, UNGROUPED_SORT_KEY } from '@/lib/utils/schedule-sort'
 import { cn } from '@/lib/utils'
 import type { ScheduleWeek, Vehicle } from '@/types/app'
 
@@ -41,6 +52,29 @@ export function ScheduleWeekOverview({
   onOpenRoute,
 }: ScheduleWeekOverviewProps) {
   const { data: weekNotes = [] } = useWeekNotes(week?.weekStart ?? '')
+  // Only the sheet is used here; its 30s tick also keeps "long on site" current.
+  const { sheetOpen, sheetRow, sheetWeek, openSheet, handleSheetOpenChange } =
+    useScheduleInteractions({
+      selectMode: false,
+      sortState: DEFAULT_SCHEDULE_SORT,
+      windowStart: week?.weekStart,
+    })
+  const { isSeen, markSeen } = useScheduleSeen()
+
+  // No decisions here: the Generate CTA already carries the due count on this screen. S3's Today
+  // passes them, for its dueUnscheduled item.
+  const needsYou = scheduleExceptions(week, [], new Date()).filter((item) =>
+    item.kind === 'skipped' || item.kind === 'crewReport' ? !isSeen(item.visit) : true,
+  )
+  const activity = fieldActivity(week)
+
+  function openException(item: ScheduleException) {
+    if (!week) return
+    if (item.kind === 'noCrew') return onOpenRoute(item.routeKey)
+    if (item.kind === 'dueUnscheduled') return onGenerate()
+    if (item.kind !== 'longOnSite') markSeen(item.visit)
+    openSheet(item.row, item.visit, week.weekStart)
+  }
 
   const cta =
     dueCount !== null && dueCount > 0 ? (
@@ -70,6 +104,19 @@ export function ScheduleWeekOverview({
   return (
     <>
       {cta}
+      <div className="mb-4 flex flex-col gap-4">
+        <NeedsYouList items={needsYou} onOpen={openException} />
+        <FieldActivityList
+          items={activity}
+          onOpen={({ row, visit }) => {
+            markSeen(visit)
+            openSheet(row, visit, week.weekStart)
+          }}
+        />
+      </div>
+      <h2 className="px-4 pb-1.5 text-xs font-semibold uppercase tracking-widest text-foreground">
+        Routes
+      </h2>
       <div className="border-y border-border bg-card">
         {week.routeGroups.map(({ routeGroup, rows }, index) => (
           <RouteOverviewRow
@@ -106,6 +153,15 @@ export function ScheduleWeekOverview({
           </button>
         )}
       </div>
+
+      {sheetRow && (
+        <VisitDetailSheet
+          open={sheetOpen}
+          onOpenChange={handleSheetOpenChange}
+          row={sheetRow}
+          weekStart={sheetWeek}
+        />
+      )}
     </>
   )
 }

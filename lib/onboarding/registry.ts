@@ -447,6 +447,15 @@ export const NEWS: NewsItem[] = [
     route: '/app/schedule',
     anchor: 'schedule.routeBand',
   },
+  {
+    key: 'news.scheduleNeedsYou',
+    roles: ['owner', 'lead', 'accountant'],
+    introduced: '2026-10-03',
+    title: 'What needs you, and what crews sent back',
+    body: 'The top of Week now lists skips, crew notes and photos, long on-site stops and routes missing crew. Open one and it leaves Needs you. Everything crews finished or skipped stays under From the field, newest first.',
+    route: '/app/schedule',
+    anchor: 'schedule.needsYou',
+  },
 ]
 
 export function forRole<T extends { roles: Roles }>(items: T[], role: EmployeeRole | null): T[] {

@@ -1,6 +1,7 @@
 import { startOfWeek, addDays, addWeeks, isAfter, isBefore, parseISO, format } from 'date-fns'
 import { cadenceFor, cadencePriority, intervalDaysFor } from '@/lib/utils/cadence'
 import { displayCrewFor, isVisitInProgress } from '@/lib/utils/visits'
+import { UNGROUPED_SORT_KEY } from '@/lib/utils/schedule-sort'
 import type {
   Account,
   Employee,
@@ -286,4 +287,159 @@ export function routeGroupStats(
     unscheduled,
     withoutCrew,
   }
+}
+
+// ─── Exceptions and field activity ──────────────────────────────────────────────
+
+/** On site this long reads as a forgotten Stop tap or a job gone wrong. */
+export const LONG_ON_SITE_HOURS = 4
+
+type VisitException = {
+  kind: 'skipped' | 'crewReport' | 'longOnSite'
+  key: string
+  row: SchedulePropertyRow
+  visit: VisitWithCrew
+  /** Route group id, or null when the property is on no route. */
+  routeKey: string | null
+  description: string
+}
+
+type AggregateException =
+  | {
+      kind: 'noCrew'
+      key: string
+      /** Route group id, or UNGROUPED_SORT_KEY for "Not on a route". */
+      routeKey: string
+      count: number
+      description: string
+    }
+  | { kind: 'dueUnscheduled'; key: string; count: number; description: string }
+
+/** One thing on the week that needs a decision. Visit items open the stop; aggregates don't. */
+export type ScheduleException = VisitException | AggregateException
+
+/**
+ * What needs Matt this week, most urgent first: skips, long on-site, crew reports, routes with
+ * crewless stops, then due-but-unscheduled. Pure; "seen" filtering is the caller's job.
+ */
+export function scheduleExceptions(
+  week: ScheduleWeek | undefined,
+  decisions: PlanDecision[],
+  now: Date,
+): ScheduleException[] {
+  if (!week) return []
+  const skipped: VisitException[] = []
+  const longOnSite: VisitException[] = []
+  const reports: VisitException[] = []
+  const noCrew: AggregateException[] = []
+
+  const buckets = [
+    ...week.routeGroups.map((g) => ({ key: g.routeGroup.id, name: g.routeGroup.name, rows: g.rows })),
+    { key: UNGROUPED_SORT_KEY, name: null, rows: week.ungrouped },
+  ]
+
+  for (const bucket of buckets) {
+    let crewless = 0
+    for (const row of bucket.rows) {
+      const visit = row.visit
+      if (!visit) continue
+      const routeKey = row.routeGroup?.id ?? null
+      const base = { key: visit.id, row, visit, routeKey }
+
+      if (visit.status === 'skipped') {
+        skipped.push({
+          ...base,
+          kind: 'skipped',
+          description: visit.skip_reason ? `Skipped: “${visit.skip_reason}”` : 'Skipped, no reason given',
+        })
+      } else if (visit.status === 'completed') {
+        const report = crewReportSummary(visit)
+        if (report) reports.push({ ...base, kind: 'crewReport', description: report })
+      } else {
+        if (
+          isVisitInProgress(visit) &&
+          visit.started_at &&
+          now.getTime() - parseISO(visit.started_at).getTime() > LONG_ON_SITE_HOURS * 3_600_000
+        ) {
+          longOnSite.push({
+            ...base,
+            kind: 'longOnSite',
+            description: `On site since ${format(parseISO(visit.started_at), 'h:mm a')}`,
+          })
+        }
+        if (displayCrewFor(visit).length === 0) crewless += 1
+      }
+    }
+    if (crewless > 0) {
+      const stops = crewless === 1 ? '1 stop' : `${crewless} stops`
+      noCrew.push({
+        kind: 'noCrew',
+        key: `noCrew:${bucket.key}`,
+        routeKey: bucket.key,
+        count: crewless,
+        description: bucket.name
+          ? `${stops} on ${bucket.name} ${crewless === 1 ? 'has' : 'have'} no crew`
+          : `${stops} not on a route ${crewless === 1 ? 'has' : 'have'} no crew`,
+      })
+    }
+  }
+
+  const byNewest = (a: VisitException, b: VisitException) =>
+    Date.parse(activityTime(b.visit)) - Date.parse(activityTime(a.visit))
+  const due = decisions.filter((d) => d.due).length
+  const dueItem: AggregateException[] =
+    due > 0
+      ? [
+          {
+            kind: 'dueUnscheduled',
+            key: 'dueUnscheduled',
+            count: due,
+            description: `${due} ${due === 1 ? 'stop is' : 'stops are'} due and not scheduled`,
+          },
+        ]
+      : []
+
+  return [
+    ...skipped.sort(byNewest),
+    ...longOnSite,
+    ...reports.sort(byNewest),
+    ...noCrew,
+    ...dueItem,
+  ]
+}
+
+/** `"Back gate stuck" · 2 photos`, or null when crew sent nothing back. */
+export function crewReportSummary(visit: VisitWithCrew): string | null {
+  const note = visit.completion_note?.trim()
+  const photos = visit.photo_count ?? 0
+  const parts = [
+    note ? `“${note}”` : null,
+    photos > 0 ? `${photos} ${photos === 1 ? 'photo' : 'photos'}` : null,
+  ].filter(Boolean)
+  return parts.length > 0 ? parts.join(' · ') : null
+}
+
+/** When a settled visit happened: ended_at, else updated_at (a skip never started has no end). */
+export function activityTime(visit: VisitWithCrew): string {
+  return visit.ended_at ?? visit.updated_at
+}
+
+export type FieldActivityItem = {
+  row: SchedulePropertyRow
+  visit: VisitWithCrew
+  at: string
+}
+
+/** The week's completed and skipped visits, newest first — what came back from the field. */
+export function fieldActivity(week: ScheduleWeek | undefined): FieldActivityItem[] {
+  if (!week) return []
+  const rows = [...week.routeGroups.flatMap((g) => g.rows), ...week.ungrouped]
+  const items: FieldActivityItem[] = []
+  for (const row of rows) {
+    const visit = row.visit
+    if (visit?.status !== 'completed' && visit?.status !== 'skipped') continue
+    items.push({ row, visit, at: activityTime(visit) })
+  }
+  // Parsed, not string-compared: an optimistic patch and a server row format offsets differently.
+  return items.sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
 }
