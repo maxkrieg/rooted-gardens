@@ -99,6 +99,19 @@ export function ScheduleBoardDesktop({
   const middleRef = useRef<HTMLDivElement>(null)
   const leftRef = useRef<HTMLElement>(null)
   const returnFocus = useRef<Element | null>(null)
+
+  // The board fills the viewport below wherever it starts. Measured, not assumed: a tour offer
+  // or the impersonation banner above it would otherwise push its bottom off-screen.
+  const [boardTop, setBoardTop] = useState<number | null>(null)
+  const boardRef = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return
+    const measure = () => setBoardTop(el.getBoundingClientRect().top + window.scrollY)
+    measure()
+    // Banners come and go above the board, and each one resizes the body.
+    const observer = new ResizeObserver(measure)
+    observer.observe(document.body)
+    return () => observer.disconnect()
+  }, [])
   const { items: needsYou } = useNeedsYou(todayWeek, todayWeekUnfiltered, todayWeekStart)
 
   const [pane, setPane] = useState<PaneState | null>(null)
@@ -182,8 +195,15 @@ export function ScheduleBoardDesktop({
   return (
     // A container, not a breakpoint: the left pane folds to a rail when the stop pane needs its room.
     <div
+      ref={boardRef}
       className="@container flex min-h-[480px] gap-3"
-      style={{ height: 'calc(100dvh - var(--schedule-sticky-h, 0px) - 3.75rem)' }}
+      // 1.5rem is the page's lg:p-6 bottom padding.
+      style={{
+        height:
+          boardTop === null
+            ? 'calc(100dvh - var(--schedule-sticky-h, 0px) - 3.75rem)'
+            : `calc(100dvh - ${boardTop}px - 1.5rem)`,
+      }}
     >
       {/* Left: view, what needs you, every route this week. */}
       <aside

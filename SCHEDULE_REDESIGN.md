@@ -17,6 +17,7 @@ conventions. It is the source of truth wherever this file is silent.
 > - [x] **S3** — Today, rebuilt around routes
 > - [x] **S4** — Property history in the stop sheet
 > - [x] **S5** — Desktop three-pane, retire the grid
+> - [x] **S6** — Follow-ups from S1–S5, and the functional checks
 >
 > **One Claude Code session per phase.** Prompt: *"Implement phase S<n> of SCHEDULE_REDESIGN.md.
 > Fill in its As-built section and tick its box when done."* Each phase lists what to read
@@ -863,5 +864,173 @@ sticky bar plus `lg:p-6`; the impersonation banner may add a little page scroll)
 feeling right at 1280, and Esc inside nested popovers.
 
 
-### S6 - Follow-ups on anything that came up in S1–S5
-**Goal.** Fix anything that came up in S1–S5 that didn't have a clear owner or a clear fix. This is the "catch-all" phase for anything that was discovered during the previous phases that needs to be addressed before the redesign is considered complete.
+---
+
+## S6 — Follow-ups from S1–S5, and the functional checks
+
+**Goal.** Close the gaps the S1–S5 As-built notes recorded, and run the functional checks no
+phase has run yet. After S6, the redesign counts as done. Triaged 2026-10-04 against `33fdde3`.
+
+**Read first:**
+- S1–S5 As-built notes (this file).
+- `hooks/useManagementSchedule.ts` → `applyVisitUpdate`, `useRefreshSchedule`.
+- `components/management/ScheduleRealtime.tsx`, and `hooks/crew/useCrewRealtimeSync.ts` for an
+  existing `visit_crew` subscription to copy.
+- `components/management/VisitDetailSheet.tsx` → `handleOpenChange`, and its call sites
+  (`ScheduleListMobile`, `TodayView`, `DeepLinkedVisitSheet`, `ScheduleBoardDesktop`,
+  `RecentVisitsList`, `InvoicedHistory`).
+- `components/crew/VisitLogger.tsx` → the seeding `useEffect` (~line 159).
+- `CLAUDE.md` → "Rules that bite", "Realtime subscriptions" (the Known gap).
+
+**Depends on:** S1–S5.
+
+**Build.**
+1. **Live photo-only completions reach Needs you.** `photo_count` is only computed at fetch
+   (`lib/schedule/fetch.ts`), and `photos` isn't in the realtime publication. So a completion
+   with photos and no note isn't a `crewReport` until something refetches, and the feed shows no
+   photos (S2 noted this as freshness, but it's worse than that). In `applyVisitUpdate`, when a
+   live update flips `status` to `completed`, invalidate that `schedule-visits` key too. Do it
+   after the `setQueryData` patch, next to the existing property-history invalidation.
+2. **Crew changes from another device show up live.** Needs you `noCrew`, the overview's "N
+   without crew", and S5's "edit crew → the middle row updates" are only right on the device that
+   made the edit (CLAUDE.md's Known gap). `visit_crew` is in the publication. In
+   `ScheduleRealtime`, subscribe to `visit_crew` INSERT/DELETE, filter client-side to visit ids in
+   the loaded weeks (as the `visits` channel does), and invalidate `['schedule-visits']`
+   **debounced** (~500ms), so a `bulkAssignRoute` of 10 rows means one refetch. Update CLAUDE.md's
+   Known gap note and REDESIGN.md's "Tabled" entry.
+3. **No `router.refresh()` on sheet close in client-first views.** `VisitDetailSheet` refreshes on
+   every non-inline close while `navigator.onLine`, which includes the schedule's phone sheet,
+   Today's sheet and the account page. On weak signal, `onLine` is true, the RSC fetch fails,
+   and the error boundary takes the page down. Make it an opt-in `refreshOnClose` prop, default
+   off, passed only by `InvoicedHistory` (billing, server-rendered). Check each other call site
+   doesn't depend on it.
+4. **Clean lint.** The `react-hooks/set-state-in-effect` error in `VisitLogger.tsx` has been noted
+   in every phase. Seed the form at open without setState-in-effect: remount the form body via a
+   `key` that changes each time the sheet opens, with `useState` initializers. Or seed in the open
+   handler. Keep the signed-URL fetch for existing photos in an effect, since that's an external sync.
+
+**Verify.** Run everything under `npm run build && npm start` with `/admin/impersonate`, at
+375×812 and at 1024 / 1440. ⚠ marks what the As-built notes flagged as riskiest.
+- S6 fixes:
+  - Crew completes with photos and no note → the owner's Needs you shows it, no reload.
+  - Owner A assigns crew → owner B's "without crew" drops, no reload.
+  - Closing the schedule sheet sends no RSC request (Network tab). Billing's sheet still refreshes.
+- S1:
+  - Overview counts are right.
+  - Route → stop → back keeps scroll ⚠.
+  - `?route=` and `?route=&visit=` reloads open the right thing. OS back from a deep link lands
+    on the overview, not off the app ⚠.
+  - Offline: drill-in works from cache, and an offline crew change updates "without crew".
+  - The CTA number matches the Generate preview, then disappears.
+  - Crew get the flat list. The accountant gets no action bar.
+- S2: crew skip → Needs you and the top of From the field, no reload. Opening it clears it, and a
+  re-edited note brings it back. Both lists render offline.
+- S3:
+  - Only today's `default_days` routes, plus live ones, appear.
+  - Crew Start/Stop moves Now/Next live.
+  - Airplane mode shows "Last seen on site at …".
+  - `/app/dashboard` and `/management/dashboard` redirect to Today.
+- S4:
+  - The `photos(type)` embed in `usePropertyHistory` has never run against dev. Check it first ⚠.
+  - History shows the right dates, crew and notes. A new completion lands on top.
+  - Offline renders from cache. Crew see it read-only.
+- S5:
+  - No horizontal scroll at 1024 / 1440.
+  - Board height with the impersonation banner up ⚠ (`ScheduleBoardDesktop` assumes sticky bar +
+    3.75rem).
+  - Whether the rail threshold feels right at 1280 ⚠.
+  - Esc inside nested popovers closes the popover, not the pane ⚠.
+  - Keyboard-only use works.
+  - One week in the Network tab.
+  - The accountant is read-only. Crew get the flat list at desktop width.
+
+Anything that fails becomes a fix in this phase. Record it in As built.
+
+**Don't.**
+- Add a `MutationType` or a schema change. None of these needs one.
+- Put `photos` in the realtime publication for fix 1. Invalidating on the status flip is enough.
+- Subscribe to `visit_crew` without a debounce. Bulk writes would refetch once per row.
+
+**Deferred, on purpose:**
+- **Matt walkthrough** (S0 skipped it). Do it on the real app after S6. If he misses
+  pattern-spotting, the answer is the read-only season heatmap under "Ruled out".
+- **An offline-queued completion doesn't patch the cached property history** (S4). It shows on the
+  next online refetch. A patch would duplicate VisitLogger's normalization.
+- **`?visit=` stays on the opened visit while a past one is shown** (S4). A past id would be a dead
+  link, since `DeepLinkedVisitSheet` only resolves loaded weeks.
+- **History taps on `/app/stop` need a connection** (S4's router push).
+- **Seen state is per viewer** (S2). The shared "handled" table stays "not now".
+- **`sortState.byGroup` is stored but unread** (S1/S5). Harmless.
+- **No Fleet nav badge** (S3). Dropped as the plan allowed.
+
+### S6 as built — deviations
+
+Build fixes 1–4 landed as planned. Build, typecheck, lint (0 errors for the first time since
+S1) and `check:tours` all pass.
+
+- **Fix 1.** `applyVisitUpdate` now invalidates the matching `schedule-visits` key when a live
+  update flips `status` to `completed`. It runs after the `setQueryData` patch, next to the
+  property-history invalidation, so the row updates at once and `photo_count` follows on refetch.
+- **Fix 2.** The `visit_crew` subscription is a second channel inside `ScheduleRealtime`
+  (`management_visit_crew`), not a new component. It listens to `*`, so UPDATE is included,
+  though nothing writes one. DELETE payloads carry only the primary key, and `visit_id` is part
+  of it, so the client-side id filter works for removals too. The device that made the edit gets
+  its own event back, which costs one extra debounced refetch. `useRefreshSchedule` after
+  `bulkAssignRoute` stays, since the subscription only exists where the schedule is mounted.
+  CLAUDE.md's Known gap and REDESIGN.md's Tabled entry are updated.
+- **Fix 3.** `refreshOnClose` is opt-in, and only `InvoicedHistory` passes it. The board pane
+  (`inline`) no longer needs its own carve-out. Checking call sites found one that *looked*
+  dependent: the account page's `RecentVisitsList`. But that page is client-first, so the
+  refresh never updated its list. It now invalidates `['account-detail', id]` on close, which is
+  offline-safe and actually picks up an edit made in the sheet.
+- **Fix 4.** Seeding uses React's "adjust state when a prop changes" pattern (a `seededOpen`
+  guard during render) rather than a `key` remount. A remount would have meant splitting the
+  form body out of the component that owns the Sheet. Side benefit: the old effect depended on
+  `initialPhotos`/`initialPresentIds`, so a background refetch while the sheet was open could
+  re-seed over the crew member's edits. That no longer happens. Existing photos are seeded at
+  once without URLs, and the signed-URL effect patches `remoteUrl` in by id (idempotent, with
+  cancellation), so thumbnails fill in a moment after the sheet opens instead of popping in.
+
+**Verify — fixes found by the browser pass.**
+- **Deep link → Back left the app (S1 ⚠, failed).** The overview entry was never slipped under a
+  `?route=` link. `weeks[0]` exists before data loads (it's built from empty arrays), so on the
+  first render `routeExists` was false, `activeRoute` null, and the one-shot effect settled with
+  nothing pushed. Both OS Back and the in-app "← Week" (`history.back()`) then left the app. It
+  now waits for `hasData`. Verified: entries become overview → route, and Back lands on the
+  overview.
+- **Board overflowed under a banner (S5 ⚠, failed).** The "Quick tour?" offer added 65px above the
+  board, which pushed it 64px past the viewport (the impersonation banner does the same). The
+  board now measures its own top with a callback ref, measuring once and then on every body
+  resize. Its height is `100dvh − top − 1.5rem`, so it no longer assumes what sits above it.
+  Verified: the board's bottom sits 24px above the viewport edge, with no page scroll.
+
+**Verify — passed** (Chrome, `next dev`, signed in as owner, widths via same-origin iframes):
+- Fix 3: closing the phone (375) schedule sheet sends no RSC request. Billing's sheet still
+  sends one.
+- No horizontal scroll at 1024 / 1280 / 1440, and one week (plus its two prefetched
+  neighbours) is fetched.
+- Keyboard: ↓ focuses a stop, Enter opens it, Esc closes it. **Esc inside the open Status dropdown
+  closes only the dropdown**, and the pane stays.
+- `?route=&visit=` reload opens the right route and stop.
+- `/app/dashboard` and `/management/dashboard` redirect to `/app/schedule?view=today`. Today on a
+  Sunday shows no running routes, which is right for Mon/Tue routes.
+- S4: "Earlier visits here" renders dates, crew and status. The `photos(type)` embed also
+  resolves against dev with the service client (43 completed visits, 8 with photos).
+- Rail at 1280: with a stop open, the board is ~1008px, under `@5xl` (1024), so the left pane
+  folds to the rail. Working as designed. Whether that *feels* right is for Matt.
+
+**Verify — not run, and why:**
+- **Realtime fixes 1 and 2, and S2/S3 live checks.** These need a second device to write. A
+  service-client write to dev, standing in for that device, was declined as a change to shared
+  data. Run with two signed-in sessions.
+- **Offline (S1, S2, S4) and "Last seen on site".** Port 3000 was `next dev`, where the worker is
+  `NetworkOnly`. Needs `npm run build && npm start`.
+- **Accountant / crew roles.** That's `/admin/impersonate`, which would have switched the session
+  in the user's own open tab.
+- **Focus return after Esc, and scroll restore.** The test tab sat in a background window, where
+  `requestAnimationFrame` and ResizeObserver don't fire. Also, three routes are too short to
+  scroll.
+- **Exactly 1024px** read as below `lg` here. This was the browser's 1.8× zoom rounding to
+  1023.9px, not the app.
+- Noted, not changed: Back from a route keeps the board's open stop pane, because the pane is
+  component state, not URL-driven. This is the same with or without a deep link.

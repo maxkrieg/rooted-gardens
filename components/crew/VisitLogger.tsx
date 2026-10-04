@@ -155,44 +155,54 @@ export function VisitLogger({
     return null
   }
 
-  // Seed state every time the sheet opens, using pre-fill values when editing
-  useEffect(() => {
+  // Seed state each time the sheet opens, using pre-fill values when editing. Adjusted during
+  // render rather than in an effect, so a refetched prop can't re-seed over the open form.
+  const [seededOpen, setSeededOpen] = useState(false)
+  if (open !== seededOpen) {
+    setSeededOpen(open)
     if (open) {
-      // Recomputed here so the effect depends only on `weekStart`.
-      const openWeekEnd = endOfDay(addDays(startOfDay(parseISO(weekStart)), 6))
-      const openLatestAllowed = minDate([new Date(), openWeekEnd])
-
       setPresentIds(initialPresentIds ?? assignedCrew.map((c) => c.employee_id))
       setServiceTypes(initialServiceTypes ?? [])
       setCompletionNote(initialCompletionNote ?? '')
-      setEndTime(toDatetimeLocalValue(openLatestAllowed.toISOString()))
-      setStartTime(toDatetimeLocalValue(startedAt ?? openLatestAllowed.toISOString()))
+      setEndTime(toDatetimeLocalValue(latestAllowed.toISOString()))
+      setStartTime(toDatetimeLocalValue(startedAt ?? latestAllowed.toISOString()))
       setStartTimeError(null)
       setEndTimeError(null)
       setPresentIdsError(false)
       setCaptionIndex(null)
-
-      // Previously uploaded photos get fresh signed URLs; they're already persisted.
-      if (initialPhotos && initialPhotos.length > 0) {
-        const supabase = createClient()
-        Promise.all(
-          initialPhotos.map(async (p) => {
-            const { data } = await supabase.storage.from('photos').createSignedUrl(p.storage_path, 3600)
-            return {
-              id: p.id,
-              storagePath: p.storage_path,
-              remoteUrl: data?.signedUrl,
-              createdAt: p.created_at,
-              caption: p.caption ?? null,
-              initialCaption: p.caption ?? null,
-            }
-          })
-        ).then(setPhotos)
-      } else {
-        setPhotos([])
-      }
+      setPhotos(
+        (initialPhotos ?? []).map((p) => ({
+          id: p.id,
+          storagePath: p.storage_path,
+          createdAt: p.created_at,
+          caption: p.caption ?? null,
+          initialCaption: p.caption ?? null,
+        })),
+      )
     }
-  }, [open, assignedCrew, startedAt, weekStart, initialServiceTypes, initialCompletionNote, initialPresentIds, initialPhotos])
+  }
+
+  // Previously uploaded photos need fresh signed URLs. Patched in by id, so a re-run is harmless.
+  useEffect(() => {
+    if (!open || !initialPhotos?.length) return
+    let cancelled = false
+    const supabase = createClient()
+    Promise.all(
+      initialPhotos.map(async (p) => {
+        const { data } = await supabase.storage.from('photos').createSignedUrl(p.storage_path, 3600)
+        return [p.id, data?.signedUrl] as const
+      }),
+    ).then((entries) => {
+      if (cancelled) return
+      const urls = new Map(entries)
+      setPhotos((prev) =>
+        prev.map((p) => (p.id && urls.get(p.id) ? { ...p, remoteUrl: urls.get(p.id) } : p)),
+      )
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [open, initialPhotos])
 
   const crewOptions = activeEmployees.map((e) => ({ id: e.id, name: e.name, role: e.role }))
 

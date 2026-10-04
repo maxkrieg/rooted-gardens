@@ -165,14 +165,17 @@ export function applyVisitUpdate(queryClient: QueryClient, incoming: VisitOverla
     if (!existing) continue
     const existingVersion = visitVersion(existing)
     if (existingVersion === null || existingVersion >= incomingVersion) continue
-    // A live completion or skip (e.g. from a crew phone) is that property's newest history.
-    if (incoming.status && incoming.status !== existing.status) {
-      queryClient.invalidateQueries({ queryKey: propertyHistoryKey(existing.property_id) })
-    }
     queryClient.setQueryData<VisitWithCrew[]>(
       key,
       data.map((v) => (v.id === incoming.id ? { ...v, ...incoming } : v)),
     )
+    // A live completion or skip (e.g. from a crew phone) is that property's newest history.
+    if (incoming.status && incoming.status !== existing.status) {
+      queryClient.invalidateQueries({ queryKey: propertyHistoryKey(existing.property_id) })
+      // photo_count is computed at fetch and photos aren't in realtime: refetch, or a
+      // photo-only completion never becomes a crew report.
+      if (incoming.status === 'completed') queryClient.invalidateQueries({ queryKey: key })
+    }
   }
 
   // The drawer reads its own entry, shared with the crew stop page.

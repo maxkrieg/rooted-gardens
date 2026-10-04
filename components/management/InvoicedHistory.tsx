@@ -519,6 +519,7 @@ export function InvoicedHistory({
             visit: { ...sheetRow.visit, visit_crew: [] },
           }}
           weekStart={sheetRow.visit.week_start}
+          refreshOnClose
         />
       )}
     </div>

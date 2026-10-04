@@ -1016,11 +1016,12 @@ no query of its own, and `ScheduleRealtime` always covers the current week for i
 **Now** line says "Last seen on site at h:mm" instead of ticking a clock over stale data. Don't
 "fix" that into a running timer. (`CrewsOnSitePanel`, which did this with an uncached query, is gone.)
 
-> **Known gap:** nothing subscribes to `visit_crew` for *other* people, so a crew change made
-> elsewhere doesn't reach a screen until something refetches. That is why `bulkAssignRoute`
-> needs `useRefreshSchedule()` — and why the vehicle appeared live while the crew avatars
-> didn't, which read as a rendering glitch rather than a missing invalidation. Raised in
-> REDESIGN.md under "Tabled".
+> **Other people's crew changes:** `ScheduleRealtime` also subscribes to `visit_crew`
+> INSERT/DELETE, filters client-side to the loaded weeks' visit ids, and invalidates
+> `['schedule-visits']` **debounced 500ms** — `visit_crew` rows carry no visit, so this is a
+> refetch, not a cache patch, and the debounce keeps a `bulkAssignRoute` to one refetch. It
+> only runs where the schedule is mounted, so `useRefreshSchedule()` after a crew write is
+> still required for the device that made it (SCHEDULE_REDESIGN S6).
 
 Treat realtime as best-effort, never the source of truth. Owner start/stop alerts are
 **in-app only** — no email / SMS / push (Phase 8.3). If an owner doesn't have the app open,

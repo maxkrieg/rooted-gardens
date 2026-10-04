@@ -36,6 +36,9 @@ interface VisitDetailSheetProps {
   weekStart: string
   /** The desktop board's right pane: the same detail, rendered in place instead of in a Sheet. */
   inline?: boolean
+  /** `router.refresh()` on close. Server-rendered containers (billing) only: on a client-first
+   *  page it refreshes an empty shell, and on weak signal the failed RSC fetch crashes it. */
+  refreshOnClose?: boolean
 }
 
 /** Maps the schedule's row into useStopDetail's shape so both share one cache entry. */
@@ -95,6 +98,7 @@ export function VisitDetailSheet({
   row: openedRow,
   weekStart: openedWeek,
   inline = false,
+  refreshOnClose = false,
 }: VisitDetailSheetProps) {
   const router = useRouter()
 
@@ -154,13 +158,11 @@ export function VisitDetailSheet({
   }
   const { data: currentEmployee } = useCurrentEmployee()
 
-  // Only server-rendered containers (billing) need a refresh; offline it would crash the page.
   function handleOpenChange(next: boolean) {
     // The stacked lightbox's close reaches this sheet as an outside interaction; ignore it.
     if (!next && (photoViewerOpen || Date.now() - photoClosedAt.current < 500)) return
     // Refresh before onOpenChange: its replaceState can discard a refresh dispatched after it.
-    // The pane only lives on the client-first schedule, which a refresh can't help.
-    if (!next && !inline && navigator.onLine) router.refresh()
+    if (!next && refreshOnClose && navigator.onLine) router.refresh()
     onOpenChange(next)
   }
 

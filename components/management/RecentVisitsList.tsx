@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
 import { Card, CardContent } from '@/components/ui/card'
 import { EmptyState } from '@/components/states/EmptyState'
@@ -22,6 +23,13 @@ interface RecentVisitsListProps {
 export function RecentVisitsList({ visits, account, loadError }: RecentVisitsListProps) {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sheetVisit, setSheetVisit] = useState<RecentVisit | null>(null)
+  const queryClient = useQueryClient()
+
+  // Edits in the sheet land in the schedule caches, not this page's; refetch it on close.
+  function handleSheetOpenChange(open: boolean) {
+    setSheetOpen(open)
+    if (!open) queryClient.invalidateQueries({ queryKey: ['account-detail', account.id] })
+  }
 
   function handleRowClick(visit: RecentVisit) {
     if (!visit.property) return // nothing to open without a property reference
@@ -115,7 +123,7 @@ export function RecentVisitsList({ visits, account, loadError }: RecentVisitsLis
       {sheetVisit?.property && (
         <VisitDetailSheet
           open={sheetOpen}
-          onOpenChange={setSheetOpen}
+          onOpenChange={handleSheetOpenChange}
           row={{
             property: sheetVisit.property,
             account,

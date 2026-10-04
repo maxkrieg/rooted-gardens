@@ -180,14 +180,15 @@ export function ScheduleView({
   // the overview. A `?route=` deep link gets an overview entry slipped in underneath, once.
   const pushedRoute = useRef(false)
   const deepLinkSettled = useRef(false)
+  // Waits for data: `weeks[0]` exists before it loads, when no route can match yet.
   useEffect(() => {
-    if (deepLinkSettled.current || !weeks[0]) return
+    if (deepLinkSettled.current || !hasData) return
     deepLinkSettled.current = true
     if (!activeRoute) return
     window.history.replaceState(null, '', scheduleUrl(filters, windowStart, null))
     window.history.pushState(null, '', scheduleUrl(filters, windowStart, activeRoute))
     pushedRoute.current = true
-  }, [weeks, activeRoute, filters, windowStart])
+  }, [hasData, activeRoute, filters, windowStart])
 
   useEffect(() => {
     function onPopState() {

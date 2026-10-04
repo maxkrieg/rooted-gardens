@@ -562,7 +562,10 @@ cleanly to a fresh project from the baseline.
 
 ## Tabled — worth doing, not scheduled
 
-- **Realtime `visit_crew` for management.** `visit_crew` is in the `supabase_realtime`
+- ~~**Realtime `visit_crew` for management.**~~ **Done in SCHEDULE_REDESIGN S6:**
+  `ScheduleRealtime` subscribes to `visit_crew`, filters to the loaded weeks' visit ids, and
+  invalidates `['schedule-visits']` debounced 500ms. Original note kept below.
+  `visit_crew` is in the `supabase_realtime`
   publication, but the management subscription (`SessionsProvider`) only covers `visits`. Crew
   already get their *own* assignments live — `useCrewRealtimeSync` filters
   `employee_id=eq.<mine>` and toasts "Your schedule was updated" — but nobody sees changes to
