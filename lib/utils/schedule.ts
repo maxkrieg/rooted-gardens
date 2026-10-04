@@ -443,3 +443,53 @@ export function fieldActivity(week: ScheduleWeek | undefined): FieldActivityItem
   // Parsed, not string-compared: an optimistic patch and a server row format offsets differently.
   return items.sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
 }
+
+/** `'mon'`…`'sun'` for a date, the same keys `route_groups.default_days` stores. */
+export function weekdayKey(date: Date): string {
+  return format(date, 'EEE').toLowerCase()
+}
+
+export type RunningRoute = {
+  /** A route group id, or UNGROUPED_SORT_KEY. */
+  key: string
+  routeGroup: RouteGroup | null
+  rows: SchedulePropertyRow[]
+  /** Visits on site now, in the rows' order. */
+  now: SchedulePropertyRow[]
+  /** The first stop not yet started, in the rows' order. Callers pass drive-ordered rows. */
+  next: SchedulePropertyRow | null
+}
+
+/**
+ * Routes whose `default_days` include `day`, plus any route with a visit on site, so nothing
+ * live is hidden. `default_days` is the only day signal: a visit is keyed to a week, not a day.
+ */
+export function routesRunningToday(
+  week: ScheduleWeek | undefined,
+  day: string,
+  order: (groupKey: string, rows: SchedulePropertyRow[]) => SchedulePropertyRow[] = (_, rows) => rows,
+): { running: RunningRoute[]; otherCount: number } {
+  if (!week) return { running: [], otherCount: 0 }
+  const groups: Array<{ key: string; routeGroup: RouteGroup | null; rows: SchedulePropertyRow[] }> = [
+    ...week.routeGroups.map(({ routeGroup, rows }) => ({ key: routeGroup.id, routeGroup, rows })),
+    ...(week.ungrouped.length > 0
+      ? [{ key: UNGROUPED_SORT_KEY, routeGroup: null, rows: week.ungrouped }]
+      : []),
+  ]
+
+  const running: RunningRoute[] = []
+  let otherCount = 0
+  for (const group of groups) {
+    const rows = order(group.key, group.rows)
+    const now = rows.filter((row) => row.visit && isVisitInProgress(row.visit))
+    const scheduledToday = group.routeGroup?.default_days?.includes(day) ?? false
+    if (!scheduledToday && now.length === 0) {
+      if (group.routeGroup) otherCount += 1
+      continue
+    }
+    const next =
+      rows.find((row) => row.visit?.status === 'scheduled' && !row.visit.started_at) ?? null
+    running.push({ ...group, rows, now, next })
+  }
+  return { running, otherCount }
+}

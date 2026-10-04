@@ -108,7 +108,7 @@ export const WELCOMES: Welcome[] = [
 export const TOURS: Tour[] = [
   {
     key: 'tour.schedule',
-    version: 2,
+    version: 3,
     title: 'Schedule',
     summary: 'Plan the week, open a stop, generate a week, change many stops at once.',
     roles: OFFICE,
@@ -120,7 +120,7 @@ export const TOURS: Tour[] = [
         anchor: 'schedule.viewToggle',
         capability: 'seeDashboard',
         title: 'Today or the week',
-        body: 'Today shows who’s on site and what’s left. Week is the plan. Tap Week.',
+        body: 'Today runs the day: what needs you, the routes out today, and what crews sent back. Week is the plan. Tap Week.',
         advanceOn: 'schedule.viewWeek',
         skipIfVisible: 'schedule.routeBand',
       },
@@ -448,13 +448,14 @@ export const NEWS: NewsItem[] = [
     anchor: 'schedule.routeBand',
   },
   {
-    key: 'news.scheduleNeedsYou',
+    key: 'news.scheduleToday',
     roles: ['owner', 'lead', 'accountant'],
     introduced: '2026-10-03',
-    title: 'What needs you, and what crews sent back',
-    body: 'The top of Week now lists skips, crew notes and photos, long on-site stops and routes missing crew. Open one and it leaves Needs you. Everything crews finished or skipped stays under From the field, newest first.',
+    title: 'Today, rebuilt around routes',
+    body: 'Today now shows the routes running today, what needs you, and what crews reported. A route runs on the days set in its Route defaults. Tap one to see its stops.',
+    parentTour: 'tour.schedule',
     route: '/app/schedule',
-    anchor: 'schedule.needsYou',
+    anchor: 'schedule.viewToggle',
   },
 ]
 

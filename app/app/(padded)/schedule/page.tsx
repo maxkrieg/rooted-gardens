@@ -15,7 +15,7 @@ export default async function SchedulePage({
     status?: string
     /** Deep link from a stop — opens this visit's detail sheet. */
     visit?: string
-    /** 'today' | 'week'. Set by the retired /app/dashboard redirect. */
+    /** 'today' | 'week'. Set by the retired /app/dashboard redirect. Absent, the client decides. */
     view?: string
     /** Opens one route's drill-in on the phone Week view. */
     route?: string
@@ -32,6 +32,7 @@ export default async function SchedulePage({
         params.view === 'today' ? 'today' : params.view === 'week' ? 'week' : null
       }
       initialRouteId={params.route ?? null}
+      weekInUrl={Boolean(params.week)}
     />
   )
 }

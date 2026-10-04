@@ -35,7 +35,7 @@ import { Button } from '@/components/ui/button'
 import { ScheduleFilterBar } from '@/components/management/ScheduleFilterBar'
 import { ScheduleFilterSheet } from '@/components/management/ScheduleFilterSheet'
 import { ScheduleHeaderMobile } from '@/components/management/ScheduleHeaderMobile'
-import { DashboardView } from '@/components/management/DashboardView'
+import { TodayView } from '@/components/management/TodayView'
 import { GenerateWeekSheet } from '@/components/management/GenerateWeekSheet'
 import { useWeekPlan, useGenerateWeek } from '@/hooks/useGenerateWeek'
 import { ScheduleRealtime } from '@/components/management/ScheduleRealtime'
@@ -56,6 +56,8 @@ interface ScheduleViewProps {
   initialViewMode: ScheduleViewMode | null
   /** `?route=` — opens that route's drill-in (a route group id, or UNGROUPED_SORT_KEY). */
   initialRouteId: string | null
+  /** Whether the URL named a week. If it did, the computed default view is Week. */
+  weekInUrl: boolean
 }
 
 const VIEW_MODE_KEY = 'rg-schedule-view'
@@ -67,6 +69,7 @@ export function ScheduleView({
   initialVisitId,
   initialViewMode,
   initialRouteId,
+  weekInUrl,
 }: ScheduleViewProps) {
   const [windowStart, setWindowStart] = useState(initialWeek)
   const [filters, setFilters] = useState<ScheduleFilterValues>(initialFilters)
@@ -93,7 +96,7 @@ export function ScheduleView({
   }, [windowStart, weekCount])
 
   // Resolved, not stored: localStorage doesn't exist on the server. Precedence: tap → ?view= →
-  // last used → Week.
+  // last used → computed default.
   const storedViewMode = useMemo<ScheduleViewMode | null>(() => {
     if (!hydrated) return null
     try {
@@ -105,13 +108,21 @@ export function ScheduleView({
   }, [hydrated])
 
   const { weeks, isLoading, isError, isStale, hasData } = useManagementSchedule(weekStarts)
+  // Today is always the current week, whatever week Week is paged to. Same cached query as
+  // TodayView's, so this costs nothing extra.
+  const currentWeekStart = useMemo(() => format(getWeekStart(new Date()), 'yyyy-MM-dd'), [])
+  const currentWeekStarts = useMemo(() => [currentWeekStart], [currentWeekStart])
+  const current = useManagementSchedule(currentWeekStarts)
+  const currentHasVisits = current.weeks[0] ? weekHasVisits(current.weeks[0]) : false
+  // Today once the week is under way, Week while it still needs generating.
+  const computedViewMode: ScheduleViewMode = !weekInUrl && currentHasVisits ? 'today' : 'week'
 
   // Unknown until the week loads; then a route that no longer exists falls back to the overview.
   const activeRoute =
     seeDashboard && route && (!weeks[0] || routeExists(weeks[0], route)) ? route : null
 
   // Crew get no Today view: it carries company-wide stats. A route is always a Week thing.
-  const requested = viewOverride ?? initialViewMode ?? storedViewMode ?? 'week'
+  const requested = viewOverride ?? initialViewMode ?? storedViewMode ?? computedViewMode
   const viewMode: ScheduleViewMode = seeDashboard && !activeRoute ? requested : 'week'
 
   function changeViewMode(next: ScheduleViewMode) {
@@ -195,11 +206,13 @@ export function ScheduleView({
   }, [])
 
   const overviewScroll = useRef(0)
-  function openRoute(routeKey: string) {
+  // Today opens routes in the current week, so it passes that week along.
+  function openRoute(routeKey: string, week: string = windowStart) {
     overviewScroll.current = window.scrollY
     setSelectMode(false)
     setRoute(routeKey)
-    window.history.pushState(null, '', scheduleUrl(filters, windowStart, routeKey))
+    if (week !== windowStart) setWindowStart(week)
+    window.history.pushState(null, '', scheduleUrl(filters, week, routeKey))
     pushedRoute.current = true
     emitTourEvent('schedule.routeOpened')
   }
@@ -238,15 +251,16 @@ export function ScheduleView({
     [weeks],
   )
 
+  // Today's week too, so its timers stay live while Week is paged elsewhere.
   const visitIds = useMemo(
     () =>
-      weeks
+      [...weeks, ...current.weeks]
         .flatMap((w) => [
           ...w.routeGroups.flatMap((rg) => rg.rows.map((r) => r.visit?.id)),
           ...w.ungrouped.map((r) => r.visit?.id),
         ])
         .filter((id): id is string => Boolean(id)),
-    [weeks],
+    [weeks, current.weeks],
   )
 
   // Planned against the *unfiltered* week: generating off a filtered view would
@@ -385,9 +399,19 @@ export function ScheduleView({
         matchCount={mobileMatchCount}
       />
 
-      {isStale && <CachedNotice />}
+      {isStale && viewMode !== 'today' && <CachedNotice />}
 
-      {viewMode === 'today' && <DashboardView />}
+      {viewMode === 'today' && (
+        <TodayView
+          filters={filters}
+          vehicles={vehicles}
+          onOpenRoute={openRoute}
+          onShowWeek={(week) => {
+            setWindowStart(week)
+            changeViewMode('week')
+          }}
+        />
+      )}
 
       {/* Kept mounted, not unmounted, when Today is showing: DeepLinkedVisitSheet
           lives in here and a ?visit= link must still open its sheet. */}
@@ -445,6 +469,12 @@ function scheduleUrl(filters: ScheduleFilterValues, week: string, route: string 
   const params = scheduleFilterParams(filters, week)
   if (route) params.set('route', route)
   return `/app/schedule?${params.toString()}`
+}
+
+function weekHasVisits(week: ScheduleWeek): boolean {
+  return (
+    week.routeGroups.some((g) => g.rows.some((r) => r.visit)) || week.ungrouped.some((r) => r.visit)
+  )
 }
 
 /** Checked against the unfiltered week, so a filter can't make a real route look deleted. */

@@ -166,6 +166,8 @@ rooted-gardens/
 │   │   ├── ScheduleWeekOverview.tsx ← phone Week for office roles: one row per route
 │   │   ├── NeedsYouList.tsx         ← exceptions (skips, crew reports, no crew…) — scheduleExceptions()
 │   │   ├── FieldActivityList.tsx    ← "From the field": settled visits, newest first — fieldActivity()
+│   │   ├── TodayView.tsx            ← the schedule's Today: Needs you → Running today (routes whose
+│   │   │                              default_days include today — routesRunningToday()) → From the field
 │   │   ├── ScheduleListMobile.tsx   ← the phone schedule (the screen that matters); one route
 │   │   │                              alone on the `?route=` drill-in, crew's flat list otherwise
 │   │   ├── RouteGroupBand.tsx       ← route header: crew, truck, progress, week note
@@ -339,8 +341,8 @@ route_groups (
   -- crew and vehicle always win over them.
   default_vehicle_id uuid FK → vehicles ON DELETE SET NULL,
   default_days text[] NOT NULL DEFAULT '{}'  -- 'mon'…'sun', CHECKed by containment
-    -- NOTE: display only. A visit is keyed to a WEEK, not a day, so there is no
-    -- per-day field to schedule into. It labels the plan; it doesn't drive it.
+    -- NOTE: a visit is keyed to a WEEK, not a day, so this never moves a stop. It
+    -- labels the plan, and decides which routes show as "Running today" on Today.
   created_at, updated_at
 )
 
@@ -908,7 +910,7 @@ client-first model across three phases (`8918429`, `c5a7760`, `a857567`, `655ba8
 `fefd77a`, `2502e69`). The split is no longer crew-vs-management; it is **field vs desk**.
 
 ### Field routes — client-first + offline queue
-Everything under `/app/*`: `/app/schedule` (which carries the dashboard as its `Today` view),
+Everything under `/app/*`: `/app/schedule` (whose `Today` view replaced the dashboard),
 `/app/accounts`, `/app/accounts/[id]`, `/app/routes`, `/app/stop/[visitId]`.
 - **Reads:** client components using **React Query** over the Supabase **browser** client,
   persisted to IndexedDB. Pages are a thin RSC shell that only reads the `rg-role` cookie
@@ -1006,9 +1008,10 @@ more — the `Map<visitId, VisitOverlay>` that `SessionsProvider` kept was folde
 in R5.5, because the grid no longer reads server props and a third store only meant every
 consumer had to remember to merge.
 
-`CrewsOnSitePanel` (the schedule's `Today` view) fetches in-progress visits and subscribes to
-`visits` UPDATE — and deliberately does **not** cache: offline it says it needs a connection
-rather than showing a frozen list with a ticking timer. Don't "fix" that.
+The schedule's `Today` view (`TodayView`) reads on-site state from that same cached week, with
+no query of its own, and `ScheduleRealtime` always covers the current week for it. Offline, its
+**Now** line says "Last seen on site at h:mm" instead of ticking a clock over stale data. Don't
+"fix" that into a running timer. (`CrewsOnSitePanel`, which did this with an uncached query, is gone.)
 
 > **Known gap:** nothing subscribes to `visit_crew` for *other* people, so a crew change made
 > elsewhere doesn't reach a screen until something refetches. That is why `bulkAssignRoute`

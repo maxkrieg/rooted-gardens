@@ -66,7 +66,6 @@ const PERSISTED_QUERY_KEYS = new Set([
   'accounts-list',
   'account-detail',
   'account-photos',
-  'fleet-issues',
   'routes-data',
   'nav-lead-count',
   'nav-unrouted-count',

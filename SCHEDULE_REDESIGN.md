@@ -7,11 +7,12 @@ conventions. It is the source of truth wherever this file is silent.
 > **Status:** planned 2026-10-03. S0 done 2026-10-03 (prototype built; no walkthrough with Matt).
 > S1 done 2026-10-03 (static checks pass; the functional checks under Verify are still to run).
 > S2 done 2026-10-03 (same: static checks pass, functional checks not yet run).
+> S3 done 2026-10-03 (same: static checks pass, functional checks not yet run).
 >
 > - [x] **S0** — Clickable prototype for Matt
 > - [x] **S1** — Week overview + route drill-in
 > - [x] **S2** — "Needs you" and "From the field"
-> - [ ] **S3** — Today, rebuilt around routes
+> - [x] **S3** — Today, rebuilt around routes
 > - [ ] **S4** — Property history in the stop sheet
 > - [ ] **S5** — Desktop three-pane, retire the grid
 >
@@ -567,7 +568,69 @@ each, and what needs Matt) instead of the old dashboard's stat cards. Fixes F4 a
 - `/app/dashboard` and `/management/dashboard` still redirect to `?view=today`.
 
 ### S3 as built — deviations
-_(empty)_
+**Shipped as specified:** `TodayView.tsx` (new) replaces `DashboardView` in `ScheduleView`, in the
+order Needs you → Running today → From the field, with `GettingStartedCard` at the top. Running today
+cards: name, days, crew, truck, done/total, progress, week note, **Now** (elapsed) and **Next**. Tap →
+that route's drill-in. "Other routes this week · N" goes to Week. Uninvoiced count and fleet chips are
+gone. `DashboardView.tsx` and `CrewsOnSitePanel.tsx` are deleted (nothing else used them), and so is
+`'fleet-issues'` from `PERSISTED_QUERY_KEYS`. No new `MutationType`, no schema change.
+
+Deviations and decisions:
+- **`routesRunningToday(week, day, order)` + `weekdayKey(date)`** are pure, in `lib/utils/schedule.ts`.
+  A route runs today if its `default_days` include the day *or* any of its visits is on site, so a
+  route with days set but a crew out on the "wrong" day still shows, not only routes with no days.
+  "Not on a route" gets a card too when something there is on site. `otherCount` counts only real
+  routes. **Next** = the first `scheduled`, not-started stop in the order `orderRows` returns (drive
+  order at `DEFAULT_SCHEDULE_SORT`). Multiple stops on site read "Now Acct +1 more". A stop is labelled by
+  account, or by "account · address" when that account has more than one stop on the route.
+- **Today is always the current week,** whatever week Week is paged to. It runs its own
+  `useManagementSchedule([currentWeek])`, the same cached query as Week's when they match. Filters
+  still apply, since the filter button stays in the header. Opening a route from Today moves Week to
+  the current week too (`openRoute(routeKey, week)`), and Back returns to Today, not to the overview,
+  because the stored/computed view still says Today.
+- **Realtime for Today:** `ScheduleRealtime` only listened to the visible window's visit ids. It now
+  also takes the current week's, so Today's Now/Next stay live while Week is paged elsewhere.
+- **Offline:** `useIsOnline` (`hooks/use-hydrated.ts`), not `useOfflineStatus`. The latter reads queue
+  counts from IndexedDB and flushes the queue on `online`, which a second mount would repeat. Offline,
+  Now drops the timer for "Last seen on site at h:mm" on its own line. The time is the cached week's
+  `dataUpdatedAt`, which realtime writes bump too, so it means "when we last heard", not when work
+  started.
+- **`dueUnscheduled` shows on Today,** from `useWeekPlan(currentWeek)` (gated like Week's CTA on
+  `editSchedule` and a loaded, non-errored plan). Today mounts its own `GenerateWeekSheet` for the
+  current week, so tapping it never generates whatever week Week happens to be on.
+- **Needs you and From the field left the Week overview** (S2 had put them there "until S3"). The
+  overview is back to the Generate CTA + route rows, and it no longer needs `useScheduleInteractions`
+  or its own sheet. Today renders its own `VisitDetailSheet`. `DeepLinkedVisitSheet` is still mounted
+  once.
+- **Computed default:** `ScheduleView` gains a `weekInUrl` prop (the page passes `Boolean(params.week)`).
+  The default is `today` when the current week has any visit and the URL didn't name a week, else
+  `week`. The URL check is what keeps a `?week=` link (or the server's UTC idea of "this week" on a
+  Sunday night) from flipping view once the current week loads. Order stays tap → `?view=` → stored →
+  computed, so someone who last tapped Week keeps Week.
+- **Header:** Today gets a small Fraunces date line ("Sat Oct 3"). The phone's sticky header, week
+  arrows included, is unchanged on Today. The arrows only move Week, as they did under the dashboard.
+- **Desktop:** Today renders at every width (capped at `max-w-3xl` on `lg`). The lists are full-bleed
+  on a phone and inset on desktop. S5 gives it a proper pane.
+- **Fleet:** no Fleet nav badge. It would add a query to every signed-in page plus a label/tone in
+  `AppShell`, which isn't "cheap", so it's dropped from Today as the plan allows.
+- **Onboarding:** `tour.schedule` → `version: 3`. The `view` step's copy now describes Today. NEWS:
+  `news.scheduleToday` (owner, lead, accountant, `parentTour: 'tour.schedule'`, anchored on
+  `schedule.viewToggle`). **`news.scheduleNeedsYou` is removed:** its body said the lists sat at the
+  top of Week, which is no longer true, and the new item covers them. The `schedule.needsYou` anchor
+  stays on `NeedsYouList`.
+- **Docs:** `RouteDefaultsSheet`'s Days hint now says Days also decide what runs on Today. `CLAUDE.md`:
+  the `default_days` schema note, Repository Structure (`TodayView.tsx`), and the realtime paragraph
+  that described `CrewsOnSitePanel`.
+
+**Checks:** `npm run build` ✓ · `npm run typecheck` ✓ · `npm run check:tours` ✓ (30 anchors) ·
+`npm run lint`: the only error is still the pre-existing one in `components/crew/VisitLogger.tsx`.
+`routesRunningToday` was run in a scratch script (jiti) against a hand-built week: day match, the
+live-but-no-days route, live ungrouped, Next skipping a settled and an on-site stop, `otherCount`.
+
+**Not yet run: the functional checks under Verify** (only today's routes on a Tuesday, crew
+Start → owner sees Now ticking → Stop advances Next without a reload, airplane mode shows "Last seen on
+site at …", the `/app/dashboard` and `/management/dashboard` redirects, which are untouched in
+`next.config.ts`). Run them under `build && start` with impersonation.
 
 ---
 

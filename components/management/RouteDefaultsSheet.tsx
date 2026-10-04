@@ -93,7 +93,7 @@ export function RouteDefaultsSheet({
           <div className="space-y-5 px-4 pb-4">
             <Field
               label="Days"
-              hint="Shown on the route's band and in a generated week. A visit is a week, not a day, so this labels the plan rather than scheduling to it."
+              hint="Shown on the route's band, and decides which routes show under Running today on the Today view. A visit is a week, not a day, so this doesn't move any stops."
             >
               <div className="flex flex-wrap gap-1.5">
                 {DAYS.map((day) => (
