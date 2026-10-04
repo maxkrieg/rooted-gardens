@@ -74,7 +74,7 @@ const PERSISTED_QUERY_KEYS = new Set([
   'active-employees',
   'active-vehicles',
   'property-photos',
-  'property-visit-history',
+  'property-history',
   'property-last-visit',
   'onboarding-progress',
 ])

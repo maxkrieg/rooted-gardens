@@ -36,7 +36,7 @@ import {
 } from '@/components/management/badges'
 import { usePropertyLastVisit } from '@/hooks/usePropertyLastVisit'
 import { qboInvoiceUrl } from '@/lib/utils/billing'
-import { PropertyVisitHistory } from '@/components/PropertyVisitHistory'
+import { PropertyHistoryStrip } from '@/components/management/PropertyHistoryStrip'
 import { PropertyPhotosSection } from '@/components/PropertyPhotosSection'
 import { PhotoLightbox, type LightboxPhoto } from '@/components/PhotoLightbox'
 import { PhotoCaptionEditor } from '@/components/PhotoCaptionEditor'
@@ -49,7 +49,7 @@ import { useActiveVehicles } from '@/hooks/crew/useActiveVehicles'
 import { isVisitInProgress, formatElapsed, nextVisitVersion } from '@/lib/utils/visits'
 import { createClient } from '@/lib/supabase/client'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
-import type { VisitStatus } from '@/types/app'
+import type { VisitStatus, VisitWithCrew } from '@/types/app'
 import { toast } from 'sonner'
 import { isOfflineError } from '@/lib/errors'
 import { enqueueMutation } from '@/lib/offline/mutation-queue'
@@ -68,6 +68,8 @@ interface VisitDetailContentProps {
   showInvoice?: boolean
   /** Lets a modal container ignore close requests while the stacked photo lightbox is open. */
   onPhotoViewerChange?: (open: boolean) => void
+  /** Opens a visit from "Earlier visits here". Omitted = the history is read-only. */
+  onOpenHistoryVisit?: (visit: VisitWithCrew) => void
 }
 
 /**
@@ -81,6 +83,7 @@ export function VisitDetailContent({
   showAddress = true,
   showInvoice = false,
   onPhotoViewerChange,
+  onOpenHistoryVisit,
 }: VisitDetailContentProps) {
   const { visit, property, account } = data
   const { data: lastVisitByProperty } = usePropertyLastVisit()
@@ -563,7 +566,12 @@ export function VisitDetailContent({
           )}
         </div>
 
-      <PropertyVisitHistory propertyId={property.id} beforeWeekStart={visit.week_start} />
+      {/* Every role: RLS lets crew read any visit (visits_select), so they get it read-only. */}
+      <PropertyHistoryStrip
+        propertyId={property.id}
+        visitId={data.visitId}
+        onOpenVisit={onOpenHistoryVisit}
+      />
 
       <CrewAssignSheet
         visitId={data.visitId}

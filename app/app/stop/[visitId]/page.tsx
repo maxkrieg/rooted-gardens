@@ -51,7 +51,7 @@ export default function StopDetailPage() {
   const queryClient = useQueryClient()
   const { data: stop, isLoading, isError, refetch } = useStopDetail(visitId)
   const { data: employee } = useCurrentEmployee()
-  const { editSchedule: canManage } = useCan()
+  const { editSchedule: canManage, seeDashboard } = useCan()
   const [completionOpen, setCompletionOpen] = useState(false)
   const [skipOpen, setSkipOpen] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
@@ -182,6 +182,10 @@ export default function StopDetailPage() {
           data={stop}
           onOpenCompletion={() => setCompletionOpen(true)}
           onOpenSkip={() => setSkipOpen(true)}
+          // Crew read the history but don't page into past stops from it.
+          onOpenHistoryVisit={
+            seeDashboard ? (past) => router.push(`/app/stop/${past.id}`) : undefined
+          }
         />
       </div>
 

@@ -19,6 +19,7 @@ import { CrewMultiSelect } from '@/components/crew/CrewMultiSelect'
 import { enqueueMutation, flushMutationQueue } from '@/lib/offline/mutation-queue'
 import { useActiveEmployees } from '@/hooks/crew/useActiveEmployees'
 import { patchScheduleVisit } from '@/hooks/useManagementSchedule'
+import { propertyHistoryKey } from '@/hooks/usePropertyHistory'
 import type { VisitCrewWithEmployee } from '@/types/app'
 import { createClient } from '@/lib/supabase/client'
 import { MAX_PHOTO_BYTES, ALLOWED_PHOTO_TYPES } from '@/lib/utils/photos'
@@ -370,6 +371,7 @@ export function VisitLogger({
     // and the week schedule so its in-progress pulse clears on completion.
     queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
     queryClient.invalidateQueries({ queryKey: ['schedule-visits'] })
+    queryClient.invalidateQueries({ queryKey: propertyHistoryKey(propertyId) })
 
     // The grid shows completed-by crew once a visit is done, and visit_crew rows
     // reach it through no other cache write.

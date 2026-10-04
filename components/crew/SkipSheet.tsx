@@ -77,6 +77,8 @@ export function SkipSheet({
 
     queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
     queryClient.invalidateQueries({ queryKey: ['schedule-visits'] })
+    // No propertyId here; only the open sheet's history is active, so this stays cheap.
+    queryClient.invalidateQueries({ queryKey: ['property-history'] })
 
     patchScheduleVisit(queryClient, visitId, (visit) => ({
       ...visit,

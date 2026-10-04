@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { addDays, format, parseISO } from 'date-fns'
-import { CalendarDays, Map, Smartphone } from 'lucide-react'
+import { CalendarDays, ChevronLeft, Map, Smartphone } from 'lucide-react'
 import {
   Sheet,
   SheetClose,
@@ -22,7 +22,7 @@ import { useStopDetail, type StopDetail } from '@/hooks/crew/useStopDetail'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { isVisitInProgress } from '@/lib/utils/visits'
 import { useApplyVisitUpdate } from '@/hooks/useManagementSchedule'
-import type { SchedulePropertyRow } from '@/types/app'
+import type { SchedulePropertyRow, VisitWithCrew } from '@/types/app'
 import { emitTourEvent } from '@/lib/onboarding/events'
 
 // routeGroup is never read in this component — callers without route-group context
@@ -87,8 +87,29 @@ function normalizeRow(row: VisitDetailRow): StopDetail | undefined {
   }
 }
 
-export function VisitDetailSheet({ open, onOpenChange, row, weekStart }: VisitDetailSheetProps) {
+export function VisitDetailSheet({ open, onOpenChange, row: openedRow, weekStart: openedWeek }: VisitDetailSheetProps) {
   const router = useRouter()
+
+  // A past visit opened from "Earlier visits here". Same property and account, so it reuses
+  // the row; dropped whenever the sheet closes or is pointed at another visit.
+  const [historyVisit, setHistoryVisit] = useState<VisitWithCrew | null>(null)
+  const [historyFor, setHistoryFor] = useState(openedRow.visit?.id)
+  if (historyFor !== openedRow.visit?.id || (!open && historyVisit)) {
+    setHistoryFor(openedRow.visit?.id)
+    setHistoryVisit(null)
+  }
+  const row = useMemo(
+    () => (historyVisit ? { ...openedRow, visit: historyVisit } : openedRow),
+    [openedRow, historyVisit],
+  )
+  const weekStart = historyVisit?.week_start ?? openedWeek
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  function showVisit(visit: VisitWithCrew | null) {
+    setHistoryVisit(visit && visit.id !== openedRow.visit?.id ? visit : null)
+    scrollRef.current?.scrollTo({ top: 0 })
+  }
+
   const visitId = row.visit?.id
   const initialData = useMemo(() => normalizeRow(row), [row])
 
@@ -205,14 +226,26 @@ export function VisitDetailSheet({ open, onOpenChange, row, weekStart }: VisitDe
             </div>
           </SheetHeader>
 
-          <div className="flex-1 overflow-y-auto px-6 py-6">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6">
+            {historyVisit && openedRow.visit && (
+              <button
+                type="button"
+                onClick={() => showVisit(null)}
+                className="-mt-2 mb-4 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-primary hover:underline"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Back to week of {format(parseISO(openedWeek), 'MMM d')}
+              </button>
+            )}
             <VisitDetailContent
+              key={data.visitId}
               data={data}
               onOpenCompletion={() => setCompletionOpen(true)}
               onOpenSkip={() => setSkipOpen(true)}
               showAddress={false}
               showInvoice
               onPhotoViewerChange={handlePhotoViewerChange}
+              onOpenHistoryVisit={showVisit}
             />
           </div>
 

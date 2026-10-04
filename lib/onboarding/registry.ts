@@ -457,6 +457,14 @@ export const NEWS: NewsItem[] = [
     route: '/app/schedule',
     anchor: 'schedule.viewToggle',
   },
+  {
+    key: 'news.propertyHistory',
+    roles: ['owner', 'lead', 'accountant', 'crew'],
+    introduced: '2026-10-03',
+    title: 'Earlier visits, on every stop',
+    body: 'Open any stop and scroll down: “Earlier visits here” lists the last 8 visits to that property, with who did them, their notes and photos.',
+    route: '/app/schedule',
+  },
 ]
 
 export function forRole<T extends { roles: Roles }>(items: T[], role: EmployeeRole | null): T[] {

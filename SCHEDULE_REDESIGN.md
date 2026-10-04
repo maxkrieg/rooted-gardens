@@ -8,12 +8,13 @@ conventions. It is the source of truth wherever this file is silent.
 > S1 done 2026-10-03 (static checks pass; the functional checks under Verify are still to run).
 > S2 done 2026-10-03 (same: static checks pass, functional checks not yet run).
 > S3 done 2026-10-03 (same: static checks pass, functional checks not yet run).
+> S4 done 2026-10-03 (same: static checks pass, functional checks not yet run).
 >
 > - [x] **S0** — Clickable prototype for Matt
 > - [x] **S1** — Week overview + route drill-in
 > - [x] **S2** — "Needs you" and "From the field"
 > - [x] **S3** — Today, rebuilt around routes
-> - [ ] **S4** — Property history in the stop sheet
+> - [x] **S4** — Property history in the stop sheet
 > - [ ] **S5** — Desktop three-pane, retire the grid
 >
 > **One Claude Code session per phase.** Prompt: *"Implement phase S<n> of SCHEDULE_REDESIGN.md.
@@ -674,7 +675,58 @@ prerequisite for retiring the grid in S5.
 - As crew: matches whatever the RLS check concluded.
 
 ### S4 as built — deviations
-_(empty)_
+**Shipped as specified:** `hooks/usePropertyHistory.ts` (key `['property-history', propertyId]`, in
+`PERSISTED_QUERY_KEYS`), `components/management/PropertyHistoryStrip.tsx` ("Earlier visits here":
+date · `VisitStatusIcon` · first names via `displayCrewFor` · photo count · one-line note), mounted in
+`VisitDetailContent` below the property notes. Invalidated on complete, skip, revert and live
+status changes. No new `MutationType`, no schema change.
+
+Deviations and decisions:
+- **It replaces an existing history.** `components/PropertyVisitHistory.tsx` already sat at the same
+  spot: collapsed by default, 5 rows, no crew, no photos, not tappable, and only weeks *before* the
+  viewed one. It's deleted, and its `'property-visit-history'` persisted key is swapped for
+  `'property-history'`. Nothing else used it.
+- **What counts as history:** settled visits only (`completed` / `skipped`), the last 8 by
+  `week_start`, any week (so a past visit opened from the strip still lists the newer ones). The
+  query fetches 9 and a `select` drops the viewed visit, which is what lets the key be per-property
+  and not per-visit. Scheduled-but-never-logged weeks aren't shown. No `is_archived` filter, per
+  "Archiving". `photo_count` counts `type = 'visit'` photos, like the schedule fetch, via a
+  `photos(type)` embed rather than a second query.
+- **The strip is always open and hidden when empty.** The old one was collapsed. The answer to "when
+  were we last there" shouldn't take a tap.
+- **Opening a past visit in the sheet:** `VisitDetailSheet` keeps a `historyVisit` and renders it
+  with the same row (same property and account). Its `StopDetail` initial data is built by the
+  existing `normalizeRow` from the history row, so it opens instantly and offline (no photos or
+  invoice until `useStopDetail` refetches). A "‹ Back to week of Jun 8" link returns to the visit the
+  sheet was opened for. The week chip follows the visit shown. Closing the sheet, or pointing it at
+  another visit, drops `historyVisit`. **`?visit=` isn't changed** while a past visit is shown,
+  because `DeepLinkedVisitSheet` only resolves visits in the loaded weeks, so a past id would be a
+  dead link. Completion and skip editing work on the past visit, as they already did from the account
+  page's Recent visits.
+- **On `/app/stop/[visitId]`** a `seeDashboard` role's tap goes to `/app/stop/<past id>` (a router
+  push, so it needs a connection unless that page is cached). Crew get the rows read-only.
+- **RLS check (crew):** `visits_select` and `visit_crew_select` in the baseline allow every role,
+  crew included, on every row, and no later migration narrows them. `photos_select` is the same. So
+  crew see the strip, as data. It's read-only by design (no `onOpenVisit`), not by policy.
+- **Invalidation:** `VisitLogger` invalidates `['property-history', propertyId]`. `SkipSheet` has no
+  property id, so it invalidates the `['property-history']` prefix, and so does
+  `useQueuedVisitMutation`'s `onSettled` (revert, crew, vehicle). Only the open sheet's entry is
+  active, so that refetches one query. `applyVisitUpdate` invalidates the property's entry when a
+  live update changes a visit's `status`, so a crew completion arriving by realtime shows up in an
+  open sheet. A completion queued **offline** doesn't patch the cached history. It appears on the
+  next refetch once online (30s `staleTime`).
+- **Onboarding:** no tour change. `NEWS` item `news.propertyHistory` (every role, including crew), with
+  no anchor (the strip only exists inside an open sheet, so a beacon would never find it) and no
+  `parentTour`.
+
+**Checks:** `npm run build` ✓ · `npm run typecheck` ✓ · `npm run check:tours` ✓ (30 anchors) ·
+`npm run lint`: the only error is still the pre-existing one in `components/crew/VisitLogger.tsx`
+(this phase added one import and one line to that file; the error is in an untouched effect).
+
+**Not yet run: the functional checks under Verify** (history dates/crew/notes against real data,
+complete → reopen another visit at the property shows it on top, offline render from cache, crew
+view). The `photos(type)` embed hasn't been run against the dev project yet. It follows the same
+visits → photos embed `useStopDetail` already uses.
 
 ---
 

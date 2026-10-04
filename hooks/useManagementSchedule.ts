@@ -12,6 +12,7 @@ import { fetchScheduleReference, fetchWeekVisits } from '@/lib/schedule/fetch'
 import { buildScheduleWeek } from '@/lib/utils/schedule'
 import { visitVersion, type VisitOverlay } from '@/lib/utils/visits'
 import { flushMutationQueue } from '@/lib/offline/mutation-queue'
+import { propertyHistoryKey } from '@/hooks/usePropertyHistory'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
 import type { ScheduleWeek, VisitWithCrew } from '@/types/app'
 
@@ -139,6 +140,8 @@ export function useQueuedVisitMutation<TInput>(
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: stopKey })
       queryClient.invalidateQueries({ queryKey: ['schedule-visits'] })
+      // Reverts and crew edits change a past visit's history row; the property isn't known here.
+      queryClient.invalidateQueries({ queryKey: ['property-history'] })
     },
   })
 }
@@ -162,6 +165,10 @@ export function applyVisitUpdate(queryClient: QueryClient, incoming: VisitOverla
     if (!existing) continue
     const existingVersion = visitVersion(existing)
     if (existingVersion === null || existingVersion >= incomingVersion) continue
+    // A live completion or skip (e.g. from a crew phone) is that property's newest history.
+    if (incoming.status && incoming.status !== existing.status) {
+      queryClient.invalidateQueries({ queryKey: propertyHistoryKey(existing.property_id) })
+    }
     queryClient.setQueryData<VisitWithCrew[]>(
       key,
       data.map((v) => (v.id === incoming.id ? { ...v, ...incoming } : v)),
