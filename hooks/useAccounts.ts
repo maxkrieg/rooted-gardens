@@ -5,6 +5,8 @@ import { useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { enqueueMutation, flushMutationQueue } from '@/lib/offline/mutation-queue'
 import { navUnroutedCountKey } from '@/hooks/useNavCounts'
+import { scheduleReferenceKey } from '@/hooks/useManagementSchedule'
+import { routesDataKey } from '@/hooks/useRoutes'
 import { signPhotoUrls } from '@/lib/utils/photos'
 import {
   fetchAccountDetail,
@@ -51,6 +53,10 @@ export function useRefreshAccounts() {
       // Adding or archiving a property moves the sidebar's unrouted count, which
       // has no realtime path of its own — see useNavCounts.
       queryClient.invalidateQueries({ queryKey: navUnroutedCountKey })
+      // The schedule and routes page build their rows from their own copies of properties and
+      // accounts, so an archive, rename or new property is stale there until these refetch.
+      queryClient.invalidateQueries({ queryKey: scheduleReferenceKey })
+      queryClient.invalidateQueries({ queryKey: routesDataKey })
     },
     [queryClient],
   )
