@@ -8,7 +8,7 @@ import {
   RouteCrewTruck,
   RouteDoneCount,
   RouteProgressBar,
-  formatDays,
+  DaysPill,
 } from '@/components/management/RouteGroupBand'
 import { useWeekNotes } from '@/hooks/useWeekNotes'
 import { routeGroupStats, type RouteGroupStats } from '@/lib/utils/schedule'
@@ -164,8 +164,9 @@ function RouteOverviewRow({
       aria-current={active ? 'true' : undefined}
       className={cn(
         'relative flex min-h-14 w-full items-center gap-3 py-3 pl-4 pr-3 text-left',
-        'transition-colors hover:bg-accent/50 active:bg-accent',
-        active && 'bg-accent shadow-[inset_3px_0_0_0_var(--primary)]',
+        'transition-colors hover:bg-secondary/60 active:bg-secondary',
+        // Selection is an ink mark in the margin, not green — green means done.
+        active && 'bg-secondary shadow-[inset_3px_0_0_0_var(--foreground)]',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
         showTopBorder && 'border-t border-border/60',
       )}
@@ -175,11 +176,7 @@ function RouteOverviewRow({
           <span className="truncate font-display text-[15px] font-semibold leading-snug text-foreground">
             {name}
           </span>
-          {days.length > 0 && (
-            <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-accent-foreground">
-              {formatDays(days)}
-            </span>
-          )}
+          {days.length > 0 && <DaysPill days={days} />}
           {onSite && <OnSiteDot />}
         </span>
 

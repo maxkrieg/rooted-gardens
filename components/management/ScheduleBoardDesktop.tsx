@@ -448,7 +448,7 @@ function RouteRail({
             className={cn(
               railButton,
               'font-display text-[13px]',
-              active ? 'bg-accent text-accent-foreground ring-2 ring-primary' : 'bg-card text-foreground hover:bg-accent/60',
+              active ? 'bg-secondary text-foreground ring-2 ring-foreground/70' : 'bg-card text-foreground hover:bg-secondary',
             )}
           >
             {initials(routeGroup.name)}

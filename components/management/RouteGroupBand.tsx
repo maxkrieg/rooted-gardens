@@ -44,8 +44,8 @@ export function RouteGroupBand({
   const { done, total, crew, vehicles, onSite } = stats
 
   return (
-    // Sage band, a forest spine, and the name in Fraunces rather than a tracked caps label.
-    <div className="bg-accent text-accent-foreground shadow-[inset_3px_0_0_0_var(--primary)]">
+    // Stone band, not sage: green is kept for progress and done, so a header never reads as success.
+    <div className="bg-secondary text-muted-foreground">
       <div className="flex items-center gap-2 pl-5 pr-4 pt-2.5">
         <span className="min-w-0 flex-1 truncate font-display text-[15px] font-semibold leading-tight text-foreground">
           {name}
@@ -76,7 +76,7 @@ export function RouteGroupBand({
 
       {/* The progress bar IS the divider. A full row for a bar plus a number was
           the most expensive whitespace on the screen. */}
-      <RouteProgressBar done={done} total={total} name={name} className="bg-primary/15" />
+      <RouteProgressBar done={done} total={total} name={name} className="bg-foreground/10" />
     </div>
   )
 }
@@ -110,7 +110,7 @@ export function RouteViewHeader({
       className={cn(
         unrouted
           ? 'bg-card bg-linear-to-r from-[var(--clay)]/10 to-[var(--clay)]/10 text-[var(--clay)]'
-          : 'bg-accent text-accent-foreground shadow-[inset_3px_0_0_0_var(--primary)]',
+          : 'bg-card text-muted-foreground',
       )}
     >
       <div className="flex h-12 items-center gap-1 pr-4">
@@ -118,7 +118,7 @@ export function RouteViewHeader({
           type="button"
           data-tour="schedule.routeBack"
           onClick={onBack}
-          className="flex h-11 shrink-0 items-center gap-0.5 rounded-lg pl-2 pr-2.5 text-sm font-semibold transition-colors hover:bg-primary/10 active:bg-primary/15"
+          className="flex h-11 shrink-0 items-center gap-0.5 rounded-lg pl-2 pr-2.5 text-sm font-semibold transition-colors text-foreground hover:bg-foreground/5 active:bg-foreground/10"
           aria-label="Back to the week"
         >
           <ChevronLeft className="h-5 w-5" aria-hidden />
@@ -134,7 +134,7 @@ export function RouteViewHeader({
         {!unrouted && <RouteDoneCount done={done} total={total} />}
       </div>
       {!unrouted && (
-        <RouteProgressBar done={done} total={total} name={name} className="bg-primary/15" />
+        <RouteProgressBar done={done} total={total} name={name} className="bg-foreground/10" />
       )}
     </div>
   )
@@ -158,15 +158,20 @@ export function RoutePlanLine({
   const hasPlan = days.length > 0 || crew.length > 0 || vehicles.length > 0
   if (!hasPlan && !trailing) return <div className="pb-1.5" />
   return (
-    <div className="flex items-center gap-2 pl-5 pr-4 pb-2 pt-1 text-[11px] text-accent-foreground">
-      {days.length > 0 && (
-        <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 font-semibold">
-          {formatDays(days)}
-        </span>
-      )}
+    <div className="flex items-center gap-2 pl-5 pr-4 pb-2 pt-1 text-[11px] text-muted-foreground">
+      {days.length > 0 && <DaysPill days={days} />}
       <RouteCrewTruck crew={crew} vehicles={vehicles} />
       {trailing && <span className="ml-auto -mr-1.5">{trailing}</span>}
     </div>
+  )
+}
+
+/** The route's standing days. An outline, not a fill: it's the plan, not a state. */
+export function DaysPill({ days }: { days: string[] }) {
+  return (
+    <span className="shrink-0 rounded-full border border-foreground/15 px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+      {formatDays(days)}
+    </span>
   )
 }
 
@@ -193,7 +198,7 @@ export function RouteDoneCount({ done, total }: { done: number; total: number })
       >
         {done}
       </span>
-      <span className="ml-0.5 text-[11px] font-medium text-accent-foreground/70">/{total}</span>
+      <span className="ml-0.5 text-[11px] font-medium text-muted-foreground">/{total}</span>
     </span>
   )
 }
@@ -285,7 +290,7 @@ export function RouteGroupMenu({
           data-tour="schedule.routeMenu"
           size="icon"
           variant="ghost"
-          className="-mr-2 h-7 w-7 shrink-0 text-accent-foreground/70 hover:bg-primary/10 hover:text-accent-foreground"
+          className="-mr-2 h-7 w-7 shrink-0 text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
           aria-label={`Actions for ${name}`}
         >
           <MoreHorizontal className="h-4 w-4" />

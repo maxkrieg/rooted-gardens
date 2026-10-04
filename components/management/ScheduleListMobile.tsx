@@ -249,7 +249,7 @@ export function ScheduleListMobile({
         className={cn(
           'w-full text-left py-3 min-h-[56px]',
           'flex items-start gap-3',
-          isNested ? 'border-l-2 border-l-primary/25 pl-6 pr-4' : 'px-4',
+          isNested ? 'border-l-2 border-l-foreground/15 pl-6 pr-4' : 'px-4',
           showTopBorder && 'border-t border-border/50',
           visitRowTint(visit?.status),
           // brightness, not a background — a bg-* hover is the same property as
@@ -260,7 +260,10 @@ export function ScheduleListMobile({
           // Selection deliberately beats the status wash — in select mode what's
           // ticked matters more than what's done.
           selectMode && isSelected && 'bg-accent/40',
-          isActive && 'ring-2 ring-inset ring-primary',
+          // The open stop: the same ink spine as the selected route. The stone fill only
+          // where there's no status wash to keep.
+          isActive && 'shadow-[inset_3px_0_0_0_var(--foreground)]',
+          isActive && !settled && !(selectMode && isSelected) && 'bg-secondary',
         )}
       >
         {/* The row is the tap target, so this is presentational only — a real
@@ -419,7 +422,7 @@ export function ScheduleListMobile({
                       onBack={onBack}
                     />
                   </div>
-                  <div className="bg-accent text-accent-foreground shadow-[inset_3px_0_0_0_var(--primary)]">
+                  <div className="border-b border-border/60">
                     <RoutePlanLine
                       days={routeGroup.default_days ?? []}
                       crew={stats.crew}
