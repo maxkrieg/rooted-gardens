@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { addDays, format, parseISO } from 'date-fns'
 import { ChevronLeft, FilePen, Flag, MoreHorizontal, Receipt, Truck, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -21,7 +21,7 @@ import { CheckIndicator } from '@/components/app/CheckIndicator'
 import { WeekNoteRibbon } from '@/components/management/WeekNoteRibbon'
 import { RouteDefaultsSheet } from '@/components/management/RouteDefaultsSheet'
 import { RoutePicker } from '@/components/management/RoutePicker'
-import { useScheduleInteractions } from '@/hooks/useScheduleInteractions'
+import { useScheduleInteractions, type OpenVisit } from '@/hooks/useScheduleInteractions'
 import { useWeekNotes } from '@/hooks/useWeekNotes'
 import { isVisitInProgress, formatElapsed, displayCrewFor } from '@/lib/utils/visits'
 import { groupRowsByAccount, routeGroupStats } from '@/lib/utils/schedule'
@@ -52,7 +52,7 @@ import { firstName } from '@/lib/utils/team'
 interface ScheduleListMobileProps {
   /** The single week on screen, already filtered. */
   week: ScheduleWeek | undefined
-  /** The unfiltered 4-week window — only feeds RouteAssignDialog's week picker. */
+  /** The unfiltered window — only feeds RouteAssignDialog's week picker. */
   windowWeeks: ScheduleWeek[]
   employees: Employee[]
   vehicles: Vehicle[]
@@ -72,6 +72,12 @@ interface ScheduleListMobileProps {
   onBack?: () => void
   /** Enter select mode from the route view's ⋯. */
   onStartSelect?: () => void
+  /** 'pane' = the desktop board's middle pane: it scrolls itself, and the action bar sits in it. */
+  layout?: 'page' | 'pane'
+  /** The board opens stops in its right pane instead of this list's sheet. */
+  onOpenVisit?: OpenVisit
+  /** The stop showing in the board's right pane, highlighted here. */
+  activeVisitId?: string
 }
 
 export function ScheduleListMobile({
@@ -87,7 +93,12 @@ export function ScheduleListMobile({
   routeGroupId,
   onBack,
   onStartSelect,
+  layout = 'page',
+  onOpenVisit,
+  activeVisitId,
 }: ScheduleListMobileProps) {
+  const inPane = layout === 'pane'
+  const topRef = useRef<HTMLDivElement>(null)
   const {
     canEdit,
     lastVisitByProperty,
@@ -114,7 +125,12 @@ export function ScheduleListMobile({
     setNoteEditKey: setNoteEditGroupId,
     selected,
     setSelected,
-  } = useScheduleInteractions({ selectMode, sortState, windowStart: week?.weekStart })
+  } = useScheduleInteractions({
+    selectMode,
+    sortState,
+    windowStart: week?.weekStart,
+    onOpenVisit,
+  })
   const { data: weekNotes = [] } = useWeekNotes(week?.weekStart ?? '')
 
   /** Band stats read the same merged visits as the rows, so they can't disagree. */
@@ -205,6 +221,7 @@ export function ScheduleListMobile({
     const overflow = displayCrew.length - 2
 
     const isSelected = selected.has(row.property.id)
+    const isActive = Boolean(activeVisitId && visit?.id === activeVisitId)
     const settled = visit?.status === 'completed' || visit?.status === 'skipped'
     const crewLabel = displayedCrew.map((emp) => firstName(emp.name)).join(', ')
 
@@ -214,11 +231,21 @@ export function ScheduleListMobile({
         type="button"
         // Only rows that already have a visit: tapping an empty one creates it.
         data-tour={visit ? 'schedule.stop' : undefined}
+        // The desktop board's ↑/↓ walks these.
+        data-stop-row=""
         disabled={isCreating}
         aria-pressed={selectMode ? isSelected : undefined}
+        aria-current={isActive ? 'true' : undefined}
         onClick={() =>
           selectMode ? toggleSelected(row.property.id) : handleRowClick(row, visit)
         }
+        onKeyDown={(e) => {
+          // S schedules without opening: the fast path for filling several stops in a row.
+          if (e.key.toLowerCase() !== 's' || visit || selectMode || isCreating || !week) return
+          if (!canEdit || e.metaKey || e.ctrlKey || e.altKey) return
+          e.preventDefault()
+          void scheduleVisit(row, week.weekStart, { openDrawer: false })
+        }}
         className={cn(
           'w-full text-left py-3 min-h-[56px]',
           'flex items-start gap-3',
@@ -233,6 +260,7 @@ export function ScheduleListMobile({
           // Selection deliberately beats the status wash — in select mode what's
           // ticked matters more than what's done.
           selectMode && isSelected && 'bg-accent/40',
+          isActive && 'ring-2 ring-inset ring-primary',
         )}
       >
         {/* The row is the tap target, so this is presentational only — a real
@@ -361,13 +389,15 @@ export function ScheduleListMobile({
     />
   )
 
-  // Sticks under ScheduleView's header, which collapses to nothing on the route view.
-  const stickyTop = { top: 'var(--schedule-sticky-h, 0px)' }
+  // Sticks under ScheduleView's header, which collapses to nothing on the route view. A pane
+  // scrolls itself, so there it sticks to the pane's top.
+  const stickyTop = { top: inPane ? 0 : 'var(--schedule-sticky-h, 0px)' }
   const showActionBar = routeView && canEdit && !selectMode
 
   return (
     <>
-      <div className="space-y-3">
+      {/* In a pane the route fills the height, so a short route still has its bar at the bottom. */}
+      <div ref={topRef} className={cn(inPane ? 'flex min-h-full flex-col' : 'space-y-3')}>
         {groups.map(({ routeGroup, rows }) => {
           const stats = statsFor(rows, currentWeek.weekStart)
           return (
@@ -375,7 +405,7 @@ export function ScheduleListMobile({
               key={routeGroup.id}
               /* Full-bleed on a phone (ScheduleView cancels the page padding), so
                  there are no side edges to round or shadow — just hairlines. */
-              className="border-y border-border bg-card"
+              className={cn('bg-card', inPane ? 'flex flex-1 flex-col' : 'border-y border-border')}
             >
               {routeView && onBack ? (
                 <>
@@ -418,16 +448,18 @@ export function ScheduleListMobile({
               )}
 
               {/* Properties, nested by account */}
-              <div className="overflow-hidden">{renderRows(routeGroup.id, rows)}</div>
+              <div className={cn('overflow-hidden', inPane && 'flex-1')}>{renderRows(routeGroup.id, rows)}</div>
 
               {showActionBar && (
                 <RouteActionBar
+                  inline={inPane}
                   hasNote={weekNotes.some((n) => n.route_group_id === routeGroup.id)}
                   onAssign={() => openAssign(routeGroup)}
                   onEditNote={() => {
                     setNoteEditGroupId(routeGroup.id)
                     // The editor opens in the header area; bring it into view.
-                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                    if (inPane) topRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+                    else window.scrollTo({ top: 0, behavior: 'smooth' })
                   }}
                   menuItems={[
                     { label: 'Assign route…', onClick: () => openAssign(routeGroup) },
@@ -441,7 +473,12 @@ export function ScheduleListMobile({
         })}
 
         {ungrouped.length > 0 && (
-          <div className="border-y border-[var(--clay)]/30 bg-card">
+          <div
+            className={cn(
+              'bg-card',
+              inPane ? 'flex flex-1 flex-col' : 'border-y border-[var(--clay)]/30',
+            )}
+          >
             {/* "Not on a route" — properties with no property_route_groups row.
                 These used to be silently dropped from the schedule entirely. */}
             {routeView && onBack ? (
@@ -472,16 +509,19 @@ export function ScheduleListMobile({
                 {routeAllPicker}
               </div>
             )}
-            <div className="overflow-hidden">{renderRows(UNGROUPED_SORT_KEY, ungrouped)}</div>
+            <div className={cn('overflow-hidden', inPane && 'flex-1')}>{renderRows(UNGROUPED_SORT_KEY, ungrouped)}</div>
 
             {showActionBar && onStartSelect && (
-              <RouteActionBar menuItems={[{ label: 'Select stops', onClick: onStartSelect }]} />
+              <RouteActionBar
+                inline={inPane}
+                menuItems={[{ label: 'Select stops', onClick: onStartSelect }]}
+              />
             )}
           </div>
         )}
 
         {/* Room for the fixed action bar, so the last stop can scroll clear of it. */}
-        {showActionBar && <div aria-hidden className="h-16" />}
+        {showActionBar && !inPane && <div aria-hidden className="h-16" />}
       </div>
 
       {selectMode && (
@@ -537,11 +577,14 @@ export function ScheduleListMobile({
  * in thumb reach. Hidden while the keyboard is up, as the nav is.
  */
 function RouteActionBar({
+  inline = false,
   hasNote,
   onAssign,
   onEditNote,
   menuItems,
 }: {
+  /** In the desktop board's pane: sticks to the pane's bottom instead of the screen's. */
+  inline?: boolean
   hasNote?: boolean
   /** Crew and Truck both open RouteAssignDialog, which sets either for the whole route. */
   onAssign?: () => void
@@ -555,8 +598,11 @@ function RouteActionBar({
   return (
     <div
       data-tour="schedule.routeActions"
-      className="fixed inset-x-0 z-40 border-t border-border bg-background/95 px-4 py-2 backdrop-blur lg:hidden"
-      style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }}
+      className={cn(
+        'z-40 border-t border-border bg-background/95 px-4 py-2 backdrop-blur',
+        inline ? 'sticky bottom-0' : 'fixed inset-x-0 lg:hidden',
+      )}
+      style={inline ? undefined : { bottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }}
     >
       <div className="flex gap-2">
         {onAssign && (

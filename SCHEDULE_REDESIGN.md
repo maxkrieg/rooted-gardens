@@ -9,13 +9,14 @@ conventions. It is the source of truth wherever this file is silent.
 > S2 done 2026-10-03 (same: static checks pass, functional checks not yet run).
 > S3 done 2026-10-03 (same: static checks pass, functional checks not yet run).
 > S4 done 2026-10-03 (same: static checks pass, functional checks not yet run).
+> S5 done 2026-10-03 (same: static checks pass, functional checks not yet run).
 >
 > - [x] **S0** — Clickable prototype for Matt
 > - [x] **S1** — Week overview + route drill-in
 > - [x] **S2** — "Needs you" and "From the field"
 > - [x] **S3** — Today, rebuilt around routes
 > - [x] **S4** — Property history in the stop sheet
-> - [ ] **S5** — Desktop three-pane, retire the grid
+> - [x] **S5** — Desktop three-pane, retire the grid
 >
 > **One Claude Code session per phase.** Prompt: *"Implement phase S<n> of SCHEDULE_REDESIGN.md.
 > Fill in its As-built section and tick its box when done."* Each phase lists what to read
@@ -783,7 +784,83 @@ coupling that `CLAUDE.md` warns about.
 - Network tab: one week fetched (plus prefetched neighbors), not four.
 
 ### S5 as built — deviations
-_(empty)_
+**Shipped as specified:** `ScheduleBoardDesktop.tsx` (new): left = Today/Week toggle, Needs you count,
+`ScheduleWeekOverview`. Middle = `TodayView` or the open route's `ScheduleListMobile`. Right = the stop,
+inline. Same `?route=` / `?visit=` as the phone. ↑/↓, Enter, Esc and `S` work. `weekCount` is gone:
+every width fetches one week, plus the ±1 prefetch. `ScheduleGrid.tsx` is deleted. `tour.schedule` →
+`version: 4`, and there's a `NEWS` item. No new `MutationType`, no schema change.
+
+Deviations and decisions:
+- **Fitting 1024px: a container query, not a third breakpoint.** At 1024 the sidebar (224) and page
+  padding leave ~750px, which can't hold 280 + a list + a stop. So when a stop is open and the board
+  is under `@5xl` (64rem of *board* width, so up to ~1300px viewports), the left pane folds to a 56px
+  `RouteRail`. The rail has Today/Week icons, the Needs you count, a Generate button while stops are
+  due, then route initials ("NH", "Wi") with an on-site pulse or a no-crew ring, plus "Not on a route".
+  The stop pane is 360px, or 420px at `@5xl`. I checked that the built CSS includes the `@container` rules.
+- **Only one layout is mounted now.** `useMediaQuery` picks `board = isWide && seeDashboard`, and the
+  other layout isn't rendered (no more `hidden lg:block` pair). So `DeepLinkedVisitSheet` lives in the
+  phone branch (still mounted once). The board resolves `?visit=` into its right pane itself, latched
+  once like the sheet, so a sheet can never open over the pane. Crew at desktop width get the flat list
+  (capped at `max-w-3xl`) with their "Every route" sort switch.
+- **The pane is `VisitDetailSheet inline`, not a new component.** That keeps the history strip, the
+  `historyVisit` back link, `VisitLogger`/`SkipSheet` and the cache push in one place. Inline renders a
+  `<section>` (an `h2` instead of Radix's `SheetTitle`, which needs a Dialog), an × button ("Close
+  stop (Esc)"), and skips the close-time `router.refresh()`. Logging or skipping still closes it, as
+  the sheet did.
+- **How stops reach the pane:** `useScheduleInteractions` takes an optional `onOpenVisit`. When it's
+  set, `openSheet` hands off instead of setting local sheet state, so `ScheduleListMobile` and
+  `TodayView` route every open (including `+ Schedule`'s create-and-open) to the board. The pane
+  re-reads its row from the loaded weeks by id (the window + Today's current week), so realtime and
+  edits repaint it. The middle row for the open stop gets `aria-current` + a ring.
+- **URL:** `scheduleUrl` now carries over the current `?visit=`, which its replaceState used to drop
+  on any filter, week or route change. On the board, switching routes `replaceState`s instead of
+  pushing, so Back leaves routes rather than walking through every one you clicked. Picking a route on
+  the left closes the open stop and switches to Week (which persists). A Today card keeps Today
+  underneath, as on a phone. The view toggle closes an open route first, since an open route forces
+  Week.
+- **Keyboard** is one `window` listener in the board. ↑/↓ moves focus through `[data-stop-row]` in the
+  middle pane, starting from the stops, from `body`, or right after clicking a route on the left.
+  Enter is the row button's own click. Esc closes the pane and puts focus back on the row that opened
+  it. All of these ignore typing targets, menus, listboxes and any open Radix dialog/popover, so Esc
+  in the crew picker closes the picker, not the pane. `S` is per row (`onKeyDown`): an empty row,
+  `editSchedule`, not in select mode, no modifier keys. Today's rows aren't in the ↑/↓ set.
+- **Route actions on desktop:** the phone's bottom action bar renders inside the middle pane as
+  `sticky bottom-0` (`ScheduleListMobile layout="pane"`), so Crew / Truck / Note / ⋯ (defaults, Select
+  stops) are there on a laptop too. **The sticky-bar "Select stops" button is gone:** selection is
+  route-shaped, as on the phone, so it's in the route's ⋯. The floating `SelectionBar` was already
+  `sticky`, so it sticks to the pane's bottom. The phone `‹ Week` header stays in the pane. On desktop
+  it leaves the route to a "Pick a route" prompt that lists the keys.
+- **Needs you count:** `hooks/useNeedsYou.ts` (new) holds Today's derivation (`scheduleExceptions`
+  plus the plan gate plus seen), so the board's count and Today's list can't disagree.
+  `useScheduleSeen` became a module-level store on `useSyncExternalStore`. Before, each mount read
+  localStorage once, so opening a report in Today wouldn't have lowered the board's count.
+- **`ScheduleNav`** showed a four-week range on desktop and hid "Today" whenever the current week was
+  anywhere in the four. It's now one week at every width.
+- **Deleted orphans:** `ScheduleGrid.tsx`, `useWeekNotesForWeeks`, `setGroupSortMode` (the per-route
+  sort writer; `byGroup` stays in storage, unread, as S1 allowed). The cell-key selection lived in
+  `ScheduleGrid` itself, so `useScheduleInteractions` only lost its "shared with the grid" framing.
+  `ScheduleViewToggle` moved to its own file so the board can share it. Stale "grid" comments are fixed
+  across the schedule files.
+- **Onboarding (v4):** `nav-desktop` is "One week at a time". `band-desktop` is now a "do it" step
+  ("Routes on the left… click a route", `advanceOn: 'schedule.routeOpened'`). `route-actions` runs at
+  both breakpoints. `open-stop` / `close-stop` copy mentions the right pane and Esc. `select-desktop`
+  is removed (its anchor is gone; `route-actions` covers Select stops). The rail carries
+  `schedule.viewToggle` and `schedule.routeBand` too, since the runner takes the first *visible* match.
+  `NEWS`: `news.scheduleBoard` (owner, lead, accountant, `parentTour: 'tour.schedule'`, anchored on
+  `schedule.routeBand`).
+- **Docs:** `CLAUDE.md` Repository Structure, the Breakpoints `lg` row, and the `ScheduleView` coupling
+  note (now "picks a layout, not a fetch size"). `REDESIGN.md` R2.5 is marked superseded.
+
+**Checks:** `npm run build` ✓ · `npm run typecheck` ✓ · `npm run check:tours` ✓ (29 anchors) ·
+`npm run lint`: the only error is still the pre-existing one in `components/crew/VisitLogger.tsx`.
+Every file this phase touched lints clean.
+
+**Not yet run: the functional checks under Verify** (1024 and 1440 with no horizontal scroll,
+keyboard-only use, edit crew → the middle row updates, `?route=&visit=` reload on both devices,
+accountant read-only, crew flat list at desktop width, one week in the Network tab). Run them under
+`build && start` with impersonation. The riskiest parts are the board's height calc (it assumes the
+sticky bar plus `lg:p-6`; the impersonation banner may add a little page scroll), the rail threshold
+feeling right at 1280, and Esc inside nested popovers.
 
 
 ### S6 - Follow-ups on anything that came up in S1–S5

@@ -15,9 +15,8 @@ interface DeepLinkedVisitSheetProps {
 }
 
 /**
- * Opens the sheet for a `?visit=` deep link. Lives here because the grid and phone list are
- * both always mounted (CSS-hidden), and each opening it stacked two sheets. Latches on the first
- * render where the visit is found, so closing it sticks.
+ * Opens the sheet for a `?visit=` deep link below `lg` (the desktop board opens it in its right
+ * pane). Mounted once by ScheduleView. Latches on the first render where the visit is found.
  */
 export function DeepLinkedVisitSheet({ weeks, visitId }: DeepLinkedVisitSheetProps) {
   // Derived, not latched at mount: `weeks` is empty on the first render now that

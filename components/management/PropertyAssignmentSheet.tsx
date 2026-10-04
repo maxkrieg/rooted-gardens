@@ -62,7 +62,7 @@ export function PropertyAssignmentSheet({
   const refreshRoutes = useRefreshRoutes()
   const [open, setOpen] = useState(false)
   // Pending flag deliberately discarded — see the note above. Same idiom as
-  // ScheduleGrid's `creatingKey`: track busy state per row ourselves.
+  // Like useScheduleInteractions' `creatingKey`: track busy state per row ourselves.
   const [, startTransition] = useTransition()
   const [reassignTarget, setReassignTarget] = useState<PropertyWithAccount | null>(null)
   const [query, setQuery] = useState('')

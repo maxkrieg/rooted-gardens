@@ -9,7 +9,7 @@ schema, and conventions.
 > **Migrations are on dev only** — prod must be migrated before this reaches `main`.
 >
 > **Next:** `SCHEDULE_REDESIGN.md` (S0–S5) reorganizes the schedule around routes and
-> exceptions, and supersedes R2.5 (the desktop grid) in its phase S5.
+> exceptions. Its phase S5 superseded R2.5: the desktop grid is gone.
 
 ---
 
@@ -355,8 +355,8 @@ tested under `npm run dev`; Serwist's `defaultCache` degrades to a single `Netwo
   `create_visit`, `skip`) in a loop, so it works offline for free and needs **no new
   `MutationType`**.
 
-- [x] **R2.5 — Desktop grid stays, demoted** *(to be superseded by `SCHEDULE_REDESIGN.md` S5,
-  which retires the grid)*
+- [x] **R2.5 — Desktop grid stays, demoted** *(**superseded 2026-10-03** by `SCHEDULE_REDESIGN.md`
+  S5: `ScheduleGrid.tsx` is deleted, and laptops get the three-pane `ScheduleBoardDesktop`)*
   *Depends on: R2.3*
   `ScheduleGrid.tsx` (the 4-week `<table>`, `hidden lg:block`) keeps working for the rare
   laptop session. ~~Do not invest further in it.~~ **Superseded 2026-09-24:** the grid was

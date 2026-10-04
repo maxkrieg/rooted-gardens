@@ -44,8 +44,7 @@ export function RouteGroupBand({
   const { done, total, crew, vehicles, onSite } = stats
 
   return (
-    // Same heading treatment as the desktop grid's route row: sage band, a
-    // forest spine, and the name in Fraunces rather than a tracked caps label.
+    // Sage band, a forest spine, and the name in Fraunces rather than a tracked caps label.
     <div className="bg-accent text-accent-foreground shadow-[inset_3px_0_0_0_var(--primary)]">
       <div className="flex items-center gap-2 pl-5 pr-4 pt-2.5">
         <span className="min-w-0 flex-1 truncate font-display text-[15px] font-semibold leading-tight text-foreground">
@@ -141,7 +140,7 @@ export function RouteViewHeader({
   )
 }
 
-// ─── Pieces shared with the desktop grid's per-week route header cells ──────
+// ─── Pieces shared with the route view header, the overview and Today ──────
 
 /** Days, crew and truck under a route's name. Keeps a little bottom space when there's no plan. */
 export function RoutePlanLine({

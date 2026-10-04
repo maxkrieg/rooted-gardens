@@ -108,7 +108,7 @@ export const WELCOMES: Welcome[] = [
 export const TOURS: Tour[] = [
   {
     key: 'tour.schedule',
-    version: 3,
+    version: 4,
     title: 'Schedule',
     summary: 'Plan the week, open a stop, generate a week, change many stops at once.',
     roles: OFFICE,
@@ -135,8 +135,8 @@ export const TOURS: Tour[] = [
         id: 'nav-desktop',
         anchor: 'schedule.weekNav',
         breakpoint: 'desktop',
-        title: 'Four weeks side by side',
-        body: 'The grid shows four weeks. Arrows slide the window; This week brings you back.',
+        title: 'One week at a time',
+        body: 'Arrows move a week; This week brings you back.',
       },
       {
         id: 'band',
@@ -150,15 +150,16 @@ export const TOURS: Tour[] = [
         id: 'band-desktop',
         anchor: 'schedule.routeBand',
         breakpoint: 'desktop',
-        title: 'Each route has a header',
-        body: 'Crew, truck and how many stops are done. Its ⋯ menu assigns the whole route, sets its defaults, or adds a note for the week.',
+        title: 'Routes on the left',
+        body: 'Its days, crew, truck, how many stops, and this week’s note. Click a route to open its stops in the middle.',
+        advanceOn: 'schedule.routeOpened',
       },
       {
         id: 'open-stop',
         requires: ['band', 'band-desktop'],
         anchor: 'schedule.stop',
         title: 'Open a stop',
-        body: 'Tap any scheduled stop to see its details.',
+        body: 'Tap any scheduled stop to see its details. On a laptop it opens on the right, and ↑ ↓ and Enter work too.',
         advanceOn: 'schedule.visitOpened',
       },
       {
@@ -179,14 +180,13 @@ export const TOURS: Tour[] = [
         id: 'close-stop',
         requires: ['open-stop'],
         title: 'Close the stop',
-        body: 'Close this sheet to keep going.',
+        body: 'Close it to keep going (Esc on a laptop).',
         advanceOn: 'schedule.visitClosed',
       },
       {
         id: 'route-actions',
-        requires: ['band'],
+        requires: ['band', 'band-desktop'],
         anchor: 'schedule.routeActions',
-        breakpoint: 'mobile',
         title: 'The whole route at once',
         body: 'Crew and Truck set them for every stop this week. Note is the week’s note. ⋯ has the route’s defaults, and Select stops to change a few together.',
       },
@@ -238,13 +238,6 @@ export const TOURS: Tour[] = [
         title: 'Confirm when it looks right',
         body: 'This creates the stops. For now, close the sheet without confirming.',
         advanceOn: 'schedule.generateClosed',
-      },
-      {
-        id: 'select-desktop',
-        anchor: 'schedule.select',
-        breakpoint: 'desktop',
-        title: 'Change many stops at once',
-        body: 'Select stops, then set crew or truck, or skip them, all together.',
       },
       {
         id: 'filters',
@@ -464,6 +457,16 @@ export const NEWS: NewsItem[] = [
     title: 'Earlier visits, on every stop',
     body: 'Open any stop and scroll down: “Earlier visits here” lists the last 8 visits to that property, with who did them, their notes and photos.',
     route: '/app/schedule',
+  },
+  {
+    key: 'news.scheduleBoard',
+    roles: ['owner', 'lead', 'accountant'],
+    introduced: '2026-10-03',
+    title: 'The schedule on a laptop',
+    body: 'On a laptop the schedule is now three panes: routes on the left, a route’s stops in the middle, the stop on the right. ↑ ↓ move between stops, Enter opens one, Esc closes it. The four-week grid is gone; a stop’s Earlier visits shows its history.',
+    parentTour: 'tour.schedule',
+    route: '/app/schedule',
+    anchor: 'schedule.routeBand',
   },
 ]
 

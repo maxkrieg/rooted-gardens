@@ -14,16 +14,22 @@ import { sortModeForGroup, type ScheduleSortState } from '@/lib/utils/schedule-s
 import { syncVisitUrlParam } from '@/lib/utils/visit-url'
 import type { RouteGroup, SchedulePropertyRow, VisitWithCrew } from '@/types/app'
 
-/** State and handlers shared by the desktop grid and the phone list. */
+/** Opens a stop somewhere other than this component's own sheet: the desktop board's right pane. */
+export type OpenVisit = (row: SchedulePropertyRow, visit: VisitWithCrew, weekStart: string) => void
+
+/** State and handlers shared by the route list and Today. */
 export function useScheduleInteractions({
   selectMode,
   sortState,
   windowStart,
+  onOpenVisit,
 }: {
   selectMode: boolean
   sortState: ScheduleSortState
   /** First week the server built, for the `?visit=` deep link. */
   windowStart: string | undefined
+  /** When set, stops open through this instead of the local sheet state. */
+  onOpenVisit?: OpenVisit
 }) {
   const { editSchedule: canEdit } = useCan()
   const createVisit = useCreateVisit()
@@ -70,6 +76,7 @@ export function useScheduleInteractions({
   }
 
   function openSheet(row: SchedulePropertyRow, visit: VisitWithCrew, weekStart: string) {
+    if (onOpenVisit) return onOpenVisit({ ...row, visit }, visit, weekStart)
     setSheetRow({ ...row, visit })
     setSheetWeek(weekStart)
     setSheetOpen(true)

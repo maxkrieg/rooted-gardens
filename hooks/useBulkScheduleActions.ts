@@ -10,8 +10,7 @@ import type { Employee, SchedulePropertyRow, VisitCrewWithEmployee } from '@/typ
 import { emitTourEvent } from '@/lib/onboarding/events'
 
 /** What a bulk apply did. `undo` is absent when it can't be reversed (scheduling creates visits). */
-/** One stop to act on: a property row and the week its visit belongs to. The
- *  desktop grid selects cells across weeks, so the week travels per target. */
+/** One stop to act on: a property row and the week its visit belongs to. */
 export interface BulkTarget {
   row: SchedulePropertyRow
   weekStart: string

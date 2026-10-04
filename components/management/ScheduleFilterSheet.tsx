@@ -29,9 +29,11 @@ interface ScheduleFilterSheetProps {
   onChange: (filters: ScheduleFilterValues) => void
   /** Stops matching the current filters, so the sheet can say what it did. */
   matchCount: number
+  /** Bottom on a phone; the desktop board opens it from the right, like the stop sheet. */
+  side?: 'bottom' | 'right'
 }
 
-/** The phone's filter sheet. "My stops" is one tap from the bar, for every role. */
+/** The schedule's filter sheet, at every width. "My stops" is one tap away, for every role. */
 export function ScheduleFilterSheet({
   open,
   onOpenChange,
@@ -41,6 +43,7 @@ export function ScheduleFilterSheet({
   employees,
   onChange,
   matchCount,
+  side = 'bottom',
 }: ScheduleFilterSheetProps) {
   const { employeeId } = useRole()
 
@@ -50,7 +53,13 @@ export function ScheduleFilterSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto">
+      <SheetContent
+        side={side}
+        className={cn(
+          'overflow-y-auto',
+          side === 'bottom' ? 'max-h-[85dvh]' : 'flex w-full flex-col sm:max-w-md',
+        )}
+      >
         <SheetHeader className="pb-2">
           <SheetTitle className="font-display text-lg">Filter</SheetTitle>
           <SheetDescription>
@@ -85,7 +94,7 @@ export function ScheduleFilterSheet({
           />
         </div>
 
-        <div className="flex gap-2 border-t border-border px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
+        <div className="mt-auto flex gap-2 border-t border-border px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
           <Button
             variant="outline"
             className="h-11 flex-1"

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useSyncExternalStore } from 'react'
 import type { VisitWithCrew } from '@/types/app'
 
 const SEEN_KEY = 'rg-schedule-seen'
@@ -26,10 +26,24 @@ function readSeen(): SeenMap {
   }
 }
 
+// One store per page, so the desktop board's Needs you count and Today's list agree.
+let store: SeenMap | null = null
+const listeners = new Set<() => void>()
+const EMPTY: SeenMap = {}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener)
+  return () => listeners.delete(listener)
+}
+
+function getSnapshot(): SeenMap {
+  store ??= readSeen()
+  return store
+}
+
 /** Per-viewer "seen" for Needs you's skips and crew reports, in localStorage. Changed reports come back. */
 export function useScheduleSeen() {
-  // Only mounted after ScheduleView's hydration gate, so reading storage up front is safe.
-  const [seen, setSeen] = useState<SeenMap>(readSeen)
+  const seen = useSyncExternalStore(subscribe, getSnapshot, () => EMPTY)
 
   const isSeen = useCallback(
     (visit: VisitWithCrew) => seen[visit.id] === seenSignature(visit),
@@ -37,19 +51,17 @@ export function useScheduleSeen() {
   )
 
   const markSeen = useCallback((visit: VisitWithCrew) => {
-    setSeen((prev) => {
-      // Re-inserted last so the oldest entries are the ones trimmed.
-      const rest = { ...prev }
-      delete rest[visit.id]
-      const entries = Object.entries({ ...rest, [visit.id]: seenSignature(visit) })
-      const next = Object.fromEntries(entries.slice(-MAX_SEEN))
-      try {
-        window.localStorage.setItem(SEEN_KEY, JSON.stringify(next))
-      } catch {
-        // Private mode or blocked storage: seen lasts for this visit to the page only.
-      }
-      return next
-    })
+    // Re-inserted last so the oldest entries are the ones trimmed.
+    const rest = { ...getSnapshot() }
+    delete rest[visit.id]
+    const entries = Object.entries({ ...rest, [visit.id]: seenSignature(visit) })
+    store = Object.fromEntries(entries.slice(-MAX_SEEN))
+    try {
+      window.localStorage.setItem(SEEN_KEY, JSON.stringify(store))
+    } catch {
+      // Private mode or blocked storage: seen lasts for this visit to the page only.
+    }
+    listeners.forEach((listener) => listener())
   }, [])
 
   return { isSeen, markSeen }

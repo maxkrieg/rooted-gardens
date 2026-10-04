@@ -43,7 +43,8 @@ export function NeedsYouList({ items, onOpen }: NeedsYouListProps) {
       >
         Needs you · {items.length}
       </h2>
-      <ul className="border-y border-border bg-card">
+      {/* Full-bleed on a phone; a rounded card on the desktop board, like the rest of Today. */}
+      <ul className="border-y border-border bg-card lg:overflow-hidden lg:rounded-2xl lg:border lg:shadow-warm">
         {items.map((item, index) => {
           const { Icon, className } = KIND_ICON[item.kind]
           const title = 'row' in item ? item.row.account.name : null

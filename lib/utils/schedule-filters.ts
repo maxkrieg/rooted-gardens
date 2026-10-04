@@ -101,7 +101,7 @@ function matchesVisitFilters(row: SchedulePropertyRow, filters: ScheduleFilterVa
 
 /**
  * Filter a schedule window, keeping its shape. Crew/status match if ANY week in the window
- * matches, so the grid keeps a row's 4-week context. Pass one week for exact matching.
+ * matches; the schedule passes one week, so in practice that's exact matching.
  */
 export function filterScheduleWeeks(
   weeks: ScheduleWeek[],

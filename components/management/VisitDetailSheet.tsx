@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { addDays, format, parseISO } from 'date-fns'
-import { CalendarDays, ChevronLeft, Map, Smartphone } from 'lucide-react'
+import { CalendarDays, ChevronLeft, Map as MapIcon, Smartphone, X } from 'lucide-react'
 import {
   Sheet,
   SheetClose,
@@ -34,9 +34,11 @@ interface VisitDetailSheetProps {
   onOpenChange: (open: boolean) => void
   row: VisitDetailRow
   weekStart: string
+  /** The desktop board's right pane: the same detail, rendered in place instead of in a Sheet. */
+  inline?: boolean
 }
 
-/** Maps the grid's row into useStopDetail's shape so both share one cache entry. */
+/** Maps the schedule's row into useStopDetail's shape so both share one cache entry. */
 function normalizeRow(row: VisitDetailRow): StopDetail | undefined {
   const v = row.visit
   if (!v) return undefined
@@ -87,7 +89,13 @@ function normalizeRow(row: VisitDetailRow): StopDetail | undefined {
   }
 }
 
-export function VisitDetailSheet({ open, onOpenChange, row: openedRow, weekStart: openedWeek }: VisitDetailSheetProps) {
+export function VisitDetailSheet({
+  open,
+  onOpenChange,
+  row: openedRow,
+  weekStart: openedWeek,
+  inline = false,
+}: VisitDetailSheetProps) {
   const router = useRouter()
 
   // A past visit opened from "Earlier visits here". Same property and account, so it reuses
@@ -116,7 +124,7 @@ export function VisitDetailSheet({ open, onOpenChange, row: openedRow, weekStart
   const { data: raw } = useStopDetail(visitId, { initialData })
   const applyVisitUpdate = useApplyVisitUpdate()
 
-  // No overlay to merge any more: the drawer and the grid read the same React
+  // No overlay to merge any more: the drawer and the list read the same React
   // Query entries, and live updates are written into those (applyVisitUpdate).
   const data = raw
 
@@ -151,7 +159,8 @@ export function VisitDetailSheet({ open, onOpenChange, row: openedRow, weekStart
     // The stacked lightbox's close reaches this sheet as an outside interaction; ignore it.
     if (!next && (photoViewerOpen || Date.now() - photoClosedAt.current < 500)) return
     // Refresh before onOpenChange: its replaceState can discard a refresh dispatched after it.
-    if (!next && navigator.onLine) router.refresh()
+    // The pane only lives on the client-first schedule, which a refresh can't help.
+    if (!next && !inline && navigator.onLine) router.refresh()
     onOpenChange(next)
   }
 
@@ -167,99 +176,138 @@ export function VisitDetailSheet({ open, onOpenChange, row: openedRow, weekStart
   const weekStartDate = parseISO(weekStart)
   const weekRangeLabel = `${format(weekStartDate, 'EEE MMM d')} – ${format(addDays(weekStartDate, 6), 'EEE MMM d')}`
 
+  // Radix's title/description need a Dialog around them; the pane has none.
+  const Title = inline ? 'h2' : SheetTitle
+
+  const header = (
+    <>
+      {/* pr-8 keeps the week chip clear of the close button, absolutely positioned top-right. */}
+      <div className="flex items-center justify-between gap-3 pr-8">
+        {/* The account owns the property, so it reads as an eyebrow above
+            the address rather than trailing after it. */}
+        <Link
+          href={`/app/accounts/${row.account.id}`}
+          className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-widest text-muted-foreground hover:text-[--primary] transition-colors"
+        >
+          {row.account.name}
+        </Link>
+        {/* Weekdays spelled out so the Mon–Sun boundaries are unmistakable. */}
+        <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-[11px] font-semibold text-[--accent-foreground] tabular-nums">
+          <CalendarDays className="h-3 w-3 shrink-0" />
+          {weekRangeLabel}
+        </span>
+      </div>
+
+      <Title className="font-display text-xl font-semibold leading-snug text-foreground">
+        {row.property.address}
+      </Title>
+
+      {!inline && (
+        <SheetDescription className="sr-only">
+          Visit at {row.property.address} for {row.account.name}, week of {weekRangeLabel}.
+        </SheetDescription>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button asChild variant="outline" size="sm" className="gap-1.5">
+          <a
+            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.property.address)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <MapIcon className="h-3.5 w-3.5 shrink-0" />
+            Open in Maps
+          </a>
+        </Button>
+        {/* The phone icon is the point: this is the stop exactly as crew see
+            it on their own phones. */}
+        <Button asChild variant="outline" size="sm" className="gap-1.5">
+          <Link href={`/app/stop/${data.visitId}`}>
+            <Smartphone className="h-3.5 w-3.5 shrink-0" />
+            Crew view
+          </Link>
+        </Button>
+      </div>
+    </>
+  )
+
+  const body = (
+    <>
+      {historyVisit && openedRow.visit && (
+        <button
+          type="button"
+          onClick={() => showVisit(null)}
+          className="-mt-2 mb-4 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-primary hover:underline"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Back to week of {format(parseISO(openedWeek), 'MMM d')}
+        </button>
+      )}
+      <VisitDetailContent
+        key={data.visitId}
+        data={data}
+        onOpenCompletion={() => setCompletionOpen(true)}
+        onOpenSkip={() => setSkipOpen(true)}
+        showAddress={false}
+        showInvoice
+        onPhotoViewerChange={handlePhotoViewerChange}
+        onOpenHistoryVisit={showVisit}
+      />
+    </>
+  )
+
   return (
     <>
-      <Sheet open={open} onOpenChange={handleOpenChange}>
-        {/* Send focus to body on close, or Radix can leave a stuck pointer-events lock. */}
-        <SheetContent
-          side="right"
-          className="w-full sm:max-w-lg flex flex-col p-0 gap-0"
-          onCloseAutoFocus={(e) => e.preventDefault()}
+      {inline ? (
+        <section
+          aria-label={`Visit at ${row.property.address}`}
+          className="relative flex h-full min-h-0 flex-col"
         >
-          {/* Identity block: account, property, week. */}
-          <SheetHeader className="px-6 pt-6 pb-4 border-b border-border shrink-0 gap-0 space-y-3">
-            {/* pr-8 keeps the week chip clear of the Sheet's own close button,
-                which is absolutely positioned at top-right. */}
-            <div className="flex items-center justify-between gap-3 pr-8">
-              {/* The account owns the property, so it reads as an eyebrow above
-                  the address rather than trailing after it. */}
-              <Link
-                href={`/app/accounts/${row.account.id}`}
-                className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-widest text-muted-foreground hover:text-[--primary] transition-colors"
-              >
-                {row.account.name}
-              </Link>
-              {/* Weekdays spelled out so the Mon–Sun boundaries are unmistakable. */}
-              <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-[11px] font-semibold text-[--accent-foreground] tabular-nums">
-                <CalendarDays className="h-3 w-3 shrink-0" />
-                {weekRangeLabel}
-              </span>
-            </div>
-
-            <SheetTitle className="font-display text-xl leading-snug">
-              {row.property.address}
-            </SheetTitle>
-
-            <SheetDescription className="sr-only">
-              Visit at {row.property.address} for {row.account.name}, week of {weekRangeLabel}.
-            </SheetDescription>
-
-            <div className="flex items-center gap-2">
-              <Button asChild variant="outline" size="sm" className="gap-1.5">
-                <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.property.address)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Map className="h-3.5 w-3.5 shrink-0" />
-                  Open in Maps
-                </a>
-              </Button>
-              {/* The phone icon is the point: this is the stop exactly as crew see
-                  it on their own phones. */}
-              <Button asChild variant="outline" size="sm" className="gap-1.5">
-                <Link href={`/app/stop/${data.visitId}`}>
-                  <Smartphone className="h-3.5 w-3.5 shrink-0" />
-                  Crew view
-                </Link>
-              </Button>
-            </div>
-          </SheetHeader>
-
-          <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6">
-            {historyVisit && openedRow.visit && (
-              <button
-                type="button"
-                onClick={() => showVisit(null)}
-                className="-mt-2 mb-4 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-primary hover:underline"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Back to week of {format(parseISO(openedWeek), 'MMM d')}
-              </button>
-            )}
-            <VisitDetailContent
-              key={data.visitId}
-              data={data}
-              onOpenCompletion={() => setCompletionOpen(true)}
-              onOpenSkip={() => setSkipOpen(true)}
-              showAddress={false}
-              showInvoice
-              onPhotoViewerChange={handlePhotoViewerChange}
-              onOpenHistoryVisit={showVisit}
-            />
+          <div className="flex shrink-0 flex-col gap-3 border-b border-border px-5 pt-5 pb-4">
+            {header}
           </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute top-3 right-3 h-8 w-8"
+            aria-label="Close stop (Esc)"
+            onClick={() => handleOpenChange(false)}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+            {body}
+          </div>
+        </section>
+      ) : (
+        <Sheet open={open} onOpenChange={handleOpenChange}>
+          {/* Send focus to body on close, or Radix can leave a stuck pointer-events lock. */}
+          <SheetContent
+            side="right"
+            className="w-full sm:max-w-lg flex flex-col p-0 gap-0"
+            onCloseAutoFocus={(e) => e.preventDefault()}
+          >
+            <SheetHeader className="px-6 pt-6 pb-4 border-b border-border shrink-0 gap-0 space-y-3">
+              {header}
+            </SheetHeader>
 
-          {/* Right-side sheets don't pad for the home indicator on a phone; the bottom variant
-             does. */}
-          <SheetFooter className="px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] border-t border-border shrink-0">
-            <SheetClose asChild>
-              <Button type="button" variant="outline" className="w-full sm:w-auto">
-                Close
-              </Button>
-            </SheetClose>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+            <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6">
+              {body}
+            </div>
+
+            {/* Right-side sheets don't pad for the home indicator on a phone; the bottom variant
+               does. */}
+            <SheetFooter className="px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] border-t border-border shrink-0">
+              <SheetClose asChild>
+                <Button type="button" variant="outline" className="w-full sm:w-auto">
+                  Close
+                </Button>
+              </SheetClose>
+            </SheetFooter>
+          </SheetContent>
+        </Sheet>
+      )}
 
       <VisitLogger
         visitId={data.visitId}

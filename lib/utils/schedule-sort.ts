@@ -34,18 +34,6 @@ export function setAllSortMode(mode: ScheduleSortMode): ScheduleSortState {
   return { all: mode, byGroup: {} }
 }
 
-/** Override one group. An override matching the default is deleted, not stored. */
-export function setGroupSortMode(
-  state: ScheduleSortState,
-  groupKey: string,
-  mode: ScheduleSortMode,
-): ScheduleSortState {
-  const byGroup = { ...state.byGroup }
-  if (mode === state.all) delete byGroup[groupKey]
-  else byGroup[groupKey] = mode
-  return { ...state, byGroup }
-}
-
 /** Tolerant of anything in localStorage, including the older bare-string format. */
 export function parseScheduleSortState(raw: string | null): ScheduleSortState | null {
   if (!raw) return null

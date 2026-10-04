@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { format, parseISO, addWeeks, addDays, isBefore, isAfter } from 'date-fns'
+import { format, parseISO, addWeeks, addDays, isSameDay } from 'date-fns'
 import { ChevronLeft, ChevronRight, CalendarIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -9,7 +9,7 @@ import { Calendar } from '@/components/ui/calendar'
 import { getWeekStart } from '@/lib/utils/schedule'
 
 interface ScheduleNavProps {
-  windowStart: string // ISO date — first Monday of the 4-week window
+  windowStart: string // ISO date — the Monday of the week on screen
   /** Week paging as client state: a router push would be a network round-trip. */
   onWeekChange: (weekStart: string) => void
 }
@@ -18,12 +18,8 @@ export function ScheduleNav({ windowStart, onWeekChange }: ScheduleNavProps) {
   const [calendarOpen, setCalendarOpen] = useState(false)
 
   const windowStartDate = parseISO(windowStart)
-  const windowEndDate = addWeeks(windowStartDate, 3) // last week shown
   const currentWeekStart = getWeekStart(new Date())
-
-  const isCurrentWeekVisible =
-    !isBefore(currentWeekStart, windowStartDate) &&
-    !isAfter(currentWeekStart, windowEndDate)
+  const isCurrentWeekVisible = isSameDay(currentWeekStart, windowStartDate)
 
   function goToWeek(weekStart: string) {
     onWeekChange(weekStart)
@@ -39,8 +35,7 @@ export function ScheduleNav({ windowStart, onWeekChange }: ScheduleNavProps) {
     setCalendarOpen(false)
   }
 
-  const rangeLabel = `${format(windowStartDate, 'MMM d')} – ${format(addWeeks(windowStartDate, 3), 'MMM d')}`
-  const singleWeekLabel = `${format(windowStartDate, 'MMM d')} – ${format(addDays(windowStartDate, 6), 'MMM d')}`
+  const weekLabel = `${format(windowStartDate, 'MMM d')} – ${format(addDays(windowStartDate, 6), 'MMM d')}`
 
   return (
     <div className="flex flex-wrap items-center gap-1.5" data-tour="schedule.weekNav">
@@ -65,13 +60,8 @@ export function ScheduleNav({ windowStart, onWeekChange }: ScheduleNavProps) {
         <ChevronLeft className="h-4 w-4" />
       </Button>
 
-      {/* Desktop: 4-week window range */}
-      <span className="hidden lg:inline font-display text-sm font-medium text-foreground px-1 min-w-[120px] text-center">
-        {rangeLabel}
-      </span>
-      {/* Mobile: single week */}
-      <span className="lg:hidden font-display text-sm font-medium text-foreground px-1 text-center">
-        {singleWeekLabel}
+      <span className="font-display text-sm font-medium text-foreground px-1 min-w-[120px] text-center">
+        {weekLabel}
       </span>
 
       <Button

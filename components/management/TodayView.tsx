@@ -19,19 +19,17 @@ import { CachedNotice } from '@/components/states/CachedNotice'
 import { SectionError } from '@/components/states/ErrorState'
 import { SectionSkeleton } from '@/components/states/skeletons'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useCan } from '@/components/app/RoleProvider'
 import { useManagementSchedule, scheduleVisitsKey } from '@/hooks/useManagementSchedule'
-import { useWeekPlan, useGenerateWeek } from '@/hooks/useGenerateWeek'
+import { useGenerateWeek } from '@/hooks/useGenerateWeek'
 import { useWeekNotes } from '@/hooks/useWeekNotes'
-import { useScheduleInteractions } from '@/hooks/useScheduleInteractions'
-import { useScheduleSeen } from '@/hooks/useScheduleSeen'
+import { useScheduleInteractions, type OpenVisit } from '@/hooks/useScheduleInteractions'
+import { useNeedsYou } from '@/hooks/useNeedsYou'
 import { useIsOnline } from '@/hooks/use-hydrated'
 import {
   fieldActivity,
   getWeekStart,
   routeGroupStats,
   routesRunningToday,
-  scheduleExceptions,
   weekdayKey,
   type RunningRoute,
   type ScheduleException,
@@ -48,17 +46,24 @@ interface TodayViewProps {
   /** A route group id or UNGROUPED_SORT_KEY, opened in this week's route drill-in. */
   onOpenRoute: (routeKey: string, weekStart: string) => void
   onShowWeek: (weekStart: string) => void
+  /** The desktop board shows stops in its right pane. Absent, Today opens its own sheet. */
+  onOpenVisit?: OpenVisit
 }
 
 /**
  * Run the day: what needs you, the routes out today, what crews sent back. Always the current
  * week, from the schedule's cached query, so it works offline and stays live through realtime.
  */
-export function TodayView({ filters, vehicles, onOpenRoute, onShowWeek }: TodayViewProps) {
+export function TodayView({
+  filters,
+  vehicles,
+  onOpenRoute,
+  onShowWeek,
+  onOpenVisit,
+}: TodayViewProps) {
   const today = useMemo(() => new Date(), [])
   const weekStart = useMemo(() => format(getWeekStart(today), 'yyyy-MM-dd'), [today])
   const weekStarts = useMemo(() => [weekStart], [weekStart])
-  const { editSchedule: canEdit } = useCan()
   const isOnline = useIsOnline()
   const queryClient = useQueryClient()
 
@@ -71,21 +76,15 @@ export function TodayView({ filters, vehicles, onOpenRoute, onShowWeek }: TodayV
       selectMode: false,
       sortState: DEFAULT_SCHEDULE_SORT,
       windowStart: weekStart,
+      onOpenVisit,
     })
-  const { isSeen, markSeen } = useScheduleSeen()
-
-  // Planned against the unfiltered week, like Week's Generate CTA.
-  const plan = useWeekPlan(weekStart, weeks[0])
+  const { items: needsYou, markSeen, plan } = useNeedsYou(week, weeks[0], weekStart)
   const generateWeek = useGenerateWeek(weekStart)
   const [generateOpen, setGenerateOpen] = useState(false)
-  const decisions = canEdit && !plan.isLoading && !plan.isError ? plan.decisions : []
 
   if (isLoading && !hasData) return <TodaySkeleton />
 
   const failed = isError && !hasData
-  const needsYou = scheduleExceptions(week, decisions, new Date()).filter((item) =>
-    item.kind === 'skipped' || item.kind === 'crewReport' ? !isSeen(item.visit) : true,
-  )
   const activity = fieldActivity(week)
   const { running, otherCount } = routesRunningToday(week, weekdayKey(today), orderRows)
   // Realtime writes bump this too, so it's "when we last heard", which is what offline needs.
@@ -104,7 +103,7 @@ export function TodayView({ filters, vehicles, onOpenRoute, onShowWeek }: TodayV
         {format(today, 'EEE MMM d')}
       </h1>
 
-      <GettingStartedCard />
+      <GettingStartedCard className="mb-6" />
 
       {isStale && <CachedNotice />}
 

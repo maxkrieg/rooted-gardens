@@ -5,6 +5,7 @@ import { ChevronRight, Sprout } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { CheckIndicator } from '@/components/app/CheckIndicator'
 import { useOnboarding } from '@/components/onboarding/OnboardingProvider'
+import { cn } from '@/lib/utils'
 
 /** The checklist rows; ticked by real work (see TASKS), or by hand with the check. */
 export function ChecklistItems({ onNavigate }: { onNavigate?: () => void }) {
@@ -51,7 +52,7 @@ export function ChecklistItems({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 /** On the schedule's Today view until every task is done or it's hidden. */
-export function GettingStartedCard() {
+export function GettingStartedCard({ className }: { className?: string }) {
   const { ready, tasks, isTaskDone, checklistDismissed, dismissChecklist } = useOnboarding()
   if (!ready || tasks.length === 0 || checklistDismissed) return null
 
@@ -59,7 +60,7 @@ export function GettingStartedCard() {
   if (doneCount === tasks.length) return null
 
   return (
-    <Card className="rounded-2xl border border-border shadow-warm">
+    <Card className={cn('rounded-2xl border border-border shadow-warm', className)}>
       <CardContent className="p-4 sm:p-5">
         <div className="mb-2 flex items-start gap-3">
           <Sprout className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden />

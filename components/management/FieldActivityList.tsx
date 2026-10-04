@@ -31,7 +31,8 @@ export function FieldActivityList({ items, onOpen }: FieldActivityListProps) {
       >
         From the field
       </h2>
-      <ul className="border-y border-border bg-card">
+      {/* Full-bleed on a phone; a rounded card on the desktop board, like the rest of Today. */}
+      <ul className="border-y border-border bg-card lg:overflow-hidden lg:rounded-2xl lg:border lg:shadow-warm">
         {shown.map((item, index) => (
           <li key={item.visit.id} className={cn(index > 0 && 'border-t border-border/60')}>
             <FieldActivityRow item={item} onOpen={() => onOpen(item)} />

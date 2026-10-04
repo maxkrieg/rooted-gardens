@@ -1,6 +1,6 @@
 import { Skeleton } from '@/components/ui/skeleton'
 
-/** Mirrors app/app/schedule/page.tsx: title + week nav, filter bar, then the grid. */
+/** Mirrors ScheduleView's skeleton: week nav, filter bar, then route blocks. */
 export default function ScheduleLoading() {
   return (
     <div className="p-4 lg:p-6">
@@ -13,7 +13,7 @@ export default function ScheduleLoading() {
         <Skeleton className="h-10 w-36 rounded-md" />
         <Skeleton className="h-10 w-36 rounded-md" />
       </div>
-      {/* Route-group blocks: a label row then stop rows, same rhythm as the grid. */}
+      {/* Route-group blocks: a label row then stop rows. */}
       <div className="space-y-6">
         {Array.from({ length: 3 }).map((_, group) => (
           <div key={group} className="space-y-2">

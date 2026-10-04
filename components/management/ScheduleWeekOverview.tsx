@@ -26,6 +26,10 @@ interface ScheduleWeekOverviewProps {
   onGenerate: () => void
   /** A route group id, or UNGROUPED_SORT_KEY for "Not on a route". */
   onOpenRoute: (routeKey: string) => void
+  /** The route open beside it on the desktop board, marked current. */
+  activeRouteKey?: string | null
+  /** 'pane' = the desktop board's left column: a rounded card instead of a full-bleed list. */
+  layout?: 'page' | 'pane'
 }
 
 /**
@@ -39,12 +43,15 @@ export function ScheduleWeekOverview({
   dueCount,
   onGenerate,
   onOpenRoute,
+  activeRouteKey = null,
+  layout = 'page',
 }: ScheduleWeekOverviewProps) {
   const { data: weekNotes = [] } = useWeekNotes(week?.weekStart ?? '')
+  const inPane = layout === 'pane'
 
   const cta =
     dueCount !== null && dueCount > 0 ? (
-      <div className="px-4 pb-3">
+      <div className={cn('pb-3', !inPane && 'px-4')}>
         <Button
           data-tour="schedule.generateCta"
           className="h-12 w-full gap-2 text-[15px]"
@@ -60,7 +67,7 @@ export function ScheduleWeekOverview({
     return (
       <>
         {cta}
-        <div className="px-4">
+        <div className={cn(!inPane && 'px-4')}>
           <ScheduleEmptyState filtered={filtered} />
         </div>
       </>
@@ -70,7 +77,12 @@ export function ScheduleWeekOverview({
   return (
     <>
       {cta}
-      <div className="border-y border-border bg-card">
+      <div
+        className={cn(
+          'bg-card',
+          inPane ? 'overflow-hidden rounded-2xl border border-border' : 'border-y border-border',
+        )}
+      >
         {week.routeGroups.map(({ routeGroup, rows }, index) => (
           <RouteOverviewRow
             key={routeGroup.id}
@@ -84,6 +96,7 @@ export function ScheduleWeekOverview({
             )}
             note={weekNotes.find((n) => n.route_group_id === routeGroup.id)?.note ?? null}
             showTopBorder={index > 0}
+            active={activeRouteKey === routeGroup.id}
             onOpen={() => onOpenRoute(routeGroup.id)}
           />
         ))}
@@ -92,11 +105,13 @@ export function ScheduleWeekOverview({
           <button
             type="button"
             onClick={() => onOpenRoute(UNGROUPED_SORT_KEY)}
+            aria-current={activeRouteKey === UNGROUPED_SORT_KEY ? 'true' : undefined}
             className={cn(
               'flex min-h-14 w-full items-center gap-3 bg-[var(--clay)]/10 px-4 py-3 text-left text-[var(--clay)]',
               'transition-[filter] hover:brightness-[0.97] active:brightness-[0.94]',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
               week.routeGroups.length > 0 && 'border-t border-[var(--clay)]/30',
+              activeRouteKey === UNGROUPED_SORT_KEY && 'bg-[var(--clay)]/20',
             )}
           >
             <span className="min-w-0 flex-1 text-xs font-semibold uppercase tracking-widest">
@@ -117,6 +132,7 @@ function RouteOverviewRow({
   stats,
   note,
   showTopBorder,
+  active,
   onOpen,
 }: {
   tourAnchor: boolean
@@ -125,6 +141,7 @@ function RouteOverviewRow({
   stats: RouteGroupStats
   note: string | null
   showTopBorder: boolean
+  active: boolean
   onOpen: () => void
 }) {
   const { done, total, crew, vehicles, onSite, unscheduled, withoutCrew } = stats
@@ -144,9 +161,11 @@ function RouteOverviewRow({
       data-tour={tourAnchor ? 'schedule.routeBand' : undefined}
       onClick={onOpen}
       aria-label={`Open ${name}`}
+      aria-current={active ? 'true' : undefined}
       className={cn(
         'relative flex min-h-14 w-full items-center gap-3 py-3 pl-4 pr-3 text-left',
         'transition-colors hover:bg-accent/50 active:bg-accent',
+        active && 'bg-accent shadow-[inset_3px_0_0_0_var(--primary)]',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
         showTopBorder && 'border-t border-border/60',
       )}

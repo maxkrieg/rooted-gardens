@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback } from 'react'
-import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { fetchWeekNotes } from '@/lib/schedule/fetch'
 import { enqueueMutation, flushMutationQueue } from '@/lib/offline/mutation-queue'
 import type { RouteGroupWeekNote } from '@/types/app'
@@ -14,20 +14,6 @@ export function useWeekNotes(weekStartISO: string) {
     queryKey: weekNotesKey(weekStartISO),
     queryFn: () => fetchWeekNotes(weekStartISO),
     staleTime: 60_000,
-  })
-}
-
-/** Notes for several weeks at once — the desktop grid's four columns. Keyed by
- *  week so a column reads only its own week's notes. */
-export function useWeekNotesForWeeks(weekStarts: string[]) {
-  return useQueries({
-    queries: weekStarts.map((weekStart) => ({
-      queryKey: weekNotesKey(weekStart),
-      queryFn: () => fetchWeekNotes(weekStart),
-      staleTime: 60_000,
-    })),
-    combine: (results) =>
-      new Map(weekStarts.map((weekStart, i) => [weekStart, results[i]?.data ?? []])),
   })
 }
 

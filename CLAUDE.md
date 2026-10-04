@@ -162,14 +162,16 @@ rooted-gardens/
 │   │   ├── RoleProvider.tsx     ← useRole() / useCan() — affordances, never security
 │   │   └── nav-items.ts         ← one nav array, access-filtered by lib/auth/access.ts
 │   ├── management/              ← schedule, accounts, routes, billing components
-│   │   ├── ScheduleGrid.tsx     ← the 4-week desktop grid (lg+ only)
-│   │   ├── ScheduleWeekOverview.tsx ← phone Week for office roles: one row per route
+│   │   ├── ScheduleBoardDesktop.tsx ← office roles at lg+: routes | a route's stops | the stop,
+│   │   │                              three panes on one URL state (`?route=`, `?visit=`); ↑/↓/Enter/Esc/S
+│   │   ├── ScheduleWeekOverview.tsx ← Week for office roles: one row per route (the board's left pane)
 │   │   ├── NeedsYouList.tsx         ← exceptions (skips, crew reports, no crew…) — scheduleExceptions()
 │   │   ├── FieldActivityList.tsx    ← "From the field": settled visits, newest first — fieldActivity()
 │   │   ├── TodayView.tsx            ← the schedule's Today: Needs you → Running today (routes whose
 │   │   │                              default_days include today — routesRunningToday()) → From the field
-│   │   ├── ScheduleListMobile.tsx   ← the phone schedule (the screen that matters); one route
-│   │   │                              alone on the `?route=` drill-in, crew's flat list otherwise
+│   │   ├── ScheduleListMobile.tsx   ← the stop list (the screen that matters); one route alone on
+│   │   │                              the `?route=` drill-in (and the board's middle pane), crew's
+│   │   │                              flat list otherwise
 │   │   ├── RouteGroupBand.tsx       ← route header: crew, truck, progress, week note
 │   │   └── InvoiceQueue.tsx
 │   └── crew/                    ← field-work components (name predates the merge)
@@ -693,7 +695,7 @@ account name and property address.
   (`audit_row_change()`) and a `CASE` branch + labels in `lib/audit/actions.ts`, or its
   changes never reach the Activity log.
 - **Where to filter:** *enumeration* points filter (`.eq('is_archived', false)`) — account
-  list & detail, ⌘K palette, routes page, unrouted counts, schedule grid, crew week schedule,
+  list & detail, ⌘K palette, routes page, unrouted counts, schedule, crew week schedule,
   contract-billing overview, reports, and the dashboard (current week + in-progress, which
   are live ops, not history). *FK-embed lookups do NOT filter* — billing/invoice queries, the
   account detail visit history, `useStopDetail` — so historical records keep their labels.
@@ -879,15 +881,16 @@ Two tiers, and only two. Pick from these rather than introducing a third:
 | Breakpoint | What changes | Why |
 |---|---|---|
 | `md` (768px) | Table ↔ card for list screens: accounts, leads | The width a simple table needs before it has to scroll sideways |
-| `lg` (1024px) | The nav (bottom bar → sidebar), and the 4-week schedule grid | The grid needs a sticky label column plus four week columns; below this it would scroll horizontally, which is forbidden above |
+| `lg` (1024px) | The nav (bottom bar → sidebar), and the schedule → three panes (office roles) | Routes, stops and the open stop side by side need this width beside the sidebar. Within the board, the left pane folds to a rail of initials via a *container* query (`@5xl`) when the stop pane is open, so there's still no third viewport tier and no sideways scroll |
 
 The routes page uses neither — it is cards at every width, which is the right answer when a
 screen has no table to degrade.
 
-**`ScheduleView` couples a JS media query to the CSS breakpoint** — `useMediaQuery('(min-width:
-1024px)')` decides whether to fetch one week or four, while `hidden lg:block` / `lg:hidden`
-decide which layout renders. If those two ever disagree, a phone either fetches three weeks it
-never renders or renders a grid it never fetched.
+**`ScheduleView` picks its layout with a JS media query** — `useMediaQuery('(min-width:
+1024px)')` chooses between `ScheduleBoardDesktop` and the phone layout, and only one is mounted.
+It no longer changes what's fetched: every width loads one week (plus prefetched neighbours).
+Because only one layout is mounted, `DeepLinkedVisitSheet` lives in the phone branch and the
+board opens `?visit=` in its own right pane.
 
 ### Shared Components
 - Use shadcn/ui primitives as the base (Button, Card, Dialog, etc.)
@@ -1005,7 +1008,7 @@ cache** via `applyVisitUpdate` (`hooks/useManagementSchedule.ts`). It is version
 `updated_at`, so a dropped or out-of-order message can't pin a stale value; an unguarded write
 would beat fresher server data on every later render. There is no separate overlay store any
 more — the `Map<visitId, VisitOverlay>` that `SessionsProvider` kept was folded into the cache
-in R5.5, because the grid no longer reads server props and a third store only meant every
+in R5.5, because the schedule no longer reads server props and a third store only meant every
 consumer had to remember to merge.
 
 The schedule's `Today` view (`TodayView`) reads on-site state from that same cached week, with
