@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { addDays, format, parseISO } from 'date-fns'
-import { CalendarDays, ChevronLeft, Map as MapIcon, Smartphone, X } from 'lucide-react'
+import { CalendarDays, ChevronLeft, Map as MapIcon, X } from 'lucide-react'
 import {
   Sheet,
   SheetClose,
@@ -218,14 +218,6 @@ export function VisitDetailSheet({
             <MapIcon className="h-3.5 w-3.5 shrink-0" />
             Open in Maps
           </a>
-        </Button>
-        {/* The phone icon is the point: this is the stop exactly as crew see
-            it on their own phones. */}
-        <Button asChild variant="outline" size="sm" className="gap-1.5">
-          <Link href={`/app/stop/${data.visitId}`}>
-            <Smartphone className="h-3.5 w-3.5 shrink-0" />
-            Crew view
-          </Link>
         </Button>
       </div>
     </>
