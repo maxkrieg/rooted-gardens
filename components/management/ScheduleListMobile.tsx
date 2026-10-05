@@ -12,7 +12,6 @@ import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
 import { ScheduleEmptyState } from '@/components/management/ScheduleEmptyState'
 import {
   RouteGroupBand,
-  RoutePlanLine,
   RouteViewHeader,
 } from '@/components/management/RouteGroupBand'
 import { ScheduleBulkControls } from '@/components/management/ScheduleBulkControls'
@@ -179,7 +178,7 @@ export function ScheduleListMobile({
   const weekLabel = `${format(weekStartDate, 'MMM d')} – ${format(addDays(weekStartDate, 6), 'MMM d')}`
   const sortToggle = onSortChange && (
     <ScheduleSortToggle
-      size="compact"
+      size="icon"
       scope="This route"
       mode={sortState.all}
       onChange={onSortChange}
@@ -420,17 +419,15 @@ export function ScheduleListMobile({
                       total={stats.total}
                       onSite={stats.onSite}
                       onBack={onBack}
-                    />
-                  </div>
-                  <div className="border-b border-border/60">
-                    <RoutePlanLine
-                      days={routeGroup.default_days ?? []}
-                      crew={stats.crew}
-                      vehicles={stats.vehicles}
+                      plan={{
+                        days: routeGroup.default_days ?? [],
+                        crew: stats.crew,
+                        vehicles: stats.vehicles,
+                      }}
                       trailing={sortToggle}
                     />
-                    {noteRibbon(routeGroup)}
                   </div>
+                  {noteRibbon(routeGroup)}
                 </>
               ) : (
                 // Sticks under the header (height from --schedule-sticky-h). The card must not
@@ -494,13 +491,15 @@ export function ScheduleListMobile({
                     total={ungrouped.length}
                     onSite={false}
                     onBack={onBack}
+                    trailing={sortToggle}
                     tone="unrouted"
                   />
                 </div>
-                <div className="flex items-center gap-2 border-b border-[var(--clay)]/30 bg-[var(--clay)]/10 px-4 py-2">
-                  {routeAllPicker}
-                  <span className="ml-auto">{sortToggle}</span>
-                </div>
+                {routeAllPicker && (
+                  <div className="flex items-center gap-2 border-b border-[var(--clay)]/30 bg-[var(--clay)]/10 px-4 py-2">
+                    {routeAllPicker}
+                  </div>
+                )}
               </>
             ) : (
               <div className="bg-[var(--clay)]/10 text-[var(--clay)] flex items-center justify-between px-4 py-2.5 border-b border-[var(--clay)]/30">

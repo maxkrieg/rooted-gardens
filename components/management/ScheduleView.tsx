@@ -305,22 +305,21 @@ export function ScheduleView({
     <div>
       {/* No <h1>: the nav tab already says Schedule, and on a phone that line
           cost more vertical space than anything else on the screen. */}
-      {/* On the route view the phone header steps aside: the route's own header sticks instead. */}
-      <ScheduleStickyBar collapsedOnPhone={Boolean(activeRoute)}>
-        {!activeRoute && (
-          <div className="lg:hidden">
-            <ScheduleHeaderMobile
-              weekStart={windowStart}
-              onWeekChange={goToWeek}
-              activeFilterCount={activeScheduleFilterCount(filters)}
-              onOpenFilters={() => setFilterSheetOpen(true)}
-              // Select stops moved to the route view: selection is route-shaped.
-              overflowActions={
-                canEdit ? [{ label: 'Generate week…', onClick: () => setGenerateOpen(true) }] : []
-              }
-            />
-          </div>
-        )}
+      {/* Kept on the route view too: it's the only place a phone shows which week this is, and
+          it lets you step a route through weeks. The route header sticks beneath it. */}
+      <ScheduleStickyBar>
+        <div className="lg:hidden">
+          <ScheduleHeaderMobile
+            weekStart={windowStart}
+            onWeekChange={goToWeek}
+            activeFilterCount={activeScheduleFilterCount(filters)}
+            onOpenFilters={() => setFilterSheetOpen(true)}
+            // Select stops moved to the route view: selection is route-shaped.
+            overflowActions={
+              canEdit ? [{ label: 'Generate week…', onClick: () => setGenerateOpen(true) }] : []
+            }
+          />
+        </div>
         {/* One row, like the phone: filters sit behind a button rather than four dropdowns. */}
         <div className="hidden items-center gap-1.5 lg:flex">
           {/* The phone keeps this in its header's ⋯; a laptop has the room to show it.
@@ -535,14 +534,7 @@ function ScheduleSkeleton() {
  * Sticks the filters and week nav to the top, publishing its height as --schedule-sticky-h for
  * the phone route header and the board's height. On a phone it re-applies page padding itself.
  */
-function ScheduleStickyBar({
-  children,
-  collapsedOnPhone = false,
-}: {
-  children: React.ReactNode
-  /** Drop the phone padding when there's nothing in the bar below lg (the route view). */
-  collapsedOnPhone?: boolean
-}) {
+function ScheduleStickyBar({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -563,10 +555,7 @@ function ScheduleStickyBar({
   return (
     <div
       ref={ref}
-      className={cn(
-        'sticky top-0 z-40 -mx-4 bg-background px-4 pb-2 mb-2 lg:mx-0 lg:px-0 lg:pb-3 lg:mb-3',
-        collapsedOnPhone && 'max-lg:p-0 max-lg:m-0',
-      )}
+      className="sticky top-0 z-40 -mx-4 bg-background px-4 pb-2 mb-2 lg:mx-0 lg:px-0 lg:pb-3 lg:mb-3"
     >
       {children}
     </div>

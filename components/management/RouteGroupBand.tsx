@@ -82,8 +82,9 @@ export function RouteGroupBand({
 }
 
 /**
- * The route view's header: back to the week, the route's name and the week, and done/total, over
- * the progress bar. One 48px row, so it can stick without breaking the ≤56px chrome rule.
+ * The route view's header: back to the week, the route's name over its plan (days, crew, truck —
+ * the week when there's no plan), a trailing control, and done/total, over the progress bar.
+ * One 48px row, so it can stick without breaking the ≤56px chrome rule.
  */
 export function RouteViewHeader({
   name,
@@ -92,10 +93,15 @@ export function RouteViewHeader({
   total,
   onSite,
   onBack,
+  plan,
+  trailing,
   tone = 'route',
 }: {
   name: string
   weekLabel: string
+  plan?: { days: string[]; crew: Employee[]; vehicles: string[] }
+  /** e.g. the sort switch, before the done count. */
+  trailing?: React.ReactNode
   done: number
   total: number
   onSite: boolean
@@ -104,6 +110,8 @@ export function RouteViewHeader({
   tone?: 'route' | 'unrouted'
 }) {
   const unrouted = tone === 'unrouted'
+  const hasPlan =
+    !!plan && (plan.days.length > 0 || plan.crew.length > 0 || plan.vehicles.length > 0)
   return (
     // Sticky, so both tones must be opaque: the clay tint sits on a card-coloured base.
     <div
@@ -128,9 +136,19 @@ export function RouteViewHeader({
           <span className="block truncate font-display text-[15px] font-semibold leading-tight text-foreground">
             {name}
           </span>
-          <span className="block truncate text-[11px] leading-tight opacity-80">{weekLabel}</span>
+          {hasPlan ? (
+            <span className="flex min-w-0 items-center gap-2 text-[11px] leading-tight" title={weekLabel}>
+              {plan.days.length > 0 && (
+                <span className="shrink-0 font-semibold text-foreground/80">{formatDays(plan.days)}</span>
+              )}
+              <RouteCrewTruck crew={plan.crew} vehicles={plan.vehicles} />
+            </span>
+          ) : (
+            <span className="block truncate text-[11px] leading-tight opacity-80">{weekLabel}</span>
+          )}
         </span>
         {onSite && <OnSiteDot />}
+        {trailing}
         {!unrouted && <RouteDoneCount done={done} total={total} />}
       </div>
       {!unrouted && (
@@ -147,21 +165,17 @@ export function RoutePlanLine({
   days,
   crew,
   vehicles,
-  trailing,
 }: {
   days: string[]
   crew: Employee[]
   vehicles: string[]
-  /** Right-aligned control, e.g. the route view's sort switch. */
-  trailing?: React.ReactNode
 }) {
   const hasPlan = days.length > 0 || crew.length > 0 || vehicles.length > 0
-  if (!hasPlan && !trailing) return <div className="pb-1.5" />
+  if (!hasPlan) return <div className="pb-1.5" />
   return (
     <div className="flex items-center gap-2 pl-5 pr-4 pb-2 pt-1 text-[11px] text-muted-foreground">
       {days.length > 0 && <DaysPill days={days} />}
       <RouteCrewTruck crew={crew} vehicles={vehicles} />
-      {trailing && <span className="ml-auto -mr-1.5">{trailing}</span>}
     </div>
   )
 }

@@ -24,13 +24,15 @@ export function ScheduleSortToggle({
   onChange: (next: ScheduleSortMode) => void
   /** Named in the accessible label so the two levels are distinguishable. */
   scope: string
-  size?: 'default' | 'compact'
+  /** 'icon' drops the label (it stays in the accessible name) to fit a header row. */
+  size?: 'default' | 'compact' | 'icon'
   className?: string
 }) {
   const next: ScheduleSortMode = mode === 'priority' ? 'route' : 'priority'
   const { label, Icon } = MODE_META[mode]
   const isPriority = mode === 'priority'
   const compact = size === 'compact'
+  const iconOnly = size === 'icon'
 
   return (
     <button
@@ -46,18 +48,22 @@ export function ScheduleSortToggle({
         'inline-flex shrink-0 items-center gap-1.5 rounded-full font-medium transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         // Deliberately under the 44px floor: a full-size chip would add ~20px per route band.
-        compact ? 'h-8 px-2.5 text-[11px]' : 'h-9 px-3 text-xs',
+        iconOnly
+          ? 'h-9 w-9 justify-center'
+          : compact
+            ? 'h-8 px-2.5 text-[11px]'
+            : 'h-9 px-3 text-xs',
         // Primary, not clay: clay is the on-site pulse, and the band it sits on
         // can be showing one. Green here reads as "this control is engaged".
         isPriority
           ? 'bg-primary/12 text-primary hover:bg-primary/20'
           : 'text-muted-foreground hover:bg-secondary-foreground/10 hover:text-foreground',
-        !compact && !isPriority && 'border border-border',
+        size === 'default' && !isPriority && 'border border-border',
         className,
       )}
     >
-      <Icon className="h-3.5 w-3.5" aria-hidden />
-      {label}
+      <Icon className={iconOnly ? 'h-4 w-4' : 'h-3.5 w-3.5'} aria-hidden />
+      {!iconOnly && label}
     </button>
   )
 }
