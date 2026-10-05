@@ -314,9 +314,12 @@ export function ScheduleView({
             onWeekChange={goToWeek}
             activeFilterCount={activeScheduleFilterCount(filters)}
             onOpenFilters={() => setFilterSheetOpen(true)}
-            // Select stops moved to the route view: selection is route-shaped.
+            // Generate week is week-wide, so it lives on the week list only; inside a route the
+            // route's own ⋯ is the one menu. Empty hides the button.
             overflowActions={
-              canEdit ? [{ label: 'Generate week…', onClick: () => setGenerateOpen(true) }] : []
+              canEdit && !activeRoute
+                ? [{ label: 'Generate week…', onClick: () => setGenerateOpen(true) }]
+                : []
             }
           />
         </div>

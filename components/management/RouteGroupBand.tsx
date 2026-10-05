@@ -84,7 +84,7 @@ export function RouteGroupBand({
 /**
  * The route view's header: back to the week, the route's name over its plan (days, crew, truck —
  * the week when there's no plan), a trailing control, and done/total, over the progress bar.
- * One 48px row, so it can stick without breaking the ≤56px chrome rule.
+ * One 56px row, the most the ≤56px chrome rule allows, so the name can be a size up.
  */
 export function RouteViewHeader({
   name,
@@ -118,10 +118,11 @@ export function RouteViewHeader({
       className={cn(
         unrouted
           ? 'bg-card bg-linear-to-r from-[var(--clay)]/10 to-[var(--clay)]/10 text-[var(--clay)]'
-          : 'bg-card text-muted-foreground',
+          // Stone, not the list's card: the header reads as chrome above the stops, not a row.
+          : 'bg-secondary text-muted-foreground',
       )}
     >
-      <div className="flex h-12 items-center gap-1 pr-4">
+      <div className="flex h-14 items-center gap-1 pr-4">
         <button
           type="button"
           data-tour="schedule.routeBack"
@@ -133,7 +134,8 @@ export function RouteViewHeader({
           Week
         </button>
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-display text-[15px] font-semibold leading-tight text-foreground">
+          {/* A size up from the stop names (15px), so the route reads as their heading. */}
+          <span className="block truncate font-display text-[19px] font-semibold leading-tight tracking-[-0.01em] text-foreground">
             {name}
           </span>
           {hasPlan ? (
