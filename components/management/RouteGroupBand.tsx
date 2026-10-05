@@ -17,7 +17,7 @@ interface RouteGroupBandProps {
   days?: string[]
   stats: RouteGroupStats
   canEdit: boolean
-  onAssignRoute: () => void
+  onAssign: (kind: 'crew' | 'truck') => void
   onEditDefaults: () => void
   onEditNote: () => void
   hasNote: boolean
@@ -35,7 +35,7 @@ export function RouteGroupBand({
   days = [],
   stats,
   canEdit,
-  onAssignRoute,
+  onAssign,
   onEditDefaults,
   onEditNote,
   hasNote,
@@ -59,7 +59,8 @@ export function RouteGroupBand({
           <RouteGroupMenu
             name={name}
             items={[
-              { label: 'Assign route…', onClick: onAssignRoute },
+              { label: 'Set crew…', onClick: () => onAssign('crew') },
+              { label: 'Set truck…', onClick: () => onAssign('truck') },
               {
                 label: hasNote ? 'Edit this week’s note…' : 'Add a note for this week…',
                 onClick: onEditNote,

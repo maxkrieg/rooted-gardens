@@ -493,3 +493,35 @@ export function routesRunningToday(
   }
   return { running, otherCount }
 }
+
+/** What a route's scheduled stops are set to this week — the Crew and Truck sheets start here. */
+export type RouteAssignment = {
+  /** Stops the sheets will change: scheduled, not done or skipped. */
+  scheduledCount: number
+  /** Everyone assigned to any scheduled stop. */
+  crewIds: string[]
+  crewMixed: boolean
+  /** The shared truck, or null when none is set or the stops differ (see vehicleMixed). */
+  vehicleId: string | null
+  vehicleMixed: boolean
+}
+
+export function routeAssignment(visits: Array<VisitWithCrew | null>): RouteAssignment {
+  const scheduled = visits.filter((v): v is VisitWithCrew => v?.status === 'scheduled')
+  const crewSets = scheduled.map((v) =>
+    v.visit_crew
+      .filter((vc) => vc.relation === 'assigned')
+      .map((vc) => vc.employee_id)
+      .sort()
+      .join(','),
+  )
+  const vehicleIds = new Set(scheduled.map((v) => v.vehicle_id))
+  const crewIds = new Set(crewSets.flatMap((s) => (s ? s.split(',') : [])))
+  return {
+    scheduledCount: scheduled.length,
+    crewIds: [...crewIds],
+    crewMixed: new Set(crewSets).size > 1,
+    vehicleId: vehicleIds.size === 1 ? [...vehicleIds][0] : null,
+    vehicleMixed: vehicleIds.size > 1,
+  }
+}

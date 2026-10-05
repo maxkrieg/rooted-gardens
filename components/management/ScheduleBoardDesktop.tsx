@@ -31,7 +31,7 @@ interface ScheduleBoardDesktopProps {
   windowStart: string
   /** Week's week, filtered — the left pane's routes and the middle pane's stops. */
   week: ScheduleWeek | undefined
-  /** The unfiltered window, for RouteAssignDialog's week picker. */
+  /** The unfiltered window, for the route's Crew and Truck counts. */
   windowWeeks: ScheduleWeek[]
   /** Today's week (always the current one), filtered and not, for the Needs you count. */
   todayWeek: ScheduleWeek | undefined

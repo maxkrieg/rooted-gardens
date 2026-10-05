@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useApplyVisitUpdate } from '@/hooks/useManagementSchedule'
 import type { VisitOverlay } from '@/lib/utils/visits'
 
-// One refetch for a bulkAssignRoute's burst of visit_crew rows, not one per row.
+// One refetch for an assignRouteCrew's burst of visit_crew rows, not one per row.
 const CREW_REFETCH_DEBOUNCE_MS = 500
 
 /**

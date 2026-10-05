@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useKeyboardOpen } from '@/hooks/use-keyboard-open'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
-import { RouteAssignDialog } from '@/components/management/RouteAssignDialog'
+import { RouteAssignSheet } from '@/components/management/RouteAssignSheets'
 import { ScheduleEmptyState } from '@/components/management/ScheduleEmptyState'
 import {
   RouteGroupBand,
@@ -23,7 +23,12 @@ import { RoutePicker } from '@/components/management/RoutePicker'
 import { useScheduleInteractions, type OpenVisit } from '@/hooks/useScheduleInteractions'
 import { useWeekNotes } from '@/hooks/useWeekNotes'
 import { isVisitInProgress, formatElapsed, displayCrewFor } from '@/lib/utils/visits'
-import { groupRowsByAccount, routeGroupStats } from '@/lib/utils/schedule'
+import {
+  groupRowsByAccount,
+  routeAssignment,
+  routeGroupStats,
+  type RouteAssignment,
+} from '@/lib/utils/schedule'
 import {
   DEFAULT_SCHEDULE_SORT,
   UNGROUPED_SORT_KEY,
@@ -51,7 +56,7 @@ import { firstName } from '@/lib/utils/team'
 interface ScheduleListMobileProps {
   /** The single week on screen, already filtered. */
   week: ScheduleWeek | undefined
-  /** The unfiltered window — only feeds RouteAssignDialog's week picker. */
+  /** The unfiltered window. Crew and Truck change every scheduled stop, so they count from it. */
   windowWeeks: ScheduleWeek[]
   employees: Employee[]
   vehicles: Vehicle[]
@@ -113,10 +118,8 @@ export function ScheduleListMobile({
     creatingKey,
     createdVisits,
     scheduleVisit,
-    assignOpen,
-    setAssignOpen,
-    assignGroup,
-    openAssign,
+    assignTarget,
+    setAssignTarget,
     defaultsGroup,
     setDefaultsGroup,
     // Lifted here because the band's ⋯ opens the note editor and the ribbon renders it.
@@ -133,11 +136,20 @@ export function ScheduleListMobile({
   const { data: weekNotes = [] } = useWeekNotes(week?.weekStart ?? '')
 
   /** Band stats read the same merged visits as the rows, so they can't disagree. */
-  function statsFor(rows: SchedulePropertyRow[], weekStart: string) {
-    return routeGroupStats(
-      rows.map((row) => row.visit ?? createdVisits.get(`${row.property.id}-${weekStart}`) ?? null),
-      vehicles,
+  function visitsFor(rows: SchedulePropertyRow[], weekStart: string) {
+    return rows.map(
+      (row) => row.visit ?? createdVisits.get(`${row.property.id}-${weekStart}`) ?? null,
     )
+  }
+  function statsFor(rows: SchedulePropertyRow[], weekStart: string) {
+    return routeGroupStats(visitsFor(rows, weekStart), vehicles)
+  }
+  /** Ignores filters: the write covers the whole route, so the summary and count must too. */
+  function assignmentFor(routeGroupId: string, weekStart: string) {
+    const unfiltered = windowWeeks
+      .find((w) => w.weekStart === weekStart)
+      ?.routeGroups.find((g) => g.routeGroup.id === routeGroupId)
+    return routeAssignment(visitsFor(unfiltered?.rows ?? [], weekStart))
   }
 
   function handleRowClick(row: SchedulePropertyRow, visit: VisitWithCrew | null) {
@@ -438,7 +450,7 @@ export function ScheduleListMobile({
                     days={routeGroup.default_days ?? []}
                     stats={stats}
                     canEdit={canEdit}
-                    onAssignRoute={() => openAssign(routeGroup)}
+                    onAssign={(kind) => setAssignTarget({ group: routeGroup, kind })}
                     onEditDefaults={() => setDefaultsGroup(routeGroup)}
                     onEditNote={() => setNoteEditGroupId(routeGroup.id)}
                     hasNote={weekNotes.some((n) => n.route_group_id === routeGroup.id)}
@@ -454,7 +466,10 @@ export function ScheduleListMobile({
                 <RouteActionBar
                   inline={inPane}
                   hasNote={weekNotes.some((n) => n.route_group_id === routeGroup.id)}
-                  onAssign={() => openAssign(routeGroup)}
+                  assignment={assignmentFor(routeGroup.id, currentWeek.weekStart)}
+                  employees={employees}
+                  vehicles={vehicles}
+                  onAssign={(kind) => setAssignTarget({ group: routeGroup, kind })}
                   onEditNote={() => {
                     setNoteEditGroupId(routeGroup.id)
                     // The editor opens in the header area; bring it into view.
@@ -462,7 +477,6 @@ export function ScheduleListMobile({
                     else window.scrollTo({ top: 0, behavior: 'smooth' })
                   }}
                   menuItems={[
-                    { label: 'Assign route…', onClick: () => openAssign(routeGroup) },
                     { label: 'Route defaults…', onClick: () => setDefaultsGroup(routeGroup) },
                     ...(onStartSelect ? [{ label: 'Select stops', onClick: onStartSelect }] : []),
                   ]}
@@ -560,12 +574,13 @@ export function ScheduleListMobile({
         />
       )}
 
-      {assignGroup && (
-        <RouteAssignDialog
-          open={assignOpen}
-          onOpenChange={setAssignOpen}
-          routeGroup={assignGroup}
-          weeks={windowWeeks}
+      {assignTarget && (
+        <RouteAssignSheet
+          kind={assignTarget.kind}
+          onOpenChange={(open) => !open && setAssignTarget(null)}
+          routeGroup={assignTarget.group}
+          weekStart={currentWeek.weekStart}
+          assignment={assignmentFor(assignTarget.group.id, currentWeek.weekStart)}
           employees={employees}
           vehicles={vehicles}
         />
@@ -581,6 +596,9 @@ export function ScheduleListMobile({
 function RouteActionBar({
   inline = false,
   hasNote,
+  assignment,
+  employees = [],
+  vehicles = [],
   onAssign,
   onEditNote,
   menuItems,
@@ -588,8 +606,12 @@ function RouteActionBar({
   /** In the desktop board's pane: sticks to the pane's bottom instead of the screen's. */
   inline?: boolean
   hasNote?: boolean
-  /** Crew and Truck both open RouteAssignDialog, which sets either for the whole route. */
-  onAssign?: () => void
+  /** What the scheduled stops are set to, shown on the Crew and Truck buttons. */
+  assignment?: RouteAssignment
+  employees?: Employee[]
+  vehicles?: Vehicle[]
+  /** Crew and Truck each open their own sheet, which sets only that for the whole route. */
+  onAssign?: (kind: 'crew' | 'truck') => void
   onEditNote?: () => void
   menuItems: Array<{ label: string; onClick: () => void }>
 }) {
@@ -609,14 +631,18 @@ function RouteActionBar({
       <div className="flex gap-2">
         {onAssign && (
           <>
-            <Button variant="outline" className="h-11 flex-1 gap-1.5" onClick={onAssign}>
-              <Users className="h-4 w-4" aria-hidden />
-              Crew
-            </Button>
-            <Button variant="outline" className="h-11 flex-1 gap-1.5" onClick={onAssign}>
-              <Truck className="h-4 w-4" aria-hidden />
-              Truck
-            </Button>
+            <AssignButton
+              icon={Users}
+              label="Crew"
+              value={crewSummary(assignment, employees)}
+              onClick={() => onAssign('crew')}
+            />
+            <AssignButton
+              icon={Truck}
+              label="Truck"
+              value={truckSummary(assignment, vehicles)}
+              onClick={() => onAssign('truck')}
+            />
           </>
         )}
         {onEditNote && (
@@ -655,4 +681,55 @@ function RouteActionBar({
       </div>
     </div>
   )
+}
+
+/** A bar button that says what's set: "Crew · MS JT", "Truck · Green Tacoma". */
+function AssignButton({
+  icon: Icon,
+  label,
+  value,
+  onClick,
+}: {
+  icon: typeof Users
+  label: string
+  value: string | null
+  onClick: () => void
+}) {
+  return (
+    <Button
+      variant="outline"
+      className="h-11 min-w-0 flex-1 gap-1.5 px-2.5"
+      onClick={onClick}
+      aria-label={value ? `${label}: ${value}. Change` : `Set ${label.toLowerCase()}`}
+    >
+      <Icon className="h-4 w-4 shrink-0" aria-hidden />
+      <span className="truncate">
+        {label}
+        {value && <span className="font-normal text-muted-foreground"> · {value}</span>}
+      </span>
+    </Button>
+  )
+}
+
+function crewSummary(assignment: RouteAssignment | undefined, employees: Employee[]) {
+  if (!assignment || assignment.crewIds.length === 0) return null
+  if (assignment.crewMixed) return 'Mixed'
+  return assignment.crewIds
+    .map((id) => employees.find((e) => e.id === id)?.name)
+    .filter((name): name is string => Boolean(name))
+    .map((name) =>
+      name
+        .split(' ')
+        .map((part) => part[0])
+        .filter(Boolean)
+        .slice(0, 2)
+        .join(''),
+    )
+    .join(' ')
+}
+
+function truckSummary(assignment: RouteAssignment | undefined, vehicles: Vehicle[]) {
+  if (!assignment) return null
+  if (assignment.vehicleMixed) return 'Mixed'
+  return vehicles.find((v) => v.id === assignment.vehicleId)?.name ?? null
 }

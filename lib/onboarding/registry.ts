@@ -188,7 +188,7 @@ export const TOURS: Tour[] = [
         requires: ['band', 'band-desktop'],
         anchor: 'schedule.routeActions',
         title: 'The whole route at once',
-        body: 'Crew and Truck set them for every stop this week. Note is the week’s note. ⋯ has the route’s defaults, and Select stops to change a few together.',
+        body: 'Crew and Truck each set one thing on every scheduled stop this week. Note is the week’s note. ⋯ has the route’s defaults, and Select stops to change a few together.',
       },
       {
         id: 'route-back',
@@ -398,7 +398,7 @@ export const TASKS: Task[] = [
     key: 'task.assignCrew',
     roles: OFFICE,
     title: 'Put crew on a stop',
-    hint: 'Open a stop, or use a route’s ⋯ → Assign route…',
+    hint: 'Open a stop, or open a route and tap Crew.',
     href: '/app/schedule',
     doneOn: 'schedule.crewAssigned',
   },

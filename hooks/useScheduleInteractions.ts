@@ -61,8 +61,11 @@ export function useScheduleInteractions({
   // Just-created visits, keyed `${propertyId}-${weekStart}`, layered under server data so a
   // new stop paints immediately. Never cleared: clearing races the data catching up.
   const [createdVisits, setCreatedVisits] = useState<Map<string, VisitWithCrew>>(new Map())
-  const [assignOpen, setAssignOpen] = useState(false)
-  const [assignGroup, setAssignGroup] = useState<RouteGroup | null>(null)
+  // The route view's Crew or Truck sheet.
+  const [assignTarget, setAssignTarget] = useState<{
+    group: RouteGroup
+    kind: 'crew' | 'truck'
+  } | null>(null)
   const [defaultsGroup, setDefaultsGroup] = useState<RouteGroup | null>(null)
   const [noteEditKey, setNoteEditKey] = useState<string | null>(null)
 
@@ -86,11 +89,6 @@ export function useScheduleInteractions({
   function handleSheetOpenChange(next: boolean) {
     setSheetOpen(next)
     if (!next) syncVisitUrlParam(null)
-  }
-
-  function openAssign(group: RouteGroup) {
-    setAssignGroup(group)
-    setAssignOpen(true)
   }
 
   // Not in startTransition: the drawer opening must be urgent or the row reads as frozen.
@@ -129,10 +127,8 @@ export function useScheduleInteractions({
     creatingKey,
     createdVisits,
     scheduleVisit,
-    assignOpen,
-    setAssignOpen,
-    assignGroup,
-    openAssign,
+    assignTarget,
+    setAssignTarget,
     defaultsGroup,
     setDefaultsGroup,
     noteEditKey,

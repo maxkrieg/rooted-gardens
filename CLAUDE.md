@@ -982,7 +982,7 @@ Parked after 5 attempts and surfaced in "Changes that didn't save". `OfflineBann
 mount-flush are mounted once by `AppShell`, which wraps every signed-in surface.
 
 **Deliberately still online-only:** plan photos (three unguarded steps, duplicates on replay),
-`bulkAssignRoute` and `assignProperties` (both overwrite whatever was there, so a delayed
+`assignRouteCrew`, `assignRouteVehicle` and `assignProperties` (all overwrite whatever was there, so a delayed
 replay could undo an edit made in between), `setRouteGroupDefaults` (replaces a whole set of
 join rows), and everything on the desk routes. These show a "needs a connection" message.
 
@@ -1019,7 +1019,7 @@ no query of its own, and `ScheduleRealtime` always covers the current week for i
 > **Other people's crew changes:** `ScheduleRealtime` also subscribes to `visit_crew`
 > INSERT/DELETE, filters client-side to the loaded weeks' visit ids, and invalidates
 > `['schedule-visits']` **debounced 500ms** — `visit_crew` rows carry no visit, so this is a
-> refetch, not a cache patch, and the debounce keeps a `bulkAssignRoute` to one refetch. It
+> refetch, not a cache patch, and the debounce keeps an `assignRouteCrew` to one refetch. It
 > only runs where the schedule is mounted, so `useRefreshSchedule()` after a crew write is
 > still required for the device that made it (SCHEDULE_REDESIGN S6).
 
