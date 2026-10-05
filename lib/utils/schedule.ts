@@ -13,6 +13,15 @@ import type {
   VisitWithCrew,
 } from '@/types/app'
 
+/** "Oct 5 – 11", or "Sep 28 – Oct 4" across a month. The end month is only said when it changes. */
+export function formatWeekRange(weekStart: string | Date): string {
+  const start = typeof weekStart === 'string' ? parseISO(weekStart) : weekStart
+  const end = addDays(start, 6)
+  return start.getMonth() === end.getMonth()
+    ? `${format(start, 'MMM d')} – ${format(end, 'd')}`
+    : `${format(start, 'MMM d')} – ${format(end, 'MMM d')}`
+}
+
 export function getWeekStart(date: Date): Date {
   return startOfWeek(date, { weekStartsOn: 1 })
 }

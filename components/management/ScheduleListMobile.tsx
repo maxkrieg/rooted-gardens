@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { addDays, format, parseISO } from 'date-fns'
+import { parseISO } from 'date-fns'
 import { ChevronLeft, FilePen, Flag, MoreHorizontal, Receipt, Truck, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -24,6 +24,7 @@ import { useScheduleInteractions, type OpenVisit } from '@/hooks/useScheduleInte
 import { useWeekNotes } from '@/hooks/useWeekNotes'
 import { isVisitInProgress, formatElapsed, displayCrewFor } from '@/lib/utils/visits'
 import {
+  formatWeekRange,
   groupRowsByAccount,
   routeAssignment,
   routeGroupStats,
@@ -187,7 +188,7 @@ export function ScheduleListMobile({
   }
   const currentWeek = week
   const weekStartDate = parseISO(currentWeek.weekStart)
-  const weekLabel = `${format(weekStartDate, 'MMM d')} – ${format(addDays(weekStartDate, 6), 'MMM d')}`
+  const weekLabel = formatWeekRange(weekStartDate)
   const sortToggle = onSortChange && (
     <ScheduleSortToggle
       size="icon"
@@ -431,6 +432,7 @@ export function ScheduleListMobile({
                       total={stats.total}
                       onSite={stats.onSite}
                       onBack={onBack}
+                      closeAs={inPane ? 'close' : 'back'}
                       plan={{
                         days: routeGroup.default_days ?? [],
                         crew: stats.crew,
@@ -505,6 +507,7 @@ export function ScheduleListMobile({
                     total={ungrouped.length}
                     onSite={false}
                     onBack={onBack}
+                    closeAs={inPane ? 'close' : 'back'}
                     trailing={sortToggle}
                     tone="unrouted"
                   />

@@ -108,7 +108,7 @@ export const WELCOMES: Welcome[] = [
 export const TOURS: Tour[] = [
   {
     key: 'tour.schedule',
-    version: 4,
+    version: 5,
     title: 'Schedule',
     summary: 'Plan the week, open a stop, generate a week, change many stops at once.',
     roles: OFFICE,
@@ -136,7 +136,7 @@ export const TOURS: Tour[] = [
         anchor: 'schedule.weekNav',
         breakpoint: 'desktop',
         title: 'One week at a time',
-        body: 'Arrows move a week; This week brings you back.',
+        body: 'Arrows move a week, and the dates open a calendar. This week brings you back.',
       },
       {
         id: 'band',
@@ -204,7 +204,7 @@ export const TOURS: Tour[] = [
         anchor: 'schedule.actions',
         breakpoint: 'mobile',
         title: 'Week actions live in ⋯',
-        body: 'Generating the week is in ⋯, and on a green button above the routes while stops are due. Tap ⋯.',
+        body: 'Filters and generating the week are in ⋯. Generating is also on a green button above the routes while stops are due. Tap ⋯.',
         advanceOn: 'schedule.menuOpened',
       },
       {
@@ -242,6 +242,8 @@ export const TOURS: Tour[] = [
       {
         id: 'filters',
         anchor: 'schedule.filters',
+        // On a phone, filters are in ⋯ (the actions-mobile step).
+        breakpoint: 'desktop',
         title: 'Filter',
         body: 'Narrow to one route, account, crew member or status.',
       },

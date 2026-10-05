@@ -99,7 +99,8 @@ export function TodayView({
 
   return (
     <div className="lg:max-w-3xl">
-      <h1 className="mb-3 font-display text-xl font-semibold text-foreground">
+      {/* Both headers already show today's date on Today. */}
+      <h1 className="sr-only">
         {format(today, 'EEE MMM d')}
       </h1>
 

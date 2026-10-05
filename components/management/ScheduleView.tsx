@@ -34,6 +34,7 @@ import {
 import { ScheduleListMobile } from '@/components/management/ScheduleListMobile'
 import { ScheduleWeekOverview } from '@/components/management/ScheduleWeekOverview'
 import { ScheduleNav } from '@/components/management/ScheduleNav'
+import { syncVisitUrlParam } from '@/lib/utils/visit-url'
 import { Button } from '@/components/ui/button'
 import { ScheduleFilterButton } from '@/components/management/ScheduleFilterButton'
 import { ScheduleFilterSheet } from '@/components/management/ScheduleFilterSheet'
@@ -286,6 +287,14 @@ export function ScheduleView({
     changeViewMode('week')
   }
 
+  // A route forces Week, so choosing Today closes it. The board's open stop closes with it.
+  function selectView(mode: ScheduleViewMode) {
+    if (mode === viewMode) return
+    if (board) syncVisitUrlParam(null)
+    if (activeRoute) closeRoute()
+    changeViewMode(mode)
+  }
+
   function goToWeek(next: string) {
     setWindowStart(format(getWeekStart(parseWeekParam(next)), 'yyyy-MM-dd'))
   }
@@ -314,6 +323,10 @@ export function ScheduleView({
             onWeekChange={goToWeek}
             activeFilterCount={activeScheduleFilterCount(filters)}
             onOpenFilters={() => setFilterSheetOpen(true)}
+            // The board has its own toggle; inside a route there's no Today to switch to.
+            view={
+              seeDashboard && !activeRoute ? { mode: viewMode, onChange: changeViewMode } : undefined
+            }
             // Generate week is week-wide, so it lives on the week list only; inside a route the
             // route's own ⋯ is the one menu. Empty hides the button.
             overflowActions={
@@ -323,48 +336,41 @@ export function ScheduleView({
             }
           />
         </div>
-        {/* One row, like the phone: filters sit behind a button rather than four dropdowns. */}
-        <div className="hidden items-center gap-1.5 lg:flex">
-          {/* The phone keeps this in its header's ⋯; a laptop has the room to show it.
-              Select stops lives in each route's ⋯, since selection is route-shaped. */}
-          {canEdit && viewMode !== 'today' && (
-            <Button
-              data-tour="schedule.actions"
-              variant="outline"
-              size="sm"
-              className="h-9 text-xs"
-              onClick={() => setGenerateOpen(true)}
-            >
-              Generate week…
-            </Button>
-          )}
+        {/* The phone's row with its ⋯ spelled out: the date, Today | Week, then the actions. */}
+        <div className="hidden items-center gap-3 lg:flex">
+          <ScheduleNav windowStart={windowStart} onWeekChange={goToWeek} mode={viewMode} />
+          {seeDashboard && <ScheduleViewToggle value={viewMode} onChange={selectView} size="compact" />}
           <div className="ml-auto flex items-center gap-1.5">
-            <ScheduleNav windowStart={windowStart} onWeekChange={goToWeek} />
             <ScheduleFilterButton
               activeFilterCount={activeScheduleFilterCount(filters)}
               onClick={() => setFilterSheetOpen(true)}
             />
+            {/* Select stops lives in each route's ⋯, since selection is route-shaped. */}
+            {canEdit && viewMode !== 'today' && (
+              <Button
+                data-tour="schedule.actions"
+                variant="outline"
+                size="sm"
+                className="h-9 text-xs"
+                onClick={() => setGenerateOpen(true)}
+              >
+                Generate week…
+              </Button>
+            )}
           </div>
         </div>
       </ScheduleStickyBar>
 
-      {/* Under the sticky bar so it scrolls away; the header row has no room left. The board
-          carries the toggle in its left pane, and office roles sort from the route view. */}
-      {!board && !activeRoute && (
+      {/* Crew's sort, under the sticky bar so it scrolls away. Office roles have Today | Week in
+          the header and sort from the route view. */}
+      {!board && !activeRoute && !seeDashboard && (
         <div className="mb-2 flex items-center gap-2 lg:mb-3">
-          {seeDashboard && (
-            <div className="max-w-xs flex-1">
-              <ScheduleViewToggle value={viewMode} onChange={changeViewMode} />
-            </div>
-          )}
-          {!seeDashboard && (
-            <ScheduleSortToggle
-              mode={sortState.all}
-              onChange={changeAllSort}
-              scope="Every route"
-              className="ml-auto"
-            />
-          )}
+          <ScheduleSortToggle
+            mode={sortState.all}
+            onChange={changeAllSort}
+            scope="Every route"
+            className="ml-auto"
+          />
         </div>
       )}
 

@@ -1,15 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertCircle, CalendarDays, CheckCircle2, MousePointerClick, Sparkles, Sun } from 'lucide-react'
+import { AlertCircle, CheckCircle2, MousePointerClick, Sparkles } from 'lucide-react'
 import { ScheduleWeekOverview } from '@/components/management/ScheduleWeekOverview'
 import { ScheduleListMobile } from '@/components/management/ScheduleListMobile'
 import { TodayView } from '@/components/management/TodayView'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
-import {
-  ScheduleViewToggle,
-  type ScheduleViewMode,
-} from '@/components/management/ScheduleViewToggle'
+import type { ScheduleViewMode } from '@/components/management/ScheduleViewToggle'
 import { CachedNotice } from '@/components/states/CachedNotice'
 import { useNeedsYou } from '@/hooks/useNeedsYou'
 import type { OpenVisit } from '@/hooks/useScheduleInteractions'
@@ -159,6 +156,14 @@ export function ScheduleBoardDesktop({
 
   const paneOpen = pane !== null && paneRow !== null
 
+  // Today | Week lives in the toolbar now; switching drops the open stop (the toolbar clears
+  // `?visit=`). Adjusted during render so the old stop never paints under the new view.
+  const [seenViewMode, setSeenViewMode] = useState(viewMode)
+  if (seenViewMode !== viewMode) {
+    setSeenViewMode(viewMode)
+    if (pane) setPane(null)
+  }
+
   // ↑/↓ walk the middle pane's stops, Enter opens (the rows are buttons), Esc closes the pane.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -205,14 +210,13 @@ export function ScheduleBoardDesktop({
             : `calc(100dvh - ${boardTop}px - 1.5rem)`,
       }}
     >
-      {/* Left: view, what needs you, every route this week. */}
+      {/* Left: what needs you, every route this week. */}
       <aside
         ref={leftRef}
         aria-label="Routes"
         className={cn('flex shrink-0 flex-col overflow-y-auto', paneOpen ? 'w-14 @5xl:w-[280px]' : 'w-[280px]')}
       >
         <div className={cn('flex-col gap-3', paneOpen ? 'hidden @5xl:flex' : 'flex')}>
-          <ScheduleViewToggle value={viewMode} onChange={changeView} />
           <NeedsYouCount
             count={needsYou.length}
             active={viewMode === 'today'}
@@ -232,7 +236,6 @@ export function ScheduleBoardDesktop({
         {paneOpen && (
           <RouteRail
             className="flex @5xl:hidden"
-            viewMode={viewMode}
             onViewModeChange={changeView}
             needsYouCount={needsYou.length}
             dueCount={dueCount}
@@ -347,7 +350,6 @@ function NeedsYouCount({
 /** The left pane folded to initials, so a 1024px laptop fits three panes without scrolling. */
 function RouteRail({
   className,
-  viewMode,
   onViewModeChange,
   needsYouCount,
   dueCount,
@@ -358,7 +360,6 @@ function RouteRail({
   onOpenRoute,
 }: {
   className?: string
-  viewMode: ScheduleViewMode
   onViewModeChange: (mode: ScheduleViewMode) => void
   needsYouCount: number
   dueCount: number | null
@@ -373,37 +374,6 @@ function RouteRail({
 
   return (
     <nav aria-label="Routes" className={cn('flex-col items-center gap-1.5', className)}>
-      <div
-        role="tablist"
-        aria-label="Schedule view"
-        data-tour="schedule.viewToggle"
-        className="flex flex-col gap-1 rounded-xl bg-secondary p-0.5"
-      >
-        {(
-          [
-            ['today', Sun],
-            ['week', CalendarDays],
-          ] as const
-        ).map(([mode, Icon]) => (
-          <button
-            key={mode}
-            role="tab"
-            type="button"
-            aria-selected={viewMode === mode}
-            aria-label={mode === 'today' ? 'Today' : 'Week'}
-            title={mode === 'today' ? 'Today' : 'Week'}
-            onClick={() => onViewModeChange(mode)}
-            className={cn(
-              railButton,
-              'h-10 w-10',
-              viewMode === mode ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            <Icon className="h-4 w-4" aria-hidden />
-          </button>
-        ))}
-      </div>
-
       {needsYouCount > 0 && (
         <button
           type="button"

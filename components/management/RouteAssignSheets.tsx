@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { addDays, format, parseISO } from 'date-fns'
+import { parseISO } from 'date-fns'
 import { Check, Loader2, WifiOff } from 'lucide-react'
 import { toast } from 'sonner'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -12,7 +12,7 @@ import { useRefreshSchedule } from '@/hooks/useManagementSchedule'
 import { useOfflineStatus } from '@/hooks/crew/useOfflineStatus'
 import { emitTourEvent } from '@/lib/onboarding/events'
 import { cn } from '@/lib/utils'
-import type { RouteAssignment } from '@/lib/utils/schedule'
+import { formatWeekRange, type RouteAssignment } from '@/lib/utils/schedule'
 import type { Employee, RouteGroup, Vehicle } from '@/types/app'
 
 export type RouteAssignKind = 'crew' | 'truck'
@@ -42,7 +42,7 @@ export function RouteAssignSheet({
 }: RouteAssignSheetProps) {
   const { isOnline } = useOfflineStatus()
   const start = parseISO(weekStart)
-  const weekLabel = `${format(start, 'MMM d')} – ${format(addDays(start, 6), 'MMM d')}`
+  const weekLabel = formatWeekRange(start)
   const { scheduledCount } = assignment
   const scope =
     scheduledCount === 0

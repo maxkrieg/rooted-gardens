@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronLeft, MoreHorizontal, Truck } from 'lucide-react'
+import { ChevronLeft, MoreHorizontal, Truck, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { emitTourEvent } from '@/lib/onboarding/events'
@@ -96,6 +96,7 @@ export function RouteViewHeader({
   onBack,
   plan,
   trailing,
+  closeAs = 'back',
   tone = 'route',
 }: {
   name: string
@@ -103,6 +104,8 @@ export function RouteViewHeader({
   plan?: { days: string[]; crew: Employee[]; vehicles: string[] }
   /** e.g. the sort switch, before the done count. */
   trailing?: React.ReactNode
+  /** 'close' is the desktop board's ×: the week is still showing beside it, so it isn't "back". */
+  closeAs?: 'back' | 'close'
   done: number
   total: number
   onSite: boolean
@@ -123,17 +126,19 @@ export function RouteViewHeader({
           : 'bg-secondary text-muted-foreground',
       )}
     >
-      <div className="flex h-14 items-center gap-1 pr-4">
-        <button
-          type="button"
-          data-tour="schedule.routeBack"
-          onClick={onBack}
-          className="flex h-11 shrink-0 items-center gap-0.5 rounded-lg pl-2 pr-2.5 text-sm font-semibold transition-colors text-foreground hover:bg-foreground/5 active:bg-foreground/10"
-          aria-label="Back to the week"
-        >
-          <ChevronLeft className="h-5 w-5" aria-hidden />
-          Week
-        </button>
+      <div className={cn('flex h-14 items-center gap-1', closeAs === 'close' ? 'pl-4 pr-2' : 'pr-4')}>
+        {closeAs === 'back' && (
+          <button
+            type="button"
+            data-tour="schedule.routeBack"
+            onClick={onBack}
+            className="flex h-11 shrink-0 items-center gap-0.5 rounded-lg pl-2 pr-2.5 text-sm font-semibold transition-colors text-foreground hover:bg-foreground/5 active:bg-foreground/10"
+            aria-label="Back to the week"
+          >
+            <ChevronLeft className="h-5 w-5" aria-hidden />
+            Week
+          </button>
+        )}
         <span className="min-w-0 flex-1">
           {/* A size up from the stop names (15px), so the route reads as their heading. */}
           <span className="block truncate font-display text-[19px] font-semibold leading-tight tracking-[-0.01em] text-foreground">
@@ -153,6 +158,17 @@ export function RouteViewHeader({
         {onSite && <OnSiteDot />}
         {trailing}
         {!unrouted && <RouteDoneCount done={done} total={total} />}
+        {closeAs === 'close' && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="ml-1 h-9 w-9 shrink-0 text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+            onClick={onBack}
+            aria-label="Close route"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
       </div>
       {!unrouted && (
         <RouteProgressBar done={done} total={total} name={name} className="bg-foreground/10" />
