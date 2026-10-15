@@ -1,6 +1,6 @@
 import { getDB, type QueuedMutation } from './idb'
 import { createClient } from '@/lib/supabase/client'
-import { shouldReport, userMessageFor } from '@/lib/errors'
+import { isPermissionDenied, shouldReport, userMessageFor } from '@/lib/errors'
 import { reportError } from '@/lib/observability/report'
 import type { PhotoType } from '@/types/app'
 
@@ -156,7 +156,7 @@ export async function enqueueMutation<T extends MutationPayload['type']>(
   type: T,
   payload: Extract<MutationPayload, { type: T }>['payload'],
   label?: string,
-): Promise<void> {
+): Promise<string> {
   const db = await getDB()
   const mutation: QueuedMutation = {
     id: crypto.randomUUID(),
@@ -169,6 +169,7 @@ export async function enqueueMutation<T extends MutationPayload['type']>(
   }
   await db.add('mutations', mutation)
   notifyQueueChanged()
+  return mutation.id
 }
 
 /** Mutations still awaiting sync. Excludes parked ('failed') ones. */
@@ -226,12 +227,13 @@ export async function retryMutation(id: string): Promise<void> {
   notifyQueueChanged()
 }
 
-/** Records a failed attempt; parks the mutation past MAX_ATTEMPTS. Returns
+/** Records a failed attempt; parks the mutation past MAX_ATTEMPTS, or at once when the
+ *  database refused it outright (retrying a permission denial can't help). Returns
  *  true when it was parked. */
 async function recordFailure(mutation: QueuedMutation, err: unknown): Promise<boolean> {
   const db = await getDB()
   const attempts = mutation.attempts + 1
-  const parked = attempts >= MAX_ATTEMPTS
+  const parked = attempts >= MAX_ATTEMPTS || isPermissionDenied(err)
   await db.put('mutations', {
     ...mutation,
     attempts,
@@ -255,6 +257,8 @@ interface FlushResult {
   synced: number
   /** Mutations parked as 'failed' on this run. */
   failed: number
+  /** The parked ones, with their errors, so a caller can roll back its own optimistic state. */
+  rejected: Array<{ id: string; error: unknown }>
   /** Mutations still queued afterwards (transient failures + anything skipped). */
   pending: number
   /** True when the flush didn't run because the device is offline. */
@@ -265,14 +269,15 @@ interface FlushResult {
 export async function flushMutationQueue(): Promise<FlushResult> {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     const counts = await getQueueCounts()
-    return { synced: 0, failed: 0, pending: counts.pending, offline: true }
+    return { synced: 0, failed: 0, rejected: [], pending: counts.pending, offline: true }
   }
 
   const pending = await getPendingMutations()
-  if (pending.length === 0) return { synced: 0, failed: 0, pending: 0, offline: false }
+  if (pending.length === 0) return { synced: 0, failed: 0, rejected: [], pending: 0, offline: false }
 
   let synced = 0
   let failed = 0
+  const rejected: FlushResult['rejected'] = []
   const supabase = createClient()
 
   for (const mutation of pending) {
@@ -528,10 +533,13 @@ export async function flushMutationQueue(): Promise<FlushResult> {
       synced++
     } catch (err) {
       console.error('[mutation-queue] flush error for', mutation.type, err)
-      if (await recordFailure(mutation, err)) failed++
+      if (await recordFailure(mutation, err)) {
+        failed++
+        rejected.push({ id: mutation.id, error: err })
+      }
     }
   }
 
   const counts = await getQueueCounts()
-  return { synced, failed, pending: counts.pending, offline: false }
+  return { synced, failed, rejected, pending: counts.pending, offline: false }
 }

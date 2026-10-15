@@ -2,7 +2,8 @@
 
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
-import { enqueueMutation, flushMutationQueue } from '@/lib/offline/mutation-queue'
+import { discardMutation, enqueueMutation, flushMutationQueue } from '@/lib/offline/mutation-queue'
+import { QueueRejectedError } from '@/lib/errors'
 import { scheduleVisitsKey } from '@/hooks/useManagementSchedule'
 import type { SchedulePropertyRow, VisitWithCrew } from '@/types/app'
 
@@ -43,7 +44,7 @@ export function useCreateVisit() {
         old ? [...old, visit] : [visit],
       )
 
-      await enqueueMutation(
+      const mutationId = await enqueueMutation(
         'create_visit',
         {
           id: visit.id,
@@ -53,7 +54,18 @@ export function useCreateVisit() {
         },
         label ?? row.property.address,
       )
-      await flushMutationQueue()
+      const { rejected } = await flushMutationQueue()
+
+      // Refused on its first try (RLS): it never will save, so take the row back off the
+      // screen and out of "Changes that didn't save" — the caller's toast says why.
+      const refusal = rejected.find((r) => r.id === mutationId)
+      if (refusal) {
+        queryClient.setQueryData<VisitWithCrew[]>(scheduleVisitsKey(weekStart), (old) =>
+          old?.filter((v) => v.id !== visit.id),
+        )
+        await discardMutation(mutationId)
+        throw new QueueRejectedError(refusal.error)
+      }
 
       return visit
     },

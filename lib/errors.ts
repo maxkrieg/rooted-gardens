@@ -88,6 +88,7 @@ export function toUserMessage(err: unknown, fallback: string, context?: string):
 
 /** `toUserMessage` without the logging or reporting — for callers that retry and report once. */
 export function userMessageFor(err: unknown, fallback: string): string {
+  if (err instanceof QueueRejectedError) return userMessageFor(err.cause, fallback)
   if (isNetworkError(err)) {
     return "Couldn't reach the server. Check your connection, then try again."
   }
@@ -128,6 +129,8 @@ function isKnownCode(err: unknown): boolean {
  *  the policy refuses is a capability bug. */
 export function shouldReport(err: unknown): boolean {
   if (!err || isNetworkError(err) || isOfflineError(err)) return false
+  // The queue reported it when it parked the write.
+  if (err instanceof QueueRejectedError) return false
   const coded = asCodedError(err)
   if (coded?.code && SESSION_CODES.has(coded.code)) return false
   if (coded?.status === 401) return false
@@ -154,4 +157,20 @@ export function isRetryableError(err: unknown): boolean {
   if (coded.status === 401 || coded.status === 403) return false
   if (coded.code && ['42501', 'PGRST301', 'PGRST302', 'PGRST116'].includes(coded.code)) return false
   return true
+}
+
+/** RLS denial, a role-guard trigger, or a 403: the same write will be refused every time. */
+export function isPermissionDenied(err: unknown): boolean {
+  const coded = asCodedError(err)
+  if (!coded) return false
+  return coded.code === '42501' || coded.code === 'P0001' || coded.status === 403
+}
+
+/** A queued write the database refused, rethrown to the screen that queued it. `cause` is the
+ *  original error, which the queue already reported. */
+export class QueueRejectedError extends Error {
+  constructor(readonly cause: unknown) {
+    super('queued write rejected')
+    this.name = 'QueueRejectedError'
+  }
 }
