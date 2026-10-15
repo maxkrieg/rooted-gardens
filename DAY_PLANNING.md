@@ -6,10 +6,11 @@ conventions; it is the source of truth wherever this file is silent.
 > **Status:** planned 2026-10-14. D0 done 2026-10-14 (static checks pass; dev migrated and
 > DB checks run; prod not migrated yet; the offline-flush check is still to run).
 > D1 done 2026-10-14 (static checks pass; the functional checks under Verify are still to run).
+> D2 done 2026-10-15 (static checks pass; logic checked with a scratch script; the in-app checks are still to run).
 >
 > - [x] **D0** — Schema, queue type, pure helpers
 > - [x] **D1** — Day lanes in the route view
-> - [ ] **D2** — Today runs on the day
+> - [x] **D2** — Today runs on the day
 > - [ ] **D3** — "Plan tomorrow" sheet
 > - [ ] **D4** — Generate pre-fills days
 >
@@ -261,7 +262,29 @@ but can't open the picker; desktop board middle pane shows the same lanes; trio 
 has no new row; a Mon/Tue route on Tuesday shows only Tue + Any + carried; a route with one stop
 planned on its off day appears that day; trio passes.
 
-**As built — deviations:** _(fill in)_
+**As built — deviations:**
+- `routesRunningToday(week, today: Date, order)` now takes a date, not a weekday key. A stop is
+  **today's** if it is planned today, has no day and its route runs today, is carried over, is
+  on site, or was **finished today** (`ended_at` falls on today's local date). That last
+  condition wasn't in the plan: it keeps a Tuesday stop done early on Monday in Monday's count,
+  and stops Monday's finished stops from padding Tuesday's.
+- A route shows when it runs today, or has a stop planned today, on site, or finished today.
+  Carryover alone doesn't bring back a route that isn't running today, because it would
+  re-appear every day until someone dealt with it. `otherCount` still counts the rest.
+- `RunningRoute.rows` is now today's stops only, and there's a new `carried` field. The card's
+  done count, progress bar and Next all use today's stops. The card says "Carried over · n
+  (first stop …)", "Today's stops are settled" and "Nothing scheduled for today". Opening the
+  card still goes to the full route view (with its day lanes), so no week-wide list is kept on
+  the card.
+- **No crew Today filter.** Since `4f88011` crew no longer have a separate stop list: they get
+  the route overview and route view, and D1's day lanes already mark today's lane. A filter
+  would duplicate that.
+- Checked with a throwaway esbuild script against a fake week (a Mon/Tue route on a Tuesday,
+  plus a Thursday route with one stop planned for Tuesday). The right stops, carryover, Next
+  and `otherCount` came out. No write happens on any path; carryover is computed purely.
+- Updated `CLAUDE.md` (the `TodayView` line and the `default_days` note) and the
+  `news.dayPlanning` text.
+
 
 ---
 

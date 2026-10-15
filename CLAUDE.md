@@ -169,8 +169,8 @@ rooted-gardens/
 │   │   ├── ScheduleWeekOverview.tsx ← Week, every role: one row per route (the board's left pane)
 │   │   ├── NeedsYouList.tsx         ← exceptions (skips, crew reports, no crew…) — scheduleExceptions()
 │   │   ├── FieldActivityList.tsx    ← "From the field": settled visits, newest first — fieldActivity()
-│   │   ├── TodayView.tsx            ← the schedule's Today (office roles only): Needs you → Running today (routes whose
-│   │   │                              default_days include today — routesRunningToday()) → From the field
+│   │   ├── TodayView.tsx            ← the schedule's Today (office roles only): Needs you → Running today (each route cut to
+│   │   │                              today's stops by planned_date + default_days — routesRunningToday()) → From the field
 │   │   ├── ScheduleListMobile.tsx   ← the stop list (the screen that matters): one route's stops,
 │   │   │                              on the `?route=` drill-in and in the board's middle pane
 │   │   ├── RouteGroupBand.tsx       ← route header pieces: crew, truck, progress, days
@@ -345,7 +345,7 @@ route_groups (
   default_vehicle_id uuid FK → vehicles ON DELETE SET NULL,
   default_days text[] NOT NULL DEFAULT '{}'  -- 'mon'…'sun', CHECKed by containment
     -- NOTE: a visit is keyed to a WEEK, not a day, so this never moves a stop. It
-    -- labels the plan, and decides which routes show as "Running today" on Today.
+    -- labels the plan, and (with visits.planned_date) decides what's "Running today".
   created_at, updated_at
 )
 

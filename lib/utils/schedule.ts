@@ -526,23 +526,29 @@ export type RunningRoute = {
   /** A route group id, or UNGROUPED_SORT_KEY. */
   key: string
   routeGroup: RouteGroup | null
+  /** Today's stops only (see `routesRunningToday`), in the caller's order. */
   rows: SchedulePropertyRow[]
   /** Visits on site now, in the rows' order. */
   now: SchedulePropertyRow[]
   /** The first stop not yet started, in the rows' order. Callers pass drive-ordered rows. */
   next: SchedulePropertyRow | null
+  /** Planned for an earlier day and not started. Derived; nothing is written. */
+  carried: SchedulePropertyRow[]
 }
 
 /**
- * Routes whose `default_days` include `day`, plus any route with a visit on site, so nothing
- * live is hidden. `default_days` is the only day signal: a visit is keyed to a week, not a day.
+ * The routes out today, each cut down to today's stops: planned today, any-day stops when the
+ * route runs today, carried over, on site, or finished today. A route shows when it runs today,
+ * has a stop planned today, or has work happening or done today, so nothing live is hidden.
  */
 export function routesRunningToday(
   week: ScheduleWeek | undefined,
-  day: string,
+  today: Date,
   order: (groupKey: string, rows: SchedulePropertyRow[]) => SchedulePropertyRow[] = (_, rows) => rows,
 ): { running: RunningRoute[]; otherCount: number } {
   if (!week) return { running: [], otherCount: 0 }
+  const day = weekdayKey(today)
+  const todayISO = format(today, 'yyyy-MM-dd')
   const groups: Array<{ key: string; routeGroup: RouteGroup | null; rows: SchedulePropertyRow[] }> = [
     ...week.routeGroups.map(({ routeGroup, rows }) => ({ key: routeGroup.id, routeGroup, rows })),
     ...(week.ungrouped.length > 0
@@ -553,16 +559,32 @@ export function routesRunningToday(
   const running: RunningRoute[] = []
   let otherCount = 0
   for (const group of groups) {
-    const rows = order(group.key, group.rows)
-    const now = rows.filter((row) => row.visit && isVisitInProgress(row.visit))
-    const scheduledToday = group.routeGroup?.default_days?.includes(day) ?? false
-    if (!scheduledToday && now.length === 0) {
+    const runsToday = group.routeGroup?.default_days?.includes(day) ?? false
+    // Work that is today's whatever its plan said: someone is there, or it was finished today.
+    const workedToday = (row: SchedulePropertyRow) =>
+      Boolean(
+        row.visit &&
+          (isVisitInProgress(row.visit) ||
+            (row.visit.ended_at && format(parseISO(row.visit.ended_at), 'yyyy-MM-dd') === todayISO)),
+      )
+    const plannedToday = (row: SchedulePropertyRow) => row.visit?.planned_date === todayISO
+
+    const rows = order(group.key, group.rows).filter(
+      (row) =>
+        plannedToday(row) ||
+        workedToday(row) ||
+        isCarriedOver(row.visit, today) ||
+        (runsToday && !row.visit?.planned_date),
+    )
+    if (!runsToday && !rows.some((row) => plannedToday(row) || workedToday(row))) {
       if (group.routeGroup) otherCount += 1
       continue
     }
+    const now = rows.filter((row) => row.visit && isVisitInProgress(row.visit))
     const next =
       rows.find((row) => row.visit?.status === 'scheduled' && !row.visit.started_at) ?? null
-    running.push({ ...group, rows, now, next })
+    const carried = rows.filter((row) => isCarriedOver(row.visit, today))
+    running.push({ ...group, rows, now, next, carried })
   }
   return { running, otherCount }
 }

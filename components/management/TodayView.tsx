@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { format } from 'date-fns'
-import { ChevronRight, Flag, WifiOff } from 'lucide-react'
+import { ChevronRight, Flag, RotateCw, WifiOff } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { GettingStartedCard } from '@/components/onboarding/GettingStartedCard'
 import { NeedsYouList } from '@/components/management/NeedsYouList'
@@ -30,7 +30,6 @@ import {
   getWeekStart,
   routeGroupStats,
   routesRunningToday,
-  weekdayKey,
   type RunningRoute,
   type ScheduleException,
 } from '@/lib/utils/schedule'
@@ -86,7 +85,7 @@ export function TodayView({
 
   const failed = isError && !hasData
   const activity = fieldActivity(week)
-  const { running, otherCount } = routesRunningToday(week, weekdayKey(today), orderRows)
+  const { running, otherCount } = routesRunningToday(week, today, orderRows)
   // Realtime writes bump this too, so it's "when we last heard", which is what offline needs.
   const lastHeardAt = queryClient.getQueryState(scheduleVisitsKey(weekStart))?.dataUpdatedAt
 
@@ -209,7 +208,7 @@ function RunningRouteCard({
   lastHeardAt: number | undefined
   onOpen: () => void
 }) {
-  const { routeGroup, rows, now, next } = route
+  const { routeGroup, rows, now, next, carried } = route
   const stats = routeGroupStats(
     rows.map((row) => row.visit),
     vehicles,
@@ -263,6 +262,16 @@ function RunningRouteCard({
         className="rounded-full bg-primary/15"
       />
 
+      {carried.length > 0 && (
+        <span className="flex min-w-0 items-center gap-1 text-[12px] leading-snug text-muted-foreground">
+          <RotateCw className="h-3 w-3 shrink-0" aria-hidden />
+          <span className="truncate">
+            Carried over · {carried.length} ({stopLabel(carried[0], rows)}
+            {carried.length > 1 && ' …'})
+          </span>
+        </span>
+      )}
+
       {note && (
         <span className="flex min-w-0 items-start gap-1 text-[12px] leading-snug text-[var(--clay)]">
           <Flag className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
@@ -288,9 +297,9 @@ function RunningRouteCard({
             <span className="truncate text-foreground">{stopLabel(next, rows)}</span>
           </span>
         ) : allSettled ? (
-          <span className="text-[12px] font-medium text-primary">Every stop settled</span>
+          <span className="text-[12px] font-medium text-primary">Today&rsquo;s stops are settled</span>
         ) : scheduled === 0 ? (
-          <span className="text-[12px] text-muted-foreground">Nothing scheduled this week</span>
+          <span className="text-[12px] text-muted-foreground">Nothing scheduled for today</span>
         ) : null}
       </span>
     </button>

@@ -491,7 +491,7 @@ export const NEWS: NewsItem[] = [
     roles: ['owner', 'lead'],
     introduced: '2026-10-14',
     title: 'Plan which day each stop runs',
-    body: 'A route that runs more than one day now splits its stops by day. Tap a stop’s day to move it; Select stops → Day moves several. Stops with no day sit under Any day.',
+    body: 'A route that runs more than one day now splits its stops by day. Tap a stop’s day to move it; Select stops → Day moves several. Stops with no day sit under Any day. Today shows only each route’s stops for the day, plus any carried over.',
     parentTour: 'tour.schedule',
     route: '/app/schedule',
     anchor: 'schedule.dayChip',
