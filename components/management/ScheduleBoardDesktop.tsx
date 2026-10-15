@@ -8,6 +8,7 @@ import { TodayView } from '@/components/management/TodayView'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
 import type { ScheduleViewMode } from '@/components/management/ScheduleViewToggle'
 import { CachedNotice } from '@/components/states/CachedNotice'
+import { useCan } from '@/components/app/RoleProvider'
 import { useNeedsYou } from '@/hooks/useNeedsYou'
 import type { OpenVisit } from '@/hooks/useScheduleInteractions'
 import { findVisitInWeeks, routeGroupStats } from '@/lib/utils/schedule'
@@ -109,7 +110,10 @@ export function ScheduleBoardDesktop({
     observer.observe(document.body)
     return () => observer.disconnect()
   }, [])
+  // Needs you is triage, an office job; crew get the board without it.
+  const { seeDashboard } = useCan()
   const { items: needsYou } = useNeedsYou(todayWeek, todayWeekUnfiltered, todayWeekStart)
+  const needsYouCount = seeDashboard ? needsYou.length : 0
 
   const [pane, setPane] = useState<PaneState | null>(null)
   // `?visit=` opens in the right pane, once, when its week has loaded. Not DeepLinkedVisitSheet:
@@ -217,11 +221,13 @@ export function ScheduleBoardDesktop({
         className={cn('flex shrink-0 flex-col overflow-y-auto', paneOpen ? 'w-14 @5xl:w-[280px]' : 'w-[280px]')}
       >
         <div className={cn('flex-col gap-3', paneOpen ? 'hidden @5xl:flex' : 'flex')}>
-          <NeedsYouCount
-            count={needsYou.length}
-            active={viewMode === 'today'}
-            onOpen={() => changeView('today')}
-          />
+          {seeDashboard && (
+            <NeedsYouCount
+              count={needsYouCount}
+              active={viewMode === 'today'}
+              onOpen={() => changeView('today')}
+            />
+          )}
           <ScheduleWeekOverview
             week={week}
             vehicles={vehicles}
@@ -237,7 +243,7 @@ export function ScheduleBoardDesktop({
           <RouteRail
             className="flex @5xl:hidden"
             onViewModeChange={changeView}
-            needsYouCount={needsYou.length}
+            needsYouCount={needsYouCount}
             dueCount={dueCount}
             onGenerate={onGenerate}
             week={week}

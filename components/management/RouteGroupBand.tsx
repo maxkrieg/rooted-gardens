@@ -1,86 +1,12 @@
 'use client'
 
-import { useState } from 'react'
-import { ChevronLeft, MoreHorizontal, Truck, X } from 'lucide-react'
+import { ChevronLeft, Truck, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { emitTourEvent } from '@/lib/onboarding/events'
 import { cn } from '@/lib/utils'
 import type { RouteGroupStats } from '@/lib/utils/schedule'
 import type { Employee } from '@/types/app'
 
 export type { RouteGroupStats }
-
-interface RouteGroupBandProps {
-  name: string
-  /** Standing days for the route ('mon'…'sun'), from its defaults. */
-  days?: string[]
-  stats: RouteGroupStats
-  canEdit: boolean
-  onAssign: (kind: 'crew' | 'truck') => void
-  onEditDefaults: () => void
-  onEditNote: () => void
-  hasNote: boolean
-  /** The week's note, when there is one. Absent notes render nothing. */
-  noteSlot?: React.ReactNode
-}
-
-/**
- * Route header on the phone schedule: name on line one, the muted plan (days, crew, truck) on
- * line two, and a 3px progress strip as the bottom border. Crew and truck come from the visits,
- * falling back to the route's defaults.
- */
-export function RouteGroupBand({
-  name,
-  days = [],
-  stats,
-  canEdit,
-  onAssign,
-  onEditDefaults,
-  onEditNote,
-  hasNote,
-  noteSlot,
-}: RouteGroupBandProps) {
-  const { done, total, crew, vehicles, onSite } = stats
-
-  return (
-    // Stone band, not sage: green is kept for progress and done, so a header never reads as success.
-    <div className="bg-secondary text-muted-foreground">
-      <div className="flex items-center gap-2 pl-5 pr-4 pt-2.5">
-        <span className="min-w-0 flex-1 truncate font-display text-[15px] font-semibold leading-tight text-foreground">
-          {name}
-        </span>
-
-        {onSite && <OnSiteDot />}
-
-        <RouteDoneCount done={done} total={total} />
-
-        {canEdit && (
-          <RouteGroupMenu
-            name={name}
-            items={[
-              { label: 'Set crew…', onClick: () => onAssign('crew') },
-              { label: 'Set truck…', onClick: () => onAssign('truck') },
-              {
-                label: hasNote ? 'Edit this week’s note…' : 'Add a note for this week…',
-                onClick: onEditNote,
-              },
-              { label: 'Route defaults…', onClick: onEditDefaults },
-            ]}
-          />
-        )}
-      </div>
-
-      <RoutePlanLine days={days} crew={crew} vehicles={vehicles} />
-
-      {noteSlot}
-
-      {/* The progress bar IS the divider. A full row for a bar plus a number was
-          the most expensive whitespace on the screen. */}
-      <RouteProgressBar done={done} total={total} name={name} className="bg-foreground/10" />
-    </div>
-  )
-}
 
 /**
  * The route view's header: back to the week, the route's name over its plan (days, crew, truck —
@@ -297,63 +223,6 @@ export function RouteProgressBar({
         style={{ width: `${pct}%` }}
       />
     </div>
-  )
-}
-
-/** The route's ⋯ menu. Popover, not a dropdown-menu — the repo has no
- *  dropdown-menu primitive and one overflow menu doesn't justify a dependency. */
-export function RouteGroupMenu({
-  name,
-  items,
-}: {
-  name: string
-  items: Array<{ label: string; onClick: () => void }>
-}) {
-  const [menuOpen, setMenuOpen] = useState(false)
-  return (
-    <Popover
-      open={menuOpen}
-      onOpenChange={(next) => {
-        setMenuOpen(next)
-        if (next) emitTourEvent('schedule.routeMenuOpened')
-      }}
-    >
-      <PopoverTrigger asChild>
-        <Button
-          data-tour="schedule.routeMenu"
-          size="icon"
-          variant="ghost"
-          className="-mr-2 h-7 w-7 shrink-0 text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-          aria-label={`Actions for ${name}`}
-        >
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-52 p-1">
-        {items.map((item) => (
-          <MenuItem
-            key={item.label}
-            label={item.label}
-            onClick={() => {
-              setMenuOpen(false)
-              item.onClick()
-            }}
-          />
-        ))}
-      </PopoverContent>
-    </Popover>
-  )
-}
-
-function MenuItem({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex min-h-11 w-full items-center rounded-md px-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-secondary"
-    >
-      {label}
-    </button>
   )
 }
 

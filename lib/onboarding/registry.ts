@@ -470,6 +470,15 @@ export const NEWS: NewsItem[] = [
     route: '/app/schedule',
     anchor: 'schedule.routeBand',
   },
+  {
+    key: 'news.crewScheduleRoutes',
+    roles: ['crew'],
+    introduced: '2026-10-14',
+    title: 'Your week, route by route',
+    body: 'The schedule now opens to a list of routes, with each one’s crew, truck and note. Tap a route to see its stops; Week brings you back.',
+    route: '/app/schedule',
+    anchor: 'schedule.routeBand',
+  },
 ]
 
 export function forRole<T extends { roles: Roles }>(items: T[], role: EmployeeRole | null): T[] {

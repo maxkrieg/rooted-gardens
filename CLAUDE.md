@@ -162,17 +162,16 @@ rooted-gardens/
 │   │   ├── RoleProvider.tsx     ← useRole() / useCan() — affordances, never security
 │   │   └── nav-items.ts         ← one nav array, access-filtered by lib/auth/access.ts
 │   ├── management/              ← schedule, accounts, routes, billing components
-│   │   ├── ScheduleBoardDesktop.tsx ← office roles at lg+: routes | a route's stops | the stop,
+│   │   ├── ScheduleBoardDesktop.tsx ← every role at lg+: routes | a route's stops | the stop,
 │   │   │                              three panes on one URL state (`?route=`, `?visit=`); ↑/↓/Enter/Esc/S
-│   │   ├── ScheduleWeekOverview.tsx ← Week for office roles: one row per route (the board's left pane)
+│   │   ├── ScheduleWeekOverview.tsx ← Week, every role: one row per route (the board's left pane)
 │   │   ├── NeedsYouList.tsx         ← exceptions (skips, crew reports, no crew…) — scheduleExceptions()
 │   │   ├── FieldActivityList.tsx    ← "From the field": settled visits, newest first — fieldActivity()
-│   │   ├── TodayView.tsx            ← the schedule's Today: Needs you → Running today (routes whose
+│   │   ├── TodayView.tsx            ← the schedule's Today (office roles only): Needs you → Running today (routes whose
 │   │   │                              default_days include today — routesRunningToday()) → From the field
-│   │   ├── ScheduleListMobile.tsx   ← the stop list (the screen that matters); one route alone on
-│   │   │                              the `?route=` drill-in (and the board's middle pane), crew's
-│   │   │                              flat list otherwise
-│   │   ├── RouteGroupBand.tsx       ← route header: crew, truck, progress, week note
+│   │   ├── ScheduleListMobile.tsx   ← the stop list (the screen that matters): one route's stops,
+│   │   │                              on the `?route=` drill-in and in the board's middle pane
+│   │   ├── RouteGroupBand.tsx       ← route header pieces: crew, truck, progress, days
 │   │   └── InvoiceQueue.tsx
 │   └── crew/                    ← field-work components (name predates the merge)
 │       ├── VisitLogger.tsx      ← completion form
@@ -881,7 +880,7 @@ Two tiers, and only two. Pick from these rather than introducing a third:
 | Breakpoint | What changes | Why |
 |---|---|---|
 | `md` (768px) | Table ↔ card for list screens: accounts, leads | The width a simple table needs before it has to scroll sideways |
-| `lg` (1024px) | The nav (bottom bar → sidebar), and the schedule → three panes (office roles) | Routes, stops and the open stop side by side need this width beside the sidebar. Within the board, the left pane folds to a rail of initials via a *container* query (`@5xl`) when the stop pane is open, so there's still no third viewport tier and no sideways scroll |
+| `lg` (1024px) | The nav (bottom bar → sidebar), and the schedule → three panes (every role) | Routes, stops and the open stop side by side need this width beside the sidebar. Within the board, the left pane folds to a rail of initials via a *container* query (`@5xl`) when the stop pane is open, so there's still no third viewport tier and no sideways scroll |
 
 The routes page uses neither — it is cards at every width, which is the right answer when a
 screen has no table to degrade.

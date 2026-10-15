@@ -10,7 +10,6 @@ export type TourEvent =
   | 'schedule.menuOpened'
   | 'schedule.generateOpened'
   | 'schedule.generateClosed'
-  | 'schedule.routeMenuOpened'
   | 'schedule.routeOpened'
   | 'schedule.routeClosed'
   | 'routes.groupMenuOpened'

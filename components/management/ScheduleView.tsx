@@ -25,7 +25,6 @@ import {
   type ScheduleSortMode,
   type ScheduleSortState,
 } from '@/lib/utils/schedule-sort'
-import { ScheduleSortToggle } from '@/components/management/ScheduleSortToggle'
 import { ScheduleBoardDesktop } from '@/components/management/ScheduleBoardDesktop'
 import {
   ScheduleViewToggle,
@@ -88,11 +87,11 @@ export function ScheduleView({
     initialRouteId ? 'week' : null,
   )
   const [sortOverride, setSortOverride] = useState<ScheduleSortState | null>(null)
-  // The phone's route drill-in. Crew don't get one: their week is already a short flat list.
+  // The route drill-in: the overview, then one route's stops. Every role.
   const [route, setRoute] = useState<string | null>(initialRouteId)
   const { editSchedule: canEdit, seeDashboard } = useCan()
-  // Office roles get the three-pane board on a laptop. Crew keep their flat list at every width.
-  const board = isWide && seeDashboard
+  // The three-pane board on a laptop, for every role. Crew just get no Today in it.
+  const board = isWide
 
   const weekStarts = useMemo(() => [windowStart], [windowStart])
 
@@ -119,8 +118,7 @@ export function ScheduleView({
   const computedViewMode: ScheduleViewMode = !weekInUrl && currentHasVisits ? 'today' : 'week'
 
   // Unknown until the week loads; then a route that no longer exists falls back to the overview.
-  const activeRoute =
-    seeDashboard && route && (!weeks[0] || routeExists(weeks[0], route)) ? route : null
+  const activeRoute = route && (!weeks[0] || routeExists(weeks[0], route)) ? route : null
 
   // Crew get no Today view: it carries company-wide stats. A route is always a Week thing.
   const requested = viewOverride ?? initialViewMode ?? storedViewMode ?? computedViewMode
@@ -361,19 +359,6 @@ export function ScheduleView({
         </div>
       </ScheduleStickyBar>
 
-      {/* Crew's sort, under the sticky bar so it scrolls away. Office roles have Today | Week in
-          the header and sort from the route view. */}
-      {!board && !activeRoute && !seeDashboard && (
-        <div className="mb-2 flex items-center gap-2 lg:mb-3">
-          <ScheduleSortToggle
-            mode={sortState.all}
-            onChange={changeAllSort}
-            scope="Every route"
-            className="ml-auto"
-          />
-        </div>
-      )}
-
       <GenerateWeekSheet
         open={generateOpen}
         onOpenChange={setGenerateOpen}
@@ -445,7 +430,7 @@ export function ScheduleView({
           <div className={viewMode === 'today' ? 'hidden' : undefined}>
             {/* -mx-4 cancels page padding so the phone list runs edge to edge. */}
             <div className="-mx-4 lg:mx-0 lg:max-w-3xl">
-              {seeDashboard && !activeRoute ? (
+              {!activeRoute ? (
                 <ScheduleWeekOverview
                   week={filteredWeek}
                   vehicles={vehicles}
@@ -465,8 +450,8 @@ export function ScheduleView({
                   onExitSelectMode={() => setSelectMode(false)}
                   sortState={listSort}
                   onSortChange={changeAllSort}
-                  routeGroupId={activeRoute ?? undefined}
-                  onBack={activeRoute ? closeRoute : undefined}
+                  routeGroupId={activeRoute}
+                  onBack={closeRoute}
                   onStartSelect={canEdit ? () => setSelectMode(true) : undefined}
                 />
               )}

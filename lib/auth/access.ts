@@ -68,7 +68,7 @@ export interface Capabilities {
   archive: boolean
   /** Create route groups and move properties between them. */
   editRoutes: boolean
-  /** The schedule's `Today` view — week stats, fleet issues, uninvoiced counts. */
+  /** The schedule's `Today` view and Needs you — triage, so not crew. */
   seeDashboard: boolean
   seeBilling: boolean
   seeLeads: boolean

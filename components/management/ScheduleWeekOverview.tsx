@@ -33,7 +33,7 @@ interface ScheduleWeekOverviewProps {
 }
 
 /**
- * The phone Week view for seeDashboard roles: one row per route, then drill in. Replaces "every
+ * The phone Week view, every role: one row per route, then drill in. Replaces "every
  * property at once" — the stop rows live one tap down, in ScheduleListMobile's route view.
  */
 export function ScheduleWeekOverview({
