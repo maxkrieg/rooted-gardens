@@ -32,6 +32,7 @@ export const AUDIT_ACTIONS: Record<string, { label: string; group: AuditGroup }>
   'visit.times_edited': { label: 'Visit times edited', group: 'Visits' },
   'visit.instruction_changed': { label: 'Crew instruction changed', group: 'Visits' },
   'visit.vehicle_changed': { label: 'Vehicle changed', group: 'Visits' },
+  'visit.day_planned': { label: 'Day planned', group: 'Visits' },
   'visit.invoiced': { label: 'Visit invoiced', group: 'Visits' },
   'visit.updated': { label: 'Visit updated', group: 'Visits' },
   'visit.deleted': { label: 'Visit deleted', group: 'Visits' },

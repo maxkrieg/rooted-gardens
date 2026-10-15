@@ -25,6 +25,7 @@ export function useCreateVisit() {
         status: 'scheduled',
         crew_instruction: null,
         vehicle_id: null,
+        planned_date: null,
         started_at: null,
         ended_at: null,
         service_types: null,

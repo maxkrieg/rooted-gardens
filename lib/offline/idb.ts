@@ -16,6 +16,7 @@ type MutationType =
   | 'create_visit'
   | 'assign_crew'
   | 'set_vehicle'
+  | 'set_planned_date'
   | 'crew_instruction'
   | 'revert_status'
   | 'property_notes'

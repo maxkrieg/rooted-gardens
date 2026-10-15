@@ -69,6 +69,12 @@ interface SetVehiclePayload {
   vehicleId: string | null
 }
 
+interface SetPlannedDatePayload {
+  visitId: string
+  /** yyyy-MM-dd inside the visit's week; null = any day. */
+  plannedDate: string | null
+}
+
 interface CrewInstructionPayload {
   visitId: string
   instruction: string | null
@@ -128,6 +134,7 @@ type MutationPayload =
   | { type: 'create_visit'; payload: CreateVisitPayload }
   | { type: 'assign_crew'; payload: AssignCrewPayload }
   | { type: 'set_vehicle'; payload: SetVehiclePayload }
+  | { type: 'set_planned_date'; payload: SetPlannedDatePayload }
   | { type: 'crew_instruction'; payload: CrewInstructionPayload }
   | { type: 'revert_status'; payload: RevertStatusPayload }
   | { type: 'property_notes'; payload: PropertyNotesPayload }
@@ -429,6 +436,15 @@ export async function flushMutationQueue(): Promise<FlushResult> {
           await supabase
             .from('visits')
             .update({ vehicle_id: p.vehicleId })
+            .eq('id', p.visitId)
+            .throwOnError()
+          break
+        }
+        case 'set_planned_date': {
+          const p = mutation.payload as SetPlannedDatePayload
+          await supabase
+            .from('visits')
+            .update({ planned_date: p.plannedDate })
             .eq('id', p.visitId)
             .throwOnError()
           break

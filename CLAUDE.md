@@ -111,6 +111,8 @@ rooted-gardens/
 │                                  /app/*, the generated week, and route defaults.
 ├── SCHEDULE_REDESIGN.md         ← the schedule as a dispatch board, S0–S5. PLANNED — one
 │                                  Claude Code session per phase; check its status block.
+├── DAY_PLANNING.md              ← visits.planned_date: which day each stop runs, D0–D4.
+│                                  PLANNED — same one-session-per-phase convention.
 ├── proxy.ts                     ← root request proxy (Next 16; auth + role gating, formerly middleware.ts)
 ├── instrumentation.ts           ← Sentry server/edge init + onRequestError
 ├── instrumentation-client.ts    ← Sentry browser init (offline transport)
@@ -446,6 +448,8 @@ visits (
   -- Planning (set by owner/lead before the week)
   crew_instruction text,                -- the "orange cell" — visit-specific note for crew
   vehicle_id uuid FK → vehicles,
+  planned_date date,                    -- the day it's planned for, inside its week; NULL = any
+                                        -- day. A plan, not a constraint (DAY_PLANNING.md).
   -- crew assignment + completion are tracked in the visit_crew join table (below),
   -- NOT as uuid[] arrays — keeps RLS, Realtime filters, and joins relational
   
@@ -972,7 +976,7 @@ store names are deliberately unchanged**: a crew phone may be holding unflushed 
 across any deploy that renames them.
 
 Queued types: `completion`, `photo`, `photo_caption`, `job_start`, `job_discard`, `skip`,
-`create_visit`, `assign_crew`, `set_vehicle`, `crew_instruction`, `revert_status`,
+`create_visit`, `assign_crew`, `set_vehicle`, `set_planned_date`, `crew_instruction`, `revert_status`,
 `property_notes`, `route_week_note`, `assign_property_route`, `onboarding_progress`. Adding one means touching
 `MutationType` (idb.ts), the payload interface + `MutationPayload` union, a `case` in the
 flush switch, and `TYPE_LABELS` in `StuckChangesSheet` (compiler-enforced).

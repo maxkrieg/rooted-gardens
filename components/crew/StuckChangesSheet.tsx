@@ -31,6 +31,7 @@ const TYPE_LABELS: Record<QueuedMutation['type'], string> = {
   create_visit: 'Scheduled stop',
   assign_crew: 'Crew assignment',
   set_vehicle: 'Vehicle assignment',
+  set_planned_date: 'Planned day',
   crew_instruction: 'Crew instruction',
   revert_status: 'Status change',
   property_notes: 'Property details',

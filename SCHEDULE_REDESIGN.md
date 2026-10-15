@@ -168,6 +168,8 @@ each layout teaches the other.
   (properties × ~12 weeks as dots), not the editable grid again.
 - **A `planned_day` on visits.** The day already lives on the route (`default_days`), and
   that's enough to answer "what runs today." No schema change in any phase.
+  _Reversed 2026-10-14 by `DAY_PLANNING.md`: multi-day routes (`Wilder · Mon/Tue`) can't say
+  which stops run which day._
 - **Gestures (swipe, long-press, drag).** Same as REDESIGN.md.
 
 ---

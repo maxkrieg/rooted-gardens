@@ -5,6 +5,7 @@ import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { enqueueMutation, flushMutationQueue } from '@/lib/offline/mutation-queue'
 import { patchScheduleVisit, scheduleVisitsKey } from '@/hooks/useManagementSchedule'
 import { nextVisitVersion } from '@/lib/utils/visits'
+import { plannedDateFor } from '@/lib/utils/schedule'
 import { useCreateVisit } from '@/hooks/useCreateVisit'
 import type { Employee, SchedulePropertyRow, VisitCrewWithEmployee } from '@/types/app'
 import { emitTourEvent } from '@/lib/onboarding/events'
@@ -121,6 +122,45 @@ export function useBulkScheduleActions() {
     [ensureVisits, queryClient],
   )
 
+  /** `day` is a weekday key, so targets in different weeks each get their own date; null = any day. */
+  const setPlannedDay = useCallback(
+    async (targets: BulkTarget[], day: string | null): Promise<BulkResult> => {
+      const previous = new Map<string, string | null>()
+      for (const { row } of targets) {
+        if (row.visit) previous.set(row.visit.id, row.visit.planned_date)
+      }
+
+      const visitIds = await ensureVisits(targets)
+      const entries = visitIds
+        .map((visitId, i) => ({
+          visitId,
+          plannedDate: day ? plannedDateFor(targets[i].weekStart, day) : null,
+        }))
+        .filter(({ visitId, plannedDate }) => (previous.get(visitId) ?? null) !== plannedDate)
+
+      await applyPlannedDate(queryClient, entries)
+      await flushMutationQueue()
+
+      return {
+        changed: entries.length,
+        undo:
+          entries.length > 0
+            ? async () => {
+                await applyPlannedDate(
+                  queryClient,
+                  entries.map(({ visitId }) => ({
+                    visitId,
+                    plannedDate: previous.get(visitId) ?? null,
+                  })),
+                )
+                await flushMutationQueue()
+              }
+            : undefined,
+      }
+    },
+    [ensureVisits, queryClient],
+  )
+
   /** Only scheduled visits: revert_status can't restore a completion, so undo would be lossy. */
   const skipAll = useCallback(
     async (targets: BulkTarget[], skipReason: string): Promise<BulkResult> => {
@@ -171,7 +211,7 @@ export function useBulkScheduleActions() {
     [queryClient],
   )
 
-  return { scheduleAll, assignCrew, setVehicle, skipAll, invalidateWeeks }
+  return { scheduleAll, assignCrew, setVehicle, setPlannedDay, skipAll, invalidateWeeks }
 }
 
 /** Enqueue + optimistic patch for one crew change across many visits. */
@@ -219,6 +259,21 @@ async function applyVehicle(
     patchScheduleVisit(queryClient, visitId, (visit) => ({
       ...visit,
       vehicle_id: vehicleId,
+      updated_at: nextVisitVersion(visit.updated_at),
+    }))
+  }
+}
+
+/** Enqueue + optimistic patch for per-visit planned dates. */
+async function applyPlannedDate(
+  queryClient: QueryClient,
+  entries: Array<{ visitId: string; plannedDate: string | null }>,
+): Promise<void> {
+  for (const { visitId, plannedDate } of entries) {
+    await enqueueMutation('set_planned_date', { visitId, plannedDate })
+    patchScheduleVisit(queryClient, visitId, (visit) => ({
+      ...visit,
+      planned_date: plannedDate,
       updated_at: nextVisitVersion(visit.updated_at),
     }))
   }

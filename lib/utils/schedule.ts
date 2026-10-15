@@ -458,6 +458,70 @@ export function weekdayKey(date: Date): string {
   return format(date, 'EEE').toLowerCase()
 }
 
+/** Week order, Monday first, matching `week_start`. */
+export const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const
+
+/** The date (`yyyy-MM-dd`) of weekday `day` in the week starting `weekStart`. */
+export function plannedDateFor(weekStart: string, day: string): string | null {
+  const offset = DAY_KEYS.indexOf(day as (typeof DAY_KEYS)[number])
+  if (offset < 0) return null
+  return format(addDays(parseISO(weekStart), offset), 'yyyy-MM-dd')
+}
+
+export type DayLane = {
+  /** `yyyy-MM-dd`, or null for the "Any day" lane. */
+  date: string | null
+  /** The weekday key, or null for "Any day". */
+  day: string | null
+  /** Whether the route runs this day; off-route lanes only exist because a stop is planned there. */
+  onRoute: boolean
+  rows: SchedulePropertyRow[]
+}
+
+/**
+ * Stops split by planned day: one lane per route day (kept when empty), one per off-route day a
+ * stop is planned on, then "Any day" last when non-empty. Row order within a lane is preserved.
+ */
+export function stopsByDay(
+  rows: SchedulePropertyRow[],
+  routeDays: string[],
+  weekStart: string,
+): DayLane[] {
+  const lanes: DayLane[] = []
+  for (const day of DAY_KEYS) {
+    const date = plannedDateFor(weekStart, day)!
+    const laneRows = rows.filter((row) => row.visit?.planned_date === date)
+    const onRoute = routeDays.includes(day)
+    if (onRoute || laneRows.length > 0) lanes.push({ date, day, onRoute, rows: laneRows })
+  }
+  const anyDay = rows.filter((row) => !row.visit?.planned_date)
+  if (anyDay.length > 0) lanes.push({ date: null, day: null, onRoute: false, rows: anyDay })
+  return lanes
+}
+
+/** Planned for an earlier day and not yet started or settled. Derived; nothing is written. */
+export function isCarriedOver(
+  visit: Pick<VisitWithCrew, 'status' | 'started_at' | 'planned_date'> | null,
+  today: Date,
+): boolean {
+  if (!visit?.planned_date || visit.status !== 'scheduled' || visit.started_at) return false
+  return visit.planned_date < format(today, 'yyyy-MM-dd')
+}
+
+/**
+ * The day a new visit inherits: the weekday it was last done, when the route runs that day.
+ * Otherwise null ("Any day") rather than a guess.
+ */
+export function defaultPlannedDate(
+  lastEndedAt: string | null,
+  routeDays: string[],
+  weekStart: string,
+): string | null {
+  if (!lastEndedAt) return null
+  const day = weekdayKey(parseISO(lastEndedAt))
+  return routeDays.includes(day) ? plannedDateFor(weekStart, day) : null
+}
+
 export type RunningRoute = {
   /** A route group id, or UNGROUPED_SORT_KEY. */
   key: string
