@@ -3,17 +3,18 @@
 A follow-on to `SCHEDULE_REDESIGN.md` (S0–S6, built). See `CLAUDE.md` for stack, schema and
 conventions; it is the source of truth wherever this file is silent.
 
-> **Status:** planned 2026-10-14. D0 done 2026-10-14 (static checks pass; dev migrated and
+> **Status:** planned 2026-10-14. **All phases built locally 2026-10-15; prod migration and push pending.** D0 done 2026-10-14 (static checks pass; dev migrated and
 > DB checks run; prod not migrated yet; the offline-flush check is still to run).
 > D1 done 2026-10-14 (static checks pass; the functional checks under Verify are still to run).
 > D2 done 2026-10-15 (static checks pass; logic checked with a scratch script; the in-app checks are still to run).
 > D3 done 2026-10-15 (static checks pass; the functional checks under Verify are still to run).
+> D4 done 2026-10-15 (static checks pass; the day rule checked with a scratch script; generating a real week is still to try).
 >
 > - [x] **D0** — Schema, queue type, pure helpers
 > - [x] **D1** — Day lanes in the route view
 > - [x] **D2** — Today runs on the day
 > - [x] **D3** — "Plan tomorrow" sheet
-> - [ ] **D4** — Generate pre-fills days
+> - [x] **D4** — Generate pre-fills days
 >
 > **One Claude Code session per phase.** Prompt: *"Implement phase D<n> of DAY_PLANNING.md.
 > Fill in its As-built section and tick its box when done."* Read **Shared rules** first.
@@ -360,4 +361,20 @@ exceptions instead of starting blank.
 **Verify:** generate a week where Wilder's stops were split Mon/Tue last week → same split this
 week; a property last done on a non-route day lands in Any day; trio passes.
 
-**As built — deviations:** _(fill in)_
+**As built — deviations:**
+- `planWeek()` is unchanged. A new pure helper,
+  `decisionPlannedDate(decision, weekStart)` in `lib/utils/schedule.ts`, wraps
+  `defaultPlannedDate` with the candidate's `lastVisitedOn` (already a local `yyyy-MM-dd` from
+  `usePropertyLastVisit`) and its route's `default_days`. The preview and the write both call
+  it, so what's shown is exactly what's written.
+- `useCreateVisit(row, weekStart, label?, plannedDate = null)` gained a 4th parameter. It sets
+  the optimistic visit's `planned_date` and goes in the `create_visit` payload as optional
+  `plannedDate`. The flush upsert writes `planned_date: p.plannedDate ?? null`. Payloads queued
+  before this have no field and write null, the column default. It's still `ignoreDuplicates`,
+  so Generate never touches an existing visit's day.
+- The preview shows a `Mon 4 · Tue 3 · Any 1` line under each route header, only for routes with
+  ≥ 2 days (a one-day route has nothing to split). It counts only ticked stops, so it updates as
+  rows are unticked.
+- Checked with a throwaway esbuild script: last done Tue → this week's Tue, Mon → Mon, Thu (off
+  the route) → Any, never visited → Any, no route → Any.
+

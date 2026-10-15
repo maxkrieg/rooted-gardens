@@ -6,7 +6,12 @@ import { enqueueMutation, flushMutationQueue } from '@/lib/offline/mutation-queu
 import { patchScheduleVisit, useScheduleReference } from '@/hooks/useManagementSchedule'
 import { useCreateVisit } from '@/hooks/useCreateVisit'
 import { nextVisitVersion } from '@/lib/utils/visits'
-import { planWeek, type PlanCandidate, type PlanDecision } from '@/lib/utils/schedule'
+import {
+  decisionPlannedDate,
+  planWeek,
+  type PlanCandidate,
+  type PlanDecision,
+} from '@/lib/utils/schedule'
 import { usePropertyLastVisit } from '@/hooks/usePropertyLastVisit'
 import type {
   Account,
@@ -58,7 +63,8 @@ export function useGenerateWeek(weekStart: string) {
       const routeGroups = reference.data?.routeGroups ?? []
       const defaultCrew = reference.data?.defaultCrew ?? []
 
-      for (const { candidate } of decisions) {
+      for (const decision of decisions) {
+        const { candidate } = decision
         const visit = await createVisit(
           {
             property: candidate.property as Property,
@@ -68,6 +74,7 @@ export function useGenerateWeek(weekStart: string) {
           },
           weekStart,
           candidate.property.address,
+          decisionPlannedDate(decision, weekStart),
         )
 
         const groupId = candidate.routeGroup?.id

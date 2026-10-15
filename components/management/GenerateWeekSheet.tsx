@@ -17,7 +17,8 @@ import { SectionError } from '@/components/states/ErrorState'
 import { toUserMessage } from '@/lib/errors'
 import { cn } from '@/lib/utils'
 import { formatDays } from '@/components/management/RouteGroupBand'
-import type { PlanDecision } from '@/lib/utils/schedule'
+import { dayName } from '@/components/management/DayPicker'
+import { DAY_KEYS, decisionPlannedDate, weekdayKey, type PlanDecision } from '@/lib/utils/schedule'
 import { emitTourEvent } from '@/lib/onboarding/events'
 
 interface GenerateWeekSheetProps {
@@ -139,6 +140,11 @@ export function GenerateWeekSheet({
                     {formatDays(group.days)}
                   </span>
                 )}
+                {group.days.length >= 2 && (
+                  <span className="block font-medium normal-case tracking-normal text-primary">
+                    {daySplit(group.rows.filter((d) => !excluded.has(d.candidate.property.id)), weekStart)}
+                  </span>
+                )}
               </h3>
               <ul>
                 {group.rows.map((decision) => {
@@ -219,4 +225,17 @@ export function GenerateWeekSheet({
       </SheetContent>
     </Sheet>
   )
+}
+
+/** `Mon 4 · Tue 3 · Any 1`: how the ticked stops will split, from each one's last-visit weekday. */
+function daySplit(decisions: PlanDecision[], weekStart: string): string {
+  const counts = new Map<string | null, number>()
+  for (const decision of decisions) {
+    const date = decisionPlannedDate(decision, weekStart)
+    const day = date ? weekdayKey(parseISO(date)) : null
+    counts.set(day, (counts.get(day) ?? 0) + 1)
+  }
+  const parts = DAY_KEYS.filter((day) => counts.has(day)).map((day) => `${dayName(day)} ${counts.get(day)}`)
+  if (counts.has(null)) parts.push(`Any ${counts.get(null)}`)
+  return parts.join(' · ')
 }

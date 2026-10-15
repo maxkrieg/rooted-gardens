@@ -215,6 +215,12 @@ export function planWeek(weekStart: string, candidates: PlanCandidate[]): PlanDe
   })
 }
 
+/** The day Generate gives a due stop: its last visit's weekday, when its route runs then. */
+export function decisionPlannedDate(decision: PlanDecision, weekStart: string): string | null {
+  const { lastVisitedOn, routeGroup } = decision.candidate
+  return defaultPlannedDate(lastVisitedOn, routeGroup?.default_days ?? [], weekStart)
+}
+
 function frequencyLabel(frequency: string): string {
   if (frequency === 'weekly') return 'Weekly'
   if (frequency === 'biweekly') return 'Biweekly'

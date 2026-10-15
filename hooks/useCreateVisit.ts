@@ -15,7 +15,12 @@ export function useCreateVisit() {
   const queryClient = useQueryClient()
 
   return useCallback(
-    async (row: SchedulePropertyRow, weekStart: string, label?: string): Promise<VisitWithCrew> => {
+    async (
+      row: SchedulePropertyRow,
+      weekStart: string,
+      label?: string,
+      plannedDate: string | null = null,
+    ): Promise<VisitWithCrew> => {
       const now = new Date().toISOString()
       const visit = {
         id: crypto.randomUUID(),
@@ -25,7 +30,7 @@ export function useCreateVisit() {
         status: 'scheduled',
         crew_instruction: null,
         vehicle_id: null,
-        planned_date: null,
+        planned_date: plannedDate,
         started_at: null,
         ended_at: null,
         service_types: null,
@@ -52,6 +57,7 @@ export function useCreateVisit() {
           accountId: row.account.id,
           propertyId: row.property.id,
           weekStart,
+          plannedDate,
         },
         label ?? row.property.address,
       )

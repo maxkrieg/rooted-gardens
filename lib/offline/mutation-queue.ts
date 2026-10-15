@@ -56,6 +56,8 @@ interface CreateVisitPayload {
   accountId: string
   propertyId: string
   weekStart: string
+  /** Optional: payloads queued before day planning shipped have none. */
+  plannedDate?: string | null
 }
 
 interface AssignCrewPayload {
@@ -403,6 +405,7 @@ export async function flushMutationQueue(): Promise<FlushResult> {
                 property_id: p.propertyId,
                 week_start: p.weekStart,
                 status: 'scheduled',
+                planned_date: p.plannedDate ?? null,
               },
               { onConflict: 'property_id,week_start', ignoreDuplicates: true },
             )
