@@ -3,7 +3,7 @@
 A follow-on to `SCHEDULE_REDESIGN.md` (S0–S6, built). See `CLAUDE.md` for stack, schema and
 conventions; it is the source of truth wherever this file is silent.
 
-> **Status:** planned 2026-10-14. **All phases built locally 2026-10-15; prod migration and push pending.** D0 done 2026-10-14 (static checks pass; dev migrated and
+> **Status:** planned 2026-10-14. **Shipped 2026-10-15: all phases built, prod migrated, functional checks run by the user, pushed.** D0 done 2026-10-14 (static checks pass; dev migrated and
 > DB checks run; prod not migrated yet; the offline-flush check is still to run).
 > D1 done 2026-10-14 (static checks pass; the functional checks under Verify are still to run).
 > D2 done 2026-10-15 (static checks pass; logic checked with a scratch script; the in-app checks are still to run).
