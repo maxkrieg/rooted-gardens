@@ -7,11 +7,12 @@ conventions; it is the source of truth wherever this file is silent.
 > DB checks run; prod not migrated yet; the offline-flush check is still to run).
 > D1 done 2026-10-14 (static checks pass; the functional checks under Verify are still to run).
 > D2 done 2026-10-15 (static checks pass; logic checked with a scratch script; the in-app checks are still to run).
+> D3 done 2026-10-15 (static checks pass; the functional checks under Verify are still to run).
 >
 > - [x] **D0** — Schema, queue type, pure helpers
 > - [x] **D1** — Day lanes in the route view
 > - [x] **D2** — Today runs on the day
-> - [ ] **D3** — "Plan tomorrow" sheet
+> - [x] **D3** — "Plan tomorrow" sheet
 > - [ ] **D4** — Generate pre-fills days
 >
 > **One Claude Code session per phase.** Prompt: *"Implement phase D<n> of DAY_PLANNING.md.
@@ -312,7 +313,29 @@ precedent), `components/management/TodayView.tsx`, `lib/utils/cadence.ts` (`cade
 **Verify:** plan Wednesday from Tuesday evening offline, reconnect, see it on a second device via
 Realtime; trio passes.
 
-**As built — deviations:** _(fill in)_
+**As built — deviations:**
+- Entry point: a `Plan tomorrow` outline button under Running today (and under "Other routes"),
+  owner/lead only (`editSchedule`), anchored `data-tour="today.planDay"`. On Sunday it reads
+  `Plan today`, because tomorrow is in next week and a visit can't be planned outside its own
+  week. The sheet's `Today | Tomorrow` toggle hides then, rather than jumping to "the next route
+  day" as the plan said.
+- `components/management/PlanDaySheet.tsx` lists this week's scheduled, not-started stops whose
+  `planned_date` is null, or on or before the target day. Stops planned for a later day are left
+  out. Each route is sorted by `sortRowsByPriority`, and routes that run on the target day come
+  first. Flags: `Carried over from Mon` (planned before today), and `Planned today` when
+  planning tomorrow, which is the "push it to tomorrow" case.
+- It reads the **unfiltered** current week (`weeks[0]`), not Today's filtered one, so a filter
+  can't silently hide stops from planning.
+- Ticks are stored as a diff from what's already on the target, and reset when the target
+  changes. The button says `Put N on Wed` (N = everything ticked), and is disabled until
+  something changes. Saving makes at most two `setPlannedDay` calls (adds → day, unticks →
+  null), with one Undo toast that runs both undos.
+- The rows are `role="checkbox"` buttons with `CheckIndicator`, not shadcn `Checkbox`, so the
+  whole row is the tap target, like select mode in the route view.
+- The sheet mounts only while open, so ticks left by a cancel are dropped.
+- Added the `news.planTomorrow` NEWS item (owner/lead), with no `parentTour`: the schedule tour
+  doesn't teach it, and tours mustn't drive a write.
+
 
 ---
 

@@ -2,13 +2,16 @@
 
 import { useMemo, useState } from 'react'
 import { format } from 'date-fns'
-import { ChevronRight, Flag, RotateCw, WifiOff } from 'lucide-react'
+import { CalendarPlus, ChevronRight, Flag, RotateCw, WifiOff } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { GettingStartedCard } from '@/components/onboarding/GettingStartedCard'
 import { NeedsYouList } from '@/components/management/NeedsYouList'
 import { FieldActivityList } from '@/components/management/FieldActivityList'
 import { GenerateWeekSheet } from '@/components/management/GenerateWeekSheet'
 import { VisitDetailSheet } from '@/components/management/VisitDetailSheet'
+import { PlanDaySheet } from '@/components/management/PlanDaySheet'
+import { Button } from '@/components/ui/button'
+import { useCan } from '@/components/app/RoleProvider'
 import {
   RouteCrewTruck,
   RouteDoneCount,
@@ -70,8 +73,15 @@ export function TodayView({
   const week = useMemo(() => filterScheduleWeeks(weeks, filters)[0], [weeks, filters])
   const { data: weekNotes = [] } = useWeekNotes(weekStart)
   // Sheet state, drive order, and the 30s tick that keeps the on-site timers moving.
-  const { orderRows, sheetOpen, sheetRow, sheetWeek, openSheet, handleSheetOpenChange } =
-    useScheduleInteractions({
+  const {
+    orderRows,
+    lastVisitByProperty,
+    sheetOpen,
+    sheetRow,
+    sheetWeek,
+    openSheet,
+    handleSheetOpenChange,
+  } = useScheduleInteractions({
       selectMode: false,
       sortState: DEFAULT_SCHEDULE_SORT,
       windowStart: weekStart,
@@ -80,6 +90,8 @@ export function TodayView({
   const { items: needsYou, markSeen, plan } = useNeedsYou(week, weeks[0], weekStart)
   const generateWeek = useGenerateWeek(weekStart)
   const [generateOpen, setGenerateOpen] = useState(false)
+  const [planOpen, setPlanOpen] = useState(false)
+  const { editSchedule: canEdit } = useCan()
 
   if (isLoading && !hasData) return <TodaySkeleton />
 
@@ -159,6 +171,20 @@ export function TodayView({
                 <ChevronRight className="h-4 w-4" aria-hidden />
               </button>
             )}
+            {canEdit && (
+              <div className="px-4 pt-2">
+                <Button
+                  variant="outline"
+                  data-tour="today.planDay"
+                  className="h-11 w-full gap-2"
+                  onClick={() => setPlanOpen(true)}
+                >
+                  <CalendarPlus className="h-4 w-4" aria-hidden />
+                  {/* Sunday's tomorrow is next week, which the sheet can't plan. */}
+                  {format(today, 'EEE') === 'Sun' ? 'Plan today' : 'Plan tomorrow'}
+                </Button>
+              </div>
+            )}
           </section>
 
           <FieldActivityList
@@ -180,6 +206,17 @@ export function TodayView({
         isError={plan.isError}
         onConfirm={generateWeek}
       />
+
+      {/* Mounted only while open, so ticks left by a cancel don't come back. */}
+      {canEdit && planOpen && (
+        <PlanDaySheet
+          open
+          onOpenChange={setPlanOpen}
+          week={weeks[0]}
+          today={today}
+          lastVisitByProperty={lastVisitByProperty}
+        />
+      )}
 
       {sheetRow && (
         <VisitDetailSheet

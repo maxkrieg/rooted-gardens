@@ -496,6 +496,15 @@ export const NEWS: NewsItem[] = [
     route: '/app/schedule',
     anchor: 'schedule.dayChip',
   },
+  {
+    key: 'news.planTomorrow',
+    roles: ['owner', 'lead'],
+    introduced: '2026-10-15',
+    title: 'Plan tomorrow from Today',
+    body: 'Plan tomorrow, under Running today, lists what’s left this week with no day or carried over, most overdue first. Tick tomorrow’s stops and put them on the day.',
+    route: '/app/schedule',
+    anchor: 'today.planDay',
+  },
 ]
 
 export function forRole<T extends { roles: Roles }>(items: T[], role: EmployeeRole | null): T[] {
