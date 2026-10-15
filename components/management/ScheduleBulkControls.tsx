@@ -12,6 +12,7 @@ import {
 } from '@/hooks/useBulkScheduleActions'
 import type { Employee, Vehicle } from '@/types/app'
 import { firstName } from '@/lib/utils/team'
+import { dayName } from '@/components/management/DayPicker'
 
 interface ScheduleBulkControlsProps {
   /** What's selected, resolved to the visit for its own week. */
@@ -23,6 +24,9 @@ interface ScheduleBulkControlsProps {
   onExitSelectMode?: () => void
   employees: Employee[]
   vehicles: Vehicle[]
+  /** The week on screen, and its route's days for the Day picker (empty off-route). */
+  weekStart: string
+  routeDays: string[]
 }
 
 /** Select-mode bar and action sheet for both layouts. On failure the selection stays for a retry. */
@@ -34,6 +38,8 @@ export function ScheduleBulkControls({
   onExitSelectMode,
   employees,
   vehicles,
+  weekStart,
+  routeDays,
 }: ScheduleBulkControlsProps) {
   const bulk = useBulkScheduleActions()
   const [bulkKind, setBulkKind] = useState<BulkActionKind | null>(null)
@@ -95,6 +101,7 @@ export function ScheduleBulkControls({
         actions={[
           { label: 'Crew', disabled: count === 0, onClick: () => setBulkKind('crew') },
           { label: 'Truck', disabled: count === 0, onClick: () => setBulkKind('vehicle') },
+          { label: 'Day', disabled: count === 0, onClick: () => setBulkKind('day') },
           {
             label: 'Schedule',
             disabled: count === 0 || targets.every(({ row }) => row.visit),
@@ -124,6 +131,15 @@ export function ScheduleBulkControls({
         }
         onPickVehicle={(vehicleId) =>
           runBulk('Setting truck…', () => bulk.setVehicle(targets, vehicleId), (n) => `Truck set on ${stops(n)}.`)
+        }
+        weekStart={weekStart}
+        routeDays={routeDays}
+        onPickDay={(day) =>
+          runBulk(
+            'Setting day…',
+            () => bulk.setPlannedDay(targets, day),
+            (n) => `${stops(n)} moved to ${day ? dayName(day) : 'any day'}.`,
+          )
         }
         onSkip={(reason) =>
           runBulk('Skipping…', () => bulk.skipAll(targets, reason), (n) => `${stops(n)} skipped.`)

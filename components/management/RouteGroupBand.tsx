@@ -3,7 +3,7 @@
 import { ChevronLeft, Truck, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import type { RouteGroupStats } from '@/lib/utils/schedule'
+import { DAY_KEYS, type RouteGroupStats } from '@/lib/utils/schedule'
 import type { Employee } from '@/types/app'
 
 export type { RouteGroupStats }
@@ -226,12 +226,10 @@ export function RouteProgressBar({
   )
 }
 
-const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
-
 /** `['tue','mon'] → 'Mon/Tue'`, in week order like the route sheet. */
 export function formatDays(days: string[]): string {
   return [...days]
-    .sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b))
+    .sort((a, b) => DAY_KEYS.indexOf(a) - DAY_KEYS.indexOf(b))
     .map((day) => day.charAt(0).toUpperCase() + day.slice(1))
     .join('/')
 }

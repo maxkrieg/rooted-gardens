@@ -5,9 +5,10 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
+import { DayPickerOptions } from '@/components/management/DayPicker'
 import type { Employee, Vehicle } from '@/types/app'
 
-export type BulkActionKind = 'crew' | 'vehicle' | 'skip'
+export type BulkActionKind = 'crew' | 'vehicle' | 'day' | 'skip'
 
 interface BulkActionSheetProps {
   kind: BulkActionKind | null
@@ -18,9 +19,13 @@ interface BulkActionSheetProps {
   onPickCrew: (employee: Employee) => void
   onPickVehicle: (vehicleId: string | null) => void
   onSkip: (reason: string) => void
+  /** The week on screen and its route's days, for the Day picker. */
+  weekStart: string
+  routeDays: string[]
+  onPickDay: (day: string | null) => void
 }
 
-/** The picker behind each bulk action: one sheet, three modes. */
+/** The picker behind each bulk action: one sheet, one mode per action. */
 export function BulkActionSheet({
   kind,
   onOpenChange,
@@ -30,6 +35,9 @@ export function BulkActionSheet({
   onPickCrew,
   onPickVehicle,
   onSkip,
+  weekStart,
+  routeDays,
+  onPickDay,
 }: BulkActionSheetProps) {
   const [reason, setReason] = useState('')
 
@@ -38,7 +46,9 @@ export function BulkActionSheet({
       ? `Assign crew to ${count}`
       : kind === 'vehicle'
         ? `Set truck on ${count}`
-        : `Skip ${count} ${count === 1 ? 'stop' : 'stops'}`
+        : kind === 'day'
+          ? `Set day for ${count}`
+          : `Skip ${count} ${count === 1 ? 'stop' : 'stops'}`
 
   return (
     <Sheet open={kind !== null} onOpenChange={onOpenChange}>
@@ -71,6 +81,10 @@ export function BulkActionSheet({
                 <RowButton label="No truck" muted onClick={() => onPickVehicle(null)} />
               </li>
             </ul>
+          )}
+
+          {kind === 'day' && (
+            <DayPickerOptions weekStart={weekStart} routeDays={routeDays} onPick={onPickDay} />
           )}
 
           {kind === 'skip' && (

@@ -1,7 +1,9 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { parseISO } from 'date-fns'
+import { format, parseISO } from 'date-fns'
+import { toast } from 'sonner'
+import { toUserMessage } from '@/lib/errors'
 import { ChevronLeft, FilePen, Flag, MoreHorizontal, Receipt, Truck, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -12,7 +14,8 @@ import { RouteAssignSheet } from '@/components/management/RouteAssignSheets'
 import { ScheduleEmptyState } from '@/components/management/ScheduleEmptyState'
 import { RouteViewHeader } from '@/components/management/RouteGroupBand'
 import { ScheduleBulkControls } from '@/components/management/ScheduleBulkControls'
-import type { BulkTarget } from '@/hooks/useBulkScheduleActions'
+import { useBulkScheduleActions, type BulkTarget } from '@/hooks/useBulkScheduleActions'
+import { DayPickerSheet, dayName } from '@/components/management/DayPicker'
 import { CheckIndicator } from '@/components/app/CheckIndicator'
 import { WeekNoteRibbon } from '@/components/management/WeekNoteRibbon'
 import { RouteDefaultsSheet } from '@/components/management/RouteDefaultsSheet'
@@ -25,6 +28,9 @@ import {
   groupRowsByAccount,
   routeAssignment,
   routeGroupStats,
+  stopsByDay,
+  weekdayKey,
+  type DayLane,
   type RouteAssignment,
 } from '@/lib/utils/schedule'
 import {
@@ -132,6 +138,9 @@ export function ScheduleListMobile({
     onOpenVisit,
   })
   const { data: weekNotes = [] } = useWeekNotes(week?.weekStart ?? '')
+  const bulk = useBulkScheduleActions()
+  // The stop whose day chip was tapped.
+  const [dayRow, setDayRow] = useState<SchedulePropertyRow | null>(null)
 
   /** Band stats read the same merged visits as the rows, so they can't disagree. */
   function visitsFor(rows: SchedulePropertyRow[], weekStart: string) {
@@ -209,6 +218,7 @@ export function ScheduleListMobile({
     row: SchedulePropertyRow,
     variant: 'merged' | 'nested',
     showTopBorder: boolean,
+    withDay: boolean,
   ) {
     const isNested = variant === 'nested'
     const cellKey = `${row.property.id}-${currentWeek.weekStart}`
@@ -226,39 +236,16 @@ export function ScheduleListMobile({
     const settled = visit?.status === 'completed' || visit?.status === 'skipped'
     const crewLabel = displayedCrew.map((emp) => firstName(emp.name)).join(', ')
 
+    const dayChip = withDay && !selectMode && visit ? renderDayChip(row, visit) : null
+
+    // A wrapper, so the day chip can be a sibling: a button can't nest in the row's button.
     return (
-      <button
+      <div
         key={row.property.id}
-        type="button"
-        // Only rows that already have a visit: tapping an empty one creates it.
-        data-tour={visit ? 'schedule.stop' : undefined}
-        // The desktop board's ↑/↓ walks these.
-        data-stop-row=""
-        // Only owner/lead can create a visit (RLS); for everyone else an empty row is inert.
-        disabled={isCreating || (!visit && !canEdit && !selectMode)}
-        aria-pressed={selectMode ? isSelected : undefined}
-        aria-current={isActive ? 'true' : undefined}
-        onClick={() =>
-          selectMode ? toggleSelected(row.property.id) : handleRowClick(row, visit)
-        }
-        onKeyDown={(e) => {
-          // S schedules without opening: the fast path for filling several stops in a row.
-          if (e.key.toLowerCase() !== 's' || visit || selectMode || isCreating || !week) return
-          if (!canEdit || e.metaKey || e.ctrlKey || e.altKey) return
-          e.preventDefault()
-          void scheduleVisit(row, week.weekStart, { openDrawer: false })
-        }}
         className={cn(
-          'w-full text-left py-3 min-h-[56px]',
-          'flex items-start gap-3',
-          isNested ? 'border-l-2 border-l-foreground/15 pl-6 pr-4' : 'px-4',
+          'flex items-stretch',
           showTopBorder && 'border-t border-border/50',
           visitRowTint(visit?.status),
-          // brightness, not a background — a bg-* hover is the same property as
-          // the status tint and would strip the wash off the row on touch.
-          'transition-[filter] hover:brightness-[0.97] active:brightness-[0.94]',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
-          isCreating && 'opacity-50 cursor-wait',
           // Selection deliberately beats the status wash — in select mode what's
           // ticked matters more than what's done.
           selectMode && isSelected && 'bg-accent/40',
@@ -268,77 +255,162 @@ export function ScheduleListMobile({
           isActive && !settled && !(selectMode && isSelected) && 'bg-secondary',
         )}
       >
-        {/* The row is the tap target, so this is presentational only — a real
-            Checkbox here is a <button> inside a <button>. */}
-        {selectMode && <CheckIndicator checked={isSelected} className="mt-0.5" />}
-
-        {/* Identity */}
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          {!isNested && (
-            <span
-              className={cn(
-                'font-display text-[15px] font-semibold leading-snug truncate',
-                settled ? 'text-muted-foreground' : 'text-foreground',
-              )}
-            >
-              {account.name}
-            </span>
+        <button
+          type="button"
+          // Only rows that already have a visit: tapping an empty one creates it.
+          data-tour={visit ? 'schedule.stop' : undefined}
+          // The desktop board's ↑/↓ walks these.
+          data-stop-row=""
+          // Only owner/lead can create a visit (RLS); for everyone else an empty row is inert.
+          disabled={isCreating || (!visit && !canEdit && !selectMode)}
+          aria-pressed={selectMode ? isSelected : undefined}
+          aria-current={isActive ? 'true' : undefined}
+          onClick={() =>
+            selectMode ? toggleSelected(row.property.id) : handleRowClick(row, visit)
+          }
+          onKeyDown={(e) => {
+            // S schedules without opening: the fast path for filling several stops in a row.
+            if (e.key.toLowerCase() !== 's' || visit || selectMode || isCreating || !week) return
+            if (!canEdit || e.metaKey || e.ctrlKey || e.altKey) return
+            e.preventDefault()
+            void scheduleVisit(row, week.weekStart, { openDrawer: false })
+          }}
+          className={cn(
+            'min-w-0 flex-1 text-left py-3 min-h-[56px]',
+            'flex items-start gap-3',
+            isNested ? 'border-l-2 border-l-foreground/15 pl-6' : 'pl-4',
+            dayChip ? 'pr-1' : 'pr-4',
+            // brightness, not a background — a bg-* hover is the same property as
+            // the status tint and would strip the wash off the row on touch.
+            'transition-[filter] hover:brightness-[0.97] active:brightness-[0.94]',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+            isCreating && 'opacity-50 cursor-wait',
           )}
-          <span className="text-[13px] leading-snug text-muted-foreground truncate">
-            {row.property.address}
-          </span>
-          {/* One meta line: cadence, crew, invoice. No rate — this is a dispatch screen. */}
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
-            {/* Settled work needs no countdown — the row already carries its
-                status wash and glyph. Outstanding work is where the wait matters. */}
-            <CadenceBadge
-              property={row.property}
-              lastVisitOn={lastVisitByProperty?.[row.property.id] ?? null}
-              showDays={!visit || visit.status === 'scheduled'}
-            />
-            {crewLabel && (
-              <span className="truncate">
-                {crewLabel}
-                {overflow > 0 && ` +${overflow}`}
+        >
+          {/* The row is the tap target, so this is presentational only — a real
+              Checkbox here is a <button> inside a <button>. */}
+          {selectMode && <CheckIndicator checked={isSelected} className="mt-0.5" />}
+
+          {/* Identity */}
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            {!isNested && (
+              <span
+                className={cn(
+                  'font-display text-[15px] font-semibold leading-snug truncate',
+                  settled ? 'text-muted-foreground' : 'text-foreground',
+                )}
+              >
+                {account.name}
               </span>
             )}
-            {visit?.status === 'completed' && visit.invoice && (
-              <span className="ink-invoiced flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide">
-                <Receipt className="h-2.5 w-2.5 shrink-0" aria-hidden />
-                {invoiceStatusLabel(visit.invoice.status)}
+            <span className="text-[13px] leading-snug text-muted-foreground truncate">
+              {row.property.address}
+            </span>
+            {/* One meta line: cadence, crew, invoice. No rate — this is a dispatch screen. */}
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+              {/* Settled work needs no countdown — the row already carries its
+                  status wash and glyph. Outstanding work is where the wait matters. */}
+              <CadenceBadge
+                property={row.property}
+                lastVisitOn={lastVisitByProperty?.[row.property.id] ?? null}
+                showDays={!visit || visit.status === 'scheduled'}
+              />
+              {crewLabel && (
+                <span className="truncate">
+                  {crewLabel}
+                  {overflow > 0 && ` +${overflow}`}
+                </span>
+              )}
+              {visit?.status === 'completed' && visit.invoice && (
+                <span className="ink-invoiced flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide">
+                  <Receipt className="h-2.5 w-2.5 shrink-0" aria-hidden />
+                  {invoiceStatusLabel(visit.invoice.status)}
+                </span>
+              )}
+            </div>
+            {/* The crew instruction (the sheet's orange cell), shown inline — phones have no hover. */}
+            {visit?.crew_instruction && (
+              <span className="mt-1 flex items-start gap-1 text-[12px] leading-snug text-[var(--clay)]">
+                <FilePen className="mt-px h-3 w-3 shrink-0" aria-hidden />
+                <span className="line-clamp-2">{visit.crew_instruction}</span>
               </span>
             )}
           </div>
-          {/* The crew instruction (the sheet's orange cell), shown inline — phones have no hover. */}
-          {visit?.crew_instruction && (
-            <span className="mt-1 flex items-start gap-1 text-[12px] leading-snug text-[var(--clay)]">
-              <FilePen className="mt-px h-3 w-3 shrink-0" aria-hidden />
-              <span className="line-clamp-2">{visit.crew_instruction}</span>
+
+          {/* At most one of: status mark, live clock, schedule action. Scheduled shows nothing. */}
+          {visit && inProgress && effectiveStartedAt ? (
+            <span className="mt-0.5 flex shrink-0 items-center gap-1.5 text-[11px] font-semibold tabular-nums text-[var(--clay)]">
+              <VisitStatusIcon status={visit.status} inProgress />
+              {formatElapsed(effectiveStartedAt)}
+            </span>
+          ) : !visit ? (
+            canEdit ? (
+              <span className="mt-0.5 shrink-0 text-xs font-medium text-primary">
+                {isCreating ? '…' : '+ Schedule'}
+              </span>
+            ) : (
+              <span className="mt-0.5 shrink-0 text-xs text-muted-foreground">Not scheduled</span>
+            )
+          ) : (
+            <span className="mt-0.5 flex shrink-0">
+              <VisitStatusIcon status={visit.status} />
             </span>
           )}
-        </div>
+        </button>
+        {dayChip}
+      </div>
+    )
+  }
 
-        {/* At most one of: status mark, live clock, schedule action. Scheduled shows nothing. */}
-        {visit && inProgress && effectiveStartedAt ? (
-          <span className="mt-0.5 flex shrink-0 items-center gap-1.5 text-[11px] font-semibold tabular-nums text-[var(--clay)]">
-            <VisitStatusIcon status={visit.status} inProgress />
-            {formatElapsed(effectiveStartedAt)}
-          </span>
-        ) : !visit ? (
-          canEdit ? (
-            <span className="mt-0.5 shrink-0 text-xs font-medium text-primary">
-              {isCreating ? '…' : '+ Schedule'}
-            </span>
-          ) : (
-            <span className="mt-0.5 shrink-0 text-xs text-muted-foreground">Not scheduled</span>
-          )
-        ) : (
-          <span className="mt-0.5 flex shrink-0">
-            <VisitStatusIcon status={visit.status} />
-          </span>
-        )}
+  // The stop's planned day. Tappable for editors; read-only text, or nothing, for everyone else.
+  function renderDayChip(row: SchedulePropertyRow, visit: VisitWithCrew) {
+    const day = visit.planned_date ? weekdayKey(parseISO(visit.planned_date)) : null
+    const pill = cn(
+      'rounded-full border px-2 py-0.5 text-[11px] font-semibold',
+      day ? 'border-border bg-card text-foreground' : 'border-dashed border-primary/50 text-primary',
+    )
+    if (!canEdit) {
+      return day ? (
+        <span className="flex shrink-0 items-start pt-3 pr-4">
+          <span className={pill}>{dayName(day)}</span>
+        </span>
+      ) : null
+    }
+    return (
+      <button
+        type="button"
+        data-tour="schedule.dayChip"
+        onClick={() => setDayRow(row)}
+        aria-label={day ? `Planned ${dayName(day)}. Change day` : 'Set a day'}
+        className="flex w-14 shrink-0 items-start justify-center pt-2.5 pr-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      >
+        <span className={pill}>{day ? dayName(day) : '+ Day'}</span>
       </button>
     )
+  }
+
+  async function setStopDay(row: SchedulePropertyRow, day: string | null) {
+    setDayRow(null)
+    try {
+      const { changed, undo } = await bulk.setPlannedDay([{ row, weekStart: currentWeek.weekStart }], day)
+      if (changed === 0) return
+      toast.success(day ? `Moved to ${dayName(day)}.` : 'Moved to any day.', {
+        action: undo
+          ? {
+              label: 'Undo',
+              onClick: () => {
+                void undo().catch(() =>
+                  toast.error('Could not undo', { description: 'The reversal is queued and will retry.' }),
+                )
+              },
+            }
+          : undefined,
+      })
+    } catch (err) {
+      toast.error('The day did not save', {
+        description: toUserMessage(err, 'It is queued and will retry.', '[ScheduleListMobile.setStopDay]'),
+      })
+    }
   }
 
   // Multi-property account header above its nested property rows.
@@ -363,18 +435,37 @@ export function ScheduleListMobile({
     )
   }
 
-  function renderRows(groupKey: string, rows: SchedulePropertyRow[]) {
-    return groupRowsByAccount(orderRows(groupKey, rows)).map(({ account, rows: acctRows }, acctIdx) => {
+  /** Rows already in display order, nested by account. */
+  function renderAccountRows(rows: SchedulePropertyRow[], withDay: boolean) {
+    return groupRowsByAccount(rows).map(({ account, rows: acctRows }, acctIdx) => {
       if (acctRows.length === 1) {
-        return renderStopRow(account, acctRows[0], 'merged', acctIdx > 0)
+        return renderStopRow(account, acctRows[0], 'merged', acctIdx > 0, withDay)
       }
       return (
         <div key={account.id}>
           <AccountHeaderRow account={account} propertyCount={acctRows.length} showTopBorder={acctIdx > 0} />
-          {acctRows.map((row, rowIdx) => renderStopRow(account, row, 'nested', rowIdx > 0))}
+          {acctRows.map((row, rowIdx) => renderStopRow(account, row, 'nested', rowIdx > 0, withDay))}
         </div>
       )
     })
+  }
+
+  // Day lanes only where the day is a real question: a multi-day route, or one with a stop
+  // already planned. A one-day route keeps its flat list.
+  function renderRows(groupKey: string, rows: SchedulePropertyRow[], routeDays: string[]) {
+    const ordered = orderRows(groupKey, rows)
+    const withDays = routeDays.length >= 2 || rows.some((row) => row.visit?.planned_date)
+    if (!withDays) return renderAccountRows(ordered, false)
+    return stopsByDay(ordered, routeDays, currentWeek.weekStart).map((lane, i) => (
+      <section key={lane.date ?? 'any'} aria-label={lane.day ? dayName(lane.day) : 'Any day'}>
+        <DayLaneHeader
+          lane={lane}
+          done={statsFor(lane.rows, currentWeek.weekStart).done}
+          first={i === 0}
+        />
+        {renderAccountRows(lane.rows, true)}
+      </section>
+    ))
   }
 
   function noteRibbon(routeGroup: RouteGroup) {
@@ -436,7 +527,7 @@ export function ScheduleListMobile({
               {noteRibbon(routeGroup)}
 
               {/* Properties, nested by account */}
-              <div className={cn('overflow-hidden', inPane && 'flex-1')}>{renderRows(routeGroup.id, rows)}</div>
+              <div className={cn('overflow-hidden', inPane && 'flex-1')}>{renderRows(routeGroup.id, rows, routeGroup.default_days ?? [])}</div>
 
               {showActionBar && (
                 <RouteActionBar
@@ -489,7 +580,7 @@ export function ScheduleListMobile({
                 {routeAllPicker}
               </div>
             )}
-            <div className={cn('overflow-hidden', inPane && 'flex-1')}>{renderRows(UNGROUPED_SORT_KEY, ungrouped)}</div>
+            <div className={cn('overflow-hidden', inPane && 'flex-1')}>{renderRows(UNGROUPED_SORT_KEY, ungrouped, [])}</div>
 
             {showActionBar && onStartSelect && (
               <RouteActionBar
@@ -513,6 +604,20 @@ export function ScheduleListMobile({
           onExitSelectMode={onExitSelectMode}
           employees={employees}
           vehicles={vehicles}
+          weekStart={currentWeek.weekStart}
+          routeDays={groups[0]?.routeGroup.default_days ?? []}
+        />
+      )}
+
+      {dayRow?.visit && (
+        <DayPickerSheet
+          open
+          onOpenChange={(open) => !open && setDayRow(null)}
+          title={`Day for ${dayRow.account.name}`}
+          weekStart={currentWeek.weekStart}
+          routeDays={groups[0]?.routeGroup.default_days ?? []}
+          current={dayRow.visit.planned_date ? weekdayKey(parseISO(dayRow.visit.planned_date)) : null}
+          onPick={(day) => void setStopDay(dayRow, day)}
         />
       )}
 
@@ -696,4 +801,36 @@ function truckSummary(assignment: RouteAssignment | undefined, vehicles: Vehicle
   if (!assignment) return null
   if (assignment.vehicleMixed) return 'Mixed'
   return vehicles.find((v) => v.id === assignment.vehicleId)?.name ?? null
+}
+
+/** `MON · Oct 13 · 4` over a day's stops, with how many are settled. */
+function DayLaneHeader({ lane, done, first }: { lane: DayLane; done: number; first: boolean }) {
+  const isToday = lane.date === format(new Date(), 'yyyy-MM-dd')
+  const total = lane.rows.length
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-2 bg-secondary/60 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground',
+        !first && 'border-t border-border',
+      )}
+    >
+      <span className={cn(isToday ? 'text-primary' : 'text-foreground/80')}>
+        {lane.day ? dayName(lane.day) : 'Any day'}
+      </span>
+      {lane.date && (
+        <span className="font-medium normal-case tracking-normal tabular-nums">
+          {isToday ? 'Today' : format(parseISO(lane.date), 'MMM d')}
+        </span>
+      )}
+      <span className="tabular-nums">· {total}</span>
+      {lane.day && !lane.onRoute && (
+        <span className="font-medium normal-case tracking-normal">· not a route day</span>
+      )}
+      {total > 0 && (
+        <span className="ml-auto tabular-nums">
+          {done}/{total}
+        </span>
+      )}
+    </div>
+  )
 }

@@ -5,9 +5,10 @@ conventions; it is the source of truth wherever this file is silent.
 
 > **Status:** planned 2026-10-14. D0 done 2026-10-14 (static checks pass; dev migrated and
 > DB checks run; prod not migrated yet; the offline-flush check is still to run).
+> D1 done 2026-10-14 (static checks pass; the functional checks under Verify are still to run).
 >
 > - [x] **D0** — Schema, queue type, pure helpers
-> - [ ] **D1** — Day lanes in the route view
+> - [x] **D1** — Day lanes in the route view
 > - [ ] **D2** — Today runs on the day
 > - [ ] **D3** — "Plan tomorrow" sheet
 > - [ ] **D4** — Generate pre-fills days
@@ -210,7 +211,30 @@ there, optional); persist a "collapsed lane" state; use drag.
 instantly, offline too; bulk Day + Undo restores prior dates (including nulls); crew see chips
 but can't open the picker; desktop board middle pane shows the same lanes; trio passes.
 
-**As built — deviations:** _(fill in)_
+**As built — deviations:**
+- **No `Day` button on the route action bar.** A phone already fits Crew · Truck · Note · ⋯
+  there. Bulk `Day` went into select mode's `SelectionBar` instead, next to Crew/Truck, and is
+  reached through ⋯ → Select stops. `BulkActionSheet` gained a `'day'` kind, and
+  `ScheduleBulkControls` takes `weekStart` and `routeDays`.
+- `components/management/DayPicker.tsx` exports `DayPickerOptions`, which the chip and the bulk
+  action share, plus `DayPickerSheet` and `dayName`. It's a bottom sheet on the board too, not
+  a popover, to match `BulkActionSheet`.
+- The row is now a `div` wrapper (tint, selection, active spine, border) around the row button
+  and a sibling chip button that is 56px wide and runs the full row height.
+  `[data-stop-row]` stays on the row button, and the board's ↑/↓ uses `querySelectorAll`, so
+  navigation doesn't depend on the structure.
+- The chip is hidden on rows with no visit (tapping those still schedules them) and in select
+  mode. Crew and the accountant see a read-only pill, and only when a day is set.
+- Lanes appear when a route has ≥ 2 `default_days` **or** any stop has a `planned_date`. Until
+  D4 pre-fills, a multi-day route opens with empty route-day lanes and everything under Any day,
+  which is accurate. Today's lane is marked "Today" in green.
+- A single chip tap goes through `setPlannedDay` with one target, with an Undo toast.
+- The Week overview's per-route `Mon 4 · Tue 3` counts are **not** built (they were optional).
+- `RouteGroupBand`'s private `DAY_ORDER` was folded into `DAY_KEYS` (now `readonly string[]`).
+- Onboarding: `tour.schedule` is now v6, with a `day-chip` step after `route-actions` (skipped
+  on routes with no chip, because the runner skips missing anchors). Added the
+  `news.dayPlanning` NEWS item (owner/lead).
+
 
 ---
 

@@ -459,11 +459,11 @@ export function weekdayKey(date: Date): string {
 }
 
 /** Week order, Monday first, matching `week_start`. */
-export const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const
+export const DAY_KEYS: readonly string[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 
 /** The date (`yyyy-MM-dd`) of weekday `day` in the week starting `weekStart`. */
 export function plannedDateFor(weekStart: string, day: string): string | null {
-  const offset = DAY_KEYS.indexOf(day as (typeof DAY_KEYS)[number])
+  const offset = DAY_KEYS.indexOf(day)
   if (offset < 0) return null
   return format(addDays(parseISO(weekStart), offset), 'yyyy-MM-dd')
 }

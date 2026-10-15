@@ -108,7 +108,7 @@ export const WELCOMES: Welcome[] = [
 export const TOURS: Tour[] = [
   {
     key: 'tour.schedule',
-    version: 5,
+    version: 6,
     title: 'Schedule',
     summary: 'Plan the week, open a stop, generate a week, change many stops at once.',
     roles: OFFICE,
@@ -189,6 +189,13 @@ export const TOURS: Tour[] = [
         anchor: 'schedule.routeActions',
         title: 'The whole route at once',
         body: 'Crew and Truck each set one thing on every scheduled stop this week. Note is the week’s note. ⋯ has the route’s defaults, and Select stops to change a few together.',
+      },
+      {
+        id: 'day-chip',
+        requires: ['band', 'band-desktop'],
+        anchor: 'schedule.dayChip',
+        title: 'Which day',
+        body: 'On a route that runs more than one day, stops sit under their day. Tap a stop’s day to move it, or Select stops → Day for several.',
       },
       {
         id: 'route-back',
@@ -478,6 +485,16 @@ export const NEWS: NewsItem[] = [
     body: 'The schedule now opens to a list of routes, with each one’s crew, truck and note. Tap a route to see its stops; Week brings you back.',
     route: '/app/schedule',
     anchor: 'schedule.routeBand',
+  },
+  {
+    key: 'news.dayPlanning',
+    roles: ['owner', 'lead'],
+    introduced: '2026-10-14',
+    title: 'Plan which day each stop runs',
+    body: 'A route that runs more than one day now splits its stops by day. Tap a stop’s day to move it; Select stops → Day moves several. Stops with no day sit under Any day.',
+    parentTour: 'tour.schedule',
+    route: '/app/schedule',
+    anchor: 'schedule.dayChip',
   },
 ]
 
