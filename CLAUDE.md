@@ -113,6 +113,8 @@ rooted-gardens/
 │                                  Claude Code session per phase; check its status block.
 ├── DAY_PLANNING.md              ← visits.planned_date: which day each stop runs, D0–D4.
 │                                  SHIPPED (D0–D4) — same one-session-per-phase convention.
+├── HELP_PAGE.md                 ← the in-app guide at /app/help, H0–H4. PLANNED. Also holds the
+│                                  rule inventory and a "possible bugs" list to decide first.
 ├── proxy.ts                     ← root request proxy (Next 16; auth + role gating, formerly middleware.ts)
 ├── instrumentation.ts           ← Sentry server/edge init + onRequestError
 ├── instrumentation-client.ts    ← Sentry browser init (offline transport)
