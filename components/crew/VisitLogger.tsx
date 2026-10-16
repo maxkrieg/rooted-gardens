@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/sheet'
 import { ServiceTypeSelector } from '@/components/crew/ServiceTypeSelector'
 import { CrewMultiSelect } from '@/components/crew/CrewMultiSelect'
-import { enqueueMutation, flushMutationQueue } from '@/lib/offline/mutation-queue'
+import { enqueueJoinVisit, enqueueMutation, flushMutationQueue } from '@/lib/offline/mutation-queue'
 import { useActiveEmployees } from '@/hooks/crew/useActiveEmployees'
 import { patchScheduleVisit } from '@/hooks/useManagementSchedule'
 import { propertyHistoryKey } from '@/hooks/usePropertyHistory'
@@ -70,6 +70,8 @@ interface VisitLoggerProps {
     caption?: string | null
     created_at?: string
   }>
+  /** Crew who aren't on this stop yet: add them first, or the database refuses the save. */
+  joinFirst?: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
@@ -87,6 +89,7 @@ export function VisitLogger({
   initialCompletionNote,
   initialPresentIds,
   initialPhotos,
+  joinFirst = false,
   open,
   onOpenChange,
   onSuccess,
@@ -321,6 +324,7 @@ export function VisitLogger({
     const endedAt = new Date(endTime).toISOString()
     const startedAtISO = new Date(startTime).toISOString()
 
+    if (joinFirst) await enqueueJoinVisit(visitId, employeeId, label)
     await enqueueMutation(
       'completion',
       {

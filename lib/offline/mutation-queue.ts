@@ -144,6 +144,20 @@ type MutationPayload =
   | { type: 'assign_property_route'; payload: AssignPropertyRoutePayload }
   | { type: 'onboarding_progress'; payload: OnboardingProgressPayload }
 
+/** RLS hides a refused UPDATE as "0 rows", not an error. Treat it as the denial it is, so the
+ *  write parks in "Changes that didn't save" instead of looking saved. */
+function expectVisitRow({ data }: { data: Array<{ id: string }> | null }): void {
+  if (!data || data.length === 0) {
+    throw Object.assign(new Error('visit update matched no rows'), { code: '42501' })
+  }
+}
+
+/** Crew can only save to a stop they're on. Queue this before their Start / Finish / Skip
+ *  when they aren't, so the write that follows is allowed. */
+export async function enqueueJoinVisit(visitId: string, employeeId: string, label?: string) {
+  await enqueueMutation('assign_crew', { visitId, employeeId, action: 'add' }, label)
+}
+
 /** Retries before a mutation is parked as 'failed' and shown in "Changes that didn't save". */
 const MAX_ATTEMPTS = 5
 
@@ -299,7 +313,9 @@ export async function flushMutationQueue(): Promise<FlushResult> {
             .from('visits')
             .update({ started_at: p.startedAt, ended_at: null })
             .eq('id', p.visitId)
+            .select('id')
             .throwOnError()
+            .then(expectVisitRow)
           break
         }
         case 'job_discard': {
@@ -310,7 +326,9 @@ export async function flushMutationQueue(): Promise<FlushResult> {
             .from('visits')
             .update({ started_at: null })
             .eq('id', p.visitId)
+            .select('id')
             .throwOnError()
+            .then(expectVisitRow)
           break
         }
         case 'completion': {
@@ -331,7 +349,9 @@ export async function flushMutationQueue(): Promise<FlushResult> {
               skip_reason: null,
             })
             .eq('id', p.visitId)
+            .select('id')
             .throwOnError()
+            .then(expectVisitRow)
           // Replace all completed rows (delete then insert): idempotent for first logs and edits.
           await supabase
             .from('visit_crew')
@@ -365,7 +385,9 @@ export async function flushMutationQueue(): Promise<FlushResult> {
               ...(p.endedAt ? { ended_at: p.endedAt } : {}),
             })
             .eq('id', p.visitId)
+            .select('id')
             .throwOnError()
+            .then(expectVisitRow)
           break
         }
         case 'photo':
@@ -440,7 +462,9 @@ export async function flushMutationQueue(): Promise<FlushResult> {
             .from('visits')
             .update({ vehicle_id: p.vehicleId })
             .eq('id', p.visitId)
+            .select('id')
             .throwOnError()
+            .then(expectVisitRow)
           break
         }
         case 'set_planned_date': {
@@ -449,7 +473,9 @@ export async function flushMutationQueue(): Promise<FlushResult> {
             .from('visits')
             .update({ planned_date: p.plannedDate })
             .eq('id', p.visitId)
+            .select('id')
             .throwOnError()
+            .then(expectVisitRow)
           break
         }
         case 'crew_instruction': {
@@ -458,7 +484,9 @@ export async function flushMutationQueue(): Promise<FlushResult> {
             .from('visits')
             .update({ crew_instruction: p.instruction })
             .eq('id', p.visitId)
+            .select('id')
             .throwOnError()
+            .then(expectVisitRow)
           break
         }
         case 'revert_status': {
@@ -467,7 +495,9 @@ export async function flushMutationQueue(): Promise<FlushResult> {
             .from('visits')
             .update({ status: 'scheduled', skip_reason: null })
             .eq('id', p.visitId)
+            .select('id')
             .throwOnError()
+            .then(expectVisitRow)
           break
         }
         case 'property_notes': {

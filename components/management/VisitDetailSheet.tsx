@@ -17,10 +17,12 @@ import {
 import { Button } from '@/components/ui/button'
 import { VisitDetailContent } from '@/components/VisitDetailContent'
 import { VisitLogger } from '@/components/crew/VisitLogger'
+import { StopActions } from '@/components/crew/StopActions'
+import { useCan, useRole } from '@/components/app/RoleProvider'
 import { SkipSheet } from '@/components/crew/SkipSheet'
 import { useStopDetail, type StopDetail } from '@/hooks/crew/useStopDetail'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
-import { isVisitInProgress } from '@/lib/utils/visits'
+import { isVisitInProgress, mustJoinVisit } from '@/lib/utils/visits'
 import { useApplyVisitUpdate } from '@/hooks/useManagementSchedule'
 import type { SchedulePropertyRow, VisitWithCrew } from '@/types/app'
 import { emitTourEvent } from '@/lib/onboarding/events'
@@ -157,6 +159,8 @@ export function VisitDetailSheet({
     setPhotoViewerOpen(open)
   }
   const { data: currentEmployee } = useCurrentEmployee()
+  const { editCompletion: canLogWork } = useCan()
+  const { role } = useRole()
 
   function handleOpenChange(next: boolean) {
     // The stacked lightbox's close reaches this sheet as an outside interaction; ignore it.
@@ -172,6 +176,7 @@ export function VisitDetailSheet({
   // could be missing these arrays even though StopDetail declares them required.
   const assignedCrew = data.assignedCrew ?? []
   const completedBy = data.completedBy ?? []
+  const joinFirst = mustJoinVisit(role, currentEmployee?.id, [...assignedCrew, ...completedBy])
 
   // Full Mon–Sun span, not just the start date — the owner is placing this visit
   // in a week, and a lone start date makes them do the arithmetic.
@@ -225,6 +230,19 @@ export function VisitDetailSheet({
     </>
   )
 
+  // Start / Finish / Skip, for anyone who logs work (not the accountant).
+  const actions = canLogWork ? (
+    <StopActions
+      key={data.visitId}
+      visitId={data.visitId}
+      visit={data.visit}
+      label={row.property.address}
+      joinFirst={joinFirst}
+      onFinish={() => setCompletionOpen(true)}
+      onSkip={() => setSkipOpen(true)}
+    />
+  ) : null
+
   const body = (
     <>
       {historyVisit && openedRow.visit && (
@@ -273,6 +291,7 @@ export function VisitDetailSheet({
           <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
             {body}
           </div>
+          {actions && <div className="shrink-0 border-t border-border px-5 py-3">{actions}</div>}
         </section>
       ) : (
         <Sheet open={open} onOpenChange={handleOpenChange}>
@@ -293,11 +312,13 @@ export function VisitDetailSheet({
             {/* Right-side sheets don't pad for the home indicator on a phone; the bottom variant
                does. */}
             <SheetFooter className="px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] border-t border-border shrink-0">
-              <SheetClose asChild>
-                <Button type="button" variant="outline" className="w-full sm:w-auto">
-                  Close
-                </Button>
-              </SheetClose>
+              {actions ?? (
+                <SheetClose asChild>
+                  <Button type="button" variant="outline" className="w-full sm:w-auto">
+                    Close
+                  </Button>
+                </SheetClose>
+              )}
             </SheetFooter>
           </SheetContent>
         </Sheet>
@@ -314,6 +335,7 @@ export function VisitDetailSheet({
         initialCompletionNote={data.visit.completion_note ?? undefined}
         initialPhotos={data.photos.filter((p) => p.type === 'visit')}
         initialPresentIds={completedBy.length > 0 ? completedBy.map((c) => c.employee_id) : undefined}
+        joinFirst={joinFirst}
         open={completionOpen}
         onOpenChange={setCompletionOpen}
         onSuccess={() => handleOpenChange(false)}
@@ -324,6 +346,7 @@ export function VisitDetailSheet({
         employeeId={currentEmployee?.id ?? ''}
         inProgress={isVisitInProgress({ started_at: data.visit.started_at, ended_at: data.visit.ended_at })}
         initialSkipReason={data.visit.skip_reason ?? undefined}
+        joinFirst={joinFirst}
         open={skipOpen}
         onOpenChange={setSkipOpen}
         onSuccess={() => handleOpenChange(false)}

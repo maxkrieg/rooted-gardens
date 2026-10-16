@@ -55,3 +55,12 @@ export function displayCrewFor(visit: VisitWithCrew): Employee[] {
   const completed = pick('completed')
   return visit.status === 'completed' && completed.length > 0 ? completed : pick('assigned')
 }
+
+/** Crew must be on a stop (assigned or credited) before the database lets them save to it. */
+export function mustJoinVisit(
+  role: string | null | undefined,
+  employeeId: string | null | undefined,
+  crew: Array<{ employee_id: string }>,
+): boolean {
+  return role === 'crew' && !!employeeId && !crew.some((c) => c.employee_id === employeeId)
+}

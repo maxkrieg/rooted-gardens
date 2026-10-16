@@ -12,7 +12,7 @@ import {
   SheetTitle,
   SheetFooter,
 } from '@/components/ui/sheet'
-import { enqueueMutation, flushMutationQueue } from '@/lib/offline/mutation-queue'
+import { enqueueJoinVisit, enqueueMutation, flushMutationQueue } from '@/lib/offline/mutation-queue'
 import { nextVisitVersion } from '@/lib/utils/visits'
 import { patchScheduleVisit } from '@/hooks/useManagementSchedule'
 import type { StopDetail } from '@/hooks/crew/useStopDetail'
@@ -26,6 +26,8 @@ interface SkipSheetProps {
   // Whether the visit is currently in progress — skipping stops the on-site clock.
   inProgress?: boolean
   initialSkipReason?: string
+  /** Crew who aren't on this stop yet: add them first, or the database refuses the save. */
+  joinFirst?: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
@@ -37,6 +39,7 @@ export function SkipSheet({
   label,
   inProgress,
   initialSkipReason,
+  joinFirst = false,
   open,
   onOpenChange,
   onSuccess,
@@ -54,6 +57,7 @@ export function SkipSheet({
 
     const endedAt = new Date().toISOString()
 
+    if (joinFirst) await enqueueJoinVisit(visitId, employeeId, label)
     await enqueueMutation(
       'skip',
       {

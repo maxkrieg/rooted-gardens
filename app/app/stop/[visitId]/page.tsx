@@ -1,22 +1,20 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useQueryClient } from '@tanstack/react-query'
 import { addDays, format, parseISO } from 'date-fns'
-import { toast } from 'sonner'
-import { ArrowLeft, CalendarDays, Play, Flag, SkipForward, Check, RotateCcw } from 'lucide-react'
+import { ArrowLeft, CalendarDays } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { VisitDetailContent } from '@/components/VisitDetailContent'
-import { useCan } from '@/components/app/RoleProvider'
+import { useCan, useRole } from '@/components/app/RoleProvider'
 import { useKeyboardOpen } from '@/hooks/use-keyboard-open'
-import { useStopDetail, type StopDetail } from '@/hooks/crew/useStopDetail'
+import { useStopDetail } from '@/hooks/crew/useStopDetail'
 import { useCurrentEmployee } from '@/hooks/crew/useCurrentEmployee'
 import { VisitLogger } from '@/components/crew/VisitLogger'
 import { SkipSheet } from '@/components/crew/SkipSheet'
-import { isVisitInProgress, formatElapsed } from '@/lib/utils/visits'
-import { enqueueMutation, flushMutationQueue } from '@/lib/offline/mutation-queue'
+import { isVisitInProgress, mustJoinVisit } from '@/lib/utils/visits'
+import { StopActions } from '@/components/crew/StopActions'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
@@ -48,13 +46,12 @@ function LoadingSkeleton() {
 export default function StopDetailPage() {
   const { visitId } = useParams<{ visitId: string }>()
   const router = useRouter()
-  const queryClient = useQueryClient()
   const { data: stop, isLoading, isError, refetch } = useStopDetail(visitId)
   const { data: employee } = useCurrentEmployee()
   const { editSchedule: canManage, seeDashboard } = useCan()
+  const { role } = useRole()
   const [completionOpen, setCompletionOpen] = useState(false)
   const [skipOpen, setSkipOpen] = useState(false)
-  const [confirmDiscard, setConfirmDiscard] = useState(false)
   const keyboardOpen = useKeyboardOpen()
 
   // A stop is often a cold entry point (PWA launch, shared link) with no history to go back to.
@@ -63,23 +60,9 @@ export default function StopDetailPage() {
     else router.replace('/app/schedule')
   }, [router])
 
-  // Optimistic start so the Start cell flips to a running timer immediately, before
-  // the queued visit update syncs. Real data (visit.started_at) takes over once present.
-  const [optimisticStartedAt, setOptimisticStartedAt] = useState<string | null>(null)
-
-  // Re-render every 30s so the running duration on the Start cell stays current.
-  const [, setTick] = useState(0)
-  useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 30_000)
-    return () => clearInterval(id)
-  }, [])
-
-  // On-site timing now lives on the visit row. Prefer real data; fall back to the
-  // optimistic start until the queued update syncs back.
-  const visitStartedAt = stop?.visit.started_at ?? optimisticStartedAt ?? null
-  const visitEndedAt = stop?.visit.ended_at ?? null
-  const inProgress = isVisitInProgress({ started_at: visitStartedAt, ended_at: visitEndedAt })
-  // confirmDiscard is only read while inProgress, so a stale `true` never renders.
+  // StopActions patches stop-detail optimistically on Start/Discard, so this is current.
+  const visitStartedAt = stop?.visit.started_at ?? null
+  const inProgress = isVisitInProgress({ started_at: visitStartedAt, ended_at: stop?.visit.ended_at ?? null })
 
   if (isLoading && !stop) return <LoadingSkeleton />
 
@@ -110,37 +93,10 @@ export default function StopDetailPage() {
   }
 
   const { visit, account } = stop
-  const isActive = visit.status !== 'completed' && visit.status !== 'skipped'
-
+  const joinFirst = mustJoinVisit(role, employee?.id, [...(stop.assignedCrew ?? []), ...(stop.completedBy ?? [])])
   // The visit's week, weekday-anchored ("Mon … Sun") so the boundaries are unambiguous.
   const weekStartDate = parseISO(visit.week_start)
   const weekRange = `${format(weekStartDate, 'EEE MMM d')} – ${format(addDays(weekStartDate, 6), 'EEE MMM d')}`
-
-  async function handleStart() {
-    if (!employee?.id || inProgress) return
-    const startedAt = new Date().toISOString()
-    setOptimisticStartedAt(startedAt)
-    await enqueueMutation('job_start', { visitId, startedAt }, stop?.property.address)
-    const result = await flushMutationQueue()
-    if (result.failed > 0) toast.error('Could not start the timer. Try again.')
-    queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
-    queryClient.invalidateQueries({ queryKey: ['schedule-visits'] })
-  }
-
-  async function handleDiscard() {
-    if (!employee?.id || !inProgress) return
-    setConfirmDiscard(false)
-    // Clear the optimistic start too, or the timer resurrects when started_at comes back null.
-    setOptimisticStartedAt(null)
-    queryClient.setQueryData<StopDetail | null>(['stop-detail', visitId], (old) =>
-      old ? { ...old, visit: { ...old.visit, started_at: null } } : old
-    )
-    await enqueueMutation('job_discard', { visitId }, stop?.property.address)
-    const result = await flushMutationQueue()
-    if (result.failed > 0) toast.error('Could not discard the start time. Try again.')
-    queryClient.invalidateQueries({ queryKey: ['stop-detail', visitId] })
-    queryClient.invalidateQueries({ queryKey: ['schedule-visits'] })
-  }
 
   return (
     <>
@@ -195,100 +151,14 @@ export default function StopDetailPage() {
         className="fixed inset-x-0 z-40 bg-background/95 backdrop-blur border-t border-[--border] px-4 pt-2 pb-2"
         style={{ bottom: keyboardOpen ? '0px' : 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }}
       >
-        {/* On-site line — stays visible above the button row once Start has been
-            tapped, independent of whether the Discard cell is mid-confirm. */}
-        {inProgress && visitStartedAt && (
-          <div className="flex items-center gap-1.5 pb-2" style={{ color: 'var(--clay)' }}>
-            <span className="relative flex h-2 w-2 shrink-0">
-              <span
-                className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
-                style={{ backgroundColor: 'var(--clay)' }}
-              />
-              <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: 'var(--clay)' }} />
-            </span>
-            <span className="text-xs font-semibold uppercase tracking-wide">
-              On site · {formatElapsed(visitStartedAt)}
-            </span>
-          </div>
-        )}
-
-        <div className="flex items-stretch gap-2">
-          {/* Start — flips to Discard once started, with an inline confirm step */}
-          {inProgress ? (
-            confirmDiscard ? (
-              <div className="flex-1 flex flex-col gap-1 min-h-[60px]">
-                <button
-                  type="button"
-                  className="flex-1 rounded-lg border text-xs font-semibold uppercase tracking-wide transition-colors active:bg-accent/10"
-                  style={{ borderColor: 'var(--clay)', color: 'var(--clay)' }}
-                  onClick={handleDiscard}
-                >
-                  Confirm
-                </button>
-                <button
-                  type="button"
-                  className="flex-1 rounded-lg border border-[--border] bg-card text-xs font-medium text-muted-foreground active:bg-accent/40 transition-colors"
-                  onClick={() => setConfirmDiscard(false)}
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                className="flex-1 flex flex-col items-center justify-center gap-1 rounded-lg border min-h-[60px] py-2 active:bg-accent/10 transition-colors"
-                style={{ borderColor: 'var(--clay)', color: 'var(--clay)' }}
-                onClick={() => setConfirmDiscard(true)}
-              >
-                <RotateCcw className="h-5 w-5" />
-                <span className="text-xs font-medium">Discard</span>
-              </button>
-            )
-          ) : (
-            <button
-              type="button"
-              className="flex-1 flex flex-col items-center justify-center gap-1 rounded-lg border border-[--border] bg-card min-h-[60px] py-2 active:bg-accent/40 disabled:opacity-40 transition-colors"
-              onClick={handleStart}
-              disabled={!isActive}
-            >
-              <Play className="h-5 w-5" style={{ color: 'var(--primary)' }} />
-              <span className="text-xs font-medium text-foreground">Start</span>
-            </button>
-          )}
-
-          {/* Finish — opens the completion form, which also closes the session */}
-          <button
-            type="button"
-            className="flex-1 flex flex-col items-center justify-center gap-1 rounded-lg border border-[--border] bg-card min-h-[60px] py-2 active:bg-accent/40 disabled:opacity-40 transition-colors"
-            onClick={() => setCompletionOpen(true)}
-            disabled={visit.status === 'completed'}
-          >
-            {visit.status === 'completed' ? (
-              <>
-                <Check className="h-5 w-5" style={{ color: 'var(--primary)' }} />
-                <span className="text-xs font-medium text-foreground">Done</span>
-              </>
-            ) : (
-              <>
-                <Flag className="h-5 w-5 text-foreground" />
-                <span className="text-xs font-medium text-foreground">Finish</span>
-              </>
-            )}
-          </button>
-
-          {/* Skip */}
-          <button
-            type="button"
-            className="flex-1 flex flex-col items-center justify-center gap-1 rounded-lg border border-[--border] bg-card min-h-[60px] py-2 active:bg-accent/40 disabled:opacity-40 transition-colors"
-            onClick={() => setSkipOpen(true)}
-            disabled={visit.status === 'skipped'}
-          >
-            <SkipForward className="h-5 w-5 text-muted-foreground" />
-            <span className="text-xs font-medium text-foreground">
-              {visit.status === 'skipped' ? 'Skipped' : 'Skip'}
-            </span>
-          </button>
-        </div>
+        <StopActions
+          visitId={visitId}
+          visit={visit}
+          label={stop.property.address}
+          joinFirst={joinFirst}
+          onFinish={() => setCompletionOpen(true)}
+          onSkip={() => setSkipOpen(true)}
+        />
       </div>
 
       <VisitLogger
@@ -307,6 +177,7 @@ export default function StopDetailPage() {
             ? stop.completedBy.map((c) => c.employee_id)
             : undefined
         }
+        joinFirst={joinFirst}
         open={completionOpen}
         onOpenChange={setCompletionOpen}
         onSuccess={() => router.replace('/app/schedule')}
@@ -318,6 +189,7 @@ export default function StopDetailPage() {
         label={stop.property.address}
         inProgress={inProgress}
         initialSkipReason={visit.skip_reason ?? undefined}
+        joinFirst={joinFirst}
         open={skipOpen}
         onOpenChange={setSkipOpen}
         onSuccess={() => router.replace('/app/schedule')}
