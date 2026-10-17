@@ -21,7 +21,6 @@ import {
 import type { Capabilities } from '@/lib/auth/access'
 import { TourRunner } from '@/components/onboarding/TourRunner'
 import { WelcomeTakeover } from '@/components/onboarding/WelcomeTakeover'
-import { HelpSheet } from '@/components/onboarding/HelpSheet'
 import { NewsBeacons } from '@/components/onboarding/NewsBeacons'
 
 export type TourStatus = 'new' | 'updated' | 'done' | 'dismissed'
@@ -44,7 +43,8 @@ interface OnboardingContextValue {
   dismissChecklist: () => void
   checklistDismissed: boolean
   showNews: (item: NewsItem) => void
-  openHelp: () => void
+  /** This role has a welcome to replay. */
+  hasWelcome: boolean
   showWelcome: () => void
 }
 
@@ -79,7 +79,6 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const [activeTourKey, setActiveTourKey] = useState<string | null>(null)
   const [activeNews, setActiveNews] = useState<NewsItem | null>(null)
   const [welcomeForced, setWelcomeForced] = useState(false)
-  const [helpOpen, setHelpOpen] = useState(false)
 
   const progress = useMemo(() => progressData ?? {}, [progressData])
   // Nothing pops up or ticks while a super admin is impersonating: it would spend the real
@@ -150,7 +149,6 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     (key: string) => {
       const tour = findTour(key)
       if (!tour) return
-      setHelpOpen(false)
       setActiveNews(null)
       if (!pathname.startsWith(tour.route)) router.push(tour.route)
       setActiveTourKey(key)
@@ -205,7 +203,6 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     dismissChecklist: () => mark({ key: CHECKLIST_KEY, state: 'dismissed' }),
     checklistDismissed: !!progress[CHECKLIST_KEY],
     showNews: (item) => {
-      setHelpOpen(false)
       if (item.route && item.anchor) {
         if (!pathname.startsWith(item.route)) router.push(item.route)
         setActiveNews(item)
@@ -213,9 +210,8 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         mark({ key: item.key, state: 'seen' })
       }
     },
-    openHelp: () => setHelpOpen(true),
+    hasWelcome: !!welcome,
     showWelcome: () => {
-      setHelpOpen(false)
       setWelcomeForced(true)
     },
   }
@@ -272,7 +268,6 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         <NewsBeacons items={beaconItems} onOpen={setActiveNews} />
       )}
 
-      <HelpSheet open={helpOpen} onOpenChange={setHelpOpen} isWide={isWide} />
     </OnboardingContext.Provider>
   )
 }

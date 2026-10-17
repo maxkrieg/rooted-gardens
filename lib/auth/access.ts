@@ -20,6 +20,7 @@ const ROUTE_ACCESS: Array<{ prefix: string; roles: readonly EmployeeRole[] }> = 
   { prefix: '/app/stop', roles: ['owner', 'lead', 'crew'] },
   { prefix: '/app/accounts', roles: ['owner', 'lead', 'accountant'] },
   { prefix: '/app/routes', roles: ['owner', 'lead', 'accountant'] },
+  { prefix: '/app/help', roles: ['owner', 'lead', 'crew', 'accountant'] },
   // Retired, but listed so the redirect to ?view=today isn't gated
   // away before next.config gets to it.
   { prefix: '/app/dashboard', roles: ['owner', 'lead', 'accountant'] },

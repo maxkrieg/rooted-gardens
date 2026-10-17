@@ -5,9 +5,10 @@ side effect a person wouldn't guess. See `CLAUDE.md` for stack, schema and conve
 the source of truth wherever this file is silent.
 
 > **Status:** planned 2026-10-15. H0 (this doc) done 2026-10-15.
+> H1 done 2026-10-17 (the trio + `check:tours` pass; the in-app checks under Verify are still to run).
 >
 > - [x] **H0**: plan, information architecture, rule inventory (this file)
-> - [ ] **H1**: scaffolding: the page, the data model, absorb the Help & tours sheet
+> - [x] **H1**: scaffolding: the page, the data model, absorb the Help & tours sheet
 > - [ ] **H2**: content: schedule, planning, routes, stops, offline
 > - [ ] **H3**: content: accounts, billing, leads, team, audit/reports/fleet, FAQ
 > - [ ] **H4**: wiring outward: "How this works" links, ⌘K, the help-key check
@@ -201,7 +202,35 @@ Help & tours entry point opens it, and the sheet is gone.
 - The NEWS dot still shows on the nav item.
 - `npm run build && npm start`: visit Help, go offline, reload, and the page renders.
 
-**As built — deviations:** _(fill in)_
+**As built — deviations:**
+- **No `NAV_ITEMS` entry.** It would have put Help in the sidebar's main list *and* kept the
+  footer button, giving two entries. Instead the existing entries became links to `/app/help`:
+  the sidebar footer button (still `data-tour="nav.help"`, ochre dot) and the More row ("New"
+  pill). Both label it "Help" and show as active on the page. `ROUTE_ACCESS` lists `/app/help`
+  for all four roles.
+- **`openHelp` is removed from the onboarding context**, not repointed: nothing called it once
+  the entries became links. `hasWelcome` was added so the strip shows "Show the welcome again"
+  only to roles that have a welcome (owner/lead today).
+- **The strip is an accordion** of Tours / Getting started (`n of m done`) / What's new
+  (`n new`), not three always-open lists, so the guide stays near the top on a phone. What's
+  new opens by default when something is due, and it lists newest first (the sheet listed
+  oldest first).
+- Icons in `lib/help/topics.ts` are string keys (`HelpIcon`), mapped to lucide components in
+  `HelpView`, so the data file stays React-free.
+- **Section roles:** Schedule, Team & roles, and FAQ are open to every role; their topics
+  narrow with `topic.roles` (H2/H3). `helpFor` drops sections with no visible topics, so crew
+  see only Start here today.
+- Hash handling: `#key` opens and scrolls on the first frame after mount (server HTML has
+  everything closed, so opening during render would mismatch hydration) and on every
+  `hashchange`. Opening a topic writes its hash with `replaceState`. Related links are plain
+  `#key` anchors, filtered to topics the role can see.
+- The `help-mobile`/`help-desktop` tour step copy now says "Help" (copy only, no bump).
+  NEWS `news.helpGuide` (all roles, 2026-10-17, no anchor) announces the page.
+- CLAUDE.md: the Onboarding section points to the Help page and states the rule that a changed
+  rule updates its topic in the same change. The repo map lists `help/page.tsx`.
+- Not done: the in-app Verify checks (role filtering via impersonation, deep link, offline
+  reload on a prod build). Per the standing preference, they weren't run in the browser.
+
 
 ---
 

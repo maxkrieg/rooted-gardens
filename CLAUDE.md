@@ -138,7 +138,8 @@ rooted-gardens/
 │   │   │   ├── accounts/
 │   │   │   │   ├── page.tsx         ← account list
 │   │   │   │   └── [id]/page.tsx    ← account detail
-│   │   │   └── routes/page.tsx      ← route groups + their defaults
+│   │   │   ├── routes/page.tsx      ← route groups + their defaults
+│   │   │   └── help/page.tsx        ← the Help guide + tours/What's new (all roles)
 │   │   └── stop/[visitId]/      ← one stop: log completion, start/stop, photos.
 │   │       └── page.tsx             Outside (padded) — it owns its own chrome.
 │   ├── admin/
@@ -1044,8 +1045,14 @@ designed as in-app only, and they are built and working.)
 `lib/onboarding/registry.ts` holds everything the app teaches, as data: per-role welcome
 slides, spotlight tours on the real screens, the Getting started checklist, and `NEWS`.
 `OnboardingProvider` (mounted by `AppShell`) decides what to show, and never shows more than
-one thing at a time. Progress lives in `onboarding_progress`. Help & tours is in More on a
-phone and in the sidebar on desktop.
+one thing at a time. Progress lives in `onboarding_progress`. The tours, checklist and What's
+new sit at the top of the **Help page** (`/app/help`, every role), which is in More on a phone
+and in the sidebar footer on desktop.
+
+**The Help guide** (`lib/help/topics.ts`, rendered by `components/help/HelpView.tsx`) explains
+how features really work, role-filtered and deep-linkable (`/app/help#topic-key`). **When you
+change a rule a topic documents, update the topic in the same change**: help that describes
+behavior the code no longer has is worse than none. Phases and the rule inventory: `HELP_PAGE.md`.
 
 - Tours point at elements by `data-tour="…"`. Both schedule layouts stay mounted, so the
   runner uses the first *visible* match. `npm run check:tours` fails if an anchor has no match.

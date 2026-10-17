@@ -259,14 +259,14 @@ export const TOURS: Tour[] = [
         anchor: 'nav.more',
         breakpoint: 'mobile',
         title: 'Replay any time',
-        body: 'More → Help & tours has this tour, the others, and what’s new.',
+        body: 'More → Help has this tour, the others, what’s new, and a guide to how everything works.',
       },
       {
         id: 'help-desktop',
         anchor: 'nav.help',
         breakpoint: 'desktop',
         title: 'Replay any time',
-        body: 'Help & tours has this tour, the others, and what’s new.',
+        body: 'Help has this tour, the others, what’s new, and a guide to how everything works.',
       },
     ],
   },
@@ -504,6 +504,13 @@ export const NEWS: NewsItem[] = [
     body: 'Plan tomorrow, under Running today, lists what’s left this week with no day or carried over, most overdue first. Tick tomorrow’s stops and put them on the day.',
     route: '/app/schedule',
     anchor: 'today.planDay',
+  },
+  {
+    key: 'news.helpGuide',
+    roles: ['owner', 'lead', 'crew', 'accountant'],
+    introduced: '2026-10-17',
+    title: 'A Help guide you can come back to',
+    body: 'Help is now a page: how the schedule, routes, stops and billing really work, with the side effects nobody would guess. Search it, or share a link to a topic. Tours and What’s new moved there too.',
   },
 ]
 

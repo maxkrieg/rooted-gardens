@@ -17,7 +17,6 @@ interface MoreSheetProps {
   counts: Record<string, number>
   /** Omitted for a role that can't open an account — the palette only finds those. */
   onOpenSearch?: () => void
-  onOpenHelp: () => void
   /** Unseen What's new items. */
   helpBadge: number
   onSignOut: () => void
@@ -31,7 +30,6 @@ export function MoreSheet({
   pathname,
   counts,
   onOpenSearch,
-  onOpenHelp,
   helpBadge,
   onSignOut,
 }: MoreSheetProps) {
@@ -144,16 +142,17 @@ export function MoreSheet({
               </span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                onOpenChange(false)
-                onOpenHelp()
-              }}
-              className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            <Link
+              href="/app/help"
+              onClick={() => onOpenChange(false)}
+              aria-current={pathname === '/app/help' ? 'page' : undefined}
+              className={cn(
+                'flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
+                pathname === '/app/help' && 'bg-accent text-[var(--accent-foreground)]',
+              )}
             >
               <CircleHelp className="h-[18px] w-[18px] shrink-0" />
-              <span className="flex-1 text-left">Help &amp; tours</span>
+              <span className="flex-1 text-left">Help</span>
               {helpBadge > 0 && (
                 <span
                   className="shrink-0 rounded-full bg-[var(--ochre)]/20 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#9A6B16]"
@@ -162,7 +161,7 @@ export function MoreSheet({
                   New
                 </span>
               )}
-            </button>
+            </Link>
 
             <button
               type="button"

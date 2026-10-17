@@ -80,7 +80,8 @@ function AppShellInner({
   const router = useRouter()
   const queryClient = useQueryClient()
   const { role, employeeId, can, impersonating } = useRole()
-  const { openHelp, dueNewsCount } = useOnboarding()
+  const { dueNewsCount } = useOnboarding()
+  const isHelpActive = pathname === '/app/help'
   const { data: employee, isError: employeeError } = useCurrentEmployee()
   const [moreOpen, setMoreOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
@@ -219,19 +220,23 @@ function AppShellInner({
         <SidebarLinks pathname={pathname} items={all} counts={counts} />
         <div className="border-t border-border px-3 pt-3 pb-3 shrink-0">
           <Button
+            asChild
             variant="ghost"
-            data-tour="nav.help"
-            className="relative mb-1 w-full justify-start gap-2 px-2 text-sm text-muted-foreground hover:text-foreground"
-            onClick={openHelp}
-          >
-            <CircleHelp className="h-4 w-4 shrink-0" />
-            Help &amp; tours
-            {dueNewsCount > 0 && (
-              <span
-                className="ml-auto h-2 w-2 rounded-full bg-[var(--ochre)]"
-                aria-label={`${dueNewsCount} new`}
-              />
+            className={cn(
+              'relative mb-1 w-full justify-start gap-2 px-2 text-sm text-muted-foreground hover:text-foreground',
+              isHelpActive && 'bg-accent text-[var(--accent-foreground)]',
             )}
+          >
+            <Link href="/app/help" data-tour="nav.help" aria-current={isHelpActive ? 'page' : undefined}>
+              <CircleHelp className="h-4 w-4 shrink-0" />
+              Help
+              {dueNewsCount > 0 && (
+                <span
+                  className="ml-auto h-2 w-2 rounded-full bg-[var(--ochre)]"
+                  aria-label={`${dueNewsCount} new`}
+                />
+              )}
+            </Link>
           </Button>
           {userEmail && (
             <p className="text-xs text-muted-foreground truncate px-1 mb-2" title={userEmail}>
@@ -322,7 +327,6 @@ function AppShellInner({
         pathname={pathname}
         counts={counts}
         onOpenSearch={canSearch ? () => setPaletteOpen(true) : undefined}
-        onOpenHelp={openHelp}
         helpBadge={dueNewsCount}
         onSignOut={handleSignOut}
       />
