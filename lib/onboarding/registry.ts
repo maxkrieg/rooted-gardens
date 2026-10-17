@@ -283,7 +283,7 @@ export const TOURS: Tour[] = [
         id: 'unrouted',
         anchor: 'routes.unrouted',
         title: 'Not on a route',
-        body: 'These properties are left out when you generate a week. Pick a route for each.',
+        body: 'These still get scheduled, but with no route’s days, truck or crew. Pick a route for each.',
       },
       {
         id: 'card',

@@ -6,10 +6,11 @@ the source of truth wherever this file is silent.
 
 > **Status:** planned 2026-10-15. H0 (this doc) done 2026-10-15.
 > H1 done 2026-10-17 (the trio + `check:tours` pass; the in-app checks under Verify are still to run).
+> H2 done 2026-10-17 (the trio + `check:tours` pass; the read-through by role is still to run).
 >
 > - [x] **H0**: plan, information architecture, rule inventory (this file)
 > - [x] **H1**: scaffolding: the page, the data model, absorb the Help & tours sheet
-> - [ ] **H2**: content: schedule, planning, routes, stops, offline
+> - [x] **H2**: content: schedule, planning, routes, stops, offline
 > - [ ] **H3**: content: accounts, billing, leads, team, audit/reports/fleet, FAQ
 > - [ ] **H4**: wiring outward: "How this works" links, ⌘K, the help-key check
 >
@@ -264,7 +265,46 @@ connection", not "online-only mutation".
 - Read the page as crew and as owner on a phone width: no topic references a control that
   role can't see.
 
-**As built — deviations:** _(fill in)_
+**As built — deviations:**
+- **49 topics** in `lib/help/topics.ts`: 48 new for sections 1–5 and 10, plus the billing
+  sample kept for H3. Owner/lead see 47, crew 21, accountant 18. Every `related` and `tour`
+  key resolves (checked with a throwaway script; H4 makes that part of `check:tours`).
+- **Role tags.** New `FIELD` (owner/lead/crew) covers stop work: the accountant can't open
+  `/app/stop`. Today topics (`today-vs-week`, `needs-you`, `running-today`, `from-the-field`)
+  are owner/lead/accountant, since `seeDashboard` includes the accountant. Crew-only:
+  `crew-week`, `fixing-the-plan-on-site`. Routes topics that describe editing (defaults,
+  drive order, unrouted, delete, one route per property) are `OFFICE`. That leaves the
+  accountant `what-a-route-is` in Routes. `route-days-dont-move-stops` moved to `OFFICE` too,
+  because it names Select stops and Plan tomorrow.
+- **Offline split.** `what-works-offline` (FIELD) lists only stop work. Office planning
+  offline vs. needs-a-connection is one OFFICE topic, `what-needs-a-connection` ("Planning
+  with no signal"), so crew never read about controls they don't have.
+- **Code vs inventory (the code won):**
+  - Unrouted properties are **not** left out of Generate. They're candidates under "Not on a
+    route" with no defaults. The Routes tour's `unrouted` step and the Unrouted panel's
+    caption said otherwise; both copy lines are fixed (copy only, no tour bump).
+  - #74: stops added on another device show up live **for the current week**.
+    `useCrewRealtimeSync` invalidates on any `visits` change that week. Only other weeks need
+    a reload.
+  - #59: Log Completion now requires a Start time. With no Start tap, it pre-fills the same as
+    End, so time on site is 0 unless edited. That's the old "0 minutes", reached differently.
+  - The board has no global **S** key. S schedules the focused unscheduled row in the route
+    list, so it's documented in `taking-a-stop-off` (OFFICE), not `desktop-board`.
+  - Reverting to Scheduled keeps the services and note, and Log Completion pre-fills them on
+    the next finish (`initialServiceTypes`/`initialCompletionNote`).
+- **Left out pending Possible bugs** (none resolved yet, so none are written as rules):
+  - B1: skip/due is stated only for "a stop skipped before anyone started it".
+  - B2: no claim about bulk Skip on an on-site stop.
+  - B3: nothing about what re-saving a completion does to its date.
+  - B4: no claim about where a newly routed property lands in drive order.
+  - B5: no mention of generating past or overlapping weeks.
+  - B6: no mention of account status in Generate.
+  - B7: As needed is described only by its preview reason ("schedule by hand"), with no
+    interval interplay.
+  - B15: no route-rename or sort-order topic.
+  - B16: no claim about inactive crew or retired trucks in defaults.
+- Not done: the Verify read-through by role at phone width (per the standing preference, no
+  browser run).
 
 ---
 

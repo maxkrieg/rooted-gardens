@@ -205,7 +205,7 @@ export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
               Not on a route
             </p>
             <p className="text-sm text-muted-foreground mt-0.5">
-              These are skipped on the schedule until they&apos;re on a route.
+              They still get scheduled, under “Not on a route”, but without a route&apos;s truck, crew or days.
             </p>
           </div>
         </div>
