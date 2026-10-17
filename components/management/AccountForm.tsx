@@ -27,6 +27,7 @@ import { createAccount, updateAccount } from '@/app/app/(padded)/accounts/action
 import { useRefreshAccounts } from '@/hooks/useAccounts'
 import { accountFormSchema, type AccountFormValues } from '@/lib/validators/account'
 import type { Account } from '@/types/app'
+import { HelpLink } from '@/components/help/HelpLink'
 
 interface AccountFormProps {
   /** Called on successful save — used by the parent Sheet to close itself. */
@@ -270,7 +271,10 @@ export function AccountForm({ onSuccess, account, defaults, onCreate }: AccountF
           name="billing_type"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Billing type <span className="text-destructive">*</span></FormLabel>
+              <div className="flex items-center justify-between gap-2">
+                <FormLabel>Billing type <span className="text-destructive">*</span></FormLabel>
+                <HelpLink topic="billing-types" />
+              </div>
               <FormControl>
                 <RadioGroup
                   value={field.value}

@@ -14,6 +14,7 @@ import { useAssignPropertyRoute } from '@/hooks/useAssignPropertyRoute'
 import { useOfflineStatus } from '@/hooks/crew/useOfflineStatus'
 import type { PropertyWithAccount, RouteGroup } from '@/types/app'
 import { emitTourEvent } from '@/lib/onboarding/events'
+import { HelpLink } from '@/components/help/HelpLink'
 
 interface UnroutedPanelProps {
   properties: PropertyWithAccount[]
@@ -207,6 +208,7 @@ export function UnroutedPanel({ properties, routeGroups }: UnroutedPanelProps) {
             <p className="text-sm text-muted-foreground mt-0.5">
               They still get scheduled, under “Not on a route”, but without a route&apos;s truck, crew or days.
             </p>
+            <HelpLink topic="unrouted-properties" className="mt-1" />
           </div>
         </div>
         <span className="font-display text-2xl font-semibold text-foreground tabular-nums shrink-0">

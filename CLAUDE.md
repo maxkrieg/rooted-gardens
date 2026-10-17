@@ -113,8 +113,8 @@ rooted-gardens/
 │                                  Claude Code session per phase; check its status block.
 ├── DAY_PLANNING.md              ← visits.planned_date: which day each stop runs, D0–D4.
 │                                  SHIPPED (D0–D4) — same one-session-per-phase convention.
-├── HELP_PAGE.md                 ← the in-app guide at /app/help, H0–H4. PLANNED. Also holds the
-│                                  rule inventory and a "possible bugs" list to decide first.
+├── HELP_PAGE.md                 ← the in-app guide at /app/help, H0–H4. BUILT. Also holds the
+│                                  rule inventory and the open "possible bugs" list (B1–B16).
 ├── proxy.ts                     ← root request proxy (Next 16; auth + role gating, formerly middleware.ts)
 ├── instrumentation.ts           ← Sentry server/edge init + onRequestError
 ├── instrumentation-client.ts    ← Sentry browser init (offline transport)
@@ -1053,6 +1053,10 @@ and in the sidebar footer on desktop.
 how features really work, role-filtered and deep-linkable (`/app/help#topic-key`). **When you
 change a rule a topic documents, update the topic in the same change**: help that describes
 behavior the code no longer has is worse than none. Phases and the rule inventory: `HELP_PAGE.md`.
+`<HelpLink topic="…" />` (`components/help/HelpLink.tsx`) puts a "How this works" link on a
+confusing screen and hides itself for roles that can't read the topic. Topics are also a Help
+group in ⌘K, open to every role. `npm run check:tours` fails on any `HelpLink`, `related` or
+`tour` key that doesn't resolve.
 
 - Tours point at elements by `data-tour="…"`. Both schedule layouts stay mounted, so the
   runner uses the first *visible* match. `npm run check:tours` fails if an anchor has no match.

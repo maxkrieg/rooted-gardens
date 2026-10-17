@@ -48,6 +48,7 @@ import {
 import { formatAccountPrice } from '@/lib/utils/accounts'
 import { cn } from '@/lib/utils'
 import type { VisitWithLocation } from '@/types/app'
+import { HelpLink } from '@/components/help/HelpLink'
 
 interface InvoiceQueueProps {
   visits: VisitWithLocation[]
@@ -325,6 +326,7 @@ export function InvoiceQueue({ visits, qboConnected }: InvoiceQueueProps) {
           {!qboConnected && (
             <p className="text-xs text-muted-foreground">Connect QuickBooks above first</p>
           )}
+          <HelpLink topic="billing-queue" />
         </div>
       </div>
 

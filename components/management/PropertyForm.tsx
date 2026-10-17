@@ -26,6 +26,7 @@ import { useRefreshAccounts, useUpdatePropertyNotes } from '@/hooks/useAccounts'
 import { FREQUENCY_DEFAULT_INTERVAL_DAYS } from '@/lib/utils/cadence'
 import { propertyFormSchema, type PropertyFormValues } from '@/lib/validators/property'
 import type { Property } from '@/types/app'
+import { HelpLink } from '@/components/help/HelpLink'
 
 /** True when only notes and interval changed, which the offline queue can replay safely. */
 function isQueueableChange(property: Property, values: PropertyFormValues): boolean {
@@ -207,7 +208,9 @@ export function PropertyForm({ accountId, onSuccess, property, defaults }: Prope
                   </span>
                 </div>
               </FormControl>
-              <p className="text-xs text-muted-foreground">{intervalHelp}</p>
+              <p className="text-xs text-muted-foreground">
+                {intervalHelp} <HelpLink topic="service-interval" className="ml-1 align-middle" />
+              </p>
               <FormMessage />
             </FormItem>
           )}

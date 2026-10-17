@@ -12,6 +12,7 @@ import { useRefreshRoutes } from '@/hooks/useRoutes'
 import { useOfflineStatus } from '@/hooks/crew/useOfflineStatus'
 import { cn } from '@/lib/utils'
 import type { Employee, RouteGroup, Vehicle } from '@/types/app'
+import { HelpLink } from '@/components/help/HelpLink'
 
 const DAYS: Array<{ value: string; label: string }> = [
   { value: 'mon', label: 'Mon' },
@@ -81,6 +82,7 @@ export function RouteDefaultsSheet({
           <SheetDescription>
             Used to pre-fill a generated week. A stop&rsquo;s own crew and truck always win.
           </SheetDescription>
+          <HelpLink topic="route-defaults" className="self-start" />
         </SheetHeader>
 
         {!isOnline ? (

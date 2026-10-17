@@ -15,6 +15,7 @@ import { useBulkScheduleActions, type BulkResult } from '@/hooks/useBulkSchedule
 import { sortRowsByPriority, weekdayKey } from '@/lib/utils/schedule'
 import { UNGROUPED_SORT_KEY } from '@/lib/utils/schedule-sort'
 import type { RouteGroup, ScheduleWeek, SchedulePropertyRow } from '@/types/app'
+import { HelpLink } from '@/components/help/HelpLink'
 
 type Target = 'today' | 'tomorrow'
 
@@ -142,6 +143,7 @@ export function PlanDaySheet({ open, onOpenChange, week, today, lastVisitByPrope
           <SheetDescription className="text-[13px]">
             What&rsquo;s left this week with no day, or carried over. Most overdue first.
           </SheetDescription>
+          <HelpLink topic="plan-tomorrow" className="self-start" />
           {hasTomorrow && (
             <div role="radiogroup" aria-label="Which day" className="mt-2 grid grid-cols-2 gap-1 rounded-lg bg-secondary p-1">
               {(['today', 'tomorrow'] as const).map((value) => (

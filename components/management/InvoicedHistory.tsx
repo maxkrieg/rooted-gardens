@@ -39,6 +39,7 @@ import { pollInvoiceStatuses, refreshInvoiceStatuses } from '@/app/management/bi
 import { qboInvoiceUrl, type DateRangePreset } from '@/lib/utils/billing'
 import { cn } from '@/lib/utils'
 import type { RevenueSummary } from '@/app/management/billing/actions'
+import { HelpLink } from '@/components/help/HelpLink'
 import type {
   Account,
   EmployeeRole,
@@ -341,6 +342,7 @@ export function InvoicedHistory({
           <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
           {refreshing ? 'Refreshing…' : 'Refresh now'}
         </Button>
+        <HelpLink topic="invoice-status" />
       </div>
 
       {sorted.length === 0 ? (

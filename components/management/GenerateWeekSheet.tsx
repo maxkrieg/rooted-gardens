@@ -20,6 +20,7 @@ import { formatDays } from '@/components/management/RouteGroupBand'
 import { dayName } from '@/components/management/DayPicker'
 import { DAY_KEYS, decisionPlannedDate, weekdayKey, type PlanDecision } from '@/lib/utils/schedule'
 import { emitTourEvent } from '@/lib/onboarding/events'
+import { HelpLink } from '@/components/help/HelpLink'
 
 interface GenerateWeekSheetProps {
   open: boolean
@@ -111,9 +112,10 @@ export function GenerateWeekSheet({
           <SheetTitle className="font-display text-lg">Generate {weekLabel}</SheetTitle>
           <SheetDescription>
             {isLoading
-              ? 'Working out what&rsquo;s due…'
+              ? 'Working out what’s due…'
               : `${selected.length} to schedule · ${skipped.length} skipped`}
           </SheetDescription>
+          <HelpLink topic="generate-week" className="self-start" />
         </SheetHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4" data-tour="generate.list">

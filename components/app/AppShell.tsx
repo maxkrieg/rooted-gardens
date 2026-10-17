@@ -99,9 +99,9 @@ function AppShellInner({
   // The More tab carries one dot summarising every badge it hides, the same
   // job the old mobile hamburger's dot did.
   const moreBadgeCount = more.reduce((sum, item) => sum + (counts[item.href] ?? 0), 0)
-  // The palette only finds accounts and opens /app/accounts/:id, so offering it
-  // to crew is a dead end — every result would bounce off the proxy gate.
-  const canSearch = !!role && canAccessRoute('/app/accounts', role)
+  // Everyone can search Help; only roles that can open an account get the Accounts group.
+  const canSearch = !!role
+  const canSearchAccounts = !!role && canAccessRoute('/app/accounts', role)
 
   // Flush anything queued during a prior offline session. Both old shells did
   // this; a surface that enqueues without it queues writes that never sync.
@@ -319,14 +319,21 @@ function AppShellInner({
         </ul>
       </nav>
 
-      {canSearch && <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />}
+      {canSearch && (
+        <CommandPalette
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          role={role}
+          searchAccounts={canSearchAccounts}
+        />
+      )}
       <MoreSheet
         open={moreOpen}
         onOpenChange={setMoreOpen}
         items={more}
         pathname={pathname}
         counts={counts}
-        onOpenSearch={canSearch ? () => setPaletteOpen(true) : undefined}
+        onOpenSearch={canSearchAccounts ? () => setPaletteOpen(true) : undefined}
         helpBadge={dueNewsCount}
         onSignOut={handleSignOut}
       />

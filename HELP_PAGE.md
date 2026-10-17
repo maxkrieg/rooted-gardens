@@ -4,16 +4,17 @@ A persistent reference page: how features work, what each setting really does, a
 side effect a person wouldn't guess. See `CLAUDE.md` for stack, schema and conventions. It is
 the source of truth wherever this file is silent.
 
-> **Status:** planned 2026-10-15. H0 (this doc) done 2026-10-15.
+> **Status:** built 2026-10-17. H0 (this doc) done 2026-10-15.
 > H1 done 2026-10-17 (the trio + `check:tours` pass; the in-app checks under Verify are still to run).
 > H2 done 2026-10-17 (the trio + `check:tours` pass; the read-through by role is still to run).
 > H3 done 2026-10-17 (the trio + `check:tours` pass; the accountant read-through is still to run).
+> H4 done 2026-10-17 (the trio + `check:tours` pass, and it fails on a broken key; the in-app checks are still to run).
 >
 > - [x] **H0**: plan, information architecture, rule inventory (this file)
 > - [x] **H1**: scaffolding: the page, the data model, absorb the Help & tours sheet
 > - [x] **H2**: content: schedule, planning, routes, stops, offline
 > - [x] **H3**: content: accounts, billing, leads, team, audit/reports/fleet, FAQ
-> - [ ] **H4**: wiring outward: "How this works" links, ⌘K, the help-key check
+> - [x] **H4**: wiring outward: "How this works" links, ⌘K, the help-key check
 >
 > **One Claude Code session per phase.** Prompt: *"Implement phase H<n> of HELP_PAGE.md.
 > Fill in its As-built section and tick its box when done."* Read **Shared rules** first.
@@ -435,7 +436,34 @@ connection", not "online-only mutation".
 - ⌘K "generate" finds the topic for owner. For crew, ⌘K shows only Help.
 - Each link lands on the open topic.
 
-**As built — deviations:** _(fill in)_
+**As built — deviations:**
+- **`HelpLink` is role-aware.** It renders nothing when the viewer's role can't read the
+  topic. `CadenceSummary` also renders for crew (stop sheet) and for the accountant (account
+  page), and `cadence-and-due` is office-only, so a plain link would have landed them on a
+  Help page without the topic. It's a client component that reads `useRole()`.
+- **All 9 links placed**, at the spots in the table above. In the Generate, Route defaults and
+  Plan tomorrow sheets it sits under the `SheetDescription`. In `CadenceSummary` and the
+  interval hint it's inline after the text. It sits beside the Billing type label, under the
+  queue's Push button, and after Refresh now.
+- **⌘K:** `canSearch` is now any signed-in role. A new `canSearchAccounts` (the old
+  `/app/accounts` check) gates the Accounts group and its fetch. The sidebar's Search… button
+  follows `canSearch`, so desktop crew get it. The phone More sheet's search row still follows
+  `canSearchAccounts`, per "don't add one to crew's More". The placeholder reads "Search
+  help…" for roles without accounts.
+- **Choosing a Help result while already on `/app/help`** uses `location.assign('#key')`,
+  because a `router.push` to the same path fires no `hashchange`, and HelpView opens topics on
+  `hashchange`. (Assigning to `location.hash` fails the React Compiler lint.) Picking the
+  topic whose hash is already in the URL only closes the palette.
+- **`check:tours`** also collects every `<HelpLink topic=…>` in `components/` and `app/`, and
+  every `related` and `tour` in `lib/help/topics.ts`, and checks them against topic keys
+  (`key:` directly followed by `section:`) and `tour.*` keys in the registry. Tested: a
+  misspelt HelpLink, `related` and `tour` each exit 1.
+- **Also fixed:** the Generate sheet's loading description showed a literal `&rsquo;` (an
+  entity in a JS string). It's now a real `’`.
+- CLAUDE.md: the Onboarding paragraph now covers `HelpLink`, the ⌘K Help group and the
+  help-key check. The repo map marks HELP_PAGE.md as built.
+- Not done: the in-app Verify checks (⌘K per role, each link landing on its topic). They
+  weren't run in the browser, per the standing preference.
 
 ---
 

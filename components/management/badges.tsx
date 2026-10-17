@@ -20,6 +20,7 @@ import { LEAD_KIND_LABELS, LEAD_STATUS_LABELS } from '@/types/app'
 import type { ServiceDueState } from '@/lib/utils/fleet'
 import { serviceDueState } from '@/lib/utils/fleet'
 import type { QboConnectionStatus } from '@/lib/quickbooks/client'
+import { HelpLink } from '@/components/help/HelpLink'
 
 // ─── Account status ──────────────────────────────────────────────────────────
 
@@ -160,7 +161,8 @@ export function CadenceSummary({
         </>
       ) : (
         'no visits logged yet'
-      )}
+      )}{' '}
+      <HelpLink topic="cadence-and-due" className="ml-1 align-middle" />
     </p>
   )
 }
