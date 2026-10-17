@@ -7,11 +7,12 @@ the source of truth wherever this file is silent.
 > **Status:** planned 2026-10-15. H0 (this doc) done 2026-10-15.
 > H1 done 2026-10-17 (the trio + `check:tours` pass; the in-app checks under Verify are still to run).
 > H2 done 2026-10-17 (the trio + `check:tours` pass; the read-through by role is still to run).
+> H3 done 2026-10-17 (the trio + `check:tours` pass; the accountant read-through is still to run).
 >
 > - [x] **H0**: plan, information architecture, rule inventory (this file)
 > - [x] **H1**: scaffolding: the page, the data model, absorb the Help & tours sheet
 > - [x] **H2**: content: schedule, planning, routes, stops, offline
-> - [ ] **H3**: content: accounts, billing, leads, team, audit/reports/fleet, FAQ
+> - [x] **H3**: content: accounts, billing, leads, team, audit/reports/fleet, FAQ
 > - [ ] **H4**: wiring outward: "How this works" links, ⌘K, the help-key check
 >
 > **One Claude Code session per phase.** Prompt: *"Implement phase H<n> of HELP_PAGE.md.
@@ -348,7 +349,43 @@ connection", not "online-only mutation".
 - The trio passes.
 - Read as the accountant: billing makes sense, and nothing references planning controls.
 
-**As built — deviations:** _(fill in)_
+**As built — deviations:**
+- **98 topics** now: H3 adds 29 for sections 6–9 and 11, plus 20 FAQ entries. It also gave
+  the H2 billing sample its `related` links. Owner sees 96, lead 91, accountant 43, crew 24.
+  All `related`/`tour` keys resolve (throwaway script; H4 makes it part of `check:tours`).
+  The H4 link keys `billing-types`, `billing-queue` and `invoice-status` exist.
+- **"What can each role do?"** stays as `what-your-role-can-do` in Start here, which every
+  role sees. It wasn't moved into Team & roles. The Team topics (`inviting-someone`,
+  `role-changes`, `team-fields`) and the FAQ on role menus are owner-only.
+- **FAQ shape:** the summary is the first sentence of the answer, because HelpView always
+  shows the summary under the title. The body holds the rest.
+- **Labels:** `where` uses the nav labels ("Leads", "Reports", "Fleet", "Activity log"), not
+  "More → …", since desk users mostly reach them from the sidebar. The queue's main button is
+  **Push N accounts to QuickBooks**; **Create invoice · $X** is the per-account drawer's.
+- **Code vs inventory (the code won):**
+  - #112: only bot signals (honeypot, too fast) are dropped silently. Over the rate limit, the
+    form tells the sender to wait. `spam` says so.
+  - #121: logging maintenance sets last-serviced only for **equipment**; vehicles have no such
+    field.
+  - #119: invoice status changes are logged (only balance, due date, email status and
+    sent/paid stamps are ignored). Cron runs show as System.
+  - #105: the cron is `0 9 * * *` UTC, written as "about 5 a.m. (4 a.m. in winter)".
+- **Left out pending Possible bugs:**
+  - B6: `account-status` and the Inactive-vs-Delete FAQ list only what status *does* change
+    (Contracts tab, adherence report). They make no claim about scheduling.
+  - B8: no topic says what happens on a double push from two tabs.
+  - B9: no claim about how a first link finds or creates a QuickBooks customer, or what a
+    stale link does.
+  - B10: the Activity log topic doesn't list what employee changes show.
+  - B11: `team-fields` says only that Active off hides someone from pickers, and says nothing
+    about sign-in.
+  - B12: `fleet` is `OFFICE`, so the accountant isn't pointed at a page that shows them
+    nothing.
+  - B13: no claim that contract invoices tag the period's visits.
+  - B14: `connecting-quickbooks` says the push buttons are off "until connected", with no
+    claim about an expired connection.
+- Not done: the Verify read-through as the accountant (no browser run, per the standing
+  preference).
 
 ---
 

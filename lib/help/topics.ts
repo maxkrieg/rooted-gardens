@@ -1203,7 +1203,247 @@ export const HELP_TOPICS: HelpTopic[] = [
     related: ['log-completion', 'cached-data'],
   },
 
+  // ─── Accounts & properties ────────────────────────────────────────────────────
+  {
+    key: 'billing-types',
+    section: 'accounts',
+    title: 'Billing types and prices',
+    summary: 'Per Visit bills each finished visit. Contract bills a flat rate per period.',
+    where: 'Accounts → an account → Edit → Billing type',
+    body: [
+      {
+        kind: 'list',
+        items: [
+          '**Per Visit:** a set price for each finished visit. **Price per visit** is required.',
+          '**Contract:** a flat rate for a period, however many visits happen. **Contract rate** and **Period** (Monthly or Seasonal) are required.',
+        ],
+      },
+      {
+        kind: 'headsUp',
+        text: 'Switching type **erases the other rate**. Switching also moves unbilled work: a contract account switched to Per Visit brings its finished, unbilled visits into the Billing Queue at the new price.',
+      },
+      {
+        kind: 'p',
+        text: '“As needed” is no longer a billing type. It’s a property frequency, set on the property.',
+      },
+    ],
+    related: ['billing-queue', 'pricing-at-push', 'contracts'],
+    tour: 'tour.accounts',
+  },
+  {
+    key: 'account-status',
+    section: 'accounts',
+    title: 'Active, Inactive, Prospective',
+    summary: 'A label for where the customer stands. It’s separate from Delete.',
+    where: 'Accounts → an account → Edit → Status',
+    body: [
+      {
+        kind: 'p',
+        text: 'Status describes the relationship: a current customer, a past one, or someone you’re quoting. It changes two things in the app:',
+      },
+      {
+        kind: 'list',
+        items: [
+          'The Contracts tab in Billing lists **Active** contract accounts only.',
+          'The visit frequency report counts **Active** accounts only.',
+        ],
+      },
+      {
+        kind: 'p',
+        text: 'Status and Delete are independent. There’s no “Archived” status, and deleting an account doesn’t change its status.',
+      },
+    ],
+    related: ['deleting-accounts', 'contracts'],
+  },
+  {
+    key: 'deleting-accounts',
+    section: 'accounts',
+    title: 'What Delete does',
+    summary: 'It hides the account or property everywhere but keeps its history.',
+    roles: ['owner'],
+    where: 'Accounts → an account → the trash button',
+    body: [
+      {
+        kind: 'p',
+        text: 'Deleting takes the account off the account list, the schedule and the routes. Past visits and invoices keep its name and addresses.',
+      },
+      {
+        kind: 'list',
+        items: [
+          'Deleting an account deletes **all its properties** too. A property can also be deleted on its own.',
+          'Its properties are **taken off their routes for good**. If it’s ever restored, put them back on a route by hand.',
+          'Finished work that isn’t billed yet **stays in the Billing Queue**, so the final visits still get invoiced.',
+          'Its future stops disappear from the schedule. They aren’t deleted, just hidden.',
+        ],
+      },
+      {
+        kind: 'headsUp',
+        text: 'A deleted contract account drops off the Contracts tab. **Bill the final period first.**',
+      },
+      {
+        kind: 'p',
+        text: 'Only an owner can delete. There’s no restore button; a deleted account can only be brought back by the developer.',
+      },
+    ],
+    related: ['account-status', 'billing-queue'],
+  },
+  {
+    key: 'editing-a-property',
+    section: 'accounts',
+    title: 'Editing a property',
+    summary: 'Address, frequency, service interval, and the notes crew see.',
+    roles: OFFICE,
+    where: 'Accounts → an account → a property → Edit → Edit Property',
+    body: [
+      {
+        kind: 'p',
+        text: 'Frequency and service interval decide when the property comes up due. Crew Notes, Access and Parking show on every visit.',
+      },
+      {
+        kind: 'p',
+        text: 'Notes and the service interval save offline. Address and frequency need a connection.',
+      },
+    ],
+    related: ['cadence-and-due', 'service-interval', 'four-kinds-of-notes'],
+  },
+  {
+    key: 'billing-address',
+    section: 'accounts',
+    title: 'Billing address vs property address',
+    summary: 'The account’s address goes on invoices. A property’s address is where crew work.',
+    where: 'Accounts → an account → Edit',
+    body: [
+      {
+        kind: 'p',
+        text: 'The billing address on the account is sent to QuickBooks for the invoice. Each property’s address is the place crew go, and it’s what invoice lines name.',
+      },
+      {
+        kind: 'p',
+        text: 'Billing and scheduling split here: scheduling, routes and frequency are per property, but billing is per account. One invoice covers all of an account’s properties.',
+      },
+    ],
+    related: ['customer-details-sync', 'invoice-lines'],
+  },
+  {
+    key: 'property-photos',
+    section: 'accounts',
+    title: 'Property photos',
+    summary: 'How-to and customer-request photos stay on crew phones for use without signal.',
+    roles: OFFICE,
+    where: 'Accounts → an account → a property → photos',
+    body: [
+      {
+        kind: 'list',
+        items: [
+          'Photos added on the account page start as **How-To Guide**. Change the type when you open one.',
+          '**How-To Guide** and **Customer Request** photos are kept on the phone once seen (about 100 MB, oldest dropped first), so crew can open them with no signal.',
+          'Crew see them on each stop under Property Notes.',
+        ],
+      },
+      { kind: 'headsUp', text: 'Deleting a photo is permanent.' },
+    ],
+    related: ['photos', 'four-kinds-of-notes'],
+  },
+  {
+    key: 'qbo-customer-id',
+    section: 'accounts',
+    title: 'Linking an account to QuickBooks',
+    summary: 'Each account points at one QuickBooks customer. The app normally sets this itself.',
+    where: 'Accounts → an account → Link to QuickBooks / Sync',
+    body: [
+      {
+        kind: 'p',
+        text: 'The first push for an account links it to a QuickBooks customer. **Link to QuickBooks** and **Sync** on the account page do it ahead of time. The accountant can use them too, though they can’t edit anything else on an account.',
+      },
+      {
+        kind: 'headsUp',
+        text: 'The **QuickBooks Customer ID** field in Edit is a manual override. A wrong value sends that account’s invoices to the wrong customer. Leave it alone unless you’re linking by hand.',
+      },
+    ],
+    related: ['customer-details-sync', 'billing-queue'],
+  },
+
   // ─── Billing & invoicing ──────────────────────────────────────────────────────
+  {
+    key: 'billing-queue',
+    section: 'billing',
+    title: 'The Billing Queue',
+    summary: 'Finished, unbilled visits for Per Visit accounts, one row per account.',
+    where: 'Billing → Queue',
+    body: [
+      {
+        kind: 'list',
+        items: [
+          'It holds every **finished** visit not yet invoiced, for **Per Visit** accounts, including deleted accounts. Skipped stops never appear.',
+          'The date filter starts at **All time**, so old unbilled work is never hidden.',
+          '**Tick an account** to bill **every visit currently shown** for it, on one invoice. The date filter decides what’s shown.',
+          '**Click the row** to pick individual visits, then **Create invoice**.',
+          '**Push N accounts to QuickBooks** sends one invoice per ticked account.',
+        ],
+      },
+      {
+        kind: 'p',
+        text: 'Contract accounts don’t appear here. They’re billed from the Contracts tab.',
+      },
+    ],
+    related: ['monthly-sweep', 'pricing-at-push', 'invoiced-is-not-sent', 'push-failures'],
+  },
+  {
+    key: 'monthly-sweep',
+    section: 'billing',
+    title: 'The monthly sweep',
+    summary: 'Per Visit accounts are billed once a month, by hand.',
+    where: 'Billing → Queue → Last month',
+    body: [
+      {
+        kind: 'p',
+        text: 'Nothing is invoiced automatically. Each month, set the date filter to **Last month**, tick the accounts, and push. Each account gets one invoice with a line per visit.',
+      },
+      {
+        kind: 'p',
+        text: 'Anything left from earlier months still shows under **All time**.',
+      },
+    ],
+    related: ['billing-queue', 'pricing-at-push'],
+  },
+  {
+    key: 'pricing-at-push',
+    section: 'billing',
+    title: 'Prices are set when you push',
+    summary: 'A visit is priced at the account’s rate on the day it’s invoiced.',
+    body: [
+      {
+        kind: 'p',
+        text: 'The queue doesn’t store a price per visit. It uses the account’s **Price per visit** at the moment you push.',
+      },
+      {
+        kind: 'headsUp',
+        text: 'Raising a price re-prices **every unbilled visit**, including last month’s. Push the old work before changing the rate if it should bill at the old price.',
+      },
+    ],
+    related: ['billing-types', 'monthly-sweep'],
+  },
+  {
+    key: 'invoice-lines',
+    section: 'billing',
+    title: 'What an invoice looks like',
+    summary: 'One line per visit: address, date, services.',
+    body: [
+      {
+        kind: 'example',
+        text: '12 Elm St — Jun 9 — mow, trim',
+      },
+      {
+        kind: 'p',
+        text: 'Every line uses one QuickBooks Product/Service, named **Services**, which must already exist in QuickBooks. A contract invoice has one line for the period.',
+      },
+      {
+        kind: 'p',
+        text: 'QuickBooks decides how the invoice looks. The app only sends the data.',
+      },
+    ],
+    related: ['push-failures', 'billing-address'],
+  },
   {
     key: 'invoiced-is-not-sent',
     section: 'billing',
@@ -1220,6 +1460,546 @@ export const HELP_TOPICS: HelpTopic[] = [
         text: 'The app **never emails the customer**. The invoice shows as **Draft** until someone sends it from QuickBooks. After that its status here changes to Sent, then Paid.',
       },
     ],
+    related: ['invoice-status', 'when-statuses-update'],
+  },
+  {
+    key: 'customer-details-sync',
+    section: 'billing',
+    title: 'Customer details go to QuickBooks',
+    summary: 'Every push copies the account’s name, email, phone and billing address over.',
+    body: [
+      {
+        kind: 'headsUp',
+        text: 'Each push **overwrites** the QuickBooks customer’s name, email, phone and billing address with what’s in the app. Edit customer details here, not in QuickBooks.',
+      },
+      {
+        kind: 'p',
+        text: 'A field left blank in the app doesn’t clear it in QuickBooks.',
+      },
+    ],
+    related: ['qbo-customer-id', 'billing-address'],
+  },
+  {
+    key: 'contracts',
+    section: 'billing',
+    title: 'Contract invoices',
+    summary: 'Billed by period, whatever the number of visits.',
+    where: 'Billing → Contracts',
+    body: [
+      {
+        kind: 'list',
+        items: [
+          'The tab lists **Active** contract accounts that haven’t been deleted, each with its last invoice.',
+          'The **Amount** starts at the contract rate and can be changed for one invoice.',
+          '**Monthly** accounts start with the current month filled in. **Seasonal** accounts start blank.',
+        ],
+      },
+      {
+        kind: 'headsUp',
+        text: 'Nothing stops you billing the same period twice. Check the **Last:** line before you create one.',
+      },
+    ],
+    related: ['billing-types', 'account-status', 'deleting-accounts'],
+  },
+  {
+    key: 'invoice-status',
+    section: 'billing',
+    title: 'Invoice statuses',
+    summary: 'Draft, Sent, Overdue and Paid, read back from QuickBooks.',
+    where: 'Billing → Invoices',
+    body: [
+      {
+        kind: 'list',
+        items: [
+          '**Draft:** not emailed from QuickBooks yet. Printed or mailed invoices stay Draft too.',
+          '**Sent:** emailed from QuickBooks. A partly paid invoice is still Sent.',
+          '**Overdue:** emailed and past its due date.',
+          '**Paid:** nothing left owing.',
+        ],
+      },
+      {
+        kind: 'headsUp',
+        text: 'A **voided** invoice reads **Paid**, because it has nothing left owing. Once an invoice is Paid, the app stops checking it.',
+      },
+    ],
+    related: ['when-statuses-update', 'invoiced-is-not-sent'],
+  },
+  {
+    key: 'when-statuses-update',
+    section: 'billing',
+    title: 'When statuses update',
+    summary: 'Once a day, every minute while Invoices is open, and on Refresh now.',
+    where: 'Billing → Invoices → Refresh now',
+    body: [
+      {
+        kind: 'list',
+        items: [
+          'Every morning at about 5 a.m. (4 a.m. in winter), for up to 50 unpaid invoices, longest-unchecked first.',
+          'About once a minute while the Invoices tab is open.',
+          'Whenever you tap **Refresh now**.',
+        ],
+      },
+      {
+        kind: 'p',
+        text: 'The **Invoiced this month** and **Invoiced this year** tiles count every pushed invoice, Drafts included. For a Per Visit invoice, each visit’s amount shown is the invoice total divided by its visits.',
+      },
+    ],
+    related: ['invoice-status'],
+  },
+  {
+    key: 'push-failures',
+    section: 'billing',
+    title: 'When a push fails',
+    summary: 'Failed accounts stay in the queue. One failure doesn’t stop the others.',
+    where: 'Billing → Queue',
+    body: [
+      {
+        kind: 'p',
+        text: 'Failures are listed under the table until you tap **Dismiss**. Their visits stay in the queue: fix the cause, then push again.',
+      },
+      {
+        kind: 'list',
+        items: [
+          '“Could not find the Services product”: create a Product/Service called Services in QuickBooks.',
+          '“Connect QuickBooks from the Billing page first”: QuickBooks isn’t connected.',
+        ],
+      },
+      {
+        kind: 'headsUp',
+        text: '“**Created in QuickBooks but could not be recorded locally**” means the invoice **does** exist in QuickBooks. **Don’t push again**, or the customer gets billed twice. Ask the developer to record it.',
+      },
+    ],
+    related: ['billing-queue', 'connecting-quickbooks', 'invoice-lines'],
+  },
+  {
+    key: 'connecting-quickbooks',
+    section: 'billing',
+    title: 'Connecting QuickBooks',
+    summary: 'Only an owner can connect it.',
+    where: 'Billing → Connect QuickBooks',
+    body: [
+      {
+        kind: 'p',
+        text: 'An owner connects QuickBooks once from the top of the Billing page. Until then, the push buttons are turned off.',
+      },
+      {
+        kind: 'p',
+        text: 'If a message says to reconnect, ask an owner. Leads and the accountant can’t connect it.',
+      },
+    ],
+    related: ['push-failures'],
+  },
+
+  // ─── Leads ────────────────────────────────────────────────────────────────────
+  {
+    key: 'where-leads-come-from',
+    section: 'leads',
+    title: 'Where leads come from',
+    summary: 'The website’s contact form and job applications.',
+    where: 'Leads',
+    body: [
+      {
+        kind: 'p',
+        text: 'Service inquiries come from the website’s contact form. Job applications come from the Jobs page.',
+      },
+      {
+        kind: 'p',
+        text: 'A **New website inquiry** alert appears only while the app is open. Nobody gets a text or email. The Leads badge counts leads still marked **New**, job applications included.',
+      },
+    ],
+    related: ['converting-a-lead', 'lead-statuses', 'spam'],
+  },
+  {
+    key: 'converting-a-lead',
+    section: 'leads',
+    title: 'Converting a lead',
+    summary: 'Turn a service inquiry into a Prospective account in two steps.',
+    where: 'Leads → a lead → Convert to Account',
+    body: [
+      {
+        kind: 'list',
+        items: [
+          '**Step 1:** the account. It starts as **Prospective** and **Per Visit**, with the lead’s name, contact details and message in the notes. Enter a price; it’s required.',
+          '**Step 2:** a property, with the lead’s address filled in. You can **Skip** it.',
+        ],
+      },
+      {
+        kind: 'p',
+        text: 'The lead is marked **Won** automatically. Only service inquiries convert, and only once.',
+      },
+    ],
+    related: ['lead-statuses', 'billing-types', 'account-status'],
+  },
+  {
+    key: 'lead-statuses',
+    section: 'leads',
+    title: 'Lead statuses',
+    summary: 'New, Contacted, Qualified, Won, Lost: labels for your own tracking.',
+    body: [
+      {
+        kind: 'p',
+        text: 'Statuses don’t trigger anything, except that **New** leads count toward the badge. Move a lead out of New once someone has looked at it.',
+      },
+    ],
+    related: ['where-leads-come-from'],
+  },
+  {
+    key: 'spam',
+    section: 'leads',
+    title: 'Spam',
+    summary: 'Obvious bots are dropped without a trace.',
+    body: [
+      {
+        kind: 'p',
+        text: 'Submissions that look automated are thrown away, and the sender still sees a thank-you, so they never show in Leads.',
+      },
+      {
+        kind: 'p',
+        text: 'Each connection can send 3 inquiries per 10 minutes and 10 per day. Past that, the form asks them to wait and try again later.',
+      },
+    ],
+    related: ['where-leads-come-from'],
+  },
+
+  // ─── Team & roles ─────────────────────────────────────────────────────────────
+  {
+    key: 'inviting-someone',
+    section: 'team',
+    title: 'Giving someone the app',
+    summary: 'Add them, give them an email, then Invite to App.',
+    roles: ['owner'],
+    where: 'More → Team',
+    body: [
+      {
+        kind: 'list',
+        items: [
+          'Add the employee, with an email address. There are no passwords: they sign in from a link in their email.',
+          '**Invite to App** works once. After that, use **Resend Link** if they need a new sign-in link.',
+        ],
+      },
+      {
+        kind: 'headsUp',
+        text: 'Changing the email of someone who already has the app **changes the email they sign in with**.',
+      },
+    ],
+    related: ['role-changes', 'what-your-role-can-do'],
+  },
+  {
+    key: 'role-changes',
+    section: 'team',
+    title: 'Changing someone’s role',
+    summary: 'What they can do changes at once. Their menu catches up later.',
+    roles: ['owner'],
+    where: 'More → Team → Edit → Role',
+    body: [
+      {
+        kind: 'p',
+        text: 'What they’re allowed to see and change follows the new role straight away. The menus and the screen they land on update the next time they sign in, or within about 12 hours.',
+      },
+    ],
+    related: ['what-your-role-can-do', 'inviting-someone'],
+  },
+  {
+    key: 'team-fields',
+    section: 'team',
+    title: 'Active, Side, Hourly rate, SMS',
+    summary: 'What each setting on a team member really does.',
+    roles: ['owner'],
+    where: 'More → Team → Edit',
+    body: [
+      {
+        kind: 'list',
+        items: [
+          '**Active:** off hides them from the crew pickers on stops and routes.',
+          '**Side** (lawn, garden, both) is a label.',
+          '**Hourly rate** is for reference. The app doesn’t do payroll.',
+          '**SMS notifications** does nothing yet. Texting crew is postponed, so the switch is saved for later.',
+        ],
+      },
+    ],
+    related: ['inviting-someone'],
+  },
+
+  // ─── Activity, reports & fleet ────────────────────────────────────────────────
+  {
+    key: 'activity-log',
+    section: 'records',
+    title: 'The Activity log',
+    summary: 'Every change, who made it, and when.',
+    roles: OFFICE,
+    where: 'Activity log',
+    body: [
+      {
+        kind: 'p',
+        text: 'It shows changes to stops, accounts, routes, billing and the team, 50 to a page, and can be filtered by action or person. It starts from late September 2026.',
+      },
+      {
+        kind: 'list',
+        items: [
+          'Changes made offline are stamped **when they synced**, not when they were tapped.',
+          'An invoice status change is credited to whoever had Billing → Invoices open at the time, or to **System** for the morning check.',
+          'One action can make several rows. Deleting an account logs each property too.',
+          'Not logged: website form submissions, QuickBooks connection housekeeping, and who was ticked on site (the completion itself is logged).',
+        ],
+      },
+    ],
+    related: ['offline-timestamps', 'when-statuses-update'],
+  },
+  {
+    key: 'reports-revenue',
+    section: 'records',
+    title: 'Revenue by month',
+    summary: 'Invoiced by the month it was pushed. Paid by the month the app saw it paid.',
+    where: 'Reports',
+    body: [
+      {
+        kind: 'list',
+        items: [
+          '**Invoiced** counts invoices in the month they were pushed to QuickBooks, Drafts included.',
+          '**Paid** counts them in the month the app first saw them fully paid, which can be a day after the real payment.',
+          'Partial payments don’t count until the invoice is paid in full.',
+        ],
+      },
+    ],
+    related: ['invoice-status', 'when-statuses-update'],
+  },
+  {
+    key: 'reports-crew',
+    section: 'records',
+    title: 'Visits per crew member',
+    summary: 'Finished visits each person was on site for, over 12 weeks.',
+    where: 'Reports',
+    body: [
+      {
+        kind: 'p',
+        text: 'Each person ticked under Who was on site? gets the visit, so a two-person job counts once for each of them. It covers the last 12 weeks, or the last 12 of a past year.',
+      },
+    ],
+    related: ['who-gets-credit'],
+  },
+  {
+    key: 'reports-adherence',
+    section: 'records',
+    title: 'Visit frequency vs. contracted',
+    summary: 'Actual visits against what each account’s frequency expects, this season.',
+    where: 'Reports',
+    body: [
+      {
+        kind: 'list',
+        items: [
+          'The season runs from the first to the latest week with a finished visit, so winter isn’t counted.',
+          'Weekly expects one visit a week, biweekly one every two, monthly about one every 4.3 weeks. As-needed properties aren’t counted.',
+          'Only **Active** accounts are included.',
+        ],
+      },
+      {
+        kind: 'headsUp',
+        text: 'It goes by the frequency, **not the service interval**. A weekly property set to every 10 days will look behind.',
+      },
+    ],
+    related: ['cadence-and-due', 'service-interval', 'account-status'],
+  },
+  {
+    key: 'fleet',
+    section: 'records',
+    title: 'Fleet and maintenance',
+    summary: 'Trucks and equipment, their status, and when service is due.',
+    roles: OFFICE,
+    where: 'Fleet',
+    body: [
+      {
+        kind: 'list',
+        items: [
+          '**Log Maintenance** records the work. Its **Next service due** date shows **Due Soon** 14 days ahead, on the Fleet page only.',
+          'For equipment, logging maintenance sets its last-serviced date to that entry’s date.',
+          '**Retired** trucks are hidden from the truck pickers. Trucks in **Maintenance** can still be picked.',
+          '**In Use** is never set automatically.',
+          'Vehicles and equipment can’t be deleted. Retire them instead.',
+        ],
+      },
+    ],
+    related: ['assign-one-stop', 'route-defaults'],
+  },
+  // ─── FAQ ──────────────────────────────────────────────────────────────────────
+  {
+    key: 'faq-missing-from-generate',
+    section: 'faq',
+    title: 'Why didn’t this property show up when I generated the week?',
+    summary: 'Open Show N skipped in the preview: it gives the reason.',
+    roles: OFFICE,
+    body: [{ kind: 'p', text: 'Usually it’s already on the week (even if that stop was skipped), it isn’t due until a later date, it’s As needed, or it was deleted.' }],
+    related: ['generate-week', 'cadence-and-due'],
+  },
+  {
+    key: 'faq-route-days-stop-on-friday',
+    section: 'faq',
+    title: 'I set the route to Mon/Wed. Why is the stop still on Friday?',
+    summary: 'A route’s days never move a stop that’s already scheduled.',
+    roles: OFFICE,
+    body: [{ kind: 'p', text: 'Change the stop’s day, use Select stops → Day, or Plan tomorrow.' }],
+    related: ['route-days-dont-move-stops', 'planned-day'],
+  },
+  {
+    key: 'faq-overdue-after-skip',
+    section: 'faq',
+    title: 'Why is a property still due right after we skipped it?',
+    summary: 'A skip means the work didn’t happen, so the property’s last visit hasn’t changed.',
+    roles: OFFICE,
+    body: [{ kind: 'p', text: 'It stays due until a visit is finished.' }],
+    related: ['skipping', 'cadence-and-due'],
+  },
+  {
+    key: 'faq-new-biweekly-weekly',
+    section: 'faq',
+    title: 'Why is a brand-new biweekly property due every week?',
+    summary: 'Until its first visit is finished there’s nothing to count from, so it comes up due every week.',
+    roles: OFFICE,
+    body: [{ kind: 'p', text: 'After the first visit it follows its 14 days.' }],
+    related: ['cadence-and-due'],
+  },
+  {
+    key: 'faq-regular-crew-no-change',
+    section: 'faq',
+    title: 'I changed the route’s regular crew. Why didn’t this week change?',
+    summary: 'Route defaults only fill in stops when a week is generated.',
+    roles: OFFICE,
+    body: [{ kind: 'p', text: 'To change this week, use Crew on the route’s bottom bar.' }],
+    related: ['route-defaults', 'route-crew-and-truck'],
+  },
+  {
+    key: 'faq-take-stop-off',
+    section: 'faq',
+    title: 'How do I take a stop off the schedule?',
+    summary: 'Skip it.',
+    roles: OFFICE,
+    body: [{ kind: 'p', text: 'There’s no delete for a stop, and a skip also tells everyone it was decided, not forgotten.' }],
+    related: ['taking-a-stop-off', 'skipping'],
+  },
+  {
+    key: 'faq-who-gets-credit',
+    section: 'faq',
+    title: 'Who gets credit for a visit: whoever was assigned, or whoever was on site?',
+    summary: 'Whoever is ticked under Who was on site? when the stop is logged.',
+    roles: ALL,
+    body: [{ kind: 'p', text: 'That’s what the stop shows once it’s done, and what Reports count.' }],
+    related: ['who-gets-credit'],
+  },
+  {
+    key: 'faq-offline-time-off',
+    section: 'faq',
+    title: 'Crew logged it with no signal. Why does the time look off?',
+    summary: 'The stop keeps the times entered in Log Completion.',
+    roles: OFFICE,
+    body: [{ kind: 'p', text: 'The Activity log shows when the change reached the server, which can be hours later.' }],
+    related: ['offline-timestamps'],
+  },
+  {
+    key: 'faq-changes-didnt-save',
+    section: 'faq',
+    title: 'What happens to “Changes that didn’t save”?',
+    summary: 'They stay on that phone until someone taps Try again or Discard.',
+    roles: FIELD,
+    body: [{ kind: 'p', text: 'Nothing is retried on its own after that.' }],
+    related: ['changes-didnt-save'],
+  },
+  {
+    key: 'faq-customer-no-invoice',
+    section: 'faq',
+    title: 'The customer says they never got the invoice.',
+    summary: 'Pushing only creates it in QuickBooks as a Draft.',
+    roles: OFFICE_AND_BOOKS,
+    body: [{ kind: 'p', text: 'Someone has to send it from QuickBooks. Its status here changes to Sent once they do.' }],
+    related: ['invoiced-is-not-sent', 'invoice-status'],
+  },
+  {
+    key: 'faq-raised-price',
+    section: 'faq',
+    title: 'I raised a price. What happens to last month’s visits?',
+    summary: 'Every visit not yet invoiced bills at the new price when it’s pushed.',
+    roles: OFFICE_AND_BOOKS,
+    body: [{ kind: 'p', text: 'Push last month’s work first if it should use the old rate.' }],
+    related: ['pricing-at-push'],
+  },
+  {
+    key: 'faq-inactive-vs-delete',
+    section: 'faq',
+    title: 'What’s the difference between Inactive and Delete?',
+    summary: 'Inactive is a status label.',
+    roles: OFFICE_AND_BOOKS,
+    body: [{ kind: 'p', text: 'It only takes a contract account off the Contracts tab and out of the frequency report. Delete hides the account and its properties everywhere but keeps their history.' }],
+    related: ['account-status', 'deleting-accounts'],
+  },
+  {
+    key: 'faq-deleted-by-mistake',
+    section: 'faq',
+    title: 'I deleted an account by mistake.',
+    summary: 'Nothing is lost, but there’s no restore button.',
+    roles: OFFICE,
+    body: [{ kind: 'p', text: 'Ask the developer to bring it back, then put its properties back on their routes.' }],
+    related: ['deleting-accounts'],
+  },
+  {
+    key: 'faq-lead-no-delete',
+    section: 'faq',
+    title: 'Why can’t a lead see the delete button?',
+    summary: 'Deleting accounts and properties is for owners only.',
+    roles: OFFICE,
+    body: [{ kind: 'p', text: 'Leads can edit everything else.' }],
+    related: ['what-your-role-can-do', 'deleting-accounts'],
+  },
+  {
+    key: 'faq-voided-paid',
+    section: 'faq',
+    title: 'Why does it say Paid for a voided invoice?',
+    summary: 'A voided invoice has nothing left owing, which is how the app reads Paid.',
+    roles: OFFICE_AND_BOOKS,
+    body: [{ kind: 'p', text: 'Once an invoice reads Paid, the app stops checking it, so it stays that way.' }],
+    related: ['invoice-status'],
+  },
+  {
+    key: 'faq-created-not-recorded',
+    section: 'faq',
+    title: 'I pushed an invoice and got “created in QuickBooks but could not be recorded”.',
+    summary: 'The invoice exists in QuickBooks.',
+    roles: OFFICE_AND_BOOKS,
+    body: [{ kind: 'p', text: 'Don’t push again or the customer is billed twice. Ask the developer to record it.' }],
+    related: ['push-failures'],
+  },
+  {
+    key: 'faq-role-menu-same',
+    section: 'faq',
+    title: 'I changed someone’s role. Why does their menu look the same?',
+    summary: 'What they can do changes at once.',
+    roles: ['owner'],
+    body: [{ kind: 'p', text: 'The menu catches up the next time they sign in, or within about 12 hours.' }],
+    related: ['role-changes'],
+  },
+  {
+    key: 'faq-sms',
+    section: 'faq',
+    title: 'Does the app text crew?',
+    summary: 'No.',
+    roles: ALL,
+    body: [{ kind: 'p', text: 'Texting is postponed. Updates appear only in the app while it’s open, so text crew yourself for anything urgent.' }],
+    related: ['live-updates', 'team-fields'],
+  },
+  {
+    key: 'faq-unrouted-inactive',
+    section: 'faq',
+    title: 'Why does the unrouted badge count a property on an inactive account?',
+    summary: 'The badge counts every property not on a route, whatever the account’s status.',
+    roles: OFFICE,
+    body: [{ kind: 'p', text: 'Put it on a route or delete it to clear it.' }],
+    related: ['unrouted-properties'],
+  },
+  {
+    key: 'faq-cadence-badge',
+    section: 'faq',
+    title: 'What does “WEEKLY · 74D” on a property mean?',
+    summary: 'It’s weekly, and 74 days have passed since its last finished visit.',
+    roles: OFFICE_AND_BOOKS,
+    body: [{ kind: 'p', text: 'Red means it’s overdue.' }],
+    related: ['cadence-and-due'],
   },
 ]
 
